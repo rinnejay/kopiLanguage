@@ -31,8 +31,8 @@ sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 ## Status & changelog
 
 ```
-Pengembangan  █████████░░░░░░░  ~60%  menuju bahasa serius (v2)
-v1.3 hari ini ████████████████  33/33 test hijau di 3 backend
+Pengembangan  ██████████░░░░░░  ~62%  menuju bahasa serius (v2)
+v1.4 hari ini ████████████████  41/41 test hijau di 3 backend
 ```
 
 | Versi | Isi |
@@ -42,6 +42,7 @@ v1.3 hari ini ████████████████  33/33 test hijau
 | **v1.2** | **array `int[]` + arena memori `kopalloc`** (bump allocator, 1 batas 8 MB): `new int[n]`, `a[i]`, `a[i] = v`, `a.length`, bounds check runtime (`kopi: array tidak valid`, OOM rapi); fix ABI entry `main` (frame x30 sendiri); pustaka `lib/Arrays.kop` (sort/binSearch/find/count/...) dan `lib/Crypto.kop` (bitxor + FNV-1a + PRNG Lehmer + XOR-stream/Caesar) — **100% ditulis dalam bahasa Kopi** di atas aritmetika murni |
 | **v1.2.1** | scoping per-blok (`if/else`, `while`, `for`, blok `{}` telanjang — deklarasi direset di akhir blok, shadow antar cabang diperbolehkan ala sibling) + multi-deklarasi `int a = 0, b = 1;` — library kini bisa memakai nama loop yang sama di metode yang sama |
 | **v1.3** | **jaringan**: builtin `Net.*` = syscall Linux langsung tanpa libc — `socket`, `connect`, `rdb` (baca 1 byte), `wrb` (tulis 1 byte), `close`, dan `Net.bytes("literal")` (byte-as-int, dikonversi compile-time). Codegen native a64 (`svc #0`) & x64 (`syscall`) membangun `sockaddr_in` di stack sendiri; VM KOP1 jalur op `OP_NET`. Pustaka `lib/Tcp.kop` (open/send/recvAll/cat/indexOf — 100% Kopi) dan `lib/Http.kop` (klien HTTP/1.0 minimal: statusOf/bodyOf/getInto) + `examples/httpget.kop`; uji loopback (echo + `python -m http.server`) masuk test.sh (33 tes) |
+| **v1.4** | **paket protokol + kripto lebih dalam** (builtin tetap: semua di atas syscall yang ada): pustaka `lib/Rfc.kop` (klien RFC 862 Echo, 863 Discard, 867 Daytime, 864 Chargen, 865 Quote, 3912 Whois, 1288 Finger), `lib/Dns.kop` (DNS-over-TCP RFC 1035/7766: susun QNAME, parse jawaban A, RCODE & pointer nama), `lib/Cipher.kop` (**RC4** S-box 256, Vigenère, base64 enc/dec, hex enc/dec, CRC-16-CCITT vektor 0x29B1, Adler-32), `Http.postInto` (POST + `Content-Length`), `Tcp.recvN`/`Tcp.num`; **bitwise penuh di `Crypto`** — `bitand`/`bitor`/`bitnot`/`pow31`/`shl31`/`shr31`/`rotl31`, murni aritmetika (identitas `A+B = (A&B)*2 + (A^B)`); fix a64 `rdb`: `ldrsb`→`ldrb` (byte 0x81 = 129, bukan −127)
 
 `test.sh` memverifikasi **konsistensi output antar-backend**: program yang sama
 harus menghasilkan output byte-per-byte identik di VM, native aarch64, dan
@@ -349,7 +350,10 @@ kopi/
 - `switch`, `do/while`, `try/catch` terbatas
 - optimasi `-O1`: register allocation (jangan semua lewat stack),
   const-folding
-- **server edition**: `bind/listen/accept` di builtin `Net` (v1 sudah punya
-  sisi klien: `lib/Tcp.kop` + `lib/Http.kop` via syscall langsung — sisi
-  server tinggal tiga syscall lagi di atas kerangka yang sama)
+- **UDP & shutdown**: builtin `snd/rcv` (datagram — satu syscall = satu paket)
+  dan syscall `shutdown` (half-close) — klien TCP v1.4 berjalan penuh
+  tanpa keduanya; server-side `bind/listen/accept` tinggal tiga syscall
+  di atas kerangka `Net` yang sama
+- **TLS**: bahasa belum punya aritmetika unsigned 64-bit untuk
+  pertukaran kunci modern — road: `u64` + bilangan besar
 - linker kecil sendiri (tanpa `cc`) → output `.so`/`.elf` langsung

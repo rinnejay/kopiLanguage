@@ -1,0 +1,228 @@
+/* Cipher.kop — pustaka cipher klasik & utilitas kode jaringan (v1).
+ *
+ * Murni di atas Crypto (bitxor/bitand, aritmetika saja) dan array
+ * int[] dengan konvensi byte-as-int (0..255). Untuk PRODUKSI: BUKAN
+ * RC4-kuat (schema lama) — jadwal yang TIDAK dienkripsi; catat di README.
+ *
+ * Isi: RC4, Vigenère, base64 (enc/dec), hex (enc/dec),
+ *      CRC-16-CCITT (0x1021), Adler-32.
+ */
+
+class Cipher {
+
+    /* ── RC4 (xor-stream nirl dengan S-box 256) ─────────────────── */
+
+    /* enc/dec bisa: fungsi sama (xor nirl). kunci: array byte-as-int
+     * (praktik umum: kunci 5..16 byte). hasil: array baru sepanjang data. */
+    static int[] rc4(int[] data, int[] key) {
+        int[] s = new int[256];
+        for (int i = 0; i < 256; i++) s[i] = i;
+        int j = 0;
+        for (int i = 0; i < 256; i++) {     /* KSA: permutasi S */
+            j = (j + s[i] + key[i % key.length]) % 256;
+            int t = s[i]; s[i] = s[j]; s[j] = t;
+        }
+        int[] out = new int[data.length];
+        int i2 = 0;
+        int j2 = 0;
+        for (int n = 0; n < data.length; n++) {   /* PRGA: 1 byte per langkah */
+            i2 = (i2 + 1) % 256;
+            j2 = (j2 + s[i2]) % 256;
+            int t = s[i2]; s[i2] = s[j2]; s[j2] = t;
+            int k = s[(s[i2] + s[j2]) % 256];
+            int d = data[n] % 256;
+            if (d < 0) d = d + 256;
+            out[n] = Crypto.bitxor(d, k);
+        }
+        return out;
+    }
+
+    /* ── Vigenère (abjad latin, nirl pada huruf) ────────────────── */
+
+    /* dir = 1 enkripsi / -1 dekripsi; huruf digeser oleh huruf kunci
+     * (kunci huruf besar dsb dinormalisasi), bukan huruf lewat begitu saja */
+    private static int[] vigCore(int[] txt, int[] key, int dir) {
+        int[] out = new int[txt.length];
+        int ki = 0;
+        for (int i = 0; i < txt.length; i++) {
+            int c = txt[i];
+            int huruf = 0;
+            if (c >= 65 && c <= 90) huruf = 1;      /* 'A'..'Z' */
+            if (c >= 97 && c <= 122) huruf = 1;     /* 'a'..'z' */
+            if (huruf == 0) { out[i] = c; continue; }
+            int base = 65;
+            if (c >= 97) base = 97;
+            int k = key[ki % key.length];
+            if (k >= 97 && k <= 122) k = k - 32;    /* huruf kunci → besar */
+            k = (k - 65) % 26;
+            if (k < 0) k = k + 26;
+            int g = (c - base) + dir * k;
+            g = g % 26;
+            if (g < 0) g = g + 26;
+            out[i] = base + g;
+            ki++;
+        }
+        return out;
+    }
+
+    static int[] vigenere(int[] txt, int[] key) {
+        return vigCore(txt, key, 1);
+    }
+
+    static int[] unvigenere(int[] txt, int[] key) {
+        return vigCore(txt, key, -1);
+    }
+
+    /* ── base64 (RFC 4648, '+' '/' ikut standar) ────────────────── */
+
+    private static int[] b64tab() {
+        int[] t = new int[64];
+        int i = 0;
+        int c = 65;                          /* 'A'.. */
+        while (c <= 90)  { t[i] = c; i++; c++; }
+        c = 97;                                    /* 'a'.. */
+        while (c <= 122) { t[i] = c; i++; c++; }
+        c = 48;                                    /* '0'.. */
+        while (c <= 57)  { t[i] = c; i++; c++; }
+        t[62] = 43;                                /* '+' */
+        t[63] = 47;                                /* '/' */
+        return t;
+    }
+
+    /* data byte-as-int → teks base64 (byte-as-int), padding '=' */
+    static int[] b64enc(int[] data) {
+        int n = data.length;
+        int ol = (n + 2) / 3 * 4;
+        int[] t = b64tab();
+        int[] out = new int[ol];
+        int o = 0;
+        for (int i = 0; i < n; i += 3) {
+            int b0 = data[i];
+            int b1 = 0;
+            int b2 = 0;
+            if (i + 1 < n) b1 = data[i + 1];
+            if (i + 2 < n) b2 = data[i + 2];
+            int tr = b0 * 65536 + b1 * 256 + b2;
+            out[o] = t[(tr / 262144) % 64]; o++;   /* 6 bit paling tinggi */
+            out[o] = t[(tr / 4096) % 64];   o++;
+            if (i + 1 < n) { out[o] = t[(tr / 64) % 64];  o++; }
+            else           { out[o] = 61;                o++; }   /* '=' */
+            if (i + 2 < n) { out[o] = t[tr % 64];         o++; }
+            else           { out[o] = 61;                o++; }
+        }
+        return out;
+    }
+
+    /* teks base64 → byte-as-int; '=' diabaikan, karakter asing → 0 */
+    static int[] b64dec(int[] txt) {
+        int[] t = b64tab();
+        int n = txt.length;
+        int[] raw = new int[n];
+        int nr = 0;
+        for (int i = 0; i < n; i++) {
+            if (txt[i] == 61) break;               /* '=' akhir */
+            int v = tabIdx(t, txt[i]);
+            raw[nr] = v; nr++;
+        }
+        int ol = nr / 4 * 3;
+        if (nr % 4 == 2) ol = ol + 1;
+        if (nr % 4 == 3) ol = ol + 2;
+        int[] out = new int[ol];
+        int o = 0;
+        int i = 0;
+        while (o < ol) {
+            int v0 = raw[i], v1 = 0, v2 = 0, v3 = 0;
+            if (i + 1 < nr) v1 = raw[i + 1];
+            if (i + 2 < nr) v2 = raw[i + 2];
+            if (i + 3 < nr) v3 = raw[i + 3];
+            int tr = v0 * 262144 + v1 * 4096 + v2 * 64 + v3;
+            out[o] = (tr / 65536) % 256; o++;
+            if (o < ol) { out[o] = (tr / 256) % 256; o++; }
+            if (o < ol) { out[o] = tr % 256; o++; }
+            i += 4;
+        }
+        return out;
+    }
+
+    /* cari nilai digit di tabel base64 */
+    private static int tabIdx(int[] hay, int v) {
+        for (int i = 0; i < hay.length; i++)
+            if (hay[i] == v) return i;
+        return 0;
+    }
+
+    /* ── hex (kecil, huruf-perhuruf deterministik) ──────────────── */
+
+    /* data → hex lowercase, 2 karakter per byte */
+    static int[] hexenc(int[] data) {
+        int[] out = new int[data.length * 2];
+        int o = 0;
+        for (int i = 0; i < data.length; i++) {
+            int b = data[i] % 256;
+            if (b < 0) b = b + 256;
+            int hi = b / 16;
+            int lo = b % 16;
+            out[o] = hexdig(hi); o++;
+            out[o] = hexdig(lo); o++;
+        }
+        return out;
+    }
+
+    /* 0..15 → '0'..'9','a'..'f' */
+    static int hexdig(int n) {
+        if (n < 10) return 48 + n;             /* '0'+n */
+        return 87 + n;                          /* 'a'+n-10 */
+    }
+
+    /* nilai hex digit ASCII → 0..15, -1 bila bukan digit hex */
+    static int hexval(int c) {
+        if (c >= 48 && c <= 57) return c - 48;
+        if (c >= 65 && c <= 90) return c - 55;  /* 'A'..'F' */
+        if (c >= 97 && c <= 122) return c - 87; /* 'a'..'f' */
+        return -1;
+    }
+
+    /* teks hex (panjang ganjil dibatasi 0 di akhir) → byte-as-int */
+    static int[] hexdec(int[] txt) {
+        int n = txt.length / 2;
+        int[] out = new int[n];
+        int o = 0;
+        for (int i = 0; i + 1 < txt.length; i += 2) {
+            int hi = hexval(txt[i]);
+            int lo = hexval(txt[i + 1]);
+            if (hi < 0 || lo < 0) { out[o] = 0; o++; continue; }
+            out[o] = hi * 16 + lo; o++;
+        }
+        return out;
+    }
+
+    /* ── checksum ───────────────────────────────────────────────── */
+
+    /* CRC-16-CCITT (poly 0x1021, init 0xFFFF) — vektor terkenal:
+     * "123456789" → 0x29B1 */
+    static int crc16(int[] data) {
+        int crc = 65535;
+        for (int i = 0; i < data.length; i++) {
+            int b = data[i] % 256;
+            if (b < 0) b = b + 256;
+            crc = Crypto.bitxor(crc, b * 256);  /*xor dengan byte di kiri */
+            for (int k = 0; k < 8; k++) {
+                int bit = crc / 32768;
+                crc = (crc % 32768) * 2;
+                if (bit == 1) crc = Crypto.bitxor(crc, 4129);   /* 0x1021 */
+            }
+        }
+        return crc;
+    }
+
+    /* Adler-32 (RFC 1950): A=1, B=0, mod 65521 dan b·65536+a. Untuk masukan besar b bisa melewati 2^31 — cukup untuk deret kecil */
+    static int adler32(int[] data) {
+        int a = 1;
+        int b = 0;
+        for (int i = 0; i < data.length; i++) {
+            a = (a + data[i]) % 65521;
+            b = (b + a) % 65521;
+        }
+        return b * 65536 + a;
+    }
+}

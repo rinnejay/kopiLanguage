@@ -1,6 +1,13 @@
 #!/bin/sh
 # test.sh — verifikasi konsistensi backend vm & a64 terhadap referensi
 cd "$(dirname "$0")"
+# bersihkan server uji sisa run yang mungkin meningkat diam-diam
+pkill -f "python3 .*kopi/[r]fc192.py" 2>/dev/null
+pkill -f "python3 .*kopi/[d]nstest.py" 2>/dev/null
+pkill -f "python3 .*kopi/[p]osttest.py" 2>/dev/null
+pkill -f "python3 -m http.server [9]911" 2>/dev/null
+pkill -f "python3 .*opencode/[e]chosrv.py" 2>/dev/null
+sleep 0.3
 T=${TMPDIR:-/data/data/com.termux/files/usr/tmp/opencode}
 mkdir -p "$T/kopi"
 PASS=0; FAIL=0
@@ -183,7 +190,7 @@ check scope "$T/kopi/scope.kop"
 # sintaks x64 untuk fitur array + library (tidak dieksekusi di aarch64)
 cp examples/array.kop "$T/kopi/array.kop"
 pas64=1
-for t in array cryptot arrtest; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done
@@ -267,6 +274,272 @@ if [ $? -eq 0 ]; then echo "PASS  net [x64]"; PASS=$((PASS+1));
 else echo "FAIL  net [x64]: sintaks assembly"; FAIL=$((FAIL+1)); fi
 
 kill $ECHO_PID $HTTP_PID 2>/dev/null
+
+# ─── Cipher: RC4/Vigenère/base64/hex/CRC-16/Adler-32 + bitwise Crypto ────
+cat > "$T/kopi/ciphertest.kop" <<'EOF'
+import Crypto;
+import Cipher;
+
+class Main {
+    public static void main(String[] args) {
+        // bitwise murni aritmetika (identitas A+B = (A⊕B)+2(A∧B))
+        System.out.println(Crypto.bitand(102, 51));      // 34
+        System.out.println(Crypto.bitor(102, 51));       // 119
+        System.out.println(Crypto.bitnot(102));          // 2147483545
+        System.out.println(Crypto.rotl31(1073741824, 1));// 1 (bit30 melorot)
+        System.out.println(Crypto.shr31(65535, 8));      // 255
+        System.out.println(Crypto.shl31(3, 31));         // 0
+        System.out.println(Crypto.mask31(4));            // 15
+        // CRC-16-CCITT & Adler-32: vektor terkenal
+        System.out.println(Cipher.crc16(Net.bytes("123456789")));      // 10673 (0x29B1)
+        System.out.println(Cipher.adler32(Net.bytes("Wikipedia")));    // 300286872
+        // base64: vektor klasik "Man" → TWFu
+        int[] e = Cipher.b64enc(Net.bytes("Man"));
+        System.out.println(e[0]);          // 'T' 84
+        System.out.println(e[1]);          // 'W' 87
+        System.out.println(e[2]);          // 'F' 70
+        System.out.println(e[3]);          // 'u' 117
+        System.out.println(Crypto.arrEq(Net.bytes("Man"), Cipher.b64dec(e)));// 1
+        // hex: 1,2,255 → "0102ff"; roundtrip
+        int[] h = Cipher.hexenc(dec(1, 2, 255));
+        int cocok = 1;
+        int[] hx = Net.bytes("0102ff");
+        for (int i = 0; i < hx.length; i++) if (hx[i] != h[i]) cocok = 0;
+        System.out.println(cocok);         // 1
+        System.out.println(Crypto.arrEq(dec(1, 2, 255), Cipher.hexdec(h)));// 1
+        // RC4: nirl (enc lalu dec = data asli)
+        int[] data = Net.bytes("rahasia jangan bocor");
+        int[] key = Net.bytes("s4l4h1");
+        System.out.println(Crypto.arrEq(data, Cipher.rc4(Cipher.rc4(data, key), key))); // 1
+        // Vigenère: ATTACKATDAWN + LEMON → LXFOPVEFRNHR (kalimat terkenal)
+        int[] v = Cipher.vigenere(Net.bytes("ATTACKATDAWN"), Net.bytes("LEMON"));
+        System.out.println(Crypto.arrEq(v, Net.bytes("LXFOPVEFRNHR")));  // 1
+        System.out.println(Crypto.arrEq(Net.bytes("ATTACKATDAWN"),
+                                        Cipher.unvigenere(v, Net.bytes("LEMON"))));   // 1
+    }
+
+    static int[] dec(int a, int b, int c) {
+        int[] x = new int[3];
+        x[0] = a; x[1] = b; x[2] = c;
+        return x;
+    }
+}
+EOF
+printf '34\n119\n2147483545\n1\n255\n0\n15\n10673\n300286872\n84\n87\n70\n117\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/ciphertest.ref"
+check ciphertest "$T/kopi/ciphertest.kop"
+
+# ─── Rfc: echo/discard/daytime/quote/chargen terhadap python server uji ──
+cat > "$T/kopi/rfc192.py" <<'EOF'
+import socket, threading, time
+
+def srv(port, fn):
+    s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind(("127.0.0.1", port)); s.listen(8)
+    while True:
+        c, _ = s.accept()
+        try: fn(c)
+        except OSError: pass
+        try: c.close()
+        except OSError: pass
+
+def echo(c):
+    c.settimeout(0.15)
+    try:
+        while True:
+            d = c.recv(4096)
+            if not d: break
+            c.sendall(d)               # pantul per batch yang masuk
+    except OSError: pass
+    c.shutdown(socket.SHUT_WR)
+
+def drain(c):        # close dengan data belum terbaca = RST, bukan EOF
+    c.settimeout(0.15)
+    try:
+        while c.recv(4096): pass
+    except OSError: pass
+    c.settimeout(None)
+
+def daytime(c):
+    drain(c)
+    c.sendall(b"2026-11-09 Kopi\n")
+    c.shutdown(socket.SHUT_WR)
+
+def quote(c):
+    drain(c)
+    c.sendall(b"Kopi suka uap dan bintang\n")
+    c.shutdown(socket.SHUT_WR)
+
+def discard(c):
+    c.recv(4096)
+
+def chargen(c):
+    pat = b"0123456789 "
+    for _ in range(64):
+        c.sendall(pat)
+        time.sleep(0.01)
+    c.shutdown(socket.SHUT_WR)
+
+for p, f in [(9921, echo), (9922, daytime), (9923, quote), (9924, discard), (9925, chargen)]:
+    threading.Thread(target=srv, args=(p, f), daemon=True).start()
+time.sleep(600)
+EOF
+python3 "$T/kopi/rfc192.py" & RFC_PID=$!
+sleep 1
+
+cat > "$T/kopi/netrfc.kop" <<'EOF'
+import Rfc;
+import Tcp;
+
+class Main {
+    public static void main(String[] args) {
+        int a = Tcp.loopback();
+        int[] out = new int[256];
+        int n = Rfc.echoInto(a, 9921, Net.bytes("ping!"), out);   // RFC 862
+        System.out.println(n);                                    // 5
+        for (int i = 0; i < n; i++) { System.out.print(out[i]); System.out.print(" "); }
+        System.out.println("");
+        int[] day = new int[64];
+        int m = Rfc.readAll(a, 9922, day);                        // RFC 867
+        System.out.println(m);                                    // 16
+        System.out.println(day[0]);                               // '2' = 50
+        int[] qu = new int[64];
+        int q = Rfc.readAll(a, 9923, qu);                         // RFC 865
+        System.out.println(q);                                    // 26
+        System.out.println(qu[0]);                                // 'K' = 75
+        System.out.println(Rfc.discard(a, 9924, Net.bytes("buang")));  // RFC 863 → 0
+        int[] cg = new int[128];                                  // RFC 864
+        int g = Rfc.fill(a, 9925, cg);
+        System.out.println(g);                                    // 128
+        System.out.println(cg[0]); System.out.println(cg[10]); System.out.println(cg[11]);    // '0' 48, ' ' 32
+        // RFC 3912 WHOIS pola kirim-tanya/baca (server uji = daytime)
+        int w = Rfc.ask(a, 9922, Net.bytes("kopi.test\r\n"), out);
+        System.out.println(w);                                    // 16
+    }
+}
+EOF
+printf '5\n112 105 110 103 33 \n16\n50\n26\n75\n0\n128\n48\n32\n48\n16\n' > "$T/kopi/netrfc.ref"
+check netrfc "$T/kopi/netrfc.kop"
+kill $RFC_PID 2>/dev/null
+
+# ─── Dns: klien DNS-over-TCP (RFC 1035/7766) terhadap resolver uji ───────
+cat > "$T/kopi/dnstest.py" <<'EOF'
+import socket, struct
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", 9953)); s.listen(8)
+
+def rx(c, n):                       # TCP recv TIDAK dijamin penuh: loop
+    b = b""
+    while len(b) < n:
+        d = c.recv(n - len(b))
+        if not d: break
+        b += d
+    return b
+
+while True:
+    c, _ = s.accept()
+    try:
+        head = rx(c, 2)
+        if len(head) == 2:
+            tlen = struct.unpack(">H", head)[0]
+            q = rx(c, tlen)
+            if len(q) == tlen:
+                header = q[0:2] + b"\x81\x80" + q[4:6] + b"\x00\x01" + b"\x00\x00\x00\x00"
+                ans = (b"\xc0\x0c" + b"\x00\x01" + b"\x00\x01" + b"\x00\x00\x00\x78"
+                       + b"\x00\x04" + bytes([10, 20, 30, 40]))
+                msg = header + q[12:] + ans
+                c.sendall(struct.pack(">H", len(msg)) + msg)
+                c.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+    try: c.close()
+    except OSError: pass
+EOF
+python3 "$T/kopi/dnstest.py" & DNS_PID=$!
+sleep 1
+
+cat > "$T/kopi/netdns.kop" <<'EOF'
+import Dns;
+import Tcp;
+
+class Main {
+    public static void main(String[] args) {
+        int[] hasil = new int[5];
+        int r = Dns.lookup(Tcp.loopback(), 9953, Net.bytes("kopi.test"), hasil, 512);
+        System.out.println(r);          // 0 sukses jaringan
+        System.out.println(hasil[0]);   // RCODE 0 = NOERROR
+        System.out.println(hasil[1]);   // 10
+        System.out.println(hasil[2]);   // 20
+        System.out.println(hasil[3]);   // 30
+        System.out.println(hasil[4]);   // 40
+    }
+}
+EOF
+printf '0\n0\n10\n20\n30\n40\n' > "$T/kopi/netdns.ref"
+check netdns "$T/kopi/netdns.kop"
+kill $DNS_PID 2>/dev/null
+
+# ─── Http.postInto: kirim POST + Content-Length ke server uji ────────────
+cat > "$T/kopi/posttest.py" <<'EOF'
+import socket
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", 9927)); s.listen(8)
+
+def rx(c, n):
+    b = b""
+    while len(b) < n:
+        d = c.recv(n - len(b))
+        if not d: break
+        b += d
+    return b
+
+while True:
+    c, _ = s.accept()
+    try:
+        head = b""
+        while b"\r\n\r\n" not in head:
+            ch = c.recv(1)
+            if not ch: break
+            head += ch
+        if b"Content-Length: " in head:
+            n = int(head.split(b"Content-Length: ")[1].split(b"\r")[0])
+            body = rx(c, n)
+            resp = b"HTTP/1.0 201 OK\r\n\r\nBody: " + body
+            c.sendall(resp)
+            c.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+    try: c.close()
+    except OSError: pass
+EOF
+python3 "$T/kopi/posttest.py" & POST_PID=$!
+sleep 1
+
+cat > "$T/kopi/netpost.kop" <<'EOF'
+import Tcp;
+import Http;
+
+class Main {
+    public static void main(String[] args) {
+        int[] path = Net.bytes("/kirim");
+        int[] body = Net.bytes("kopi-body");
+        int[] buf = new int[256];
+        int n = Http.postInto(Tcp.loopback(), 9927, Net.bytes("h"), path, body, buf);
+        if (n < 0) { System.out.println(n); return; }
+        int[] resp = new int[n];
+        for (int i = 0; i < n; i++) resp[i] = buf[i];
+        System.out.println(Http.statusOf(resp));        // 201
+        int[] b = Http.bodyOf(resp);
+        System.out.println(b.length);                   // 15 = "Body: kopi-body" ("Body: " 6 karakter)
+        System.out.println(b[0]);                        // 'B' = 66
+    }
+}
+EOF
+printf '201\n15\n66\n' > "$T/kopi/netpost.ref"
+check netpost "$T/kopi/netpost.kop"
+kill $POST_PID 2>/dev/null
 
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"

@@ -357,7 +357,7 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tsvc\t#0");
             emit("\tcmp\tx0, #1");
             emit("\tb.ne\t1f");
-            emit("\tldrsb\tw0, [sp]");                 /* byte → int sign-ext */
+            emit("\tldrb\tw0, [sp]");                  /* byte → 0..255 */
             emit("\tb\t2f");
             emit("1:");
             emit("\tmov\tw0, #-1");                    /* EOF / error → -1 */

@@ -105,7 +105,7 @@ class Tcp {
         return out;
     }
 
-    /* indeks pertama needle dalam hay mulai from; -1 bila tidak ada */
+    /* indeks pertama needle dalam hay mulai dari indeks from; -1 bila tak ada */
     static int indexOf(int[] hay, int[] needle, int from) {
         if (needle.length == 0) return from;
         int lim = hay.length - needle.length;
@@ -115,5 +115,35 @@ class Tcp {
             if (j == needle.length) return i;
         }
         return -1;
+    }
+
+    /* baca tepat n byte (atau berhenti di EOF/buf penuh);
+     * kembalikan jumlah byte yang benar-benar terbaca — untuk protokol
+     * berbatas panjang eksplisit (DNS-over-TCP misalnya) */
+    static int recvN(int fd, int[] buf, int n) {
+        if (n > buf.length) n = buf.length;
+        int got = 0;
+        while (got < n) {
+            int b = Net.rdb(fd);
+            if (b < 0) return got;
+            buf[got] = b;
+            got++;
+        }
+        return got;
+    }
+
+    /* v ≥ 0 → digit ASCII desimal (tanpa tanda); dipakai Content-Length */
+    static int[] num(int v) {
+        if (v <= 0) return Net.bytes("0");
+        int[] rev = new int[10];
+        int n = 0;
+        while (v > 0) {
+            rev[n] = 48 + v % 10;
+            n++;
+            v = v / 10;
+        }
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) out[i] = rev[n - 1 - i];
+        return out;
     }
 }

@@ -79,6 +79,63 @@ class Crypto {
         return r % hi;
     }
 
+    /* ── sandbox bitwise penuh (domain 31-bit, 0..2147483647) ────── */
+
+    /* identitas aritmétika: A + B = (A⊕B) + 2·(A∧B)  ⟹  ia juga
+     * A∧B = (A+B−A⊕B)/2 dan A∨B = A⊕B + A∧B — tanpa operator & | ^ */
+    static int bitand(int a, int b) {
+        return (a + b - bitxor(a, b)) / 2;
+    }
+
+    static int bitor(int a, int b) {
+        return bitxor(a, b) + bitand(a, b);
+    }
+
+    /* komplemen 31-bit (pelengkap di dalam 0..2^31-1) */
+    static int bitnot(int x) {
+        return 2147483647 - x;
+    }
+
+    /* 2^n untuk n 0..30 (n=31 membanjir tanda) */
+    static int pow31(int n) {
+        int p = 1;
+        for (int i = 0; i < n; i++) p = p + p;
+        return p;
+    }
+
+    /* masker n bit terendah */
+    static int mask31(int n) {
+        if (n <= 0) return 0;
+        if (n >= 31) return 2147483647;
+        return pow31(n) - 1;
+    }
+
+    /* geser kiri, bit di atas 2^31 dibuang */
+    static int shl31(int x, int n) {
+        if (n <= 0) return x;
+        if (n >= 31) return 0;
+        return (x % pow31(31 - n)) * pow31(n);
+    }
+
+    /* geser kanan logis (masukan positif) */
+    static int shr31(int x, int n) {
+        if (n <= 0) return x;
+        if (n >= 31) return 0;
+        return x / pow31(n);
+    }
+
+    /* rotasi kiri 31-bit (bit paling atas mengalirlah ke bawah) */
+    static int rotl31(int x, int n) {
+        n = n % 31;
+        if (n == 0) return x;
+        return shl31(x, n) + x / pow31(31 - n);
+    }
+
+    /* rotasi kanan */
+    static int rotr31(int x, int n) {
+        return rotl31(x, 31 - (n % 31));
+    }
+
     /* ── cipher ────────────────────────────────────────────────── */
 
     /* XOR stream: out[i] = in[i] ^ key[i % key.length]

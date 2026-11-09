@@ -1,0 +1,128 @@
+/* Dns.kop — klien DNS-over-TCP (RFC 1035 §4 + RFC 7766), v1.
+ *
+ * Resolver inti publik menerima DNS melalui TCP; untuk uji lokal dialihkan
+ * ke port server uji. Pesan dibaca dengan awalan panjang 2 byte
+ * (aturan pemisah aliran DNS-over-TCP).
+ *
+ * Aturan paket (angka 16-bit dibaca oktet-tinggi · 256 + oktet-rendah):
+ *   header 12 byte: ID, FLAGS (3 byte = QR|OP|AA|TC|RD; 4 byte =
+ *   RA|Z|RCODE), QDCOUNT, ANCOUNT, NSCOUNT, ARCOUNT
+ *   question: QNAME (label len·byte ... 0) + QTYPE + QCLASS
+ *   answer  : NAME (label ATAU pointer 2 byte ≥ 0xC0) + TYPE + CLASS
+ *             + TTL(4) + RDLENGTH(2) + RDATA
+ *
+ * Batas v1: ID selalu 0 (uji — tanpa state acak), QTYPE didukung A(1),
+ * hanya jawaban A pertama yang diambil.
+ */
+
+class Dns {
+
+    /* ── menyusun permintaan ───────────────────────────────────── */
+
+    /* nama "kopi.test" (byte-as-int, pemisah titik ASCII 46)
+     * → QNAME: panjang·oktet ... lalu terminator 0 */
+    static int[] qname(int[] dotted) {
+        int[] tmp = new int[dotted.length + 2];
+        int o = 0;
+        int start = 0;
+        for (int i = 0; i <= dotted.length; i++) {
+            if (i == dotted.length || dotted[i] == 46) {
+                int l = i - start;
+                tmp[o] = l; o++;
+                for (int j = 0; j < l; j++) { tmp[o] = dotted[start + j]; o++; }
+                start = i + 1;
+            }
+        }
+        tmp[o] = 0; o++;
+        int[] out = new int[o];
+        for (int i = 0; i < o; i++) out[i] = tmp[i];
+        return out;
+    }
+
+    /* permintaan penuh: header + QNAME + QTYPE + QCLASS=1 (IN) */
+    static int[] query(int[] dottedName, int qtype) {
+        int[] n = qname(dottedName);
+        int[] h = new int[12 + n.length + 4];
+        h[0] = 0; h[1] = 0;               /* ID = 0 (uji; acak dijadwal) */
+        h[2] = 0; h[3] = 0;               /* FLAGS = 0 (kueri, RD clear) */
+        h[4] = 0; h[5] = 1;               /* QDCOUNT = 1 */
+        h[6] = 0; h[7] = 0; h[8] = 0; h[9] = 0;
+        h[10] = 0; h[11] = 0;             /* NSCOUNT/ARCOUNT */
+        int i = 12;
+        for (int k = 0; k < n.length; k++) { h[i] = n[k]; i++; }
+        h[i] = qtype / 256; h[i + 1] = qtype % 256;
+        h[i + 2] = 0; h[i + 3] = 1;       /* QCLASS IN */
+        return h;
+    }
+
+    /* ── menelaah jawaban ───────────────────────────────────────── */
+
+    /* lewati nama di dalam pesan: label (hitung byte) atau pointer
+     * 2 byte (≥ 0xC0); kembalikan indeks sesudah nama */
+    static int skipName(int[] m, int i) {
+        int lim = m.length - 1;
+        while (i < lim && m[i] != 0) {
+            if (m[i] >= 192) return i + 2;
+            i = i + m[i] + 1;
+        }
+        return i + 1;
+    }
+
+    /* nilai RCODE dari flag byte ke-4 */
+    static int rcodeOf(int[] resp) {
+        if (resp.length < 12) return -1;
+        return resp[3] % 16;
+    }
+
+    /* ── tanya resolver ─────────────────────────────────────────── */
+
+    /* kirim kueri A (qtype=1) ke addr:port (TCP, awalan panjang 2 byte)
+     * dan telaah balasannya melalui hasil:
+     *   hasil[0] = RCODE (0 = NOERROR, 3 = NXDOMAIN, ...),
+     *   hasil[1..4] = oktet IPv4 jawaban A pertama (atau -1 bila kosong)
+     * kembali: 0 sukses / negatif galat jaringan / -9 = balas salah bentuk */
+    static int lookup(int addr, int port, int[] dottedName, int[] hasil, int cap) {
+        hasil[0] = -1; hasil[1] = -1; hasil[2] = -1; hasil[3] = -1; hasil[4] = -1;
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) return fd;
+        int[] q = query(dottedName, 1);
+        /* awal perintah panjang TCP-DNS: UINT16 besar-akhir */
+        int w = Net.wrb(fd, q.length / 256);
+        if (w == 0) w = Net.wrb(fd, q.length % 256);
+        if (w < 0)  { Net.close(fd); return w; }
+        int r = Tcp.sendBuf(fd, q);
+        if (r < 0)  { Net.close(fd); return r; }
+
+        int[] buf = new int[cap];
+        /* baca 2 byte panjang balik */
+        int b1 = Net.rdb(fd);
+        if (b1 < 0) { Net.close(fd); return -1; }
+        int b2 = Net.rdb(fd);
+        if (b2 < 0) { b2 = 0; }
+        int tlen = b1 * 256 + b2;
+        int n = Tcp.recvN(fd, buf, tlen);
+        Net.close(fd);
+        if (n != tlen) return -9;         /* balas terpotong */
+
+        if (rcodeOf(buf) != 0) { hasil[0] = rcodeOf(buf); return 0; }
+
+        int an = buf[6] * 256 + buf[7];
+        int i = skipName(buf, 12);         /* lompat QNAME pertanyaan */
+        i += 4;                            /* QTYPE + QCLASS */
+        for (int k = 0; k < an && i + 10 <= buf.length; k++) {
+            i = skipName(buf, i);
+            int tipe = buf[i] * 256 + buf[i + 1];
+            int rdl = buf[i + 8] * 256 + buf[i + 9];
+            if (rdl < 0 || rdl > 512) { hasil[0] = -9; return 0; }
+            if (tipe == 1 && rdl == 4 && hasil[1] < 0 && i + 12 <= buf.length) {
+                hasil[1] = buf[i + 10];
+                hasil[2] = buf[i + 11];
+                hasil[3] = buf[i + 12];
+                hasil[4] = buf[i + 13];
+            }
+            i += 10 + rdl;
+        }
+        hasil[0] = 0;
+        return 0;
+    }
+}

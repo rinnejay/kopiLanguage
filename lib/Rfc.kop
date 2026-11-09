@@ -1,0 +1,86 @@
+/* Rfc.kop — klien protokol baru (era awal TCP) tetap standar (v1).
+ *
+ * Semua klien-side murni di atas Tcp. Pola yang dipakai protokol:
+ *   - server menutup koneksi sisi server setelah selesai (daytime,
+ *     quote, whois, finger) → recvAll aman
+ *   - server memantul data (echo) → recvN(panjang) cukup, tak perlu
+ *     shutdown penulisan (builtin belum punya syscall shutdown)
+ *   - server tak membalas apa pun (discard) → tutup segera
+ *
+ * Parameter port boleh 0 = port standar (saat uji lokal: kirim port uji).
+ */
+
+class Rfc {
+
+    private static int portfix(int p, int def) {
+        if (p <= 0) return def;
+        return p;
+    }
+
+    /* ── RFC 862 ECHO (TCP/7): server memantul persis ───────────── */
+
+    /* kirim data, baca balikan sebanyak data.length;
+     * sukses → jumlah byte ≥ 0 (biasanya == data.length); gagal → negatif */
+    static int echoInto(int addr, int port, int[] data, int[] out) {
+        int fd = Tcp.open(addr, portfix(port, 7));
+        if (fd < 0) return fd;
+        int r = Tcp.sendBuf(fd, data);
+        if (r < 0) {
+            Net.close(fd);
+            return r;
+        }
+        int n = Tcp.recvN(fd, out, data.length);
+        Net.close(fd);
+        return n;
+    }
+
+    /* ── RFC 863 DISCARD (TCP/9): baca tidak tinggal apa-apa, tutup segera ─── */
+
+    static int discard(int addr, int port, int[] data) {
+        int fd = Tcp.open(addr, portfix(port, 9));
+        if (fd < 0) return fd;
+        int r = Tcp.sendBuf(fd, data);
+        Net.close(fd);
+        return r;
+    }
+
+    /* ── RFC 867 DAYTIME (TCP/13) & RFC 865 QUOTE (TCP/17):
+     *    server kirim satu beban teks lalu tutup koneksi ─────────── */
+
+    /* buka, muat ke buf hingga EOF/server tutup, tutup; sukses → n ≥ 0 */
+    static int readAll(int addr, int port, int[] buf) {
+        int fd = Tcp.open(addr, portfix(port, 13));
+        if (fd < 0) return fd;
+        int n = Tcp.recvAll(fd, buf);
+        Net.close(fd);
+        return n;
+    }
+
+    /* ── RFC 864 CHARGEN (TCP/19): server membanjiri teks pola ──── */
+
+    /* muat buf PENUH pattern (server tak berhenti sendiri) lalu tutup */
+    static int fill(int addr, int port, int[] buf) {
+        int fd = Tcp.open(addr, portfix(port, 19));
+        if (fd < 0) return fd;
+        int n = Tcp.recvN(fd, buf, buf.length);
+        Net.close(fd);
+        return n;
+    }
+
+    /* ── RFC 3912 WHOIS (TCP/43) & RFC 1288 FINGER (TCP/79):
+     *    kirim satu baris pertanyaan, server balas lalu tutup ────── */
+
+    /* kirim pertanyaan (harus sudah diakhiri '\r\n'), muat balasan */
+    static int ask(int addr, int port, int[] enqu, int[] buf) {
+        int fd = Tcp.open(addr, portfix(port, 43));
+        if (fd < 0) return fd;
+        int r = Tcp.sendBuf(fd, enqu);
+        if (r < 0) {
+            Net.close(fd);
+            return r;
+        }
+        int n = Tcp.recvAll(fd, buf);
+        Net.close(fd);
+        return n;
+    }
+}

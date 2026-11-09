@@ -74,6 +74,31 @@ class Http {
         return n;
     }
 
+    /* ── POST satu putaran ──────────────────────────────────────── */
+
+    /* kirim POST dengan body (Content-Length dari Tcp.num), muat
+     * SELURUH respons ke buf — semantik sama dengan getInto. */
+    static int postInto(int addr, int port, int[] host, int[] path,
+                        int[] body, int[] buf) {
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) return fd;
+        int[] head = Tcp.cat(Net.bytes("POST "), path);
+        head = Tcp.cat(head, Net.bytes(" HTTP/1.0\r\nHost: "));
+        head = Tcp.cat(head, host);
+        head = Tcp.cat(head, Net.bytes("\r\nContent-Type: text/plain\r\nContent-Length: "));
+        head = Tcp.cat(head, Tcp.num(body.length));
+        head = Tcp.cat(head, Net.bytes("\r\n\r\n"));
+        int r = Tcp.sendBuf(fd, head);
+        if (r == 0) r = Tcp.sendBuf(fd, body);
+        if (r < 0) {
+            Net.close(fd);
+            return r;
+        }
+        int n = Tcp.recvAll(fd, buf);
+        Net.close(fd);
+        return n;
+    }
+
     /* kenyamanan: GET lalu langsung ke body. galat ditandai array
      * hasil [0] = kode negatif (body tidak mungkin negatif). */
     static int[] body(int addr, int port, int[] host, int[] path, int cap) {
