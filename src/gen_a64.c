@@ -129,6 +129,10 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_EXPR:
         if (s->a) gen_expr(m, s->a);
         break;
+    case ST_BLOCK:
+        gen_stmts(m, s->d);
+        break;
+
     default:
         die("gen_a64: statement kind=%d", s->kind);
     }

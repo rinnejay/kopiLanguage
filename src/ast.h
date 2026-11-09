@@ -17,6 +17,7 @@ enum {
     ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
     ST_IDXASG,     /* a[i] = v : a=array expr, b=index expr, c=value expr */
+    ST_BLOCK,      /* blok { ... } : d=statement list (scope sendiri)      */
 };
 
 typedef struct Node {

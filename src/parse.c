@@ -76,6 +76,8 @@ static Node *block(void) {
     Node *head = 0, *tail = 0;
     while (!at('}')) {
         Node *s = stmt_single();
+        /* rantai multi-deklarasi (int a = 0, b = 1;) ditautkan dulu */
+        while (tail && tail->next) tail = tail->next;
         if (tail) tail->next = s; else head = s;
         tail = s;
     }
@@ -178,14 +180,22 @@ static Node *stmt_single(void) {
     switch (t->type) {
     case KW_INT: case KW_BOOL: case KW_FN: {
         Ty ty = type_opt();
-        Node *n = newnode(ST_VAR, line);
-        n->dty = (int)ty;
-        n->str = xs(peek()->text);
-        expect(T_ID, "nama variabel");
-        expect('=', "'=' — variabel lokal wajib diinisialisasi");
-        n->a = expr();
+        /* multi-deklarasi: int a = 0, b = 1; → rantai ST_VAR via ->next */
+        Node *head = 0, *tailst = 0;
+        while (1) {
+            Node *n = newnode(ST_VAR, line);
+            n->dty = (int)ty;
+            n->str = xs(peek()->text);
+            expect(T_ID, "nama variabel");
+            expect('=', "'=' — variabel lokal wajib diinisialisasi");
+            n->a = expr();
+            if (tailst) tailst->next = n; else head = n;
+            tailst = n;
+            if (at(',')) { advance(); continue; }
+            break;
+        }
         expect(';', "';'");
-        return n;
+        return head;
     }
     case KW_IF: {
         Node *n = newnode(ST_IF, line);
@@ -254,7 +264,11 @@ static Node *stmt_single(void) {
     }
     case KW_BREAK: { advance(); expect(';', "';'"); Node *n = newnode(ST_BRK, line); return n; }
     case KW_CONTINUE: { advance(); expect(';', "';'"); Node *n = newnode(ST_CONT, line); return n; }
-    case '{': return block();
+    case '{': {
+        Node *n = newnode(ST_BLOCK, line);
+        n->d = block();
+        return n;
+    }
     case ';': { advance(); Node *n = newnode(T_VOID, line); n->kind = ST_EXPR; n->a = 0; return n; }
     }
 
@@ -866,15 +880,30 @@ static void resolve_stmt(Node *s) {
         s->dty = (int)v->ty;   /* stamp tipe → codegen 32/64-bit */
         break;
     }
+    case ST_BLOCK: {
+        /* blok telanjang: scope sendiri */
+        int mks = nscope, mki = nextslot;
+        resolve_stmts(s->d);
+        nscope = mks;  /* slot tidak direset → nlocals tetap watermark */
+        break;
+    }
     case ST_IF:
     case ST_WHILE: {
+        /* scoping per-blok: deklarasi di badan blok dibereskan di akhir */
         Ty ct = type_expr(s->a);
         if (ct != T_BOOL) die("baris %d: kondisi harus boolean", s->line);
+        int mks = nscope, mki = nextslot;
         resolve_stmts(s->b);
-        if (s->c) resolve_stmts(s->c);
+        nscope = mks;  /* slot tidak direset → nlocals tetap watermark */
+        if (s->c) {   /* cabang else: scope sendiri (bisa shadow if-branch) */
+            resolve_stmts(s->c);
+            nscope = mks;  /* slot tidak direset → nlocals tetap watermark */
+        }
         break;
     }
     case ST_FOR: {
+        /* init for (int i = ...) juga bagian dari scope blok for */
+        int mks = nscope, mki = nextslot;
         if (s->a) resolve_stmt(s->a);
         if (s->b) {
             Ty ct = type_expr(s->b);
@@ -882,6 +911,7 @@ static void resolve_stmt(Node *s) {
         }
         resolve_stmts(s->d);
         if (s->c) resolve_stmts(s->c);
+        nscope = mks;  /* slot tidak direset → nlocals tetap watermark */
         break;
     }
     case ST_BRK: case ST_CONT: break;

@@ -158,6 +158,28 @@ EOF
 printf '160\n50\n4\n10\n50\n3\n-1\n2\n1\n' > "$T/kopi/arrtest.ref"
 check arrtest "$T/kopi/arrtest.kop"
 
+# scoping per-blok + multi-deklarasi: var loop boleh dipakai ulang antar blok
+cat > "$T/kopi/scope.kop" <<'EOF'
+class Scope {
+    public static void main(String[] args) {
+        int kel = 0;
+        for (int i = 0; i < 5; i++) kel += i;
+        for (int i = 0; i < 3; i++) kel += 10;      // i boleh dipakai ulang
+        { int i = 99; kel += i; }                    // blok telanjang: scope sendiri
+        int prob = 0;
+        if (kel > 0) { int i = 100; prob = 55; }
+        else { int i = 0; prob = 0; }                // else: scope sendiri (shadow OK)
+        prob += 1;
+        int a = 0, b = 1, c = 2;                     // multi-deklarasi satu baris
+        System.out.println(kel);
+        System.out.println(prob);
+        System.out.println(a + b + c);
+    }
+}
+EOF
+printf '139\n56\n3\n' > "$T/kopi/scope.ref"
+check scope "$T/kopi/scope.kop"
+
 # sintaks x64 untuk fitur array + library (tidak dieksekusi di aarch64)
 cp examples/array.kop "$T/kopi/array.kop"
 pas64=1

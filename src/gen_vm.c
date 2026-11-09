@@ -117,6 +117,10 @@ static void gen_stmt(Node *s) {
     case ST_EXPR:
         if (s->a) { gen_expr(s->a); em8(OP_POP); }
         break;
+    case ST_BLOCK:
+        gen_stmts(s->d);
+        break;
+
     case ST_IDXASG:
         gen_expr(s->c);          /* nilai - dipakai paling atas */
         gen_expr(s->a);          /* array pointer */

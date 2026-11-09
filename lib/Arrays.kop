@@ -74,7 +74,7 @@ class Arrays {
         int[] out = new int[a.length + b.length];
         int i = 0;
         for (int k = 0; k < a.length; k++) { out[i] = a[k]; i++; }
-        for (int k2 = 0; k2 < b.length; k2++) { out[i] = b[k2]; i++; }
+        for (int k = 0; k < b.length; k++) { out[i] = b[k]; i++; }
         return out;
     }
 
@@ -102,7 +102,7 @@ class Arrays {
         return out;
     }
 
-    /* biner: akurus nomor urut terurut atau -1 */
+    /* biner: pada array terurut, indeks v atau -1 */
     static int binSearch(int[] xs, int v) {
         int lo = 0;
         int hi = xs.length - 1;

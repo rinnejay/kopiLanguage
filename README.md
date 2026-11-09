@@ -31,8 +31,8 @@ sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 ## Status & changelog
 
 ```
-Pengembangan  ████████░░░░░░░░  ~55%  menuju bahasa serius (v2)
-v1.2 hari ini ████████████████  26/26 test hijau di 3 backend
+Pengembangan  ████████░░░░░░░░  ~58%  menuju bahasa serius (v2)
+v1.2 hari ini ████████████████  28/28 test hijau di 3 backend
 ```
 
 | Versi | Isi |
@@ -40,6 +40,7 @@ v1.2 hari ini ████████████████  26/26 test hijau
 | **v1.0** | core language: class/static, `int/boolean`, aritmetika semantik Java, kontrol alir, multi-file `import`, 3 backend (a64 native, x64 native, VM KOP1) |
 | **v1.1** | lambda/closure sejati: capture by-value, `fn` sebagai argumen, arity check runtime, semua backend |
 | **v1.2** | **array `int[]` + arena memori `kopalloc`** (bump allocator, 1 batas 8 MB): `new int[n]`, `a[i]`, `a[i] = v`, `a.length`, bounds check runtime (`kopi: array tidak valid`, OOM rapi); fix ABI entry `main` (frame x30 sendiri); pustaka `lib/Arrays.kop` (sort/binSearch/find/count/...) dan `lib/Crypto.kop` (bitxor + FNV-1a + PRNG Lehmer + XOR-stream/Caesar) — **100% ditulis dalam bahasa Kopi** di atas aritmetika murni |
+| **v1.2.1** | scoping per-blok (`if/else`, `while`, `for`, blok `{}` telanjang — deklarasi dibereka di akhir blok, shadow antar cabang diperbolehkan ala sibling) + multi-deklarasi `int a = 0, b = 1;` — library kini bisa memakai nama loop yang sama di metode yang sama |
 
 `test.sh` memverifikasi **konsistensi output antar-backend**: program yang sama
 harus menghasilkan output byte-per-byte identik di VM, native aarch64, dan
@@ -345,9 +346,6 @@ kopi/
 - GC proper: saat ini arena = bump allocator yang tidak pernah dibebaskan
   (cukup untuk program batch); mark-sweep sederhana di jadwal
 - `switch`, `do/while`, `try/catch` terbatas
-- perbaikan tercatat: loop-var scoping per-block (saat ini var `int k` di dua
-  for-loop dalam satu metode dianggap redeclare), multi-deklarasi
-  `int a = 0, b = 1;`
 - optimasi `-O1`: register allocation (jangan semua lewat stack),
   const-folding
 - **server edition**: `lib/Net.kop` — socket/HTTP via binding syscall di
