@@ -1,0 +1,23 @@
+// belanja.kop — program utama yang mengimpor keranjang.kop.
+// Form A: import "keranjang.kop";   (path eksplisit, relatif ke file ini)
+// Form B: import Keranjang;         (dicari Keranjang.kop / keranjang.kop)
+
+import "keranjang.kop";
+
+class Main {
+    public static void main(String[] args) {
+        int total = Keranjang.total(15000, 3);
+        System.out.print("total belanja    : ");
+        System.out.println(total);
+
+        int ong = Keranjang.ongkir(17);
+        System.out.print("ongkir (17km)    : ");
+        System.out.println(ong);
+
+        System.out.print("setelah diskon   : ");
+        System.out.println(Keranjang.diskon(total));
+
+        System.out.print("grand total      : ");
+        System.out.println(Keranjang.diskon(total) + ong);
+    }
+}

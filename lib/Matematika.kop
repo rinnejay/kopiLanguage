@@ -1,0 +1,88 @@
+// Matematika.kop — library standar Kopi (ditulis 100% dalam bahasa Kopi)
+// Cara pakai:   import Matematika;   →   Matematika.abs(-5), dst.
+// Semuanya static; tidak butuh deklarasi export — semua metode publik.
+
+class Matematika {
+
+    static int abs(int x) {
+        if (x < 0) { return -x; }
+        return x;
+    }
+
+    static int min(int a, int b) {
+        if (a < b) { return a; }
+        return b;
+    }
+
+    static int max(int a, int b) {
+        if (a > b) { return a; }
+        return b;
+    }
+
+    // FPB ala Euclid
+    static int gcd(int a, int b) {
+        if (a < 0) { a = -a; }
+        if (b < 0) { b = -b; }
+        while (b != 0) {
+            int t = a % b;
+            a = b;
+            b = t;
+        }
+        return a;
+    }
+
+    // KPK = a*b / FPB; bagi dulu supaya tidak mudah overflow
+    static int lcm(int a, int b) {
+        if (a == 0 || b == 0) { return 0; }
+        return abs(a) / gcd(a, b) * abs(b);
+    }
+
+    // a^e (< 2^31, jadi eksponen kecil saja)
+    static int pangkat(int a, int e) {
+        int r = 1;
+        for (int i = 0; i < e; i++) {
+            r = r * a;
+        }
+        return r;
+    }
+
+    // akar bulat ke bawah (bagian-bagian Newton)
+    static int akar(int n) {
+        if (n < 2) { return n; }
+        int x = n;
+        int y = (x + 1) / 2;
+        while (y < x) {
+            x = y;
+            y = (x + n / x) / 2;
+        }
+        return x;
+    }
+
+    static boolean prima(int n) {
+        if (n < 2) { return false; }
+        if (n < 4) { return true; }
+        if (n % 2 == 0) { return false; }
+        for (int i = 3; i * i <= n; i = i + 2) {
+            if (n % i == 0) { return false; }
+        }
+        return true;
+    }
+
+    static int faktorial(int n) {
+        int r = 1;
+        for (int i = 2; i <= n; i++) {
+            r = r * i;
+        }
+        return r;
+    }
+
+    // Fibonacci rekursif — pembuktian pemanggilan lintas-file bekerja normal
+    static int fib(int n) {
+        if (n < 2) { return n; }
+        return fib(n - 1) + fib(n - 2);
+    }
+
+    static boolean genap(int n) {
+        return n % 2 == 0;
+    }
+}

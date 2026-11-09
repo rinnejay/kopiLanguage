@@ -1,0 +1,147 @@
+/* Kopi lexer: mengubah source .kop menjadi array token. */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "lex.h"
+#include "ast.h"
+
+static void *xmalloc(size_t n) {
+    void *p = calloc(1, n);
+    if (!p) die("out of memory");
+    return p;
+}
+
+static char *xstrndup(const char *s, size_t n) {
+    char *p = xmalloc(n + 1);
+    memcpy(p, s, n);
+    return p;
+}
+
+static const char *g_srcfile;   /* file sedang di-lex */
+
+static struct { const char *kw; int type; } kws[] = {
+    {"class", KW_CLASS}, {"public", KW_PUBLIC}, {"private", KW_PRIVATE},
+    {"static", KW_STATIC}, {"final", KW_FINAL}, {"int", KW_INT},
+    {"boolean", KW_BOOL}, {"void", KW_VOID}, {"String", KW_STRING},
+    {"if", KW_IF}, {"else", KW_ELSE}, {"while", KW_WHILE}, {"for", KW_FOR},
+    {"return", KW_RETURN}, {"true", KW_TRUE}, {"false", KW_FALSE},
+    {"break", KW_BREAK}, {"continue", KW_CONTINUE}, {"import", KW_IMPORT},
+    {"fn", KW_FN},
+    {0, 0},
+};
+
+static char *unescape(const char *s, size_t n, char endq) {
+    char *out = xmalloc(n + 1);
+    size_t i = 0, j = 0;
+    while (i < n && s[i] != endq) {
+        if (s[i] == '\\' && i + 1 < n) {
+            char c = s[i + 1];
+            i += 2;
+            switch (c) {
+            case 'n': out[j++] = '\n'; break;
+            case 't': out[j++] = '\t'; break;
+            case 'r': out[j++] = '\r'; break;
+            case '0': out[j++] = '\0'; break;
+            default: out[j++] = c; break;   /* \" \\ dll */
+            }
+        } else {
+            out[j++] = s[i++];
+        }
+    }
+    return out;
+}
+
+Tok *lex_file(const char *path, int *ntoks) {
+    g_srcfile = path;
+    FILE *f = fopen(path, "rb");
+    if (!f) die("tidak bisa membuka file: %s", path);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *src = xmalloc((size_t)size + 1);
+    if (fread(src, 1, (size_t)size, f) != (size_t)size) die("gagal membaca file: %s", path);
+    fclose(f);
+    src[size] = 0;
+
+    int cap = 256, n = 0, line = 1;
+    Tok *toks = xmalloc(sizeof(Tok) * (size_t)cap);
+    char *p = src;
+
+#define PUSH(tt, ttx, tnm) do { \
+        if (n == cap) { cap *= 2; toks = realloc(toks, sizeof(Tok) * (size_t)cap); } \
+        toks[n].type = (tt); toks[n].text = (ttx); toks[n].num = (tnm); toks[n].line = line; toks[n].file = g_srcfile; n++; \
+    } while (0)
+
+    while (*p) {
+        if (*p == '\n') { line++; p++; continue; }
+        if (isspace((unsigned char)*p)) { p++; continue; }
+        if (p[0] == '/' && p[1] == '/') { while (*p && *p != '\n') p++; continue; }
+        if (p[0] == '/' && p[1] == '*') {
+            p += 2;
+            while (*p && !(p[0] == '*' && p[1] == '/')) {
+                if (*p == '\n') line++;
+                p++;
+            }
+            if (!*p) die("baris %d: komentar /* tidak ditutup", line);
+            p += 2;
+            continue;
+        }
+        if (isdigit((unsigned char)*p)) {
+            char *start = p;
+            while (isdigit((unsigned char)*p)) p++;
+            PUSH(T_NUM, 0, strtol(start, 0, 10));
+            continue;
+        }
+        if (isalpha((unsigned char)*p) || *p == '_') {
+            char *start = p;
+            while (isalnum((unsigned char)*p) || *p == '_') p++;
+            size_t len = (size_t)(p - start);
+            int type = T_ID;
+            for (int i = 0; kws[i].kw; i++)
+                if (strlen(kws[i].kw) == len && !strncmp(kws[i].kw, start, len))
+                    { type = kws[i].type; break; }
+            PUSH(type, type == T_ID ? xstrndup(start, len) : 0, 0);
+            continue;
+        }
+        if (*p == '"') {
+            p++;
+            char *start = p;
+            while (*p && *p != '"') {
+                if (*p == '\n') die("baris %d: string tidak ditutup", line);
+                if (*p == '\\') p++;
+                p++;
+            }
+            if (!*p) die("baris %d: string tidak ditutup", line);
+            PUSH(TK_STR, unescape(start, (size_t)(p - start), '"'), 0);
+            p++;
+            continue;
+        }
+        /* operator 2-char */
+        if (p[0] == '&' && p[1] == '&') { PUSH(T_AND, 0, 0); p += 2; continue; }
+        if (p[0] == '|' && p[1] == '|') { PUSH(T_OR, 0, 0); p += 2; continue; }
+        if (p[0] == '=' && p[1] == '=') { PUSH(T_EQ, 0, 0); p += 2; continue; }
+        if (p[0] == '!' && p[1] == '=') { PUSH(T_NE, 0, 0); p += 2; continue; }
+        if (p[0] == '<' && p[1] == '=') { PUSH(T_LE, 0, 0); p += 2; continue; }
+        if (p[0] == '>' && p[1] == '=') { PUSH(T_GE, 0, 0); p += 2; continue; }
+        /* ++ -- += -= *= /= %= => */
+        if (p[0] == '+' && p[1] == '+') { PUSH(T_PP, 0, 0);    p += 2; continue; }
+        if (p[0] == '-' && p[1] == '-') { PUSH(T_MM, 0, 0);    p += 2; continue; }
+        if (p[0] == '+' && p[1] == '=') { PUSH(T_ADDEQ, 0, 0); p += 2; continue; }
+        if (p[0] == '-' && p[1] == '=') { PUSH(T_SUBEQ, 0, 0); p += 2; continue; }
+        if (p[0] == '*' && p[1] == '=') { PUSH(T_MULEQ, 0, 0); p += 2; continue; }
+        if (p[0] == '/' && p[1] == '=') { PUSH(T_DIVEQ, 0, 0); p += 2; continue; }
+        if (p[0] == '%' && p[1] == '=') { PUSH(T_MODEQ, 0, 0); p += 2; continue; }
+        if (p[0] == '=' && p[1] == '>') { PUSH(T_ARROW, 0, 0); p += 2; continue; }
+        if (strchr("+-*/%(){};,.=!<>[]", *p) && *p) {
+            PUSH((unsigned char)*p, 0, 0);
+            p++;
+            continue;
+        }
+        die("baris %d: karakter tidak dikenal '%c'", line, *p);
+    }
+    PUSH(T_EOF, 0, 0);
+    (void)src;
+    *ntoks = n;
+    return toks;
+}

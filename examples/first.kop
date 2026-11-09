@@ -1,0 +1,12 @@
+class Main {
+    static int kali(int a, int b) {
+        return a * b;
+    }
+
+    public static void main(String[] args) {
+        int x = 7;
+        int y = 6;
+        System.out.print("42 == ");
+        System.out.println(kali(x, y));
+    }
+}

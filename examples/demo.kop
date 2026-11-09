@@ -1,0 +1,62 @@
+class Matematika {
+    static int tambah(int a, int b) {
+        return a + b;
+    }
+}
+
+class Main {
+    static int faktorial(int n) {
+        if (n <= 1) { return 1; }
+        return n * faktorial(n - 1);
+    }
+
+    static int fib(int n) {
+        if (n < 2) { return n; }
+        return fib(n - 1) + fib(n - 2);
+    }
+
+    static boolean isGenap(int n) {
+        return n % 2 == 0;
+    }
+
+    static void cetakBanyak(int a, int b, int c) {
+        System.out.print(a);
+        System.out.print(" + ");
+        System.out.print(b);
+        System.out.print(" = ");
+        cetakBanyak_(a, b, c);
+    }
+
+    static void cetakBanyak_(int a, int b, int c) {
+        System.out.println(c);
+    }
+
+    public static void main(String[] args) {
+        System.out.println(Matematika.tambah(40, 2));
+
+        int i = 1;
+        while (i <= 10) {
+            if (isGenap(i) && i != 10) {
+                System.out.print(i);
+                System.out.print(" genap; fakt= ");
+            } else if (!isGenap(i)) {
+                System.out.print(i);
+                System.out.print(" ganjil; fakt= ");
+            } else {
+                System.out.print(i);
+                System.out.print(" terakhir; fakt= ");
+            }
+            System.out.println(faktorial(i));
+            i = i + 1;
+        }
+
+        System.out.print("fib(20) = ");
+        System.out.println(fib(20));
+
+        for (int j = 3; j <= 5; j = j + 1) {
+            System.out.println(Matematika.tambah(j, j * 100));
+        }
+
+        cetakBanyak(1, 2, 555);
+    }
+}

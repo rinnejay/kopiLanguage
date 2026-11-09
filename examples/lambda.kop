@@ -1,0 +1,33 @@
+// lambda.kop — lambda (fn) dengan capture penuh: snapshot by-value.
+//   x => expr            badan ekspresi
+//   (a, b) => { ... }    badan pernyataan
+//   () => ...            nol parameter
+// Capture: nilai variabel luar DIKOPI saat lambda dibuat; penulisan di
+// dalam lambda hanya menyentuh salinan privat (global tak terpengaruh).
+
+class Kalkul {
+    static int terapkan(fn f, int x)   { return f(x); }
+    static int gabung(fn g, int a, int b) { return g(a, b); }
+
+    public static void main(String[] args) {
+        int faktor = 3;
+        fn p = x => x * faktor;
+        System.out.println(p(10));           // 30 (capture snapshot faktor)
+        System.out.println(terapkan(p, 7));  // 21 (fn sebagai argumen)
+
+        System.out.println(gabung((a, b) => a - b, 40, 2));  // 38 (lambda inline)
+
+        fn q = (a, b) => { int r = a; r += b; return r; };   // badan pernyataan
+        System.out.println(gabung(q, 40, 2));  // 42
+
+        fn d = x => x * 2;                     // tanpa capture
+        System.out.println(d(21));             // 42
+        System.out.println(p(5));              // 15
+
+        int n = 0;
+        fn b = () => { n++; return n; };       // nol parameter; n = salinan
+        System.out.println(b());               // 1 (per call mulai dari snapshot)
+        System.out.println(b());               // 1 lagi — luar tetap? n tetap 0
+        System.out.println(n);                 // 0 (tidak bocor keluar)
+    }
+}

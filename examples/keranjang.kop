@@ -1,0 +1,20 @@
+// keranjang.kop — "library" kecil: berisi class belanja.
+// Tidak perlu deklarasi export: SEMUA class static di file ini
+// otomatis bisa dipanggil oleh file yang mengimpor.
+
+class Keranjang {
+    static int total(int harga, int jumlah) {
+        return harga * jumlah;
+    }
+
+    static int ongkir(int km) {
+        if (km <= 10) { return 5000; }
+        return 5000 + (km - 10) * 1000;
+    }
+
+    static int diskon(int total) {
+        // diskon 10% bila di-atas 100000
+        if (total >= 100000) { return total * 9 / 10; }
+        return total;
+    }
+}
