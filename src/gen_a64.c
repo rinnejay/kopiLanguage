@@ -20,6 +20,7 @@ static void emit(const char *fmt, ...) {
 
 static int gen_expr(Method *m, Node *e);
 static void gen_stmts(Method *m, Node *lst);
+static int netlbl;      /* label EX_NET unik per kemunculan */
 
 static int cur_ret_label;
 
@@ -272,6 +273,119 @@ static int gen_expr(Method *m, Node *e) {
         gen_expr(m, e->a);
         emit("\tldr\tw0, [x0]");
         return 0;
+    case EX_NET: {                       /* syscall Linux langsung (tanpa libc) */
+        int ln = netlbl++;                /* label unik per kemunculan */
+        /* 0=socket(domain,type) 1=connect(fd,ipBE,port) 2=rdb(fd)
+         * 3=wrb(fd,b) 4=close(fd) 5=bytes("lit") → int[]                    */
+        if (e->ival == 5) {              /* Net.bytes("literal") → arena       */
+            int c = (int)e->cp;
+            emit("\tadrp\tx9, :got:cpool%d", c);
+            emit("\tldr\tx9, [x9, :got_lo12:cpool%d]", c);
+            emit("\tmov\tw2, #0");                       /* strlen */
+            emit(".LNB%da:", ln);
+            emit("\tldrb\tw1, [x9, x2]");
+            emit("\tadd\tw2, w2, #1");
+            emit("\tcbnz\tw1, .LNB%da", ln);
+            emit("\tsub\tw2, w2, #1");                   /* len = w2 */
+            emit("\tsxtw\tx10, w2");
+            emit("\tlsl\tx0, x10, #3");
+            emit("\tadd\tx0, x0, #8");
+            emit("\tbl\tkopalloc");
+            emit("\tstr\tx10, [x0]");                    /* len */
+            emit("\tmov\tx11, x0");                      /* simpan hasil */
+            emit("\tmov\tx12, #0");                      /* i */
+            emit(".LNB%db:", ln);
+            emit("\tcmp\tx12, x10");
+            emit("\tb.hs\t.LNB%dc", ln);
+            emit("\tldrb\tw1, [x9, x12]");
+            emit("\tlsl\tx13, x12, #3");
+            emit("\tadd\tx13, x13, #8");
+            emit("\tstr\tx1, [x11, x13]");
+            emit("\tadd\tx12, x12, #1");
+            emit("\tb\t.LNB%db", ln);
+            emit(".LNB%dc:", ln);
+            emit("\tmov\tx0, x11");
+            return 1;                       /* hasil pointer array 64-bit */
+        }
+        int n = 0;
+        for (Node *aa = e->a; aa; aa = aa->next) {
+            gen_expr(m, aa);
+            push_val(0);                    /* arg selalu int */
+            n++;
+        }
+        if (n <= 0) return 0;
+        if (e->ival == 0) {                 /* socket(domain, type) */
+            emit("\tldr\tw0, [sp, #%d]", (n - 1 - 0) * 16);
+            emit("\tldr\tw1, [sp, #0]");
+            emit("\tadd\tsp, sp, #%d", n * 16);
+            emit("\tmov\tw2, #0");                     /* proto = 0 */
+            emit("\tmov\tx8, #198");                   /* __NR_socket */
+            emit("\tsvc\t#0");
+        } else if (e->ival == 1) {          /* connect(fd, ipBE, port) */
+            emit("\tstp\txzr, xzr, [sp, #-16]!");      /* sockaddr 16B nol */
+            emit("\tldrb\tw4, [sp, #36]");             /* ip b0  (a) */
+            emit("\tldr\tw6, [sp, #32]");              /* ipBE */
+            emit("\tldr\tw7, [sp, #16]");              /* port */
+            emit("\tlsr\tw4, w7, #8");
+            emit("\tstrb\tw4, [sp, #2]");              /* port hi */
+            emit("\tand\tw4, w7, #0xff");
+            emit("\tstrb\tw4, [sp, #3]");              /* port lo */
+            emit("\tlsr\tw4, w6, #24");
+            emit("\tstrb\tw4, [sp, #4]");
+            emit("\tlsr\tw4, w6, #16");
+            emit("\tand\tw4, w4, #0xff");
+            emit("\tstrb\tw4, [sp, #5]");
+            emit("\tlsr\tw4, w6, #8");
+            emit("\tand\tw4, w4, #0xff");
+            emit("\tstrb\tw4, [sp, #6]");
+            emit("\tand\tw4, w6, #0xff");
+            emit("\tstrb\tw4, [sp, #7]");
+            emit("\tmovz\tw4, #2");                    /* AF_INET */
+            emit("\tstrb\tw4, [sp, #0]");
+            emit("\tldr\tx0, [sp, #48]");              /* fd  (16+32) */
+            emit("\tmov\tx1, sp");                     /* &sa */
+            emit("\tmov\tw2, #16");
+            emit("\tmov\tx8, #203");                   /* __NR_connect */
+            emit("\tsvc\t#0");
+            emit("\tadd\tsp, sp, #64");                /* sockaddr + 3 arg */
+        } else if (e->ival == 2) {          /* rdb(fd) */
+            emit("\tstp\txzr, xzr, [sp, #-16]!");      /* buffer 1B */
+            emit("\tldr\tx0, [sp, #16]");              /* fd */
+            emit("\tmov\tx1, sp");
+            emit("\tmov\tw2, #1");
+            emit("\tmov\tx8, #63");                    /* __NR_read */
+            emit("\tsvc\t#0");
+            emit("\tcmp\tx0, #1");
+            emit("\tb.ne\t1f");
+            emit("\tldrsb\tw0, [sp]");                 /* byte → int sign-ext */
+            emit("\tb\t2f");
+            emit("1:");
+            emit("\tmov\tw0, #-1");                    /* EOF / error → -1 */
+            emit("2:");
+            emit("\tadd\tsp, sp, #32");
+        } else if (e->ival == 3) {          /* wrb(fd, b) */
+            /* stack: [16..31]=b (push terakhir), [32..47]=fd */
+            emit("\tstp\txzr, xzr, [sp, #-16]!");
+            emit("\tldr\tw2, [sp, #16]");              /* byte */
+            emit("\tstrb\tw2, [sp]");
+            emit("\tldr\tx0, [sp, #32]");              /* fd */
+            emit("\tmov\tx1, sp");
+            emit("\tmov\tw2, #1");
+            emit("\tmov\tx8, #64");                    /* __NR_write */
+            emit("\tsvc\t#0");
+            emit("\tadd\tsp, sp, #32");
+            emit("\tcmp\tx0, #1");
+            emit("\tb.ne\t4f");
+            emit("\tmov\tx0, xzr");
+            emit("4:");
+        } else if (e->ival == 4) {          /* close(fd) */
+            emit("\tldr\tx0, [sp, #0]");
+            emit("\tadd\tsp, sp, #%d", n * 16);
+            emit("\tmov\tx8, #57");                    /* __NR_close */
+            emit("\tsvc\t#0");
+        }
+        return 0;                           /* hasil int di w0/x0 */
+    }
     case EX_ENVLOAD:
         emit("\tldr\tx0, [x29, #-8]");   /* slot 0 = param $env */
         emit("\tldr\tw0, [x0, #%ld]", 24 + 8 * (long)e->ival);
@@ -342,6 +456,8 @@ static void asm_escape(const char *s, char *dst, size_t cap) {
         unsigned char c = (unsigned char)*p;
         if (c == '"' || c == '\\') { dst[j++] = '\\'; dst[j++] = (char)c; }
         else if (c == '\n') { dst[j++] = '\\'; dst[j++] = 'n'; }
+        else if (c == '\r') { dst[j++] = '\\'; dst[j++] = 'r'; }
+        else if (c == 0)    { dst[j++] = '\\'; dst[j++] = '0'; }
         else if (c == '\t') { dst[j++] = '\\'; dst[j++] = 't'; }
         else dst[j++] = (char)c;
     }

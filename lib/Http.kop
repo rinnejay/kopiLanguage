@@ -1,0 +1,91 @@
+/* Http.kop — klien HTTP/1.0 minimal untuk Kopi (v1).
+ *
+ * Di atas Tcp (yang di atas builtin `Net`). Fitur sengaja dipangkas
+ * untuk v1: GET saja, HTTP/1.0 saja (server menutup koneksi sendiri
+ * setelah merespons — tidak ada keep-alive/parsing transfer-encoding).
+ *
+ * Pemisahan galat yang rapi:
+ *   - getInto() → total byte respons (≥ 0) atau kode galat negatif
+ *   - statusOf() → kode status HTTP (200, 404, ...) atau -1 bila
+ *     jawaban tidak berbentuk baris status yang normal
+ *
+ * Konstanta byte demi kejelasan: 13 = '\r', 32 = ' ', 48..57 = digit.
+ */
+
+class Http {
+
+    /* ── permintaan ─────────────────────────────────────────────── */
+
+    /* susun baris permintaan GET lengkap:
+     *   "GET <path> HTTP/1.0\r\nHost: <host>\r\n\r\n"
+     * (Net.bytes literal sama di-dedup compiler ke satu isi cpool)     */
+    static int[] req(int[] host, int[] path) {
+        int[] out = Tcp.cat(Net.bytes("GET "), path);
+        out = Tcp.cat(out, Net.bytes(" HTTP/1.0\r\nHost: "));
+        out = Tcp.cat(out, host);
+        out = Tcp.cat(out, Net.bytes("\r\n\r\n"));
+        return out;
+    }
+
+    /* ── respons ────────────────────────────────────────────────── */
+
+    /* kode status HTTP dari baris pertama ("HTTP/1.0 200 OK"),
+     * -1 bila tidak cocol dengan format baris status */
+    static int statusOf(int[] resp) {
+        if (resp.length < 12) return -1;      /* "HTTP/1.0 " sudah 10 byte */
+        int n = Tcp.indexOf(resp, Net.bytes(" "), 0);
+        if (n < 0) return -1;
+        int code = 0;
+        int ada = 0;
+        for (int i = n + 1; i < resp.length; i++) {
+            int c = resp[i];
+            if (c == 32) break;               /* spasi menyusul kode */
+            if (c < 48 || c > 57) return -1;  /* bukan digit: redi */
+            code = code * 10 + (c - 48);
+            ada = 1;
+        }
+        if (ada == 0 || code == 0) return -1;
+        return code;
+    }
+
+    /* isi (body) respons: semua byte setelah pemisah CRLF CRLF.
+     * tanpa pemisah (jawaban tak utuh) → seluruh respons dibalikkan. */
+    static int[] bodyOf(int[] resp) {
+        int p = Tcp.indexOf(resp, Net.bytes("\r\n\r\n"), 0);
+        if (p < 0) return resp;
+        return Tcp.tail(resp, p + 4);
+    }
+
+    /* ── GET satu putaran ───────────────────────────────────────── */
+
+    /* kirim GET dan muat SELURUH respons (header + body) ke buf.
+     * sukses → total byte respons (≥ 0); gagal → kode negatif.
+     * buf terlalu kecil → respons terpotong (batas v1 tercatat). */
+    static int getInto(int addr, int port, int[] host, int[] path, int[] buf) {
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) return fd;
+        int r = Tcp.sendBuf(fd, req(host, path));
+        if (r < 0) {
+            Net.close(fd);
+            return r;
+        }
+        int n = Tcp.recvAll(fd, buf);
+        Net.close(fd);
+        return n;
+    }
+
+    /* kenyamanan: GET lalu langsung ke body. galat ditandai array
+     * hasil [0] = kode negatif (body tidak mungkin negatif). */
+    static int[] body(int addr, int port, int[] host, int[] path, int cap) {
+        int[] buf = new int[cap];
+        int n = getInto(addr, port, host, path, buf);
+        if (n < 0) {
+            int[] err = new int[1];
+            err[0] = n;
+            return err;
+        }
+        int[] resp = new int[n];
+        for (int i = 0; i < n; i++) resp[i] = buf[i];
+        return bodyOf(resp);
+    }
+}

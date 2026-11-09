@@ -3,6 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <errno.h>
 
 enum {
     OP_HALT = 0, OP_ICONST, OP_ILOAD, OP_ISTORE, OP_POP,
@@ -12,6 +17,7 @@ enum {
     OP_PRINTILN, OP_PRINTI, OP_PRINTSLN, OP_PRINTS,
     OP_NEWCLO, OP_CALLIND, OP_ENVLOAD, OP_IDXR, OP_IDXW, OP_ALEN,
     OP_NEWARR,                      /* lambda/closure + array arena */
+    OP_NET,                         /* builtin Net.* (ubit syscall host) */
 };
 
 #define MAXM 4096
@@ -333,6 +339,58 @@ static void run(void) {
         case OP_ALEN: {
             long *blk = (long *)stackv[--sp];
             stackv[sp++] = blk[0];
+            break;
+        }
+        case OP_NET: {
+            uint16_t bi = (uint16_t)m->code[f->pc] | ((uint16_t)m->code[f->pc + 1] << 8);
+            f->pc += 2;
+            /* array byte-as-int: [0]=len, [1+i]=elemen (semantik byte 0..255) */
+            if (bi == 0) {                        /* socket(domain, type) */
+                int64_t tipe = stackv[--sp], dom = stackv[--sp];
+                int fd = (int)socket((int)dom, (int)tipe, 0);
+                stackv[sp++] = fd;
+            } else if (bi == 1) {                 /* connect(fd, ipBE, port) */
+                int64_t port = stackv[--sp], ipbe = stackv[--sp], fdi = stackv[--sp];
+                struct sockaddr_in sa;
+                memset(&sa, 0, sizeof sa);
+                sa.sin_family = AF_INET;
+                /* builtin menerima nilai polos: ipBE = a*2^24+b*2^16+c*2^8+d,
+                 * port = nomor host (mis. 9901); htonl/htons mengurusi urutan
+                 * byte jaringan meski endian host apa pun */
+                sa.sin_port = htons((uint16_t)((long)port & 0xffff));
+                sa.sin_addr.s_addr = htonl((uint32_t)((long)ipbe & 0xffffffff));
+                int r = (int)connect((int)fdi, (struct sockaddr *)&sa, sizeof sa);
+                stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 2) {                 /* rdb(fd) → byte 0..255 atau -1 */
+                int64_t fdi = stackv[--sp];
+                unsigned char b;
+                long nrd = read((int)fdi, &b, 1);
+                if (nrd < 0) dievm("Net.rdb: read gagal");
+                stackv[sp++] = (nrd == 0) ? -1 : (long)b;
+            } else if (bi == 3) {                 /* wrb(fd, byte) → 0 atau -errno */
+                int64_t v = stackv[--sp], fdi = stackv[--sp];
+                unsigned char b = (unsigned char)(v & 0xff);
+                long nwr = write((int)fdi, &b, 1);
+                stackv[sp++] = (nwr == 1) ? 0 : (nwr < 0 ? -errno : -1);
+            } else if (bi == 4) {                 /* close(fd) */
+                int64_t fdi = stackv[--sp];
+                stackv[sp++] = close((int)fdi);
+            } else if (bi == 5) {                 /* Net.bytes("literal") */
+                uint16_t cp16 = (uint16_t)m->code[f->pc] | ((uint16_t)m->code[f->pc + 1] << 8);
+                f->pc += 2;
+                const char *s = cpool[cp16];
+                long n = 0;
+                while (s[n]) n++;                 /* strlen (byte-as-int, tanpa NUL) */
+                if (heap_used + n + 1 > HEAPLEN) dievm("arena penuh (Net.bytes)");
+                long *blk = heap + heap_used;
+                heap_used += n + 1;
+                blk[0] = n;
+                for (long i = 0; i < n; i++)
+                    blk[1 + i] = (long)(unsigned char)s[i];
+                stackv[sp++] = (int64_t)blk;
+            } else {
+                dievm("Net builtin tidak dikenal");
+            }
             break;
         }
         case OP_HALT:

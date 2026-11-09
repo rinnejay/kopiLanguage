@@ -1,0 +1,119 @@
+/* Tcp.kop — transport TCP untuk Kopi (v1).
+ *
+ * Dibangun murni di atas builtin namespace `Net` (syscalls Linux langsung
+ * tanpa libc):
+ *   Net.socket(domain, type)   → fd | -1
+ *   Net.connect(fd, ipBE, port)→ 0  | -errno       (port host biasa)
+ *   Net.rdb(fd)                → byte 0..255 | -1  (EOF/galat)
+ *   Net.wrb(fd, b)             → 0 | -errno
+ *   Net.close(fd)              → 0
+ *   Net.bytes("literal")       → int[] byte-as-int (tanpa NUL)
+ *
+ * Konvensi seluruh pustaka:
+ *   - byte  : int 0..255 di dalam array int[]
+ *   - alamat: integer besar-akhir, ip(127,0,0,1) = 2130706433
+ *   - port  : nomor host biasa (builtin mengurusi urutan byte jaringan)
+ *   - galat : nilai negatif (-1 atau -errno) dari builtin
+ *
+ * Batas v1 (jujur, catatan juga di README): 1 syscall per byte — cukup
+ * untuk loopback dan uji; pemerataan buffer masuk daftar v1.x.
+ */
+
+class Tcp {
+
+    /* ── alamat IPv4 ────────────────────────────────────────────── */
+
+    /* susun alamat dari 4 oktet a.b.c.d */
+    static int ip(int a, int b, int c, int d) {
+        return a * 16777216 + b * 65536 + c * 256 + d;
+    }
+
+    /* alamat khas untuk uji: 127.0.0.1 */
+    static int loopback() {
+        return ip(127, 0, 0, 1);
+    }
+
+    /* ── koneksi ────────────────────────────────────────────────── */
+
+    /* buka TCP klien. sukses → fd ≥ 0; gagal → kode negatif
+     * (sumber galat dibedakan: socket → 0, connect → -errno). */
+    static int open(int addr, int port) {
+        int fd = Net.socket(2, 1);            /* AF_INET, SOCK_STREAM */
+        if (fd < 0) return fd;
+        int r = Net.connect(fd, addr, port);
+        if (r < 0) {
+            Net.close(fd);                    /* fd bocor jangan! */
+            return r;
+        }
+        return fd;
+    }
+
+    /* tutup koneksi (alias builtin close agar satu API yang diingat) */
+    static int drop(int fd) {
+        return Net.close(fd);
+    }
+
+    /* ── transfer byte ──────────────────────────────────────────── */
+
+    /* kirim len byte pertama buf. sukses → 0; gagal → kode negatif
+     * dan sisa byte tidak jadi terkirim (penelepon yang memutus). */
+    static int send(int fd, int[] buf, int len) {
+        if (len > buf.length) len = buf.length;
+        for (int i = 0; i < len; i++) {
+            int r = Net.wrb(fd, buf[i]);
+            if (r < 0) return r;
+        }
+        return 0;
+    }
+
+    /* kirim seluruh buf. sukses → 0; gagal → kode negatif */
+    static int sendBuf(int fd, int[] buf) {
+        return send(fd, buf, buf.length);
+    }
+
+    /* baca hingga EOF atau buf penuh. sukses → jumlah byte ≥ 0.
+     * satu syscall = satu byte, jadi galat baca builtin hanya muncul
+     * sekali lalu identik EOF: keduanya mengerucut ke akhir baca. */
+    static int recvAll(int fd, int[] buf) {
+        int n = 0;
+        while (n < buf.length) {
+            int b = Net.rdb(fd);
+            if (b < 0) return n;              /* EOF */
+            buf[n] = b;
+            n++;
+        }
+        return n;
+    }
+
+    /* ── tata array byte ────────────────────────────────────────── */
+
+    /* gabung a lalu b jadi array baru */
+    static int[] cat(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        int i = 0;
+        for (int k = 0; k < a.length; k++) { out[i] = a[k]; i++; }
+        for (int k = 0; k < b.length; k++) { out[i] = b[k]; i++; }
+        return out;
+    }
+
+    /* potong mulai indeks from sampai akhir */
+    static int[] tail(int[] xs, int from) {
+        if (from < 0) from = 0;
+        if (from > xs.length) from = xs.length;
+        int[] out = new int[xs.length - from];
+        for (int i = 0; i < out.length; i++) out[i] = xs[from + i];
+        return out;
+    }
+
+    /* indeks pertama needle dalam hay mulai from; -1 bila tidak ada */
+    static int indexOf(int[] hay, int[] needle, int from) {
+        if (needle.length == 0) return from;
+        int lim = hay.length - needle.length;
+        for (int i = from; i <= lim; i++) {
+            int j = 0;
+            while (j < needle.length && hay[i + j] == needle[j]) j++;
+            if (j == needle.length) return i;
+        }
+        return -1;
+    }
+}

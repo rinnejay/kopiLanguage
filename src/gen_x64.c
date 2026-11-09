@@ -23,6 +23,7 @@ static void spop(const char *r) { emit("\tpopq %%%s", r); par ^= 1; }
 
 static int gen_expr(Method *m, Node *e);
 static void gen_stmts(Method *m, Node *lst);
+static int netlbl;      /* label EX_NET unik per kemunculan */
 static int cur_ret_label;
 
 /* 32-bit int/bool vs 64-bit (pointer lambda/array) */
@@ -283,6 +284,128 @@ static int gen_expr(Method *m, Node *e) {
         gen_expr(m, e->a);
         emit("\tmovl (%rax), %%eax");
         return 0;
+    case EX_NET: {                       /* syscall Linux langsung (tanpa libc) */
+        int ln = netlbl++;                /* label unik per kemunculan */
+        /* 0=socket 1=connect 2=rdb 3=wrb 4=close 5=bytes */
+        if (e->ival == 5) {              /* Net.bytes("literal") → int[]       */
+            int c = (int)e->cp;
+            /* 1) strlen(s) → rcx */
+            emit("\tleaq cpool%d(%%rip), %%rsi", c);
+            emit("\txorl %%ecx, %%ecx");
+            emit(".LNX%da:", ln);
+            emit("\tcmpb $0, (%%rsi,%%rcx)");
+            emit("\tje .LNX%db", ln);
+            emit("\taddq $1, %%rcx");
+            emit("\tjmp .LNX%da", ln);
+            emit(".LNX%db:", ln);
+            /* 2) alokasi arena 8*len + 8 */
+            emit("\tmovq %%rcx, %%rdi");
+            emit("\tshlq $3, %%rdi");
+            emit("\taddq $8, %%rdi");
+            emit("\tcall kopalloc");
+            emit("\tmovq %%rcx, (%%rax)");               /* len */
+            emit("\tmovq %%rax, %%rbx");                 /* hasil (rbx callee-saved) */
+            /* 3) salin byte-as-int: rbx+8+8i = s[i] */
+            emit("\tleaq cpool%d(%%rip), %%rsi", c);
+            emit("\txorl %%ecx, %%ecx");
+            emit(".LNX%dc:", ln);
+            emit("\tcmpq %%rcx, (%%rax)");
+            emit("\tjbe .LNX%dd", ln);                    /* i >= len → selesai */
+            emit("\tmovzbl (%%rsi,%%rcx), %%edx");
+            emit("\tshlq $3, %%rcx");
+            emit("\tmovq %%rdx, 8(%%rbx,%%rcx)");
+            emit("\tshrq $3, %%rcx");
+            emit("\taddq $1, %%rcx");
+            emit("\tjmp .LNX%dc", ln);
+            emit(".LNX%dd:", ln);
+            emit("\tmovq %%rbx, %%rax");
+            return 1;
+        }
+        int n = 0;
+        for (Node *aa = e->a; aa; aa = aa->next) {
+            gen_expr(m, aa);
+            spush();
+            n++;
+        }
+        if (e->ival == 0) {                              /* socket(domain, type) */
+            emit("\tmovl %d(%%rsp), %%edi", (n - 1 - 0) * 8);
+            emit("\tmovl %d(%%rsp), %%esi", (n - 1 - 1) * 8);
+            emit("\taddq $%d, %%rsp", n * 8);
+            emit("\txorl %%edx, %%edx");                /* proto */
+            emit("\tmovl $41, %%eax");                  /* __NR_socket */
+            emit("\tsyscall");
+        } else if (e->ival == 1) {                       /* connect(fd, ipBE, port) */
+            /* sockaddr_in 16 byte di stack, lalu syscall */
+            emit("\tmovl %d(%%rsp), %%edi", (n - 1 - 0) * 8);   /* fd */
+            emit("\tmovl %d(%%rsp), %%esi", (n - 1 - 1) * 8);   /* ipBE */
+            emit("\tmovl %d(%%rsp), %%edx", (n - 1 - 2) * 8);   /* port */
+            emit("\taddq $%d, %%rsp", n * 8);
+            emit("\tpushq $0");
+            emit("\tpushq $0");                         /* 16 byte nol */
+            emit("\tandq $-16, %%rsp");
+            emit("\tmovb $2, (%%rsp)");                 /* AF_INET */
+            emit("\tmovl %%edx, %%eax");
+            emit("\tshrl $8, %%eax");
+            emit("\tmovb %%al, 2(%%rsp)");              /* port hi */
+            emit("\tmovb %%dl, 3(%%rsp)");              /* port lo */
+            emit("\tmovl %%esi, %%eax");
+            emit("\tshrl $24, %%eax");
+            emit("\tmovb %%al, 4(%%rsp)");
+            emit("\tmovl %%esi, %%eax");
+            emit("\tshrl $16, %%eax");
+            emit("\tmovb %%al, 5(%%rsp)");
+            emit("\tmovl %%esi, %%eax");
+            emit("\tshrl $8, %%eax");
+            emit("\tmovb %%al, 6(%%rsp)");
+            emit("\tmovb %%sil, 7(%%rsp)");
+            emit("\tmovq %%rsp, %%rsi");
+            emit("\tmovl $16, %%edx");
+            emit("\tmovl $42, %%eax");                  /* __NR_connect */
+            emit("\tsyscall");
+            emit("\taddq $16, %%rsp");
+        } else if (e->ival == 2) {                       /* rdb(fd) */
+            emit("\tmovl %d(%%rsp), %%edi", (n - 1) * 8);
+            emit("\taddq $%d, %%rsp", n * 8);
+            emit("\tpushq $0");                         /* buffer 1B */
+            emit("\tpushq $0");
+            emit("\tmovq %%rsp, %%rsi");
+            emit("\tmovl $1, %%edx");
+            emit("\txorl %%eax, %%eax");                /* __NR_read */
+            emit("\tsyscall");
+            emit("\tcmpq $1, %%rax");
+            emit("\tjne 1f");
+            emit("\tmovzbq (%%rsp), %%rax");            /* byte 0..255 */
+            emit("\tjmp 2f");
+            emit("1:");
+            emit("\tmovl $-1, %%eax");                  /* EOF / error */
+            emit("2:");
+            emit("\taddq $16, %%rsp");
+        } else if (e->ival == 3) {                       /* wrb(fd, b) */
+            emit("\tmovl %d(%%rsp), %%edi", (n - 1 - 0) * 8);   /* fd */
+            emit("\tmovl %d(%%rsp), %%esi", (n - 1 - 1) * 8);   /* byte */
+            emit("\taddq $%d, %%rsp", n * 8);
+            emit("\tpushq $0");
+            emit("\tpushq $0");
+            emit("\tmovb %%sil, (%%rsp)");
+            emit("\tmovq %%rsp, %%rsi");
+            emit("\tmovl $1, %%edx");
+            emit("\tmovl $1, %%eax");                   /* __NR_write */
+            emit("\tsyscall");
+            emit("\taddq $16, %%rsp");
+            emit("\tdecl %%eax");
+            emit("\tjne 1f");
+            emit("\txorl %%eax, %%eax");
+            emit("\tjmp 2f");
+            emit("1:");
+            emit("2:");
+        } else if (e->ival == 4) {                       /* close(fd) */
+            emit("\tmovl %d(%%rsp), %%edi", (n - 1) * 8);
+            emit("\taddq $%d, %%rsp", n * 8);
+            emit("\tmovl $3, %%eax");                   /* __NR_close */
+            emit("\tsyscall");
+        }
+        return 0;
+    }
     case EX_ENVLOAD:
         emit("\tmovq -8(%%rbp), %%rax");  /* slot 0 = param $env */
         emit("\tmovl %ld(%%rax), %%eax", 24 + 8 * (long)e->ival);
@@ -338,6 +461,8 @@ static void asm_escape(const char *s, char *dst, size_t cap) {
         unsigned char c = (unsigned char)*p;
         if (c == '"' || c == '\\') { dst[j++] = '\\'; dst[j++] = (char)c; }
         else if (c == '\n') { dst[j++] = '\\'; dst[j++] = 'n'; }
+        else if (c == '\r') { dst[j++] = '\\'; dst[j++] = 'r'; }
+        else if (c == 0)    { dst[j++] = '\\'; dst[j++] = '0'; }
         else if (c == '\t') { dst[j++] = '\\'; dst[j++] = 't'; }
         else dst[j++] = (char)c;
     }

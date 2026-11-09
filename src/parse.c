@@ -453,6 +453,12 @@ static Node *primary(void) {
         n->a = primary();
         return n;
     }
+    if (at(TK_STR)) {
+        Node *n = newnode(EX_STRLIT, line);
+        n->str = xs(t->text);
+        advance();
+        return n;
+    }
     if (at(T_ID) && !strcmp(xs(t->text), "new") && peek2()->type == KW_INT) {
         advance();                       /* new */
         advance();                       /* int   */
@@ -651,6 +657,7 @@ static Method *find_method(const char *cls, const char *name) {
 static void resolve_stmts(Node *lst);      /* deklarasi maju */
 static void collect_cp_stmt(Node *s);
 static Ty type_expr(Node *e);
+static int cp_push(const char *s);
 
 static int lam_counter;
 
@@ -788,6 +795,42 @@ static Ty type_expr(Node *e) {
         char buf[512];
         const char *dot = strchr(e->str, '.');
         memcpy(buf, e->str, (size_t)(dot - e->str)); buf[dot - e->str] = 0;
+        /* namespace builtin Net.*: syscall native (socket/connect/read/write/close)
+         * + bytes("literal") → array byte-as-int, dikonversi compile-time */
+        if (!strcmp(buf, "Net")) {
+            const char *fn = dot + 1;
+            int bi;
+            int want = 0;
+            if      (!strcmp(fn, "socket"))  { bi = 0; want = 2; }
+            else if (!strcmp(fn, "connect")) { bi = 1; want = 3; }
+            else if (!strcmp(fn, "rdb"))     { bi = 2; want = 1; }
+            else if (!strcmp(fn, "wrb"))     { bi = 3; want = 2; }
+            else if (!strcmp(fn, "close"))   { bi = 4; want = 1; }
+            else if (!strcmp(fn, "bytes"))   { bi = 5; want = 1; }
+            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes)", e->line, fn);
+
+            int narg = (int)e->ival;
+            if (bi == 5) {
+                if (narg != 1 || e->a == 0 || e->a->kind != EX_STRLIT)
+                    die("baris %d: Net.bytes membutuhkan tepat satu string literal", e->line);
+                e->kind = EX_NET;
+                e->ival = bi;
+                e->cp = cp_push(e->a->str);
+                e->dty = (int)T_ARI;
+                return T_ARI;
+            }
+            if (narg != want)
+                die("baris %d: Net.%s membutuhkan %d argumen, dapat %d", e->line, fn, want, narg);
+            Node *aa = e->a;
+            for (int i = 0; i < narg; i++, aa = aa->next) {
+                if (type_expr(aa) != T_INT)
+                    die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
+            }
+            e->kind = EX_NET;
+            e->ival = bi;
+            e->dty = (int)T_INT;
+            return T_INT;
+        }
         Method *m = find_method(buf, dot + 1);
         if (!m) {
             /* bukan metode: mungkin variabel lambda → pemanggilan dinamis */
@@ -960,29 +1003,35 @@ static void resolve_stmts(Node *lst) {
 
 static int cpcap;
 
+/* push string ke cpool (dedup); dipakai collector ST_PRINT & Net.bytes */
+static int cp_push(const char *s) {
+    for (int i = 0; i < prog.ncp; i++)
+        if (!strcmp(prog.cpool[i], s)) return i;
+    if (prog.ncp >= cpcap) {
+        cpcap *= 2;
+        prog.cpool = realloc(prog.cpool, sizeof(char *) * (size_t)cpcap);
+    }
+    prog.cpool[prog.ncp] = s;
+    return prog.ncp++;
+}
+
 /* kumpulkan string literal unik dari semua ST_PRINT ke cpool */
 static void collect_cp_stmt(Node *s) {
     if (!s) return;
     g_linefile = s->file;
     if (s->kind == ST_PRINT && s->str) {
-        int found = 0;
-        for (int i = 0; i < prog.ncp; i++)
-            if (!strcmp(prog.cpool[i], s->str)) { s->cp = i; found = 1; break; }
-        if (!found) {
-            if (prog.ncp >= cpcap) {
-                cpcap *= 2;
-                prog.cpool = realloc(prog.cpool, sizeof(char *) * (size_t)cpcap);
-            }
-            s->cp = prog.ncp;
-            prog.cpool[prog.ncp++] = s->str;
-        }
+        s->cp = cp_push(s->str);
     } else if (s->kind == ST_IF || s->kind == ST_WHILE) {
         collect_cp_stmt(s->b);
         collect_cp_stmt(s->c);
+    } else if (s->kind == ST_BLOCK) {
+        collect_cp_stmt(s->d);
     } else if (s->kind == ST_FOR) {
         collect_cp_stmt(s->a);
         collect_cp_stmt(s->d);
         collect_cp_stmt(s->c);
+    } else if (s->kind == ST_EXPR && s->a) {
+        /* cpool untuk Net.bytes diatur saat type_expr */
     }
     collect_cp_stmt(s->next);
 }

@@ -14,6 +14,7 @@ enum {
     OP_PRINTILN, OP_PRINTI, OP_PRINTSLN, OP_PRINTS,
     OP_NEWCLO, OP_CALLIND, OP_ENVLOAD, OP_IDXR, OP_IDXW, OP_ALEN,
     OP_NEWARR,                      /* lambda/closure + array arena */
+    OP_NET,                         /* builtin Net.* (syscall host) */
 };
 
 typedef struct {
@@ -167,6 +168,13 @@ static void gen_expr(Node *e) {
         em8(OP_CALLIND); em16(i);
         break;
     }
+    case EX_NET:
+        if (e->ival != 5)                /* Net.bytes: literal dicerna compile-time */
+            for (Node *aa = e->a; aa; aa = aa->next) gen_expr(aa);
+        em8(OP_NET);
+        em16((int)e->ival);
+        if (e->ival == 5) em16((int)e->cp);       /* Net.bytes: index cpool */
+        break;
     case EX_ENVLOAD:
         em8(OP_ENVLOAD);
         em16((int)e->ival);

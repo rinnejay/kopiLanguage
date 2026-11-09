@@ -1,0 +1,30 @@
+// Klien HTTP minimal: unduh / dari server HTTP lokal (python -m http.server).
+// Jalankan: python3 -m http.server 9910 --bind 127.0.0.1
+// (di uji: test.sh menyalakan servernya sendiri)
+import Tcp;
+import Http;
+
+class Main {
+    public static void main(String[] args) {
+        int addr = Tcp.loopback();               // 127.0.0.1
+        int port = 9910;
+        int[] host = Net.bytes("127.0.0.1");
+        int[] path = Net.bytes("/");
+
+        // seluruh respons (header + body) malah tereksplisit memisah
+        int[] buf = new int[8192];
+        int n = Http.getInto(addr, port, host, path, buf);
+        if (n < 0) {
+            System.out.println(n);               // kode galat negatif
+            return;
+        }
+        int[] resp = new int[n];
+        for (int i = 0; i < n; i++) resp[i] = buf[i];
+
+        System.out.println(Http.statusOf(resp));          // 200
+        int[] b = Http.bodyOf(resp);
+        System.out.println(b.length);                      // panjang isi
+        for (int i = 0; i < b.length; i++) System.out.print(b[i]);
+        System.out.println("");
+    }
+}

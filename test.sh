@@ -190,6 +190,84 @@ done
 if [ $pas64 -eq 1 ]; then echo "PASS  library [x64]"; PASS=$((PASS+1));
 else echo "FAIL  library [x64]: sintaks assembly"; FAIL=$((FAIL+1)); fi
 
+# ─── Net: builtin + pustaka Tcp/Http (uji loopback, server disedot sendiri) ───
+mkdir -p "$T/kopi/www"
+printf 'Halo Net Kopi!\n' > "$T/kopi/www/halo.txt"
+
+cat > "$T/kopi/echosrv.py" <<'EOF'
+import socket
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", 9912)); s.listen(8)
+while True:
+    c, _ = s.accept()
+    try:
+        d = c.recv(4096)
+        c.sendall(b"ACK:" + d)
+        c.shutdown(socket.SHUT_WR)
+    except OSError:
+        pass
+    try: c.close()
+    except OSError: pass
+EOF
+python3 "$T/kopi/echosrv.py" & ECHO_PID=$!
+python3 -m http.server 9911 --bind 127.0.0.1 --directory "$T/kopi/www" & HTTP_PID=$!
+sleep 1
+
+# raw: builtin socket/connect/wrb/rdb + pustaka Tcp
+cat > "$T/kopi/netraw.kop" <<'EOF'
+import Tcp;
+
+class Main {
+    public static void main(String[] args) {
+        int fd = Tcp.open(Tcp.loopback(), 9912);
+        if (fd < 0) { System.out.println(fd); return; }
+        System.out.println(Tcp.sendBuf(fd, Net.bytes("ping")));
+        int[] buf = new int[100];
+        int n = Tcp.recvAll(fd, buf);
+        System.out.println(n);
+        for (int i = 0; i < n; i++) { System.out.print(buf[i]); System.out.print(" "); }
+        System.out.println("");
+        Tcp.drop(fd);
+    }
+}
+EOF
+printf '0\n8\n65 67 75 58 112 105 110 103 \n' > "$T/kopi/netraw.ref"
+check netraw "$T/kopi/netraw.kop"
+
+# HTTP/1.0 GET via pustaka Http (status, panjang body, isi body)
+cat > "$T/kopi/netget.kop" <<'EOF'
+import Tcp;
+import Http;
+
+class Main {
+    public static void main(String[] args) {
+        int[] host = Net.bytes("127.0.0.1");
+        int[] path = Net.bytes("/halo.txt");
+        int[] buf = new int[8192];
+        int n = Http.getInto(Tcp.loopback(), 9911, host, path, buf);
+        if (n < 0) { System.out.println(n); return; }
+        int[] resp = new int[n];
+        for (int i = 0; i < n; i++) resp[i] = buf[i];
+        System.out.println(Http.statusOf(resp));
+        int[] b = Http.bodyOf(resp);
+        System.out.println(b.length);
+        for (int i = 0; i < b.length; i++) { System.out.print(b[i]); System.out.print(" "); }
+        System.out.println("");
+    }
+}
+EOF
+printf '200\n15\n72 97 108 111 32 78 101 116 32 75 111 112 105 33 10 \n' > "$T/kopi/netget.ref"
+check netget "$T/kopi/netget.kop"
+
+# sintaks x64 untuk Net (tidak dieksekusi di aarch64)
+./kopicc "$T/kopi/netget.kop" -t x64 -o "$T/kopi/netget64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/netget64.s" -o /dev/null
+if [ $? -eq 0 ]; then echo "PASS  net [x64]"; PASS=$((PASS+1));
+else echo "FAIL  net [x64]: sintaks assembly"; FAIL=$((FAIL+1)); fi
+
+kill $ECHO_PID $HTTP_PID 2>/dev/null
+
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"
 [ $FAIL -eq 0 ]

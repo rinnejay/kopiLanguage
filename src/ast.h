@@ -13,6 +13,8 @@ enum {
     EX_NEWARR,     /* new int[n]: a=size expr, dty=T_ARI                  */
     EX_IDX,        /* a[i]  : a=array expr, b=index expr                  */
     EX_LEN,        /* a.length : a=array expr                             */
+    EX_NET,        /* builtin Net.* : ival=idx builtin, a=args            */
+    EX_STRLIT,     /* string literal dalam ekspresi (khusus Net.bytes)    */
     /* statements */
     ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
