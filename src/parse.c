@@ -45,8 +45,12 @@ static Method *cur_method;
 
 /* ---------- tipe ---------- */
 
-static Ty type_opt(void) {  /* int | boolean | void | fn | String ([]) */
-    if (at(KW_INT)) { advance(); return T_INT; }
+static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) */
+    if (at(KW_INT)) {
+        advance();
+        if (at('[')) { advance(); expect(']', "']' setelah '[' pada int[]"); return T_ARI; }
+        return T_INT;
+    }
     if (at(KW_BOOL)) { advance(); return T_BOOL; }
     if (at(KW_VOID)) { advance(); return T_VOID; }
     if (at(KW_FN)) { advance(); return T_FN; }
@@ -420,23 +424,60 @@ static Node *primary(void) {
         n->a = primary();
         return n;
     }
+    if (at(T_ID) && !strcmp(xs(t->text), "new") && peek2()->type == KW_INT) {
+        advance();                       /* new int[n] — array dari arena */
+        expect('[', "'[' setelah 'new int'");
+        Node *n = newnode(EX_NEWARR, line);
+        n->dty = (int)T_ARI;
+        n->a = expr();
+        expect(']', "']' pada new int[n]");
+        return n;
+    }
     if (at(T_ID)) {
-        /* panggilan metode / Class.metode(...) */
-        if (peek2()->type == '(' || peek2()->type == '.')
+        /* panggilan metode / Class.metode(...): nama berlambang (. lalu id lalu '(') */
+        if (peek2()->type == '(' ||
+            (peek2()->type == '.' && ts[ti + 2].type == T_ID && ts[ti + 3].type == '('))
             return call_node(line);
         Node *n = newnode(EX_VAR, line);
         n->str = xs(t->text);
         advance();
-        return n;
+        return n;   /* postfix (a[i], a.length) ditangani pemanggil */
     }
     die("baris %d: ekspresi tidak dikenal", line);
     return 0;
 }
 
+/* postfix: primary lalu beruntun a[i] dan a.length */
+static Node *postfix(void) {
+    Node *l = primary();
+    for (;;) {
+        if (at('.')) {    /* hanya .length yang valid di sini */
+            if (peek2()->type != T_ID || strcmp(xs(peek2()->text), "length"))
+                die("baris %d: setelah '.' hanya '.length' yang didukung", l->line);
+            advance(); advance();
+            Node *n = newnode(EX_LEN, l->line);
+            n->a = l;
+            l = n;
+            break;
+        }
+        if (at('[')) {
+            advance();
+            Node *n = newnode(EX_IDX, l->line);
+            n->a = l;
+            n->b = expr();
+            expect(']', "']' pada a[i]");
+            l = n;
+            continue;
+        }
+        break;
+    }
+    return l;
+}
+
 static void mul_chain_cleanup_placeholder(void) { }
 
 static Node *mul_chain(void) {
-    Node *l = primary();
+    Node *l = postfix();
     while (at('*') || at('/') || at('%')) {
         Node *n = newnode(EX_BIN, peek()->line);
         char op = (char)ts[ti].type;
@@ -444,7 +485,7 @@ static Node *mul_chain(void) {
         n->str = s;
         n->a = l;
         advance();
-        n->b = primary();
+        n->b = postfix();
         l = n;
     }
     return l;

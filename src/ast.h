@@ -1,7 +1,7 @@
 #ifndef AST_H
 #define AST_H
 
-typedef enum { T_INT, T_BOOL, T_VOID, T_STR, T_FN } Ty;
+typedef enum { T_INT, T_BOOL, T_VOID, T_STR, T_FN, T_ARI } Ty;
 
 /* Node kinds */
 enum {
@@ -10,9 +10,13 @@ enum {
     EX_ARROW,      /* lambda: c=params, a=expr body / d=stmt body, cp=Method* */
     EX_FCALL,      /* pemanggilan lewat closure: a=args, b=callee expr    */
     EX_ENVLOAD,    /* baca capture ke-j dari env: ival=j, dty=tipe capture */
+    EX_NEWARR,     /* new int[n]: a=size expr, dty=T_ARI                  */
+    EX_IDX,        /* a[i]  : a=array expr, b=index expr                  */
+    EX_LEN,        /* a.length : a=array expr                             */
     /* statements */
     ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
+    ST_IDXASG,     /* a[i] = v : a=array expr, b=index expr, c=value expr */
 };
 
 typedef struct Node {
