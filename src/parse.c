@@ -278,10 +278,25 @@ static Node *stmt_single(void) {
         return n;
     }
 
-    /* assignment, ++/+= kompon, atau call statement */
+    /* assignment, a[i] = v, ++/+= kompon, atau call statement */
     if (t->type == T_ID) {
         int t2 = peek2()->type;
         if (t2 == '=') return parse_assignment(line, 1);
+        if (t2 == '[') {
+            /* a[i] = v; (indeks di sisi kiri) */
+            Node *s = newnode(ST_IDXASG, line);
+            Node *arr = newnode(EX_VAR, line);
+            arr->str = xs(t->text);
+            advance();
+            expect('[', "'[' pada a[i]");
+            s->a = arr;
+            s->b = expr();
+            expect(']', "']' pada a[i]");
+            expect('=', "'=' pada a[i] = v");
+            s->c = expr();
+            expect(';', "';' setelah a[i] = v");
+            return s;
+        }
         if (is_incuptok(t2)) return compound_assign(line, 1);
         Node *ex = newnode(ST_EXPR, line);
         ex->a = call_node(line);
@@ -425,7 +440,8 @@ static Node *primary(void) {
         return n;
     }
     if (at(T_ID) && !strcmp(xs(t->text), "new") && peek2()->type == KW_INT) {
-        advance();                       /* new int[n] — array dari arena */
+        advance();                       /* new */
+        advance();                       /* int   */
         expect('[', "'[' setelah 'new int'");
         Node *n = newnode(EX_NEWARR, line);
         n->dty = (int)T_ARI;
@@ -799,6 +815,7 @@ static Ty type_expr(Node *e) {
         if (want != got)
             die("baris %d: metode %s butuh %d argumen, dapat %d", e->line, e->str, want, got);
         e->ival = m->index;   /* simpan index metode */
+        e->dty = (long)m->ret;    /* tipe kembalian untuk backend native */
         return m->ret;
     }
     case EX_ARROW:
@@ -806,6 +823,21 @@ static Ty type_expr(Node *e) {
         return T_FN;   /* nilai lambda bertipe fn; ret internal di Method */
     case EX_ENVLOAD:
         return (Ty)e->dty;
+    case EX_NEWARR:
+        if (type_expr(e->a) != T_INT)
+            die("baris %d: ukuran 'new int[n]' harus int", e->line);
+        if ((long)e->ival < 0) e->ival = 0;
+        return T_ARI;
+    case EX_IDX:
+        if (type_expr(e->a) != T_ARI)
+            die("baris %d: indeks [..] hanya untuk array int[]", e->line);
+        if (type_expr(e->b) != T_INT)
+            die("baris %d: indeks array harus int", e->line);
+        return T_INT;
+    case EX_LEN:
+        if (type_expr(e->a) != T_ARI)
+            die("baris %d: .length hanya untuk array int[]", e->line);
+        return T_INT;
     }
     die("type_expr: node tidak dikenal kind=%d", e->kind);
     return T_INT;
@@ -878,6 +910,15 @@ static void resolve_stmt(Node *s) {
             (void)t;
         }
         break;
+    case ST_IDXASG: {
+        if (type_expr(s->a) != T_ARI)
+            die("baris %d: penugasan a[i] = v butuh array int[] di ruas kiri", s->line);
+        if (type_expr(s->b) != T_INT)
+            die("baris %d: indeks array harus int", s->line);
+        if (type_expr(s->c) != T_INT)
+            die("baris %d: nilai penugasan a[i] harus int", s->line);
+        break;
+    }
     default:
         die("resolusi: statement kind=%d tidak dikenal", s->kind);
     }

@@ -1,0 +1,27 @@
+// array.kop — array int[] dari arena memori, dengan bounds-check runtime.
+class Data {
+    static int jumlah(int[] xs) {
+        int s = 0;
+        for (int i = 0; i < xs.length; i++) s += xs[i];
+        return s;
+    }
+
+    public static void main(String[] args) {
+        int[] a = new int[10];
+        for (int i = 0; i < a.length; i++) a[i] = i * i;
+        System.out.println(a[a.length - 1]);   // 81
+        System.out.println(jumlah(a));         // 285 = 0+1+4+9+16+25+36+49+64+81
+
+        int[] b = new int[3];
+        b[0] = a.length;
+        b[1] = a[1];
+        b[2] = b[0] + b[1];                    // 11
+        System.out.println(b[2]);
+
+        int[] z = new int[0];                  // array kosong
+        System.out.println(z.length);          // 0
+
+        // bounds-check: lepas baris ini untuk lihat error rapi:
+        // System.out.println(a[99]);          // kopi: array tidak valid
+    }
+}

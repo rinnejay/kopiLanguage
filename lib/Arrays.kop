@@ -1,0 +1,117 @@
+/* Arrays.kop — pustaka utilitas array int[].
+ *
+ * Semua fungsi murni: TIDAK Mengubah array masukan kecuali dan hanya pada
+ * fungsi sort yang dinamisnya memang memerlukan ubahan langsung.
+ * NAIK disiplin: O(n) untuk traversala, O(n log n) untuk sort uji merge.
+ */
+
+class Arrays {
+
+    /* jumlah seluruh elemen (semantik wrap int 32-bit) */
+    static int sum(int[] xs) {
+        int s = 0;
+        for (int i = 0; i < xs.length; i++) s += xs[i];
+        return s;
+    }
+
+    static int max(int[] xs) {
+        int m = xs[0];
+        for (int i = 1; i < xs.length; i++)
+            if (xs[i] > m) m = xs[i];
+        return m;
+    }
+
+    static int min(int[] xs) {
+        int m = xs[0];
+        for (int i = 1; i < xs.length; i++)
+            if (xs[i] < m) m = xs[i];
+        return m;
+    }
+
+    /* pencarian linier: indeks pertama atau -1 */
+    static int find(int[] xs, int v) {
+        for (int i = 0; i < xs.length; i++)
+            if (xs[i] == v) return i;
+        return -1;
+    }
+
+    /* banding dua array: 1 jika sama panjang & tiap elemen sama */
+    static int arrEq(int[] a, int[] b) {
+        if (a.length != b.length) return 0;
+        for (int i = 0; i < a.length; i++)
+            if (a[i] != b[i]) return 0;
+        return 1;
+    }
+
+    /* berapa kali v muncul */
+    static int count(int[] xs, int v) {
+        int n = 0;
+        for (int i = 0; i < xs.length; i++)
+            if (xs[i] == v) n++;
+        return n;
+    }
+
+    /* salin balik n elemen pertama ke array baru */
+    static int[] take(int[] xs, int n) {
+        if (n > xs.length) n = xs.length;
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) out[i] = xs[i];
+        return out;
+    }
+
+    /* buang n elemen pertama */
+    static int[] drop(int[] xs, int n) {
+        if (n < 0) n = 0;
+        if (n > xs.length) n = xs.length;
+        int k = xs.length - n;
+        int[] out = new int[k];
+        for (int i = 0; i < k; i++) out[i] = xs[n + i];
+        return out;
+    }
+
+    /* gabungan a lalu b */
+    static int[] merge(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        int i = 0;
+        for (int k = 0; k < a.length; k++) { out[i] = a[k]; i++; }
+        for (int k2 = 0; k2 < b.length; k2++) { out[i] = b[k2]; i++; }
+        return out;
+    }
+
+    /* urut naik (merge sort, tak mengubah elemen masukan) */
+    static int[] sort(int[] xs) {
+        if (xs.length <= 1) return xs;
+        int m = xs.length / 2;
+        int[] l = take(xs, m);
+        int[] r = drop(xs, m);
+        return msort(sort(l), sort(r));
+    }
+
+    private static int[] msort(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        int i = 0;
+        int j = 0;
+        int k = 0;
+        while (i < a.length && j < b.length) {
+            if (a[i] <= b[j]) { out[k] = a[i]; i++; }
+            else              { out[k] = b[j]; j++; }
+            k++;
+        }
+        while (i < a.length) { out[k] = a[i]; i++; k++; }
+        while (j < b.length) { out[k] = b[j]; j++; k++; }
+        return out;
+    }
+
+    /* biner: akurus nomor urut terurut atau -1 */
+    static int binSearch(int[] xs, int v) {
+        int lo = 0;
+        int hi = xs.length - 1;
+        while (lo <= hi) {
+            int m = lo + (hi - lo) / 2;
+            if (xs[m] == v) return m;
+            if (xs[m] < v)  lo = m + 1;
+            else            hi = m - 1;
+        }
+        return -1;
+    }
+}

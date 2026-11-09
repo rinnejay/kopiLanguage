@@ -1,0 +1,113 @@
+/* Crypto.kop — utilitas hash & cipher untuk Kopi (v1: aritmetika murni).
+ *
+ * Bahasa Kopi v1 belum punya operator bitwise (^ & << >>), jadi semua
+ * operasi bit dikerjakan lewat bagian aritmetika + tabel — hasilnya tetap
+ * oke untuk hash cache, PRNG, dan cipher demo; bukan untuk kriptografi
+ * produksi (tanda di README).
+ *
+ * Konvensi byte: int 0..255 (byte-as-int) di dalam array int[].
+ */
+
+class Crypto {
+
+    /* ── fondasi bitwise tanpa operator bitwise ─────────────────── */
+
+    /* xor bit-demi-bit untuk nilai NONNEGATIF < 2^31 */
+    static int bitxor(int a, int b) {
+        int r = 0;
+        int p = 1;
+        for (int i = 0; i < 31; i++) {
+            int na = a % 2;
+            int nb = b % 2;          /* bit terendah */
+            boolean beda = na != nb;
+            if (beda) r = r + p;                 /* xor = bit berbeda */
+            a = a / 2;
+            b = b / 2;
+            p = p + p;
+        }
+        return r;
+    }
+
+    /* banding dua array: 1 jika sama panjang & tiap elemen sama */
+    static int arrEq(int[] a, int[] b) {
+        if (a.length != b.length) return 0;
+        for (int i = 0; i < a.length; i++)
+            if (a[i] != b[i]) return 0;
+        return 1;
+    }
+
+    static int abs_(int x) {
+        if (x < 0) return -x;
+        return x;
+    }
+
+    /* ── hash ───────────────────────────────────────────────────── */
+
+    /* FNV-1a 32-bit darider array byte-as-int (len elemen pertama) */
+    static int fnv1a(int[] data, int len) {
+        int h = 2166136261;
+        int HMAX = 4294967296 - 1;               /* 2^32 - 1 (wrap di atas italia) */
+        for (int i = 0; i < len; i++) {
+            int b = data[i] % 256;
+            if (b < 0) b = b + 256;
+            h = bitxor(h, b);
+            h = h * 16777619;
+        }
+        return abs_(h);
+    }
+
+    /* ── PRNG ──────────────────────────────────────────────────── */
+
+    /* Lehmer/LCG (Schrage) — perkiraan berpisah murni int,
+     * seed/mulai 1..2^31-2, hasil [0, M) */
+    static int nextRand(int x) {
+        int M = 2147483647;
+        int A = 48271;
+        int Q = 44488;
+        int R = 3399;
+        int hi = x / Q;
+        int lo = x % Q;
+        int t = A * lo - R * hi;
+        if (t <= 0) t = t + M;
+        return t;
+    }
+
+    static int randRange(int seed, int hi) {
+        if (hi <= 0) return 0;
+        int r = nextRand(seed);
+        if (r < 0) r = -r;
+        return r % hi;
+    }
+
+    /* ── cipher ────────────────────────────────────────────────── */
+
+    /* XOR stream: out[i] = in[i] ^ key[i % key.length]
+     * XOR nirl: pemanggilan kedua dengan key yang sama = dekripsi. */
+    static int[] xorStream(int[] inp, int[] key) {
+        int[] out = new int[inp.length];
+        for (int i = 0; i < inp.length; i++) {
+            int a = inp[i] % 256;
+            int k = key[i % key.length] % 256;
+            if (a < 0) a = a + 256;
+            if (k < 0) k = k + 256;
+            int x = bitxor(a, k);
+            out[i] = x;
+        }
+        return out;
+    }
+
+    /* Caesar shift (+k mod 256) — disetara beserta 'uncaesar' */
+    static int[] caesar(int[] inp, int k) {
+        int[] out = new int[inp.length];
+        for (int i = 0; i < inp.length; i++) {
+            int c = (inp[i] + k) % 256;
+            if (c < 0) c = c + 256;
+            out[i] = c;
+        }
+        return out;
+    }
+
+    static int[] uncaesar(int[] inp, int k) {
+        return caesar(inp, 256 - (k % 256));
+    }
+}

@@ -103,8 +103,70 @@ check lambda "$T/kopi/lambda.kop"
 # lambda di target x64: cek sintaks assembly (tidak dieksekusi di aarch64)
 ./kopicc examples/lambda.kop -t x64 -o "$T/kopi/lambda64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/lambda64.s" -o /dev/null
-if [ $? -eq 0 ]; then echo "PASS  lambda [x64]"; PASS=$((PASS+1)); 
+if [ $? -eq 0 ]; then echo "PASS  lambda [x64]"; PASS=$((PASS+1));
 else echo "FAIL  lambda [x64]: sintaks assembly"; FAIL=$((FAIL+1)); fi
+
+# array int[] dari arena memori (bounds check runtime)
+printf '81\n285\n11\n0\n' > "$T/kopi/array.ref"
+check array examples/array.kop
+
+# pustaka Crypto: aritmetika murni (fnv1a, xorStream round-trip, caesar, PRNG)
+cat > "$T/kopi/cryptot.kop" <<'EOF'
+import Crypto;
+
+class Main {
+    public static void main(String[] args) {
+        int[] data = new int[8];
+        data[0] = 104; data[1] = 97; data[2] = 108; data[3] = 111;
+        data[4] = 10; data[5] = 20; data[6] = 30; data[7] = 40;
+        System.out.println(Crypto.fnv1a(data, 8));
+        int[] key = new int[3];
+        key[0] = 7; key[1] = 42; key[2] = 200;
+        System.out.println(Crypto.arrEq(data, Crypto.xorStream(Crypto.xorStream(data, key), key)));
+        System.out.println(Crypto.arrEq(data, Crypto.uncaesar(Crypto.caesar(data, 3), 3)));
+        int s = 123456789;
+        for (int i = 0; i < 5; i++) s = Crypto.nextRand(s);
+        System.out.println(s);
+        System.out.println(Crypto.bitxor(102, 51));
+    }
+}
+EOF
+printf '929486015\n1\n1\n1845549155\n85\n' > "$T/kopi/cryptot.ref"
+check cryptot "$T/kopi/cryptot.kop"
+
+# pustaka Arrays: sort, binSearch, find, count, arrEq
+cat > "$T/kopi/arrtest.kop" <<'EOF'
+import Arrays;
+
+class Main {
+    public static void main(String[] args) {
+        int[] a = new int[6];
+        a[0] = 40; a[1] = 10; a[2] = 30; a[3] = 10; a[4] = 50; a[5] = 20;
+        System.out.println(Arrays.sum(a));
+        System.out.println(Arrays.max(a));
+        System.out.println(Arrays.find(a, 50));
+        int[] s = Arrays.sort(a);
+        System.out.println(s[0]);
+        System.out.println(s[5]);
+        System.out.println(Arrays.binSearch(s, 30));
+        System.out.println(Arrays.binSearch(s, 55));
+        System.out.println(Arrays.count(a, 10));
+        System.out.println(Arrays.arrEq(s, s) + Arrays.arrEq(s, a));
+    }
+}
+EOF
+printf '160\n50\n4\n10\n50\n3\n-1\n2\n1\n' > "$T/kopi/arrtest.ref"
+check arrtest "$T/kopi/arrtest.kop"
+
+# sintaks x64 untuk fitur array + library (tidak dieksekusi di aarch64)
+cp examples/array.kop "$T/kopi/array.kop"
+pas64=1
+for t in array cryptot arrtest; do
+    ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
+    cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
+done
+if [ $pas64 -eq 1 ]; then echo "PASS  library [x64]"; PASS=$((PASS+1));
+else echo "FAIL  library [x64]: sintaks assembly"; FAIL=$((FAIL+1)); fi
 
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"

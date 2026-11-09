@@ -12,7 +12,8 @@ enum {
     OP_LT, OP_GT, OP_LE, OP_GE, OP_EQ, OP_NE,
     OP_JMP, OP_JMPF, OP_JMPT, OP_CALL, OP_RET,
     OP_PRINTILN, OP_PRINTI, OP_PRINTSLN, OP_PRINTS,
-    OP_NEWCLO, OP_CALLIND, OP_ENVLOAD,     /* lambda/closure */
+    OP_NEWCLO, OP_CALLIND, OP_ENVLOAD, OP_IDXR, OP_IDXW, OP_ALEN,
+    OP_NEWARR,                      /* lambda/closure + array arena */
 };
 
 typedef struct {
@@ -116,6 +117,12 @@ static void gen_stmt(Node *s) {
     case ST_EXPR:
         if (s->a) { gen_expr(s->a); em8(OP_POP); }
         break;
+    case ST_IDXASG:
+        gen_expr(s->c);          /* nilai - dipakai paling atas */
+        gen_expr(s->a);          /* array pointer */
+        gen_expr(s->b);          /* idx */
+        em8(OP_IDXW);
+        break;
     default:
         die("gen_vm: statement kind=%d", s->kind);
     }
@@ -159,6 +166,19 @@ static void gen_expr(Node *e) {
     case EX_ENVLOAD:
         em8(OP_ENVLOAD);
         em16((int)e->ival);
+        break;
+    case EX_NEWARR:
+        gen_expr(e->a);
+        em8(OP_NEWARR);
+        break;
+    case EX_IDX:
+        gen_expr(e->a);          /* array pointer */
+        gen_expr(e->b);          /* indeks */
+        em8(OP_IDXR);
+        break;
+    case EX_LEN:
+        gen_expr(e->a);
+        em8(OP_ALEN);
         break;
     case EX_BIN: {
         char op = e->str[0];

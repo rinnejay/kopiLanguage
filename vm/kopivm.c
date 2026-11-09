@@ -10,7 +10,8 @@ enum {
     OP_LT, OP_GT, OP_LE, OP_GE, OP_EQ, OP_NE,
     OP_JMP, OP_JMPF, OP_JMPT, OP_CALL, OP_RET,
     OP_PRINTILN, OP_PRINTI, OP_PRINTSLN, OP_PRINTS,
-    OP_NEWCLO, OP_CALLIND, OP_ENVLOAD,     /* lambda/closure */
+    OP_NEWCLO, OP_CALLIND, OP_ENVLOAD, OP_IDXR, OP_IDXW, OP_ALEN,
+    OP_NEWARR,                      /* lambda/closure + array arena */
 };
 
 #define MAXM 4096
@@ -37,10 +38,15 @@ static void dievm(const char *m) {
     exit(1);
 }
 
-/* heap untuk closure (bump arena; GC belum ada) */
+/* heap untuk closure & array (bump arena; GC belum ada) */
 #define HEAPLEN (1 << 19)   /* dalam long: 4 MB */
 static long *heap;
 static long heap_used;
+
+static void dievm2(const char *m, long v) {
+    fprintf(stderr, "kopivm: %s (%ld)\n", m, v);
+    exit(1);
+}
 
 static uint8_t rd8(size_t *p) { return img[(*p)++]; }
 static uint16_t rd16(size_t *p) { uint16_t v = rd8(p); v |= (uint16_t)rd8(p) << 8; return v; }
@@ -145,9 +151,10 @@ static void run(void) {
             break;
         }
         case OP_POP: sp--; break;
-        case OP_ADD: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a + b; break;
-        case OP_SUB: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a - b; break;
-        case OP_MUL: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a * b; break;
+        /* semantik int 32-bit (wrap, seperti Java/backend native) */
+        case OP_ADD: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a + b); break;
+        case OP_SUB: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a - b); break;
+        case OP_MUL: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a * b); break;
         case OP_DIV:
             b = stackv[--sp]; a = stackv[--sp];
             if (b == 0) dievm("pembagian dengan nol");
@@ -288,6 +295,44 @@ static void run(void) {
             if ((long)cj >= ncap) dievm("capture korup");
             if (sp >= MAXSTACK) dievm("operand stack penuh");
             stackv[sp++] = blk[3 + cj];
+            break;
+        }
+        case OP_NEWARR: {
+            int64_t n = stackv[--sp];
+            if (n < 0) dievm2("ukuran array negatif", (long)n);
+            if (heap_used + n + 1 > HEAPLEN)
+                dievm("arena penuh — GC belum ada; reset arena per request"); 
+            long *blk = heap + heap_used;
+            heap_used += n + 1;
+            blk[0] = (long)n;
+            if (sp >= MAXSTACK) dievm("operand stack penuh");
+            stackv[sp++] = (int64_t)blk;
+            break;
+        }
+        case OP_IDXR: {
+            int64_t idx = stackv[--sp];
+            long *blk = (long *)stackv[--sp];
+            if ((long *)0 == blk || blk < heap || blk >= heap + HEAPLEN)
+                dievm("array tidak valid (di luar arena)");
+            if (idx < 0 || blk[0] <= idx)
+                dievm2("indeks array di luar batas", (long)idx);
+            stackv[sp++] = blk[1 + idx];
+            break;
+        }
+        case OP_IDXW: {
+            int64_t idx = stackv[--sp];
+            long *blk = (long *)stackv[--sp];
+            int64_t val = stackv[--sp];
+            if ((long *)0 == blk || blk < heap || blk >= heap + HEAPLEN)
+                dievm("array tidak valid (di luar arena)");
+            if (idx < 0 || blk[0] <= idx)
+                dievm2("indeks array di luar batas", (long)idx);
+            blk[1 + idx] = val;
+            break;
+        }
+        case OP_ALEN: {
+            long *blk = (long *)stackv[--sp];
+            stackv[sp++] = blk[0];
             break;
         }
         case OP_HALT:

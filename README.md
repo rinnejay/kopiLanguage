@@ -28,6 +28,23 @@
 sendiri, type checker sendiri, generator assembly sendiri, dan mesin virtual
 sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 
+## Status & changelog
+
+```
+Pengembangan  ████████░░░░░░░░  ~55%  menuju bahasa serius (v2)
+v1.2 hari ini ████████████████  26/26 test hijau di 3 backend
+```
+
+| Versi | Isi |
+|-------|-----|
+| **v1.0** | core language: class/static, `int/boolean`, aritmetika semantik Java, kontrol alir, multi-file `import`, 3 backend (a64 native, x64 native, VM KOP1) |
+| **v1.1** | lambda/closure sejati: capture by-value, `fn` sebagai argumen, arity check runtime, semua backend |
+| **v1.2** | **array `int[]` + arena memori `kopalloc`** (bump allocator, 1 batas 8 MB): `new int[n]`, `a[i]`, `a[i] = v`, `a.length`, bounds check runtime (`kopi: array tidak valid`, OOM rapi); fix ABI entry `main` (frame x30 sendiri); pustaka `lib/Arrays.kop` (sort/binSearch/find/count/...) dan `lib/Crypto.kop` (bitxor + FNV-1a + PRNG Lehmer + XOR-stream/Caesar) — **100% ditulis dalam bahasa Kopi** di atas aritmetika murni |
+
+`test.sh` memverifikasi **konsistensi output antar-backend**: program yang sama
+harus menghasilkan output byte-per-byte identik di VM, native aarch64, dan
+(sintaks assembly) x86-64.
+
 ## Bangun
 
 ```sh
@@ -90,6 +107,7 @@ Fitur v1.0 (semua sudah diuji di backend a64 maupun vm):
 |-----------------------------------|---------------------------------------------------|
 | `class`, metode `static`          | multi-class, panggilan lintas-class `Cls.nama()`  |
 | tipe `int`, `boolean`, `void`     | checker tipe sederhana (deteksi salah tipe)       |
+| array `int[]`                     | `new int[n]`, `a[i]`, `a[i] = v`, `a.length` — heap arena `kopalloc` + bounds check runtime |
 | aritmetika                        | `+ - * / %` (semantik Java: trunc ke 0)           |
 | pembanding                        | `< > <= >= == !=`                                 |
 | logika                            | `&& || !` dengan **short-circuit**                |
@@ -136,6 +154,46 @@ Cara kerja:
   [3+j]=capture` — arity dicek runtime (error rapi, bukan SIGSEGV)
 - batas: maks 5 argumen pemanggilan `f(a,b,...)` dan maks 32 capture;
   kembalian lambda masih `int`/`boolean`; return lambda belum didukung
+
+## Arena memori & array `int[]` (v1.2)
+
+Semua alokasi dinamis (elemen array, closure) masuk satu **arena bump
+allocator** — sederhana, cepat, tanpa free-per-objek:
+
+```
+kopalloc(n):  used += n; if (used > 8MB) die("arena memori habis");
+              return base + (used - n);
+```
+
+- **Native a64/x64**: `base` = satu blok `malloc(1<<23)` di entry `main` (stub
+  `main` punya **frame sendiri** — tanpa itu, `bl malloc` menimpa `x30` dan
+  `ret` di class-main mengeksekusi ulang `main` = loop; bug ABI yang
+  menarik!). Limit 8 MB, lalu pesan rapi + exit 1, bukan SIGSEGV.
+- **VM**: arena 4 MB di heap `kopivm`, semantik penuh.
+- layout array identik di semua backend: `[0]=length, [8+8*i]=elemen` —
+  elemen integer 32-bit disimpan sign-extended 8 byte penuh, jadi layout
+  pointer array portable antar backend.
+- bounds check runtime: indeks negatif/`>= length` →
+  `kopi: array tidak valid (indeks/ukuran salah)` (cek unsigned di a64:
+  `cmp; b.hs` menutupi negatif sekaligus lewat `lsl #3` di atas elemen 64-bit).
+
+```java
+class Data {
+    static int jumlah(int[] xs) {
+        int s = 0;
+        for (int i = 0; i < xs.length; i++) s += xs[i];
+        return s;
+    }
+    public static void main(String[] args) {
+        int[] a = new int[10];
+        for (int i = 0; i < a.length; i++) a[i] = i * i;
+        System.out.println(jumlah(a));          // 285
+    }
+}
+```
+
+Contoh penuh: `examples/array.kop` (81, 285, 11, 0 — diuji vm & a64
+byte-per-byte sama).
 
 ## Import & multi-file
 
@@ -188,6 +246,16 @@ Kopi, bukan kode built-in compiler:
 |-------------------|---------------------------------------------------------------------|
 | `lib/Matematika.kop` | `abs min max gcd lcm pangkat akar prima faktorial fib genap`     |
 | `lib/Angka.kop`      | `balik` (12345→54321), `jumlahDigit`, `panjang`, `deka`, `cetakBasis` (2..10) |
+| `lib/Arrays.kop`     | `sum max min find count arrEq take drop merge sort` (merge sort O(n log n)) + `binSearch` |
+| `lib/Crypto.kop`     | `bitxor` (per-bit, tanpa operator bitwise), `fnv1a` (FNV-1a 32-bit), `nextRand`/`randRange` (Lehmer/Schrage), `xorStream` (XOR cipher nirl), `caesar`/`uncaesar` |
+
+`Arrays` dan `Crypto` adalah bukti paling kuat bahasanya benar-benar
+*bahasa*: keduanya ditulis 100% dalam Kopi murni, tanpa satu pun builtin
+baru — `bitxor` misalnya mengekstrak bit dengan `a % 2` / `a / 2` lewat satu
+loop 31 iterasi, karena fungsi v1.2 belum punya operator `^ & | <<`.
+Konvensi byte = `int` 0..255. Kualitas: cocok untuk hash-cache/PRNG/cipher
+edukatif; **bukan** kriptografi produksi (belum ada operator bitwise & mod
+2^32 asli). Hak intelektual fungsi tetap standar (FNV-1a, Lehmer).
 
 ```java
 import Matematika;
@@ -214,26 +282,37 @@ Contoh siap pakai: `examples/pakai_lib.kop` (→ diuji di semua backend oleh
 ## Arsitektur backend
 
 ### Native aarch64 (`-t a64`)
-- Evaluasi ekspresi: hasil di `w0`, nilai sementara di-push ke stack
-  (`str w0, [sp, #-16]!` → aman align-16 untuk setiap `bl`).
+- Evaluasi ekspresi: hasil di `w0` (int) atau `x0` (pointer closure/array);
+  nilai sementara di-push ke stack (`str w0/x0, [sp, #-16]!` → aman align-16
+  untuk setiap `bl`).
 - Frame metode: `stp x29, x30`; local variable disimpan di slot
-  `[x29, #-8(k+1)]`; parameter `w0..w7` disalin ke jadwal slot.
+  `[x29, #-8(k+1)]`; parameter `w0..w7` disalin ke jadwal slot. Slot 64-bit
+  (`T_FN`/`T_ARI`) di-load/store dengan `ldr x` penuh.
 - Pemanggilan tidak melanggar ABI aarch64: SP tetap selaras 16.
 - `println` = `printf` lewat `:got:` (PIE, siap dirakit di Android/bionic).
-- Entry: symbol `main` → `b <Class>__main`, exit code 0.
+- Entry: symbol `main` → frame sendiri + satu `malloc` arena + `bl
+  <Class>__main` (pemanggilan normal: `bl`, bukan `b`), exit code 0.
+- Trap runtime: `.Klam` (arity lambda), `.Karr` (bounds array), `.Koom`
+  (arena habis) — semuanya printf + exit, bukan SIGSEGV.
 
 ### Native x86-64 (`-t x64`)
 - Sama bentuknya, AT&T, `pushq/popq`; argumen register SysV `rdi..r9`.
+- Hasil int di `%eax`, pointer di `%rax`; elemen array 8 byte dengan
+  `cmpl (%r10), %eax; jae .Karr`.
 - Track paritas SP saat compile-time supaya setiap `call` selaras 16.
 
 ### Mesin virtual KOP1 (`-t vm`)
 - Format file: magic `KOP1`, tabel metode (nargs/nlocals/kode), cpool string.
-- Stack machine: ~28 opcodes (`ICONST ILOAD ISTORE ADD SUB MUL DIV MOD
-  NEG NOT LT GT LE GE EQ NE JMP JMPF JMPT CALL RET PRINT...`).
+- Stack machine: ~35 opcodes (`ICONST ILOAD ISTORE ADD SUB MUL DIV MOD NEG
+  NOT LT GT LE GE EQ NE JMP JMPF JMPT CALL RET PRINT...` + `NEWARR IDXR IDXW
+  ALEN` untuk array + `NEWCLO CALLIND ENVLOAD` untuk lambda).
+- Semantik int 32-bit: hasil `ADD/SUB/MUL` di-truncate `(int32_t)` supaya
+  output identik dengan backend native (semantik wrap ala Java).
 - CALL/RET dikelola dengan frame stack sendiri (`kopivm`) — tumpukan operand
   dibagi antar frame dengan `retbase` supaya nilai sementara caller tidak
   tertimpa.
-- `DIV/MOD` dengan nol → pesan runtime error, bukan crash panik.
+- `DIV/MOD` dengan nol, bounds array, arena habis → pesan runtime error,
+  bukan crash panik.
 
 ## Struktur proyek
 
@@ -256,12 +335,21 @@ kopi/
 └── test.sh                → konsistensi output antar-backend
 ```
 
-## Roadmap v2 (belum ada, tapi fondasinya sudah rapi)
+## Roadmap (fondasinya sudah rapi)
 
 - `long` (64-bit), `double`, `char`, `String` sebagai tipe sebenarnya
-- array `int[]` + heap KOP1 (GC mark-sweep sederhana)
+- operator bitwise `& ^ | << >>` (Crypto bisa diubah jadi native shift) +
+  ternary `? :`
 - instance class (field, `new`, virtual dispatch / vtable)
 - static fields & inisialisasi
+- GC proper: saat ini arena = bump allocator yang tidak pernah dibebaskan
+  (cukup untuk program batch); mark-sweep sederhana di jadwal
 - `switch`, `do/while`, `try/catch` terbatas
-- optimasi: register allocation (jangan semua lewat stack), const-folding
+- perbaikan tercatat: loop-var scoping per-block (saat ini var `int k` di dua
+  for-loop dalam satu metode dianggap redeclare), multi-deklarasi
+  `int a = 0, b = 1;`
+- optimasi `-O1`: register allocation (jangan semua lewat stack),
+  const-folding
+- **server edition**: `lib/Net.kop` — socket/HTTP via binding syscall di
+  backend native (dibangun di atas pustaka Arrays/Crypto yang sudah ada)
 - linker kecil sendiri (tanpa `cc`) → output `.so`/`.elf` langsung

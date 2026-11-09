@@ -25,20 +25,40 @@ static int gen_expr(Method *m, Node *e);
 static void gen_stmts(Method *m, Node *lst);
 static int cur_ret_label;
 
+/* 32-bit int/bool vs 64-bit (pointer lambda/array) */
+static int is64ty(Ty t) { return t == T_FN || t == T_ARI; }
+
 /* hasil ekspresi: 0 = int/bool di %eax; 1 = pointer closure di %rax */
 
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
         gen_expr(m, s->a);
-        if (s->dty == (int)T_FN) emit("\tmovq %%rax, -%ld(%%rbp)", (s->ival + 1) * 8);
+        if (is64ty((Ty)s->dty)) emit("\tmovq %%rax, -%ld(%%rbp)", (s->ival + 1) * 8);
         else emit("\tmovl %%eax, -%ld(%%rbp)", (s->ival + 1) * 8);
         break;
     case ST_ASSIGN:
         gen_expr(m, s->a);
-        if (s->dty == (int)T_FN) emit("\tmovq %%rax, -%ld(%%rbp)", (s->ival + 1) * 8);
+        if (is64ty((Ty)s->dty)) emit("\tmovq %%rax, -%ld(%%rbp)", (s->ival + 1) * 8);
         else emit("\tmovl %%eax, -%ld(%%rbp)", (s->ival + 1) * 8);
         break;
+    case ST_IDXASG: {
+        gen_expr(m, s->c);               /* nilai */
+        spush();
+        gen_expr(m, s->a);               /* rax = array */
+        spush();
+        gen_expr(m, s->b);               /* eax = idx */
+        emit("\tpopq %%r10");            /* array */
+        emit("\tpopq %%rcx");            /* nilai */
+        emit("\ttestl %%eax, %%eax");
+        emit("\tjl .Karr");
+        emit("\tcmpl (%r10), %%eax");
+        emit("\tjae .Karr");
+        emit("\tmovl %%eax, %%eax");     /* zero-extend idx */
+        emit("\tmovslq %%ecx, %%rcx");   /* nilai sign-extend 64 */
+        emit("\tmovq %%rcx, 8(%%r10,%%rax,8)");
+        break;
+    }
     case ST_IF: {
         int lelse = nlab++, lend = nlab++;
         gen_expr(m, s->a);
@@ -175,7 +195,7 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tmovl $%d, %%eax", (int)e->ival);
         break;
     case EX_VAR:
-        if (e->dty == (int)T_FN) {
+        if (is64ty((Ty)e->dty)) {
             emit("\tmovq -%ld(%%rbp), %%rax", (e->ival + 1) * 8);
             return 1;
         }
@@ -188,15 +208,12 @@ static int gen_expr(Method *m, Node *e) {
         break;
     case EX_CALL:
         x64_call(m, e);
-        break;
+        return is64ty((Ty)e->dty);       /* int[] / fn → %rax; int → %eax */
     case EX_ARROW: {
         /* closure = blok 64-bit: [0]=kode [1]=ncapt [2]=nuser [3+j]=capture */
         Method *hm = (Method *)e->cp;
         emit("\tmovq $%ld, %%rdi", 8 * (3 + (long)hm->ncapt));
-        int need = par;
-        if (need) emit("\tsubq $8, %%rsp");
-        emit("\tcall malloc@PLT");
-        if (need) emit("\taddq $8, %%rsp");
+        emit("\tcall kopalloc");        /* arena bump: rdi = byte */
         emit("\tmovq %%rax, %%r10");
         emit("\tleaq %s__%s(%%rip), %%rax", hm->cls, hm->name);
         emit("\tmovq %%rax, (%%r10)");
@@ -234,6 +251,34 @@ static int gen_expr(Method *m, Node *e) {
         if (need) emit("\taddq $8, %%rsp");
         break;
     }
+    case EX_NEWARR: {
+        gen_expr(m, e->a);               /* eax = n */
+        emit("\ttestl %%eax, %%eax");
+        emit("\tjl .Karr");             /* ukuran salah */
+        emit("\tmovl %%eax, %%r10d");   /* simpan n */
+        emit("\tshlq $3, %%r10");       /* 8*n */
+        emit("\taddq $8, %%r10");       /* + header len */
+        emit("\tmovq %%r10, %%rdi");
+        emit("\tcall kopalloc");
+        emit("\tmovq %%r10, (%rax)");   /* len */
+        return 1;
+    }
+    case EX_IDX: {
+        gen_expr(m, e->a);               /* rax = array */
+        spush();
+        gen_expr(m, e->b);               /* eax = idx */
+        emit("\tpopq %%r10");           /* array */
+        emit("\tcmpl (%r10), %%eax");   /* len */
+        emit("\tjae .Karr");            /* unsigned: negatif tertangkap */
+        emit("\tmovl %%eax, %%eax");
+        emit("\tcltq");
+        emit("\tmovq (%%r10,%%rax,8), %%rax");   /* elemen 8-byte */
+        return 0;
+    }
+    case EX_LEN:
+        gen_expr(m, e->a);
+        emit("\tmovl (%rax), %%eax");
+        return 0;
     case EX_ENVLOAD:
         emit("\tmovq -8(%%rbp), %%rax");  /* slot 0 = param $env */
         emit("\tmovl %ld(%%rax), %%eax", 24 + 8 * (long)e->ival);
@@ -313,7 +358,7 @@ void gen_x64(const char *outpath) {
             int i = 0;
             for (Param *p = m->params; p; p = p->next, i++) {
                 if (i >= 6) break;
-                if ((Ty)p->ty == T_FN)   /* param lambda disalin 64-bit */
+                if (is64ty((Ty)p->ty))   /* param lambda/array disalin 64-bit */
                     emit("\tmovq %%%s, -%ld(%%rbp)", regs64[i], (i + 1) * 8);
                 else
                     emit("\tmovl %%%s, -%ld(%%rbp)", regs[i], (i + 1) * 8);
@@ -333,12 +378,59 @@ void gen_x64(const char *outpath) {
         if (m->index == prog.mainidx) {
             emit("\t.globl main");
             emit("main:");
-            emit("\tjmp %s__%s", m->cls, m->name);
+            /* frame main sendiri: call kopalloc-era malloc mengubah rsp/return,
+               dan sp harus selaras 16 LEWAT call (ABI SysV) */
+            emit("\tpushq %%rbp");
+            emit("\tmovq %%rsp, %%rbp");
+            emit("\tandq $-16, %%rsp");
+            emit("\tmovl $8388608, %%edi");     /* 1<<23 bytes arena */
+            emit("\tcall malloc@PLT");
+            emit("\tmovq %%rax, kop_arena_base(%%rip)");
+            emit("\tmovl $0, %%eax");           /* arg main diabaikan */
+            emit("\tcall %s__%s", m->cls, m->name);
+            emit("\tmovl $0, %%eax");           /* exit status 0 */
+            emit("\tmovq %%rbp, %%rsp");
+            emit("\tpopq %%rbp");
+            emit("\tret");
+            break;
         }
 
     /* stub mati: jumlah argumen lambda tidak cocok (dilompati dari jne .Klam).
        push+andq menjamin rsp selaras 16 apa pun parity saat masuk. */
-    emit(".Klam:");
+    emit(".Karr:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tandq $-16, %%rsp");
+    emit("\tleaq .Lmsg_arr(%%rip), %%rdi");
+    emit("\tcall printf@PLT");
+    emit("\tmovl $1, %%edi");
+    emit("\tcall exit@PLT");
+
+    emit(".Koom:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tandq $-16, %%rsp");
+    emit("\tleaq .Lmsg_oom(%%rip), %%rdi");
+    emit("\tcall printf@PLT");
+    emit("\tmovl $1, %%edi");
+    emit("\tcall exit@PLT");
+
+    emit(".text");
+    emit("\t.globl kopalloc");
+    emit("kopalloc:");
+    emit("\tmovq kop_arena_used(%%rip), %%rax");
+    emit("\taddq %%rdi, %%rax");
+    emit("\tcmpq $8388608, %%rax");
+    emit("\tjge .Koom");
+    emit("\tmovq %%rax, kop_arena_used(%%rip)");
+    emit("\tsubq %%rdi, %%rax");
+    emit("\taddq kop_arena_base(%%rip), %%rax");
+    emit("\tret");
+
+    emit("\t.section .data");
+    emit("\t.align 8");
+    emit("kop_arena_base: .quad 0");
+    emit("kop_arena_used: .quad 0");
     emit("\tpushq %%rbp");
     emit("\tmovq %%rsp, %%rbp");
     emit("\tandq $-16, %%rsp");
@@ -353,6 +445,8 @@ void gen_x64(const char *outpath) {
     emit(".Lfmt_s: .asciz \"%s\"", "%s");
     emit(".Lfmt_sn: .asciz \"%s\"", "%s\\n");
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
+    emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
+    emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");
     for (int i = 0; i < prog.ncp; i++) {
         char esc[1200];
         asm_escape(prog.cpool[i], esc, sizeof esc);
