@@ -203,6 +203,146 @@ check proyekbesar examples/proyekbesar/ProyekBesar.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/proyekbesar64.s" -o /dev/null \
     && echo "PASS  proyekbesar [x64]" || { echo "FAIL  proyekbesar [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── OS/file I/O + Str/Map/Set/Deque/Path/Time (v1.7) ───────────────────
+rm -rf ostest_tmp1.txt ostest_tmp2.txt ostest_dir
+cat > "$T/kopi/ostest.kop" <<'EOF'
+import File;
+import Str;
+
+class Main {
+    public static void main(String[] args) {
+        int[] p1 = Net.bytes("ostest_tmp1.txt");
+        int fd = File.create(p1);
+        System.out.println(fd > 0);
+        int[] data = Net.bytes("halo dunia");
+        System.out.println(File.writeAll(fd, data));
+        File.close(fd);
+
+        fd = File.openRead(p1);
+        System.out.println(fd > 0);
+        int[] buf = new int[64];
+        int n = File.readInto(fd, buf);
+        System.out.println(n);
+        System.out.println(Str.eq(Str.slice(buf, 0, n), data));
+        System.out.println(File.size(fd));
+        System.out.println(File.seekSet(fd, 5));
+        int[] b2 = new int[16];
+        int n2 = File.readInto(fd, b2);
+        System.out.println(n2);
+        System.out.println(Str.eq(Str.slice(b2, 0, n2), Net.bytes("dunia")));
+        File.close(fd);
+
+        int[] p2 = Net.bytes("ostest_tmp2.txt");
+        System.out.println(File.renameTo(p1, p2));
+        fd = File.openRead(p2);
+        System.out.println(File.size(fd));
+        File.close(fd);
+        System.out.println(File.remove(p2));
+        System.out.println(File.openRead(p2) < 0);
+
+        int[] dir = Net.bytes("ostest_dir");
+        int mr = File.mkdir(dir);
+        System.out.println(mr == 0 || mr == -17);   /* baru atau sudah ada */
+        int[] fp = Net.bytes("ostest_dir/f.txt");
+        fd = File.create(fp);
+        System.out.println(fd > 0);
+        File.writeAll(fd, Net.bytes("abc"));
+        File.close(fd);
+        fd = File.openRead(fp);
+        System.out.println(File.size(fd));
+        File.close(fd);
+        System.out.println(File.remove(fp));
+    }
+}
+EOF
+printf '%s\n' 1 0 1 10 1 10 5 5 1 0 10 0 1 1 1 3 0 > "$T/kopi/ostest.ref"
+check ostest "$T/kopi/ostest.kop"
+rm -rf ostest_tmp1.txt ostest_tmp2.txt ostest_dir
+
+cat > "$T/kopi/textmap.kop" <<'EOF'
+import Str;
+import Map;
+import Set;
+import Deque;
+import Path;
+import Time;
+
+class Main {
+    public static void main(String[] args) {
+        int[] s = Net.bytes("  Kopi Language  ");
+        System.out.println(Str.len(s));
+        System.out.println(Str.len(Str.trim(s)));
+        System.out.println(Str.eq(Str.upper(Net.bytes("kopi")), Net.bytes("KOPI")));
+        System.out.println(Str.indexOf(s, Net.bytes("Lang"), 0));
+        System.out.println(Str.splitCount(Net.bytes("a,b,c"), 44));
+        System.out.println(Str.eq(Str.splitAt(Net.bytes("a,b,c"), 44, 1), Net.bytes("b")));
+        System.out.println(Str.toInt(Net.bytes("-42")));
+        System.out.println(Str.len(Str.fromInt(12345)));
+        System.out.println(Str.eq(Str.replaceSeq(Net.bytes("a-b-a"), Net.bytes("a"), Net.bytes("xy")), Net.bytes("xy-b-xy")));
+        System.out.println(Str.eq(Str.padLeft(Net.bytes("7"), 3, 48), Net.bytes("007")));
+        System.out.println(Str.utf8Count(Net.bytes("é")));
+
+        int[] m = Map.make(128);
+        for (int i = 0; i < 100; i++) Map.put(m, i * 7, i);
+        System.out.println(Map.size(m));
+        System.out.println(Map.get(m, 49));
+        System.out.println(Map.has(m, 999));
+        System.out.println(Map.remove(m, 49));
+        System.out.println(Map.size(m));
+        System.out.println(Map.getOr(m, 49, -1));
+        int[] m2 = Map.grow(m);
+        System.out.println(Map.size(m2));
+        int[] acc = new int[1];
+        Map.forEach(m2, (k, v) => { acc[0] = acc[0] + v; });
+        System.out.println(acc[0]);
+
+        int[] st = Set.make(8);
+        Set.add(st, 1);
+        Set.add(st, 2);
+        Set.add(st, 2);
+        Set.add(st, 3);
+        System.out.println(Set.size(st));
+        System.out.println(Set.has(st, 2));
+        System.out.println(Set.remove(st, 2));
+        System.out.println(Set.size(st));
+
+        int[] d = Deque.make(4);
+        Deque.pushBack(d, 1);
+        Deque.pushBack(d, 2);
+        Deque.pushFront(d, 0);
+        System.out.println(Deque.size(d));
+        System.out.println(Deque.popFront(d));
+        System.out.println(Deque.popBack(d));
+        System.out.println(Deque.size(d));
+
+        System.out.println(Str.eq(Path.base(Net.bytes("/a/b/c.txt")), Net.bytes("c.txt")));
+        System.out.println(Str.eq(Path.dir(Net.bytes("/a/b/c.txt")), Net.bytes("/a/b")));
+        System.out.println(Str.eq(Path.ext(Net.bytes("/a/b/c.txt")), Net.bytes("txt")));
+        System.out.println(Str.eq(Path.join(Net.bytes("/a"), Net.bytes("b")), Net.bytes("/a/b")));
+
+        System.out.println(Str.eq(Time.format(1700000000), Net.bytes("2023-11-14 22:13:20")));
+        System.out.println(Time.weekday(1700000000));
+        int[] c = Time.civil(0);
+        System.out.println(c[0]);
+        System.out.println(c[1]);
+        System.out.println(c[2]);
+        long t0 = Time.monoMs();
+        Time.sleepMs(5);
+        long dt = Time.monoMs() - t0;
+        System.out.println(dt >= 0);
+        System.out.println(Time.epoch() > 1600000000);
+    }
+}
+EOF
+printf '%s\n' 17 13 1 7 3 1 -42 5 1 1 1 100 7 0 1 99 -1 99 4943 3 1 1 2 3 0 2 1 1 1 1 1 1 2 1970 1 1 1 1 > "$T/kopi/textmap.ref"
+check textmap "$T/kopi/textmap.kop"
+
+for t in ostest textmap; do
+    ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" \
+        && cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null \
+        && echo "PASS  $t [x64]" || { echo "FAIL  $t [x64]"; FAIL=$((FAIL+1)); }
+done
+
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
 printf '1\n1\n1\n0\n' > "$T/kopi/aeadvec.ref"

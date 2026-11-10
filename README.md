@@ -36,7 +36,7 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 
 | Lokasi | Kelompok | Isi |
 |--------|----------|-----|
-| `lib/core/` | logika dasar bahasa | `Math` (lengkap: modular, teori bilangan, kombinatorika, bit, geometri), `Digits`, `Stats` (statistik), `Matrix` (aljabar matriks), `Arrays` (termasuk fungsional), **`Json`** (parse/tulis JSON) |
+| `lib/core/` | logika dasar & sistem | `Math`, `Digits`, `Stats`, `Matrix`, `Arrays`, **`Json`**, **`Str`** (teks), **`Map`/`Set`/`Deque`**, **`File`/`Path`**, **`Time`** |
 | `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
 | `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard), **`Udp`** (datagram: bind/sendTo/recvFrom/shutdown), **`Tls`** (klien TLS 1.3 — lihat bagian khusus di bawah) |
 
@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.6.5 hari ini  ████████████████  77/77 test hijau — proyek 54 file, eksekusi paralel, ~24 MB RSS, tanpa hang
+v1.7.0 hari ini  ████████████████  81/81 test hijau — file I/O, waktu, Str, Map/Set/Deque (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -68,6 +68,7 @@ v1.6.5 hari ini  ████████████████  77/77 test hi
 | **v1.6.3** | **array fungsional + gula metode**: `Arrays.forEach`, `forEachIndexed`, `map`, `filter`, `reduce`, `any`, `all`, `countWhere`, `findIndex`, `sumBy`, `copy`, `reverse` (semuanya memakai lambda Kopi). Sintaks metode `a.forEach(f)`, `a.map(f)`, dst. didukung lewat desugaring ke `Arrays.*` (butuh `import Arrays;`). Perbaikan array: `Arrays.max/min` tidak lagi meledak pada array kosong, `take` meng-clamp `n < 0`. Uji baru `arrayfn` dan `arrchk` (return array besar 300 elemen, `new int[0]`, identitas) di VM & a64 + sintaks x64; suite 73/73 |
 | **v1.6.4** | **JSON native**: literal `json {...}` / `json [...]` (sampai 8 entri; lebih dari 4 pasangan objek dirangkai via `Json.put`), nilai berupa tape `int[]` sehingga bisa disimpan di variabel, dipassing, dan dikembalikan fungsi. Pustaka `lib/core/Json.kop`: `parse`, `write`, `print`/`line`, `typeOf`/`isNull`/`isBool`/`isNumber`/`isString`/`isArray`/`isObject`, `asInt`/`asDouble`/`asBool`/`asText`, `count`/`at`/`get`/`has`, `put`/`del`/`add` (immutable), konstruktor `nullV`/`boolV`/`num`/`str`/`arrN`/`objN`. Angka disimpan sebagai teks sumber (format dipertahankan), string di-escape saat ditulis, `\uXXXX` didekode ke UTF-8 (tanpa pasangan surrogate). Parser mengenal token `:`; uji `jsontest` di VM & a64 + sintaks x64; suite 75/75 |
 | **v1.6.5** | **uji ketangguhan proyek besar** `examples/proyekbesar/`: **54 file `.kop`** (53 modul + main) saling `import`, memakai pustaka (`Math`, `Arrays`, `Stats`, `Matrix`, `Json`, `Cipher`, `Hash`) dan modul lokal (struktur data, algoritma, CSV/JSON, inventory/order/billing, lexer/compiler/evaluator/VM mini). Harness `bench.py`: kompilasi a64/VM/x64 **paralel**, eksekusi a64 & VM **paralel** dengan timeout 120 s, sampling `VmHWM` untuk puncak RSS, banding output byte-per-byte, lalu **4 proses a64 paralel**. Hasil acuan: kompilasi ~0,13 s; a64 ~0,14 s, VM ~0,94 s; puncak RSS ~24 MB; 102 baris output identik; tanpa hang/OOM (fase memori ≈21,6 MB payload pada arena/heap 32 MB). Juga ditambahkan `Json.write` (publik) dan `proyekbesar` masuk `test.sh` (a64/VM/x64) |
+| **v1.7.0** | **fondasi OS + teks + collections**: builtin baru `Net.openb` (path dinamis), `mkdirb`, `unlinkb`, `renameb`, `seek`, `time`, `mono` (long ms), `sleep`, `exit` di a64/x64/VM. Library baru: **`Str`** (potong/gabung/cari/ganti/trim/case/pad/angka/hex/UTF-8 count), **`Map`** (int→int open addressing, grow/forEach), **`Set`**, **`Deque`**, **`File`** (create/append/baca/tulis/seek/size/rename/unlink/mkdir), **`Path`**, **`Time`** (epoch/mono/sleep, kalender UTC + format). Bug yang ikut diperbaiki: capture **array** dalam lambda (EX_ENVLOAD hanya 32-bit), path syscall belum NUL-terminated, pointer rename tertukar, seek membaca 64-bit dari slot 32-bit. Uji `ostest` (file I/O) & `textmap` (Str/Map/Set/Deque/Path/Time) di VM & a64 + sintaks x64; suite 81/81 |
 
 ## Bangun
 
@@ -198,6 +199,80 @@ float  f     = 1.5f + 2.25f;           // 3.75
   sebagai batas, bukan jaminan lintas-CPU).
 - Backend **x64** menerima tipe baru (assembly lolos `cc -target`, diuji
   sintaks); eksekusi runtime baru diverifikasi di **aarch64** dan **VM**.
+
+## OS, teks, collections, waktu (v1.7.0)
+
+### File I/O dinamis
+
+```java
+import File;
+import Str;
+
+int[] p = Net.bytes("data.txt");
+int fd = File.create(p);              // O_WRONLY|O_CREAT|O_TRUNC, 0644
+File.writeAll(fd, Net.bytes("halo dunia"));
+File.close(fd);
+
+fd = File.openRead(p);
+int[] buf = new int[64];
+int n = File.readInto(fd, buf);       // → jumlah byte
+int sz = File.size(fd);
+File.seekSet(fd, 5);
+File.close(fd);
+
+File.renameTo(p, Net.bytes("data2.txt"));
+File.remove(Net.bytes("data2.txt"));
+File.mkdir(Net.bytes("folder"));
+```
+
+Path boleh **dinamis** (`int[]`); builtin memaket byte ke penyangga syscall
+(maks ±4000 byte, dipotong). Yang belum ada: `readdir`, `stat`, `rmdir`,
+metadata/permission, mmap.
+
+### Teks (`Str`) — masih byte-array
+
+```java
+int[] s = Net.bytes("  Kopi Language  ");
+Str.trim(s); Str.upper(s); Str.indexOf(s, Net.bytes("Lang"), 0);
+Str.splitCount(Net.bytes("a,b,c"), 44);
+Str.splitAt(Net.bytes("a,b,c"), 44, 1);     // "b"
+Str.replaceSeq(Net.bytes("a-b"), Net.bytes("a"), Net.bytes("xy"));
+Str.padLeft(Net.bytes("7"), 3, 48);         // "007"
+Str.fromInt(-42); Str.toInt(Net.bytes("-42"));
+```
+Teks belum menjadi tipe `String` native; versi ini ASCII + `utf8Count`
+sederhana. Operasi Unicode penuh (case/normalisasi) belum ada.
+
+### Collections
+
+```java
+import Map; import Set; import Deque;
+
+int[] m = Map.make(128);
+Map.put(m, 7, 70);  Map.get(m, 7);  Map.has(m, 7);  Map.remove(m, 7);
+m = Map.grow(m);                       // kapasitas tetap → grow manual
+Map.forEach(m, (k, v) => { ... });
+
+int[] st = Set.make(64);  Set.add(st, 1);  Set.has(st, 1);
+int[] dq = Deque.make(16);
+Deque.pushBack(dq, 1); Deque.pushFront(dq, 0);
+Deque.popFront(dq); Deque.popBack(dq);
+```
+`Map`/`Set` hanya kunci `int`; kapasitas tetap (pangkat dua), `grow`
+mengembalikan peta baru; kunci `INT_MIN` dicadangkan. `Deque` kapasitas tetap.
+
+### Waktu
+
+```java
+import Time;
+int now = Time.epoch();                 // detik Unix (int; batas 2038)
+long t0 = Time.monoMs();                // monotonik (long)
+Time.sleepMs(10);
+int[] c = Time.civil(1700000000);       // {2023,11,14,22,13,20} UTC
+int wd = Time.weekday(1700000000);      // 2 = Selasa
+int[] s = Time.format(1700000000);      // "2023-11-14 22:13:20"
+```
+UTC saja; zona waktu/kalender lokal belum ada.
 
 ## JSON (v1.6.4)
 
@@ -438,6 +513,13 @@ Kopi, bukan kode built-in compiler:
 | `lib/core/Matrix.kop`  | `zero identity add sub scale transpose mul trace det1 det2 det3 det det isIdentity` (matriks persegi, `int[]` datar) |
 | `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge copy reverse sort` (merge sort O(n log n)) + `binSearch`; **fungsional**: `forEach forEachIndexed map filter reduce any all countWhere findIndex sumBy` |
 | `lib/core/Json.kop`       | `parse write print line typeOf isNull isBool isNumber isString isArray isObject asInt asDouble asBool asText count at get has put del add nullV boolV num str arrN objN` |
+| `lib/core/Str.kop`        | `len eq cmp copy cat slice at indexOf lastIndexOf contains startsWith endsWith trim upper lower repeat reverse replaceByte replaceSeq countByte splitCount splitAt padLeft padRight fromInt toInt isDigits equalsIgnoreCase utf8Count hex print line` |
+| `lib/core/Map.kop`        | `make cap size put get getOr has remove clear grow forEach` (int→int, open addressing) |
+| `lib/core/Set.kop`        | `make add has remove size clear grow forEach` |
+| `lib/core/Deque.kop`      | `make capacity size isEmpty isFull pushBack pushFront popFront popBack get clear` |
+| `lib/core/File.kop`       | `openRead create append close writeAll readInto seekSet seekCur seekEnd size remove renameTo mkdir` + konstanta flag |
+| `lib/core/Path.kop`       | `join base dir ext isAbsolute sep SEP` |
+| `lib/core/Time.kop`       | `epoch monoMs sleepMs civil weekday format` (UTC) |
 | `lib/crypto/Crypto.kop`   | `bitxor` (per-bit, tanpa operator bitwise), `fnv1a` (FNV-1a 32-bit), `nextRand`/`randRange` (Lehmer/Schrage), `xorStream` (XOR cipher nirl), `caesar`/`uncaesar` |
 
 ### Batas jujur pustaka matematika
@@ -706,7 +788,8 @@ kopi/
 
 ## Roadmap (fondasinya sudah rapi)
 
-- `char`, `String` sebagai tipe sebenarnya; **array bertipe** (`long[]`, `double[]`, ...); lambda dengan tipe numerik baru
+- `char`, **`String` native** (agar `Str` tidak lagi byte-array); **array bertipe** (`long[]`, `double[]`, ...); lambda dengan tipe numerik baru
+- file/direktori lanjutan (`readdir`, `stat`, `rmdir`, permission), timezone/kalender, Map dengan kunci string/byte
 - operator bitwise `& ^ | << >>` (Crypto bisa diubah jadi native shift) +
   ternary `? :`
 - instance class (field, `new`, virtual dispatch / vtable)

@@ -1,0 +1,287 @@
+// Str.kop — utilitas teks (byte-as-int) murni Kopi (v1.7).
+// Teks direpresentasikan int[] berisi byte 0..255; versi ini ASCII +
+// hitung UTF-8 sederhana (tanpa normalisasi/segmentation Unicode).
+
+class Str {
+
+    static int len(int[] s) { return s.length; }
+
+    static boolean eq(int[] a, int[] b) {
+        if (a.length != b.length) return false;
+        for (int i = 0; i < a.length; i++) if (a[i] != b[i]) return false;
+        return true;
+    }
+
+    static int cmp(int[] a, int[] b) {
+        int n = a.length;
+        if (b.length < n) n = b.length;
+        for (int i = 0; i < n; i++) {
+            if (a[i] < b[i]) return -1;
+            if (a[i] > b[i]) return 1;
+        }
+        if (a.length < b.length) return -1;
+        if (a.length > b.length) return 1;
+        return 0;
+    }
+
+    static int[] copy(int[] a) {
+        int[] o = new int[a.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        return o;
+    }
+
+    static int[] cat(int[] a, int[] b) {
+        int[] o = new int[a.length + b.length];
+        int k = 0;
+        for (int i = 0; i < a.length; i++) { o[k] = a[i]; k++; }
+        for (int i = 0; i < b.length; i++) { o[k] = b[i]; k++; }
+        return o;
+    }
+
+    static int[] slice(int[] s, int from, int n) {
+        if (from < 0) from = 0;
+        if (from > s.length) from = s.length;
+        if (n < 0) n = 0;
+        if (from + n > s.length) n = s.length - from;
+        int[] o = new int[n];
+        for (int i = 0; i < n; i++) o[i] = s[from + i];
+        return o;
+    }
+
+    static int at(int[] s, int i) {
+        if (i < 0 || i >= s.length) return -1;
+        return s[i];
+    }
+
+    static int indexOf(int[] s, int[] ndl, int from) {
+        if (ndl.length == 0) return from;
+        int lim = s.length - ndl.length;
+        for (int i = from; i <= lim; i++) {
+            int j = 0;
+            while (j < ndl.length && s[i + j] == ndl[j]) j++;
+            if (j == ndl.length) return i;
+        }
+        return -1;
+    }
+
+    static int lastIndexOf(int[] s, int[] ndl) {
+        int last = -1;
+        int p = 0;
+        while (true) {
+            int q = indexOf(s, ndl, p);
+            if (q < 0) break;
+            last = q;
+            p = q + 1;
+        }
+        return last;
+    }
+
+    static boolean contains(int[] s, int[] ndl) { return indexOf(s, ndl, 0) >= 0; }
+
+    static boolean startsWith(int[] s, int[] p) {
+        if (p.length > s.length) return false;
+        for (int i = 0; i < p.length; i++) if (s[i] != p[i]) return false;
+        return true;
+    }
+
+    static boolean endsWith(int[] s, int[] p) {
+        if (p.length > s.length) return false;
+        int off = s.length - p.length;
+        for (int i = 0; i < p.length; i++) if (s[off + i] != p[i]) return false;
+        return true;
+    }
+
+    static int[] trimLeft(int[] s) {
+        int a = 0;
+        while (a < s.length && (s[a] == 32 || s[a] == 9 || s[a] == 10 || s[a] == 13)) a++;
+        return slice(s, a, s.length - a);
+    }
+
+    static int[] trimRight(int[] s) {
+        int b = s.length;
+        while (b > 0 && (s[b - 1] == 32 || s[b - 1] == 9 || s[b - 1] == 10 || s[b - 1] == 13)) b--;
+        return slice(s, 0, b);
+    }
+
+    static int[] trim(int[] s) { return trimRight(trimLeft(s)); }
+
+    static int[] upper(int[] s) {
+        int[] o = copy(s);
+        for (int i = 0; i < o.length; i++) if (o[i] >= 97 && o[i] <= 122) o[i] = o[i] - 32;
+        return o;
+    }
+
+    static int[] lower(int[] s) {
+        int[] o = copy(s);
+        for (int i = 0; i < o.length; i++) if (o[i] >= 65 && o[i] <= 90) o[i] = o[i] + 32;
+        return o;
+    }
+
+    static int[] repeat(int[] s, int n) {
+        if (n <= 0) return new int[0];
+        int[] o = new int[s.length * n];
+        int k = 0;
+        for (int r = 0; r < n; r++)
+            for (int i = 0; i < s.length; i++) { o[k] = s[i]; k++; }
+        return o;
+    }
+
+    static int[] reverse(int[] s) {
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) o[i] = s[s.length - 1 - i];
+        return o;
+    }
+
+    static int[] replaceByte(int[] s, int from, int to) {
+        int[] o = copy(s);
+        for (int i = 0; i < o.length; i++) if (o[i] == from) o[i] = to;
+        return o;
+    }
+
+    static int[] replaceSeq(int[] s, int[] old, int[] nw) {
+        if (old.length == 0) return copy(s);
+        int[] o = new int[0];
+        int i = 0;
+        while (i < s.length) {
+            if (i + old.length <= s.length) {
+                int j = 0;
+                while (j < old.length && s[i + j] == old[j]) j++;
+                if (j == old.length) { o = cat(o, nw); i = i + old.length; continue; }
+            }
+            int[] one = new int[1];
+            one[0] = s[i];
+            o = cat(o, one);
+            i++;
+        }
+        return o;
+    }
+
+    static int countByte(int[] s, int b) {
+        int n = 0;
+        for (int i = 0; i < s.length; i++) if (s[i] == b) n++;
+        return n;
+    }
+
+    static int splitCount(int[] s, int sep) {
+        if (s.length == 0) return 0;
+        int n = 1;
+        for (int i = 0; i < s.length; i++) if (s[i] == sep) n++;
+        return n;
+    }
+
+    static int[] splitAt(int[] s, int sep, int idx) {
+        int k = 0;
+        int st = 0;
+        for (int i = 0; i <= s.length; i++) {
+            boolean end = i == s.length;
+            boolean hit = false;
+            if (!end && s[i] == sep) hit = true;
+            if (end || hit) {
+                if (k == idx) return slice(s, st, i - st);
+                k++;
+                st = i + 1;
+            }
+        }
+        return new int[0];
+    }
+
+    static int[] padLeft(int[] s, int width, int pad) {
+        if (s.length >= width) return copy(s);
+        int[] o = new int[width];
+        int fill = width - s.length;
+        for (int i = 0; i < fill; i++) o[i] = pad;
+        for (int i = 0; i < s.length; i++) o[fill + i] = s[i];
+        return o;
+    }
+
+    static int[] padRight(int[] s, int width, int pad) {
+        if (s.length >= width) return copy(s);
+        int[] o = new int[width];
+        for (int i = 0; i < s.length; i++) o[i] = s[i];
+        for (int i = s.length; i < width; i++) o[i] = pad;
+        return o;
+    }
+
+    static int[] fromInt(int v) {
+        boolean neg = v < 0;
+        int n = v;
+        if (neg) n = -n;
+        int[] tmp = new int[12];
+        int k = 0;
+        if (n == 0) { tmp[0] = 48; k = 1; }
+        while (n > 0) { tmp[k] = 48 + n % 10; k++; n = n / 10; }
+        int off = 0;
+        if (neg) off = 1;
+        int[] o = new int[k + off];
+        if (neg) o[0] = 45;
+        for (int i = 0; i < k; i++) o[off + i] = tmp[k - 1 - i];
+        return o;
+    }
+
+    static int toInt(int[] s) {
+        int i = 0;
+        boolean neg = false;
+        if (i < s.length && s[i] == 45) { neg = true; i++; }
+        int r = 0;
+        while (i < s.length) {
+            int c = s[i];
+            if (c < 48 || c > 57) break;
+            r = r * 10 + (c - 48);
+            i++;
+        }
+        if (neg) r = -r;
+        return r;
+    }
+
+    static boolean isDigits(int[] s) {
+        if (s.length == 0) return false;
+        for (int i = 0; i < s.length; i++) if (s[i] < 48 || s[i] > 57) return false;
+        return true;
+    }
+
+    static boolean equalsIgnoreCase(int[] a, int[] b) {
+        if (a.length != b.length) return false;
+        for (int i = 0; i < a.length; i++) {
+            int x = a[i];
+            int y = b[i];
+            if (x >= 65 && x <= 90) x = x + 32;
+            if (y >= 65 && y <= 90) y = y + 32;
+            if (x != y) return false;
+        }
+        return true;
+    }
+
+    static int utf8Count(int[] s) {
+        int n = 0;
+        for (int i = 0; i < s.length; i++) {
+            if ((s[i] & 192) != 128) n++;
+        }
+        return n;
+    }
+
+    static int[] hex(int[] data) {
+        int[] dig = new int[16];
+        int k = 0;
+        for (int i = 0; i < data.length; i++) {
+            int v = data[i] & 255;
+            int hi = v / 16;
+            int lo = v % 16;
+            if (hi < 10) dig[k] = 48 + hi; else dig[k] = 87 + hi;
+            k++;
+            if (lo < 10) dig[k] = 48 + lo; else dig[k] = 87 + lo;
+            k++;
+        }
+        int[] o = new int[k];
+        for (int i = 0; i < k; i++) o[i] = dig[i];
+        return o;
+    }
+
+    static void print(int[] s) {
+        for (int i = 0; i < s.length; i++) Net.wrb(1, s[i]);
+    }
+
+    static void line(int[] s) {
+        print(s);
+        Net.wrb(1, 10);
+    }
+}

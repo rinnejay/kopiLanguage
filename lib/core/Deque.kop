@@ -1,0 +1,52 @@
+// Deque.kp — antrian dua ujung (ring buffer) v1.7.
+// Layout: d[0]=capacity, d[1]=head, d[2]=size; elemen mulai d[3].
+
+class Deque {
+    static int[] make(int cap) {
+        if (cap < 1) cap = 1;
+        int[] d = new int[3 + cap];
+        d[0] = cap;
+        return d;
+    }
+    static int capacity(int[] d) { return d[0]; }
+    static int size(int[] d) { return d[2]; }
+    static boolean isEmpty(int[] d) { return d[2] == 0; }
+    static boolean isFull(int[] d) { return d[2] >= d[0]; }
+
+    static boolean pushBack(int[] d, int v) {
+        if (d[2] >= d[0]) return false;
+        int c = d[0];
+        int at = (d[1] + d[2]) % c;
+        d[3 + at] = v;
+        d[2] = d[2] + 1;
+        return true;
+    }
+    static boolean pushFront(int[] d, int v) {
+        if (d[2] >= d[0]) return false;
+        int c = d[0];
+        d[1] = (d[1] + c - 1) % c;
+        d[3 + d[1]] = v;
+        d[2] = d[2] + 1;
+        return true;
+    }
+    static int popFront(int[] d) {
+        if (d[2] == 0) return 0;
+        int v = d[3 + d[1]];
+        d[1] = (d[1] + 1) % d[0];
+        d[2] = d[2] - 1;
+        return v;
+    }
+    static int popBack(int[] d) {
+        if (d[2] == 0) return 0;
+        int c = d[0];
+        int at = (d[1] + d[2] - 1) % c;
+        int v = d[3 + at];
+        d[2] = d[2] - 1;
+        return v;
+    }
+    static int get(int[] d, int i) {
+        if (i < 0 || i >= d[2]) return 0;
+        return d[3 + (d[1] + i) % d[0]];
+    }
+    static void clear(int[] d) { d[1] = 0; d[2] = 0; }
+}

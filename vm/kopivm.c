@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <errno.h>
 #include <math.h>
 #include "ast.h"
@@ -179,6 +181,16 @@ static int64_t conv_val(int64_t v, int from, int to) {
         return (to == T_FLOAT) ? f_bits((float)v) : d_bits((double)v);
     }
     return norm_val(v, to);
+}
+
+static char *pack_cpath(long *a, size_t maxlen) {
+    size_t len = (size_t)a[0];
+    if (len > maxlen) len = maxlen;
+    char *b = (char *)malloc(len + 1);
+    if (!b) dievm("path: memori habis");
+    for (size_t i = 0; i < len; i++) b[i] = (char)(a[1 + i] & 0xff);
+    b[len] = 0;
+    return b;
 }
 
 static void run(void) {
@@ -551,6 +563,55 @@ static void run(void) {
                 int64_t how = stackv[--sp], fdi = stackv[--sp];
                 int r = shutdown((int)fdi, (int)how);
                 stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 13) {                /* openb(path, flags, mode) */
+                int64_t mode = stackv[--sp], flags = stackv[--sp];
+                long *pa = (long *)stackv[--sp];
+                char *path = pack_cpath(pa, 4000);
+                int fd = open(path, (int)flags, (int)mode);
+                free(path);
+                stackv[sp++] = (fd < 0) ? -errno : fd;
+            } else if (bi == 14) {                /* mkdirb(path) */
+                long *pa = (long *)stackv[--sp];
+                char *path = pack_cpath(pa, 4000);
+                int r = mkdir(path, 0755);
+                free(path);
+                stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 15) {                /* unlinkb(path) */
+                long *pa = (long *)stackv[--sp];
+                char *path = pack_cpath(pa, 4000);
+                int r = unlink(path);
+                free(path);
+                stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 16) {                /* renameb(old, new) */
+                long *na = (long *)stackv[--sp];
+                long *oa = (long *)stackv[--sp];
+                char *nw = pack_cpath(na, 4000);
+                char *od = pack_cpath(oa, 4000);
+                int r = rename(od, nw);
+                free(od); free(nw);
+                stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 17) {                /* seek(fd, off, whence) */
+                int64_t whence = stackv[--sp], off = stackv[--sp], fdi = stackv[--sp];
+                off_t r = lseek((int)fdi, (off_t)off, (int)whence);
+                stackv[sp++] = (r < 0) ? -errno : (int64_t)r;
+            } else if (bi == 18) {                /* time() */
+                struct timespec ts;
+                clock_gettime(CLOCK_REALTIME, &ts);
+                stackv[sp++] = (int64_t)ts.tv_sec;
+            } else if (bi == 19) {                /* mono() ms */
+                struct timespec ts;
+                clock_gettime(CLOCK_MONOTONIC, &ts);
+                stackv[sp++] = (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+            } else if (bi == 20) {                /* sleep(ms) */
+                int64_t ms = stackv[--sp];
+                struct timespec ts;
+                ts.tv_sec = (time_t)(ms / 1000);
+                ts.tv_nsec = (long)((ms % 1000) * 1000000);
+                int r = nanosleep(&ts, 0);
+                stackv[sp++] = (r < 0) ? -errno : 0;
+            } else if (bi == 21) {                /* exit(code) */
+                int64_t code = stackv[--sp];
+                exit((int)code);
             } else {
                 dievm("Net builtin tidak dikenal");
             }

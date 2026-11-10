@@ -1,0 +1,13 @@
+// Set.kp — himpunan int di atas Map (v1.7).
+import Map;
+
+class Set {
+    static int[] make(int cap) { return Map.make(cap); }
+    static boolean add(int[] s, int v) { return Map.put(s, v, 1); }
+    static boolean has(int[] s, int v) { return Map.has(s, v); }
+    static boolean remove(int[] s, int v) { return Map.remove(s, v); }
+    static int size(int[] s) { return Map.size(s); }
+    static void clear(int[] s) { Map.clear(s); }
+    static int[] grow(int[] s) { return Map.grow(s); }
+    static void forEach(int[] s, fn f) { Map.forEach(s, (k, v) => f(k)); }
+}

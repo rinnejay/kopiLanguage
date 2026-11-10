@@ -1182,7 +1182,16 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "sendto"))  { bi = 10; want = 4; }
             else if (!strcmp(fn, "recvfrom")){ bi = 11; want = 3; }
             else if (!strcmp(fn, "shutdown")){ bi = 12; want = 2; }
-            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes openr recvb sendb bind sendto recvfrom shutdown)", e->line, fn);
+            else if (!strcmp(fn, "openb"))   { bi = 13; want = 3; }
+            else if (!strcmp(fn, "mkdirb"))  { bi = 14; want = 1; }
+            else if (!strcmp(fn, "unlinkb")) { bi = 15; want = 1; }
+            else if (!strcmp(fn, "renameb")) { bi = 16; want = 2; }
+            else if (!strcmp(fn, "seek"))    { bi = 17; want = 3; }
+            else if (!strcmp(fn, "time"))    { bi = 18; want = 0; }
+            else if (!strcmp(fn, "mono"))    { bi = 19; want = 0; }
+            else if (!strcmp(fn, "sleep"))   { bi = 20; want = 1; }
+            else if (!strcmp(fn, "exit"))    { bi = 21; want = 1; }
+            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes openr recvb sendb bind sendto recvfrom shutdown openb mkdirb unlinkb renameb seek time mono sleep exit)", e->line, fn);
 
             int narg = (int)e->ival;
             if (bi == 5) {
@@ -1232,11 +1241,26 @@ static Ty type_expr_raw(Node *e) {
                 } else if (bi == 12) {
                     if (t != T_INT)
                         die("baris %d: Net.shutdown membutuhkan (fd int, how int)", e->line);
+                } else if (bi == 13) {
+                    if (i == 0 && t != T_ARI)
+                        die("baris %d: Net.openb argumen path harus int[]", e->line);
+                    if (i > 0 && t != T_INT)
+                        die("baris %d: Net.openb argumen flags/mode harus int", e->line);
+                } else if (bi == 14 || bi == 15) {
+                    if (t != T_ARI)
+                        die("baris %d: Net.%s argumen path harus int[]", e->line, fn);
+                } else if (bi == 16) {
+                    if (t != T_ARI)
+                        die("baris %d: Net.renameb kedua argumen harus int[] path", e->line);
+                } else if (bi == 17 || bi == 20 || bi == 21) {
+                    if (t != T_INT)
+                        die("baris %d: argumen Net.%s harus int", e->line, fn);
                 } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
             }
             e->kind = EX_NET;
             e->ival = bi;
+            if (bi == 19) { e->dty = (int)T_LONG; return T_LONG; }
             e->dty = (int)T_INT;
             return T_INT;
         }

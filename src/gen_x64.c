@@ -130,6 +130,28 @@ static void conv_ty(Ty from, Ty to) {
 
 /* hasil ekspresi: 0 = int/bool di %eax; 1 = pointer closure di %rax */
 
+/* pak byte array (pointer di r10) ke kop_iobuf + base; panjang di r11 */
+static void pack_path_bytes_x64(int ln, char tag, long base) {
+    emit("\tleaq kop_iobuf(%%rip), %%rbx");
+    if (base) emit("\taddq $%ld, %%rbx", base);
+    emit("\tmovl (%%r10), %%r11d");
+    emit("\tcmpl $%ld, %%r11d", 4000 - base);
+    emit("\tjle .LPKX%d%ca", ln, tag);
+    emit("\tmovl $%ld, %%r11d", 4000 - base);
+    emit(".LPKX%d%ca:", ln, tag);
+    emit("\txorl %%ecx, %%ecx");
+    emit(".LPKX%d%cb:", ln, tag);
+    emit("\tcmpl %%r11d, %%ecx");
+    emit("\tjge .LPKX%d%cc", ln, tag);
+    emit("\tmovl %%ecx, %%eax");
+    emit("\tshlq $3, %%rax");
+    emit("\tmovq 8(%%r10,%%rax), %%rdx");
+    emit("\tmovb %%dl, (%%rbx,%%rcx)");
+    emit("\tincl %%ecx");
+    emit("\tjmp .LPKX%d%cb", ln, tag);
+    emit(".LPKX%d%cc:", ln, tag);
+}
+
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
@@ -908,6 +930,122 @@ static int gen_expr(Method *m, Node *e) {
                 return 0;
             }
         }
+        if (e->ival >= 13 && e->ival <= 21) {
+            int na = 0;
+            for (Node *aa = e->a; aa; aa = aa->next) { gen_expr(m, aa); spush(); na++; }
+            if (e->ival == 13) {                       /* openb(path,flags,mode) */
+                emit("\tmovq 16(%%rsp), %%r10");
+                pack_path_bytes_x64(ln, 'a', 0);
+                emit("\tmovl $-100, %%edi");
+                emit("\tmovq %%rbx, %%rsi");
+                emit("\tmovl 8(%%rsp), %%edx");
+                emit("\tmovl (%%rsp), %%r10d");
+                emit("\tmovl $257, %%eax");
+                emit("\tsyscall");
+                emit("\taddq $24, %%rsp");
+                par ^= 1;
+                return 0;
+            }
+            if (e->ival == 14) {                       /* mkdirb(path) */
+                emit("\tmovq (%%rsp), %%r10");
+                pack_path_bytes_x64(ln, 'a', 0);
+                emit("\tmovl $-100, %%edi");
+                emit("\tmovq %%rbx, %%rsi");
+                emit("\tmovl $493, %%edx");
+                emit("\tmovl $258, %%eax");
+                emit("\tsyscall");
+                emit("\taddq $8, %%rsp");
+                par ^= 1;
+                return 0;
+            }
+            if (e->ival == 15) {                       /* unlinkb(path) */
+                emit("\tmovq (%%rsp), %%r10");
+                pack_path_bytes_x64(ln, 'a', 0);
+                emit("\tmovl $-100, %%edi");
+                emit("\tmovq %%rbx, %%rsi");
+                emit("\txorl %%edx, %%edx");
+                emit("\tmovl $263, %%eax");
+                emit("\tsyscall");
+                emit("\taddq $8, %%rsp");
+                par ^= 1;
+                return 0;
+            }
+            if (e->ival == 16) {                       /* renameb(old,new) */
+                emit("\tmovq 8(%%rsp), %%r10");
+                pack_path_bytes_x64(ln, 'a', 0);
+                emit("\tmovq (%%rsp), %%r10");
+                pack_path_bytes_x64(ln, 'b', 2048);
+                emit("\tmovl $-100, %%edi");
+                emit("\tleaq -2048(%%rbx), %%rsi");
+                emit("\tmovl $-100, %%edx");
+                emit("\tmovq %%rbx, %%r10");
+                emit("\tmovl $264, %%eax");
+                emit("\tsyscall");
+                emit("\taddq $16, %%rsp");
+                return 0;
+            }
+            if (e->ival == 17) {                       /* seek(fd,off,whence) */
+                emit("\tmovl 16(%%rsp), %%edi");
+                emit("\tmovslq 8(%%rsp), %%rsi");
+                emit("\tmovl (%%rsp), %%edx");
+                emit("\tmovl $8, %%eax");
+                emit("\tsyscall");
+                emit("\taddq $24, %%rsp");
+                par ^= 1;
+                return 0;
+            }
+            if (e->ival == 18) {                       /* time() */
+                emit("\tsubq $16, %%rsp");
+                emit("\txorl %%edi, %%edi");
+                emit("\tmovq %%rsp, %%rsi");
+                emit("\tmovl $228, %%eax");
+                emit("\tsyscall");
+                emit("\tmovq (%%rsp), %%rax");
+                emit("\taddq $16, %%rsp");
+                return 0;
+            }
+            if (e->ival == 19) {                       /* mono() ms */
+                emit("\tsubq $16, %%rsp");
+                emit("\tmovl $1, %%edi");
+                emit("\tmovq %%rsp, %%rsi");
+                emit("\tmovl $228, %%eax");
+                emit("\tsyscall");
+                emit("\tmovq (%%rsp), %%r8");
+                emit("\timulq $1000, %%r8, %%r8");
+                emit("\tmovq 8(%%rsp), %%rax");
+                emit("\txorl %%edx, %%edx");
+                emit("\tmovq $1000000, %%rcx");
+                emit("\tdivq %%rcx");
+                emit("\taddq %%r8, %%rax");
+                emit("\taddq $16, %%rsp");
+                return 1;
+            }
+            if (e->ival == 20) {                       /* sleep(ms) */
+                emit("\tmovq (%%rsp), %%rax");
+                emit("\tmovq $1000, %%rcx");
+                emit("\txorl %%edx, %%edx");
+                emit("\tdivq %%rcx");
+                emit("\tsubq $16, %%rsp");
+                emit("\tmovq %%rax, (%%rsp)");
+                emit("\timulq $1000000, %%rdx, %%rdx");
+                emit("\tmovq %%rdx, 8(%%rsp)");
+                emit("\tmovq %%rsp, %%rdi");
+                emit("\txorl %%esi, %%esi");
+                emit("\tmovl $35, %%eax");
+                emit("\tsyscall");
+                emit("\taddq $16, %%rsp");
+                emit("\taddq $8, %%rsp");
+                par ^= 1;
+                emit("\txorl %%eax, %%eax");
+                return 0;
+            }
+            if (e->ival == 21) {                       /* exit(code) */
+                emit("\tmovl (%%rsp), %%edi");
+                emit("\tmovl $60, %%eax");
+                emit("\tsyscall");
+                return 0;
+            }
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -995,6 +1133,10 @@ static int gen_expr(Method *m, Node *e) {
     }
     case EX_ENVLOAD:
         emit("\tmovq -8(%%rbp), %%rax");  /* slot 0 = param $env */
+        if (is64ty((Ty)e->dty)) {
+            emit("\tmovq %ld(%%rax), %%rax", 24 + 8 * (long)e->ival);
+            return 1;
+        }
         emit("\tmovl %ld(%%rax), %%eax", 24 + 8 * (long)e->ival);
         break;
     case EX_BIN: {

@@ -1,0 +1,114 @@
+// Map.kp — peta int→int (open addressing, kapasitas tetap/pow2) v1.7.
+// Layout: m[0]=capacity, m[1]=size, m[2..2+cap)=keys, m[2+cap..)=values.
+// Sentinel: EMPTY = INT_MIN (kunci INT_MIN tidak didukung);
+// TOMBSTONE untuk penghapusan. Kapasitas harus pangkat dua.
+
+class Map {
+
+    static int EMPTY() { return (int)-2147483648L; }
+    static int TOMB()  { return (int)-2147483647L; }
+
+    static int[] make(int cap) {
+        int c = 1;
+        while (c < cap) c = c * 2;
+        int[] m = new int[2 + 2 * c];
+        m[0] = c;
+        for (int i = 0; i < c; i++) m[2 + i] = EMPTY();
+        return m;
+    }
+
+    static int cap(int[] m) { return m[0]; }
+    static int size(int[] m) { return m[1]; }
+
+    static int slot(int[] m, int k) {
+        int c = m[0];
+        int h = k * (int)2654435761L;
+        h = h ^ (h >>> 16);
+        return h & (c - 1);
+    }
+
+    static int find(int[] m, int k) {
+        int c = m[0];
+        int i = slot(m, k);
+        for (int n = 0; n < c; n++) {
+            int key = m[2 + i];
+            if (key == EMPTY()) return -1;
+            if (key == k) return i;
+            i = (i + 1) & (c - 1);
+        }
+        return -1;
+    }
+
+    static boolean has(int[] m, int k) { return find(m, k) >= 0; }
+
+    static int get(int[] m, int k) {
+        int i = find(m, k);
+        if (i < 0) return EMPTY();
+        return m[2 + m[0] + i];
+    }
+
+    static int getOr(int[] m, int k, int def) {
+        int i = find(m, k);
+        if (i < 0) return def;
+        return m[2 + m[0] + i];
+    }
+
+    static boolean put(int[] m, int k, int v) {
+        int c = m[0];
+        int i = slot(m, k);
+        int tomb = -1;
+        for (int n = 0; n < c; n++) {
+            int key = m[2 + i];
+            if (key == EMPTY()) {
+                int at = i;
+                if (tomb >= 0) at = tomb;
+                m[2 + at] = k;
+                m[2 + c + at] = v;
+                m[1] = m[1] + 1;
+                return true;
+            }
+            if (key == TOMB()) {
+                if (tomb < 0) tomb = i;
+            } else if (key == k) {
+                m[2 + c + i] = v;
+                return true;
+            }
+            i = (i + 1) & (c - 1);
+        }
+        return false;
+    }
+
+    static boolean remove(int[] m, int k) {
+        int i = find(m, k);
+        if (i < 0) return false;
+        m[2 + i] = TOMB();
+        m[1] = m[1] - 1;
+        return true;
+    }
+
+    static void clear(int[] m) {
+        int c = m[0];
+        for (int i = 0; i < c; i++) m[2 + i] = EMPTY();
+        m[1] = 0;
+    }
+
+    /* peta baru berkapasitas 2x + salin isi */
+    static int[] grow(int[] m) {
+        int[] n = make(m[0] * 2);
+        int c = m[0];
+        for (int i = 0; i < c; i++) {
+            int k = m[2 + i];
+            if (k != EMPTY() && k != TOMB()) put(n, k, m[2 + c + i]);
+        }
+        return n;
+    }
+
+    /* iterasi semua pasangan: f(key, value) */
+    static void forEach(int[] m, fn f) {
+        int c = m[0];
+        for (int i = 0; i < c; i++) {
+            int k = m[2 + i];
+            if (k != EMPTY() && k != TOMB()) f(k, m[2 + c + i]);
+        }
+    }
+}

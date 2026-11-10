@@ -1,0 +1,34 @@
+// File.kop — file I/O di atas builtin Net (path dinamis int[]) v1.7.
+// Flag openat standar Linux; mode 0644 = 420.
+
+class File {
+    static int O_RDONLY() { return 0; }
+    static int O_WRONLY() { return 1; }
+    static int O_CREAT()  { return 64; }
+    static int O_TRUNC()  { return 512; }
+    static int O_APPEND() { return 1024; }
+    static int MODE_0644() { return 420; }
+
+    static int openRead(int[] path)  { return Net.openb(path, 0, 0); }
+    static int create(int[] path)    { return Net.openb(path, 577, 420); }
+    static int append(int[] path)    { return Net.openb(path, 1089, 420); }
+    static int close(int fd)         { return Net.close(fd); }
+
+    static int writeAll(int fd, int[] data) { return Net.sendb(fd, data); }
+    static int readInto(int fd, int[] buf)  { return Net.recvb(fd, buf); }
+
+    static int seekSet(int fd, int off) { return Net.seek(fd, off, 0); }
+    static int seekCur(int fd, int off) { return Net.seek(fd, off, 1); }
+    static int seekEnd(int fd, int off) { return Net.seek(fd, off, 2); }
+
+    static int size(int fd) {
+        int cur = Net.seek(fd, 0, 1);
+        int end = Net.seek(fd, 0, 2);
+        Net.seek(fd, cur, 0);
+        return end;
+    }
+
+    static int remove(int[] path) { return Net.unlinkb(path); }
+    static int renameTo(int[] oldp, int[] newp) { return Net.renameb(oldp, newp); }
+    static int mkdir(int[] path) { return Net.mkdirb(path); }
+}

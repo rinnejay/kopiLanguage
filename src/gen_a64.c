@@ -143,6 +143,35 @@ static void push_val(int is64) {
     else emit("\tstr\tw0, [sp, #-16]!");
 }
 
+/* pak byte array (pointer di x10) ke kop_iobuf + base; hasil panjang di w11 */
+static void pack_path_bytes(int ln, char tag, long base) {
+    char l1[40], l2[40], l3[40];
+    snprintf(l1, sizeof l1, ".LPK%d%ca", ln, tag);
+    snprintf(l2, sizeof l2, ".LPK%d%cb", ln, tag);
+    snprintf(l3, sizeof l3, ".LPK%d%cc", ln, tag);
+    emit("\tadrp\tx17, kop_iobuf");
+    emit("\tadd\tx17, x17, :lo12:kop_iobuf");
+    if (base) emit("\tadd\tx17, x17, #%ld", base);
+    emit("\tldr\tw11, [x10]");
+    emit("\tcmp\tw11, #%ld", 4000 - base);
+    emit("\tb.ls\t%s", l1);
+    emit("\tmov\tw11, #%ld", 4000 - base);
+    emit("%s:", l1);
+    emit("\tmov\tw13, #0");
+    emit("%s:", l2);
+    emit("\tcmp\tw13, w11");
+    emit("\tb.hs\t%s", l3);
+    emit("\tsxtw\tx15, w13");
+    emit("\tlsl\tx15, x15, #3");
+    emit("\tadd\tx15, x15, #8");
+    emit("\tldr\tx16, [x10, x15]");
+    emit("\tstrb\tw16, [x17, x13]");
+    emit("\tadd\tw13, w13, #1");
+    emit("\tb\t%s", l2);
+    emit("%s:", l3);
+    emit("\tstrb\twzr, [x17, x11]");        /* NUL-terminate */
+}
+
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
@@ -886,6 +915,129 @@ static int gen_expr(Method *m, Node *e) {
                 return 0;
             }
         }
+        if (e->ival >= 13 && e->ival <= 21) {
+            int idx = 0;
+            for (Node *aa = e->a; aa; aa = aa->next, idx++) {
+                gen_expr(m, aa);
+                int isArr = (e->ival == 13 && idx == 0) ||
+                            (e->ival == 14 || e->ival == 15) ||
+                            (e->ival == 16 && idx < 2);
+                push_val(isArr);
+            }
+            if (e->ival == 13) {            /* openb(path, flags, mode) */
+                emit("\tldr\tx10, [sp, #32]");
+                pack_path_bytes(ln, 'a', 0);
+                emit("\tmovn\tw0, #99");               /* AT_FDCWD */
+                emit("\tmov\tx1, x17");
+                emit("\tldr\tw2, [sp, #16]");          /* flags */
+                emit("\tldr\tw3, [sp, #0]");           /* mode */
+                emit("\tmov\tx8, #56");                /* __NR_openat */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #48");
+                return 0;
+            }
+            if (e->ival == 14) {            /* mkdirb(path) */
+                emit("\tldr\tx10, [sp, #0]");
+                pack_path_bytes(ln, 'a', 0);
+                emit("\tmovn\tw0, #99");
+                emit("\tmov\tx1, x17");
+                emit("\tmov\tw2, #493");               /* 0755 */
+                emit("\tmov\tx8, #34");                /* __NR_mkdirat */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #16");
+                return 0;
+            }
+            if (e->ival == 15) {            /* unlinkb(path) */
+                emit("\tldr\tx10, [sp, #0]");
+                pack_path_bytes(ln, 'a', 0);
+                emit("\tmovn\tw0, #99");
+                emit("\tmov\tx1, x17");
+                emit("\tmov\tx2, #0");
+                emit("\tmov\tx8, #35");                /* __NR_unlinkat */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #16");
+                return 0;
+            }
+            if (e->ival == 16) {            /* renameb(old, new) */
+                emit("\tldr\tx10, [sp, #16]");
+                pack_path_bytes(ln, 'a', 0);
+                emit("\tldr\tx10, [sp, #0]");
+                pack_path_bytes(ln, 'b', 2048);
+                emit("\tmovn\tw0, #99");
+                emit("\tsub\tx1, x17, #2048");         /* path lama */
+                emit("\tmovn\tw2, #99");
+                emit("\tmov\tx3, x17");                /* path baru */
+                emit("\tmov\tx8, #38");                /* __NR_renameat */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #32");
+                return 0;
+            }
+            if (e->ival == 17) {            /* seek(fd, off, whence) */
+                emit("\tldr\tw0, [sp, #32]");
+                emit("\tldr\tw1, [sp, #16]");
+                emit("\tsxtw\tx1, w1");
+                emit("\tldr\tw2, [sp, #0]");
+                emit("\tmov\tx8, #62");                /* __NR_lseek */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #48");
+                return 0;
+            }
+            if (e->ival == 18) {            /* time() → detik epoch */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tmov\tw0, #0");                 /* CLOCK_REALTIME */
+                emit("\tmov\tx1, sp");
+                emit("\tmov\tx8, #113");               /* __NR_clock_gettime */
+                emit("\tsvc\t#0");
+                emit("\tldr\tx0, [sp]");
+                emit("\tadd\tsp, sp, #16");
+                return 0;
+            }
+            if (e->ival == 19) {            /* mono() → milidetik monotonik */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tmov\tw0, #1");                 /* CLOCK_MONOTONIC */
+                emit("\tmov\tx1, sp");
+                emit("\tmov\tx8, #113");
+                emit("\tsvc\t#0");
+                emit("\tldr\tx1, [sp]");
+                emit("\tldr\tx2, [sp, #8]");
+                emit("\tmov\tx3, #1000");
+                emit("\tmul\tx0, x1, x3");
+                emit("\tmovz\tx3, #0x4240");
+                emit("\tmovk\tx3, #0xf, lsl #16");
+                emit("\tudiv\tx2, x2, x3");
+                emit("\tadd\tx0, x0, x2");
+                emit("\tadd\tsp, sp, #16");
+                return 1;
+            }
+            if (e->ival == 20) {            /* sleep(ms) */
+                emit("\tldr\tw0, [sp, #0]");
+                emit("\tmov\tw1, #1000");
+                emit("\tudiv\tw2, w0, w1");            /* detik */
+                emit("\tmsub\tw3, w2, w1, w0");        /* sisa ms */
+                emit("\tmovz\tw4, #0x4240");
+                emit("\tmovk\tw4, #0xf, lsl #16");
+                emit("\tmul\tw3, w3, w4");
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tsxtw\tx2, w2");
+                emit("\tstr\tx2, [sp]");
+                emit("\tsxtw\tx3, w3");
+                emit("\tstr\tx3, [sp, #8]");
+                emit("\tmov\tx0, sp");
+                emit("\tmov\tx1, #0");
+                emit("\tmov\tx8, #115");               /* __NR_nanosleep */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #16");
+                emit("\tadd\tsp, sp, #16");
+                emit("\tmov\tw0, wzr");
+                return 0;
+            }
+            if (e->ival == 21) {            /* exit(code) */
+                emit("\tldr\tw0, [sp, #0]");
+                emit("\tmov\tx8, #93");                /* __NR_exit */
+                emit("\tsvc\t#0");
+                return 0;
+            }
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -967,6 +1119,10 @@ static int gen_expr(Method *m, Node *e) {
     }
     case EX_ENVLOAD:
         emit("\tldr\tx0, [x29, #-8]");   /* slot 0 = param $env */
+        if (is64ty((Ty)e->dty)) {
+            emit("\tldr\tx0, [x0, #%ld]", 24 + 8 * (long)e->ival);
+            return 1;
+        }
         emit("\tldr\tw0, [x0, #%ld]", 24 + 8 * (long)e->ival);
         return 0;
     case EX_CAST: {
@@ -1170,7 +1326,7 @@ void gen_a64(const char *outpath) {
     emit("\t.align 3");
     emit("kop_arena_base: .quad 0");
     emit("kop_arena_used: .quad 0");
-    emit(".comm kop_iobuf, 256, 32");      /* penyangga syscall rekursi builtin */
+    emit(".comm kop_iobuf, 4096, 32");      /* penyangga syscall rekursi builtin */
 
     emit("\t.section .rodata");
     emit(".Lfmt_i: .asciz \"%s\"", "%d");
