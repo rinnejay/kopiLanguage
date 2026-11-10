@@ -36,7 +36,7 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 
 | Lokasi | Kelompok | Isi |
 |--------|----------|-----|
-| `lib/core/` | logika dasar bahasa | `Matematika`, `Angka`, `Arrays` |
+| `lib/core/` | logika dasar bahasa | `Math`, `Digits`, `Arrays` |
 | `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
 | `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard), **`Tls`** (klien TLS 1.3 — lihat bagian khusus di bawah) |
 
@@ -60,6 +60,7 @@ v1.5d-E2 hari ini ████████████████  61/61 test h
 | **v1.5d-D** | **AEAD ChaCha20-Poly1305 murni Kopi** (`lib/Aead.kop`): otk = 32 byte pertama blok counter-0, ct = ChaCha20 counter-1, `macData = aad ‖ pad16 ‖ ct ‖ pad16 ‖ lenLE64(aad) ‖ lenLE64(ct)`, tag = Poly1305(otk); **lulus vektor §2.8.2 RFC 7539 = RFC 8439** (key `80..9f`, nonce `00000007 40414243 44454647`, tag `1ae10b59 …`) + roundtrip dekripsi + kasus-ganti ciphertext terdeteksi, di VM, native a64, sintaks x64. Generator fail-keras: oracle python murni (mod p, int besar) wajib mereproduksi ct & tag RFC sebelum test dibuat. Jebakan hari ini: (1) tag `d63103…` yang tadinya menjadi kecurigaan tak berlaku — 7539 dan 8439 sama-sama `1ae10b59…`; (2) nonce AEAD LE-word: `07 00 00 00 40 41 42 43 …` (word13 = 7), bukan `00 00 00 07 …`; (3) otk butuh feed 32 byte-nol — 16 byte menghasilkan s kosong dan tag menyertainya salah. Semua backend harus menghasilkan output byte-per-byte identik: VM, native aarch64, dan x86-64 (sintaks assembly) |
 | **v1.5d-E** | **klien TLS 1.3 (RFC 8446) murni Kopi** di `lib/net/Tls.kop` + `lib/crypto/Der.kop` (pin SPKI) : record layer AEAD ChaCha20-Poly1305, key schedule penuh (§7.1), X25519, sertifikat di-pin (TOFU), server Finished **diverifikasi** (HMAC finished_key atas transkrip), client Finished dikirim, `writeApp`/`readApp` untuk data aplikasi dua arah. Lolos lawan `openssl s_server` (2× NewSessionTicket, `close_notify` warning) dan server echo TLS |
 | **v1.5d-E2** | **akar-akar bug TLS dibereskan** (semua diverifikasi oracle python/RFC, bukan tambal nilai): ① `Kdf.expandLabel` — urutan `HkdfLabel` §7.1 salah (panjang label harus termasuk `"tls13 "`). ② **Poly1305** — carry `carPass` bisa tersisa di slot 9 (`2^135 ≡ 160 mod p`) lalu dibuang `mulFold` berikutnya → tag benar untuk pesan pendek dan salah ~50% untuk 700–900 B; kini dikuras `fold9()` tiap blok. ③ nonce record — seq 64-bit **big-endian** di byte 4..11 (§5.2), shift ≥32 dihindari (UB C/ARM). ④ `seal()` — loop menyalin melewati batas array (panjang record salah). ⑤ key schedule — `early = Extract(0³²,0³²)`, `master = Extract(DS(hs,"derived",H("")),0³²)`, `c_ap`/`s_ap` dari transkrip s.d. **server Finished**. ⑥ client Finished — kunci handshake klien (CH+SH), seq reset 0, inner type **22**. Test 61/61; generator Poly1305 menambah 3 vektor panjang deterministik, `gen_kdf.py` diperbaiki ke label RFC |
+| **v1.5d-E3** | **penamaan pustaka inti jadi Inggris**: `Matematika`→**`Math`** (`pangkat`→`pow`, `akar`→`sqrt`, `prima`→`isPrime`, `faktorial`→`factorial`, `genap`→`isEven`), `Angka`→**`Digits`** (`balik`→`reverse`, `jumlahDigit`→`digitSum`, `panjang`→`digitCount`, `deka`→`pow10`, `cetakBasis`→`printBase`); `examples/pakai_lib.kop` + `test.sh` + README diselaraskan |
 
 ## Bangun
 
@@ -99,18 +100,18 @@ CPU.
 ## Bahasa
 
 ```java
-class Matematika {
-    static int tambah(int a, int b) { return a + b; }
+class Calc {
+    static int add(int a, int b) { return a + b; }
 }
 
 class Main {
-    static boolean isGenap(int n)  { return n % 2 == 0; }
-    static void cetak(int x)       { System.out.println(x); }
+    static boolean isEven(int n)   { return n % 2 == 0; }
+    static void print(int x)       { System.out.println(x); }
 
     public static void main(String[] args) {
-        cetak(Matematika.tambah(40, 2));   // panggil lintas-class static
+        print(Calc.add(40, 2));            // panggil lintas-class static
         for (int i = 0; i < 10; i++) {
-            if (isGenap(i) && i != 4) { continue; }
+            if (isEven(i) && i != 4) { continue; }
             System.out.println(i);
         }
     }
@@ -260,8 +261,8 @@ Kopi, bukan kode built-in compiler:
 
 | File              | Isi                                                                 |
 |-------------------|---------------------------------------------------------------------|
-| `lib/core/Matematika.kop` | `abs min max gcd lcm pangkat akar prima faktorial fib genap`     |
-| `lib/core/Angka.kop`      | `balik` (12345→54321), `jumlahDigit`, `panjang`, `deka`, `cetakBasis` (2..10) |
+| `lib/core/Math.kop`    | `abs min max gcd lcm pow sqrt isPrime factorial fib isEven` |
+| `lib/core/Digits.kop`  | `reverse` (12345→54321), `digitSum`, `digitCount`, `pow10`, `printBase` (2..10) |
 | `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge sort` (merge sort O(n log n)) + `binSearch` |
 | `lib/crypto/Crypto.kop`   | `bitxor` (per-bit, tanpa operator bitwise), `fnv1a` (FNV-1a 32-bit), `nextRand`/`randRange` (Lehmer/Schrage), `xorStream` (XOR cipher nirl), `caesar`/`uncaesar` |
 
@@ -274,13 +275,13 @@ edukatif; **bukan** kriptografi produksi (belum ada operator bitwise & mod
 2^32 asli). Hak intelektual fungsi tetap standar (FNV-1a, Lehmer).
 
 ```java
-import Matematika;
-import Angka;
+import Math;
+import Digits;
 
 class Main {
     public static void main(String[] args) {
-        System.out.println(Matematika.gcd(12, 18));   // 6
-        Angka.cetakBasis(42, 2);                      // 101010
+        System.out.println(Math.gcd(12, 18));   // 6
+        Digits.printBase(42, 2);                // 101010
         System.out.println("");
     }
 }

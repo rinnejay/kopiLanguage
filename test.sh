@@ -119,8 +119,8 @@ EOF
 printf '42\n' > "$T/kopi/multi.ref"
 check multi "$T/kopi/utama.kop"
 
-# library standar lib/ — import Matematika/Angka dengan pencarian lib kopicc
-printf 'abs(-5)      = 5\ngcd(12,18)   = 6\nlcm(4,6)     = 12\nakar(100)    = 10\nmax(7,-3)    = 7\nprima(97)    = 1\nprima(96)    = 0\nfaktorial(9) = 362880\nfib(11)      = 89\nbalik(12345) = 54321\ndigit(907)   = 16\n42 biner     = 101010\n' > "$T/kopi/pakai_lib.ref"
+# library standar lib/ — import Math/Digits dengan pencarian lib kopicc
+printf 'abs(-5)       = 5\ngcd(12,18)    = 6\nlcm(4,6)      = 12\nsqrt(100)     = 10\nmax(7,-3)     = 7\nisPrime(97)   = 1\nisPrime(96)   = 0\nfactorial(9)  = 362880\nfib(11)       = 89\nreverse(12345)= 54321\ndigitSum(907) = 16\n42 biner      = 101010\n' > "$T/kopi/pakai_lib.ref"
 check pakai_lib examples/pakai_lib.kop
 
 # ++ -- += dst: desugar statement-level

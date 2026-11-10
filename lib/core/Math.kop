@@ -1,8 +1,8 @@
-// Matematika.kop — library standar Kopi (ditulis 100% dalam bahasa Kopi)
-// Cara pakai:   import Matematika;   →   Matematika.abs(-5), dst.
+// Math.kop — library standar Kopi (ditulis 100% dalam bahasa Kopi)
+// Cara pakai:   import Math;   →   Math.abs(-5), dst.
 // Semuanya static; tidak butuh deklarasi export — semua metode publik.
 
-class Matematika {
+class Math {
 
     static int abs(int x) {
         if (x < 0) { return -x; }
@@ -38,7 +38,7 @@ class Matematika {
     }
 
     // a^e (< 2^31, jadi eksponen kecil saja)
-    static int pangkat(int a, int e) {
+    static int pow(int a, int e) {
         int r = 1;
         for (int i = 0; i < e; i++) {
             r = r * a;
@@ -47,7 +47,7 @@ class Matematika {
     }
 
     // akar bulat ke bawah (bagian-bagian Newton)
-    static int akar(int n) {
+    static int sqrt(int n) {
         if (n < 2) { return n; }
         int x = n;
         int y = (x + 1) / 2;
@@ -58,7 +58,7 @@ class Matematika {
         return x;
     }
 
-    static boolean prima(int n) {
+    static boolean isPrime(int n) {
         if (n < 2) { return false; }
         if (n < 4) { return true; }
         if (n % 2 == 0) { return false; }
@@ -68,7 +68,7 @@ class Matematika {
         return true;
     }
 
-    static int faktorial(int n) {
+    static int factorial(int n) {
         int r = 1;
         for (int i = 2; i <= n; i++) {
             r = r * i;
@@ -82,7 +82,7 @@ class Matematika {
         return fib(n - 1) + fib(n - 2);
     }
 
-    static boolean genap(int n) {
+    static boolean isEven(int n) {
         return n % 2 == 0;
     }
 }

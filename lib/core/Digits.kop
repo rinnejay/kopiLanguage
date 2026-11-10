@@ -1,13 +1,13 @@
-// Angka.kop — library standar Kopi: manipulasi digit & basis.
+// Digits.kop — library standar Kopi: manipulasi digit & basis.
 // Catatan: `?`/String belum ada di v1.0, jadi trik idiomatiknya:
 //   - digit diolah lewat `n % 10` dan `n / 10`
 //   - urutan cetak benar lewat REKURSI (cetak digit setelah memanggil
 //     diri-sendiri, sehingga digit paling kanan tercetak terakhir)
 
-class Angka {
+class Digits {
 
     // balik urutan digit: 12345 → 54321 (tanda tetap)
-    static int balik(int n) {
+    static int reverse(int n) {
         boolean neg = n < 0;
         if (neg) { n = -n; }
         int r = 0;
@@ -19,7 +19,7 @@ class Angka {
         return r;
     }
 
-    static int jumlahDigit(int n) {
+    static int digitSum(int n) {
         if (n < 0) { n = -n; }
         int s = 0;
         while (n > 0) {
@@ -30,14 +30,14 @@ class Angka {
     }
 
     // hitung berapa digit: 12345 → 5
-    static int panjang(int n) {
+    static int digitCount(int n) {
         if (n < 0) { n = -n; }
         if (n < 10) { return 1; }
-        return 1 + panjang(n / 10);
+        return 1 + digitCount(n / 10);
     }
 
     // pangkat tertinggi 10 yang muat: 12345 → 10000
-    static int deka(int n) {
+    static int pow10(int n) {
         if (n < 0) { n = -n; }
         int d = 1;
         while (n >= 10) {
@@ -49,16 +49,16 @@ class Angka {
 
     // cetak n dalam basis 2..10.
     // Basis > 10 belum bisa (butuh karakter 'A'-'F' yang belum tersedia);
-    // untuk itu cetakAngka dibatasi dan return tanpa apa-apa keluaran basis.
-    static void cetakBasis(int n, int basis) {
-        if (basis < 2 || basis > 10) { return; }
+    // untuk itu printBase dibatasi dan return tanpa apa-apa keluaran basis.
+    static void printBase(int n, int base) {
+        if (base < 2 || base > 10) { return; }
         if (n < 0) {
             System.out.print("-");
             n = -n;
         }
-        if (n >= basis) {
-            cetakBasis(n / basis, basis);   // rekursi dulu → urutan benar
+        if (n >= base) {
+            printBase(n / base, base);   // rekursi dulu → urutan benar
         }
-        System.out.print(n % basis);
+        System.out.print(n % base);
     }
 }

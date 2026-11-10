@@ -1,47 +1,47 @@
 // pakai_lib.kop — pakai library standar dari folder lib/ proyek.
 // Perhatikan: file ini sendiri berada jauh di examples/, sementara
-// Matematika/Angka ada di lib/ — ketemu lewat pencarian lib kopicc.
+// Math/Digits ada di lib/ — ketemu lewat pencarian lib kopicc.
 
-import Matematika;
-import Angka;
+import Math;
+import Digits;
 
 class Main {
     public static void main(String[] args) {
-        System.out.print("abs(-5)      = ");
-        System.out.println(Matematika.abs(-5));
+        System.out.print("abs(-5)       = ");
+        System.out.println(Math.abs(-5));
 
-        System.out.print("gcd(12,18)   = ");
-        System.out.println(Matematika.gcd(12, 18));
+        System.out.print("gcd(12,18)    = ");
+        System.out.println(Math.gcd(12, 18));
 
-        System.out.print("lcm(4,6)     = ");
-        System.out.println(Matematika.lcm(4, 6));
+        System.out.print("lcm(4,6)      = ");
+        System.out.println(Math.lcm(4, 6));
 
-        System.out.print("akar(100)    = ");
-        System.out.println(Matematika.akar(100));
+        System.out.print("sqrt(100)     = ");
+        System.out.println(Math.sqrt(100));
 
-        System.out.print("max(7,-3)    = ");
-        System.out.println(Matematika.max(7, -3));
+        System.out.print("max(7,-3)     = ");
+        System.out.println(Math.max(7, -3));
 
-        System.out.print("prima(97)    = ");
-        System.out.println(Matematika.prima(97));
+        System.out.print("isPrime(97)   = ");
+        System.out.println(Math.isPrime(97));
 
-        System.out.print("prima(96)    = ");
-        System.out.println(Matematika.prima(96));
+        System.out.print("isPrime(96)   = ");
+        System.out.println(Math.isPrime(96));
 
-        System.out.print("faktorial(9) = ");
-        System.out.println(Matematika.faktorial(9));
+        System.out.print("factorial(9)  = ");
+        System.out.println(Math.factorial(9));
 
-        System.out.print("fib(11)      = ");
-        System.out.println(Matematika.fib(11));
+        System.out.print("fib(11)       = ");
+        System.out.println(Math.fib(11));
 
-        System.out.print("balik(12345) = ");
-        System.out.println(Angka.balik(12345));
+        System.out.print("reverse(12345)= ");
+        System.out.println(Digits.reverse(12345));
 
-        System.out.print("digit(907)   = ");
-        System.out.println(Angka.jumlahDigit(907));
+        System.out.print("digitSum(907) = ");
+        System.out.println(Digits.digitSum(907));
 
-        System.out.print("42 biner     = ");
-        Angka.cetakBasis(42, 2);
+        System.out.print("42 biner      = ");
+        Digits.printBase(42, 2);
         System.out.println("");
     }
 }
