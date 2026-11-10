@@ -206,6 +206,20 @@ static void gen_stmt(Method *m, Node *s) {
         brk_sp--; brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
+    case ST_DO: {
+        int ltop = nlab++, lcont = nlab++, lend = nlab++;
+        int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
+        emit(".L%d:", ltop);
+        gen_stmts(m, s->b);
+        emit(".L%d:", lcont);
+        gen_expr(m, s->a);
+        emit("\ttestl %%eax, %%eax");
+        emit("\tjne .L%d", ltop);
+        emit(".L%d:", lend);
+        brk_sp--; brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
+        break;
+    }
     case ST_FOR: {
         if (s->a) gen_stmt(m, s->a);
         int ltop = nlab++, lend = nlab++, lcont = nlab++;
@@ -1585,6 +1599,18 @@ static int gen_expr(Method *m, Node *e) {
         }
         emit("\tmovl %ld(%%rax), %%eax", 24 + 8 * (long)e->ival);
         break;
+    case EX_TERN: {
+        int lelse = nlab++, lend = nlab++;
+        gen_expr(m, e->a);
+        emit("\ttestl %%eax, %%eax");
+        emit("\tje .L%d", lelse);
+        int w1 = gen_expr(m, e->b);
+        emit("\tjmp .L%d", lend);
+        emit(".L%d:", lelse);
+        int w2 = gen_expr(m, e->c);
+        emit(".L%d:", lend);
+        return (w1 && w2) ? 1 : is64ty((Ty)e->dty);
+    }
     case EX_BIN: {
         Ty bl = (Ty)e->a->dty, br = (Ty)e->b->dty, bres = (Ty)e->dty;
         if (!((bl == T_INT || bl == T_BOOL) && (br == T_INT || br == T_BOOL) &&

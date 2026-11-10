@@ -53,9 +53,14 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[i], "-t") && i + 1 < argc) { target = argv[++i]; continue; }
         if (!strcmp(argv[i], "a64") || !strcmp(argv[i], "x64") || !strcmp(argv[i], "vm"))
             { target = argv[i]; continue; }
+        if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-V")) {
+            printf("kopicc 1.11.0 (Kopi) — target a64 | x64 | vm\n");
+            return 0;
+        }
         if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
             printf("kopicc — compiler bahasa Kopi\n"
-                   "  usage: kopicc <source.kop> [more.kop ...] [-o output] [-t a64|x64|vm]\n\n"
+                   "  usage: kopicc <source.kop> [more.kop ...] [-o output] [-t a64|x64|vm]\n"
+                   "         kopicc --version | --help\n\n"
                    "  multi-file: seberapa banyak .kop pun digabung jadi satu unit;\n"
                    "  di dalam file juga boleh dipakai:\n"
                    "      import \"util.kop\";      (path relatif terhadap file asal)\n"

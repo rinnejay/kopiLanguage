@@ -103,6 +103,7 @@ static inline int ty_can_implicit(Ty dst, Ty src) {
 enum {
     /* expressions */
     EX_INT, EX_BOOL, EX_VAR, EX_CALL, EX_UN, EX_BIN,
+    EX_TERN,       /* cond ? a : b : a=cond, b=then, c=else */
     EX_ARROW,      /* lambda: c=params, a=expr body / d=stmt body, cp=Method* */
     EX_FCALL,      /* pemanggilan lewat closure: a=args, b=callee expr    */
     EX_ENVLOAD,    /* baca capture ke-j dari env: ival=j, dty=tipe capture */
@@ -114,7 +115,7 @@ enum {
     EX_CAST,       /* (tipe) expr : a=operand, dty=tipe tujuan            */
     EX_TSTR,       /* template `...{expr}...` : a=daftar bagian (byte/ekspresi) */
     /* statements */
-    ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR,
+    ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR, ST_DO,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
     ST_IDXASG,     /* a[i] = v : a=array expr, b=index expr, c=value expr */
     ST_BLOCK,      /* blok { ... } : d=statement list (scope sendiri)      */

@@ -1,0 +1,48 @@
+// langtest.kop — ternary, do/while, dan metode instance String (v1.11).
+import Str;
+
+class Main {
+    static int max(int a, int b) { return a > b ? a : b; }
+
+    public static void main(String[] args) {
+        int x = 5;
+        int y = 9;
+        System.out.println(max(x, y));
+        System.out.println(x > y ? x : y);
+        System.out.println(x < y ? "ya" : "tidak");
+        String s = x < y ? "kiri" : "kanan";
+        System.out.println(s);
+
+        int i = 0;
+        do { i++; } while (i < 3);
+        System.out.println(i);
+        do { i--; } while (false);
+        System.out.println(i);
+
+        int j = 0;
+        do {
+            j++;
+            if (j == 2) continue;
+            if (j == 4) break;
+        } while (j < 10);
+        System.out.println(j);
+
+        System.out.println(x < 0 ? 0 : x < 10 ? 1 : 2);
+        long z = y > 3 ? 9000000000L : 0L;
+        System.out.println(z);
+
+        String t = "  Kopi Bahasa  ";
+        System.out.println(t.trim());
+        System.out.println(t.trim().upper());
+        System.out.println("kopi".equals("kopi"));
+        System.out.println("Kopi".equalsIgnoreCase("kOPI"));
+        System.out.println("arena".charAt(2));
+        System.out.println("realtime".substring(0, 4));
+        System.out.println("game server".indexOf("server"));
+        System.out.println("game server".indexOf("x"));
+        System.out.println("abc".isEmpty());
+        System.out.println("".isEmpty());
+        System.out.println("ab".repeat(3));
+        System.out.println("  ".trim().isEmpty());
+    }
+}

@@ -29,7 +29,7 @@ static struct { const char *kw; int type; } kws[] = {
     {"uint32", KW_UINT32}, {"uint64", KW_UINT64},
     {"byte", KW_BYTE}, {"short", KW_SHORT},
     {"int8", KW_INT8}, {"int16", KW_INT16},
-    {"if", KW_IF}, {"else", KW_ELSE}, {"while", KW_WHILE}, {"for", KW_FOR},
+    {"if", KW_IF}, {"else", KW_ELSE}, {"while", KW_WHILE}, {"do", KW_DO}, {"for", KW_FOR},
     {"return", KW_RETURN}, {"true", KW_TRUE}, {"false", KW_FALSE},
     {"break", KW_BREAK}, {"continue", KW_CONTINUE}, {"import", KW_IMPORT},
     {"fn", KW_FN}, {"json", KW_JSON},
@@ -263,7 +263,7 @@ static Tok *lex_scan(char *src, const char *fname, int startline, int *ntoks) {
         if (p[0] == '>' && p[1] == '>' && p[2] == '>') { PUSH(T_USHR, 0, 0);  p += 3; continue; }
         if (p[0] == '>' && p[1] == '>' && p[2] == '=') { PUSH(T_SHREQ, 0, 0);  p += 3; continue; }
         if (p[0] == '>' && p[1] == '>') { PUSH(T_SHR, 0, 0);     p += 2; continue; }
-        if (strchr("+-*/%(){};:,.=!<>[]&|^~", *p) && *p) {
+        if (strchr("+-*/%(){};:,.=!<>[]&|^~?", *p) && *p) {
             PUSH((unsigned char)*p, 0, 0);
             p++;
             continue;

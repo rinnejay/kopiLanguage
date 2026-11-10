@@ -256,6 +256,17 @@ static Node *stmt_single(void) {
         n->b = at('{') ? block() : stmt_single();
         return n;
     }
+    case KW_DO: {
+        Node *n = newnode(ST_DO, line);
+        advance();
+        n->b = at('{') ? block() : stmt_single();
+        expect(KW_WHILE, "'while' setelah badan do");
+        expect('(', "'(' setelah while");
+        n->a = expr();
+        expect(')', "')' setelah kondisi do-while");
+        expect(';', "';' setelah do-while");
+        return n;
+    }
     case KW_FOR: {
         Node *n = newnode(ST_FOR, line);
         advance();
@@ -1006,6 +1017,15 @@ static Node *expr(void) {
         n->b = and_chain();
         l = n;
     }
+    if (at('?')) {
+        Node *n = newnode(EX_TERN, peek()->line);
+        n->a = l;
+        advance();
+        n->b = expr();
+        expect(':', "':' pada ekspresi ternary a ? b : c");
+        n->c = expr();
+        return n;
+    }
     return l;
 }
 
@@ -1065,6 +1085,30 @@ static SVar *lookup_name(const char *name) {
     for (int i = nscope - 1; i >= 0; i--)
         if (!strcmp(scope[i].name, name)) return &scope[i];
     return 0;
+}
+
+/* metode instance String: s.substring(...) → Str.substring?? — dipetakan
+ * ke fungsi Str.* yang sudah ada (receiver jadi argumen pertama). */
+static int is_str_method(const char *n) {
+    return !strcmp(n, "charAt") || !strcmp(n, "substring") ||
+           !strcmp(n, "indexOf") || !strcmp(n, "lastIndexOf") ||
+           !strcmp(n, "contains") || !strcmp(n, "startsWith") ||
+           !strcmp(n, "endsWith") || !strcmp(n, "trim") ||
+           !strcmp(n, "trimLeft") || !strcmp(n, "trimRight") ||
+           !strcmp(n, "upper") || !strcmp(n, "lower") ||
+           !strcmp(n, "repeat") || !strcmp(n, "equals") ||
+           !strcmp(n, "equalsIgnoreCase") || !strcmp(n, "isEmpty") ||
+           !strcmp(n, "toInt") || !strcmp(n, "utf8Count") ||
+           !strcmp(n, "replaceSeq") || !strcmp(n, "countByte") ||
+           !strcmp(n, "padLeft") || !strcmp(n, "padRight");
+}
+
+/* nama metode instance → fungsi Str.* */
+static const char *str_method_target(const char *n) {
+    if (!strcmp(n, "charAt")) return "at";
+    if (!strcmp(n, "substring")) return "slice";
+    if (!strcmp(n, "equals")) return "eq";
+    return n;
 }
 
 static int is_array_method(const char *n) {
@@ -1288,6 +1332,22 @@ static Ty type_expr_raw(Node *e) {
             die("baris %d: '-' butuh operand numerik", e->line);
         return t;
     }
+    case EX_TERN: {
+        Ty ct = type_expr(e->a);
+        if (ct != T_BOOL) die("baris %d: kondisi ternary harus boolean", e->line);
+        Ty t1 = type_expr(e->b);
+        Ty t2 = type_expr(e->c);
+        Ty r = t1;
+        if (t1 == t2) {
+            r = t1;
+        } else if ((t1 == T_STR || t1 == T_ARI) && (t2 == T_STR || t2 == T_ARI)) {
+            r = T_STR;
+        } else {
+            die("baris %d: cabang ternary harus bertipe sama (pakai cast)", e->line);
+        }
+        e->dty = (int)r;
+        return r;
+    }
     case EX_BIN: {
         Ty lt = type_expr(e->a), rt = type_expr(e->b);
         char op = e->str[0];
@@ -1499,7 +1559,64 @@ static Ty type_expr_raw(Node *e) {
             return T_INT;
         }
         Method *m = find_method(buf, dot + 1);
+        /* Parser mengubah semua x.m(...) menjadi Arrays.m(x, ...).
+         * Di sini kita belokkan ke Str.* bila penerimanya String. */
+        if (!m && !strcmp(buf, "Arrays") && is_str_method(dot + 1)) {
+            Ty rt = type_expr(e->a);
+            if (rt == T_STR || rt == T_ARI) {
+                const char *tgt = str_method_target(dot + 1);
+                Method *sm = find_method("Str", tgt);
+                if (sm) {
+                    if (!strcmp(dot + 1, "indexOf") && (int)e->ival == 2) {
+                        /* s.indexOf(needle) → Str.indexOf(s, needle, 0) */
+                        Node *z = newnode(EX_INT, e->line);
+                        z->ival = 0;
+                        z->dty = (int)T_INT;
+                        Node *tail = e->a;
+                        while (tail->next) tail = tail->next;
+                        tail->next = z;
+                    }
+                    char *full = xmalloc(strlen("Str.") + strlen(tgt) + 1);
+                    sprintf(full, "Str.%s", tgt);
+                    e->str = full;
+                    int argc2 = 0;
+                    for (Node *aa = e->a; aa; aa = aa->next) argc2++;
+                    e->ival = (long)argc2;
+                    m = sm;
+                }
+            }
+        }
         if (!m) {
+            /* gula String: s.trim() → Str.trim(s) */
+            SVar *sr = lookup_name(buf);
+            if (sr && (sr->ty == T_STR || sr->ty == T_ARI) && is_str_method(dot + 1)) {
+                const char *tgt = str_method_target(dot + 1);
+                Method *sm = find_method("Str", tgt);
+                if (!sm)
+                    die("baris %d: metode String '%s' butuh 'import Str;'", e->line, dot + 1);
+                if (sm) {
+                    Node *recv = newnode(EX_VAR, e->line);
+                    recv->str = xs(buf);
+                    recv->next = e->a;
+                    if (!strcmp(dot + 1, "indexOf") && (int)e->ival == 1) {
+                        Node *z = newnode(EX_INT, e->line);
+                        z->ival = 0;
+                        z->dty = (int)T_INT;
+                        Node *tail = recv;
+                        while (tail->next) tail = tail->next;
+                        tail->next = z;
+                    }
+                    char *full = xmalloc(strlen("Str.") + strlen(tgt) + 1);
+                    sprintf(full, "Str.%s", tgt);
+                    e->str = full;
+                    int argc2 = 0;
+                    for (Node *aa = recv; aa; aa = aa->next) argc2++;
+                    e->ival = (long)argc2;
+                    e->a = recv;
+                    m = sm;
+                }
+            }
+            if (!m) {
             /* gula array: a.forEach(f) → Arrays.forEach(a, f) */
             if (is_array_method(dot + 1)) {
                 SVar *rv = lookup_name(buf);
@@ -1541,6 +1658,7 @@ static Ty type_expr_raw(Node *e) {
             if (i > 5)
                 die("baris %d: maksimal 5 argumen pemanggilan lambda", e->line);
             return T_INT;   /* tipe kembalian lambda dinamis: int (v1) */
+            }
         }
         e->meth = m;
         int i = 0;
@@ -1667,6 +1785,14 @@ static void resolve_stmt(Node *s) {
             resolve_stmts(s->c);
             nscope = mks;  /* slot tidak direset → nlocals tetap watermark */
         }
+        break;
+    }
+    case ST_DO: {
+        int mks = nscope, mki = nextslot;
+        resolve_stmts(s->b);
+        nscope = mks;
+        Ty ct = type_expr(s->a);
+        if (ct != T_BOOL) die("baris %d: kondisi do-while harus boolean", s->line);
         break;
     }
     case ST_FOR: {

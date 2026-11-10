@@ -100,6 +100,20 @@ static void gen_stmt(Node *s) {
         brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
+    case ST_DO: {
+        int ltop = newlab(), lcont = newlab(), lend = newlab();
+        int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
+        mark(ltop);
+        gen_stmts(s->b);
+        mark(lcont);
+        gen_expr(s->a);
+        jmp(OP_JMPT, ltop);
+        mark(lend);
+        brk_sp--;
+        brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
+        break;
+    }
     case ST_FOR: {
         if (s->a) gen_stmt(s->a);       /* init (ST_VAR / ST_ASSIGN) */
         int ltop = newlab(), lend = newlab(), lcont = newlab();
@@ -337,6 +351,17 @@ static void gen_expr(Node *e) {
         gen_expr(e->a);
         em8(OP_ALEN);
         break;
+    case EX_TERN: {
+        int lelse = newlab(), lend = newlab();
+        gen_expr(e->a);
+        jmp(OP_JMPF, lelse);
+        gen_expr(e->b);
+        jmp(OP_JMP, lend);
+        mark(lelse);
+        gen_expr(e->c);
+        mark(lend);
+        break;
+    }
     case EX_BIN: {
         Ty bl = (Ty)e->a->dty, br = (Ty)e->b->dty, bres = (Ty)e->dty;
         if (!((bl == T_INT || bl == T_BOOL) && (br == T_INT || br == T_BOOL) &&

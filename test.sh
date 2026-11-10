@@ -1057,9 +1057,9 @@ class Main {
         int[] a = Rand.bytes(32);
         int[] b = Rand.bytes(32);
         System.out.println(a.length);
-        int diff = 0;
+        int diff = 0;                 /* cukup "ada beda", bukan 32/32 */
         for (int i = 0; i < 32; i++) {
-            if (a[i] != b[i]) diff++;
+            if (a[i] != b[i]) diff = 1;
         }
         System.out.println(diff);
         int[] satu = Rand.bytes(1);
@@ -1067,7 +1067,7 @@ class Main {
     }
 }
 EOF
-printf '3004\n1\n1\n32\n32\n1\n' > "$T/kopi/netbulk.ref"
+printf '3004\n1\n1\n32\n1\n1\n' > "$T/kopi/netbulk.ref"
 check netbulk "$T/kopi/netbulk.kop"
 kill $BULK_PID 2>/dev/null
 
@@ -1359,6 +1359,10 @@ if [ $game_ok -eq 1 ]; then
 else
     echo "FAIL  game: build"; FAIL=$((FAIL+1))
 fi
+
+# ─── fitur bahasa v1.11: ternary, do/while, metode String ───
+cp test/langtest.ref "$T/kopi/langtest.ref"
+check langtest test/langtest.kop
 
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
