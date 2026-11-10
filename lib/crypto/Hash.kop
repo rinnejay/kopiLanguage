@@ -214,4 +214,74 @@ class Hash {
         for (int i = 0; i < a.length; i++) if (a[i] != b[i]) return 0;
         return 1;
     }
+
+    /* ── SHA-1 (FIPS 180-4 / RFC 3174) — untuk WebSocket, dsb. ──── */
+
+    static int rotl(int x, int n) {
+        if (n == 0) return x;
+        return (x << n) | (x >>> (32 - n));
+    }
+
+    /* satu-shot SHA-1: pesan byte-as-int → digest 20 byte-as-int */
+    static int[] sha1(int[] msg) {
+        int L = msg.length;
+        int total = L + 9;
+        int nblk = (total + 63) / 64;
+        int nsz = nblk * 64;
+        int[] m = new int[nsz];
+        int i = 0;
+        while (i < L) { m[i] = msg[i]; i++; }
+        m[L] = 128;
+        int bitlen = L * 8;
+        m[nsz - 4] = (bitlen >>> 24) & 255;
+        m[nsz - 3] = (bitlen >>> 16) & 255;
+        m[nsz - 2] = (bitlen >>> 8) & 255;
+        m[nsz - 1] = bitlen & 255;
+
+        int h0 = 1732584193;          /* 0x67452301 */
+        int h1 = -271733879;          /* 0xEFCDAB89 */
+        int h2 = -1732584194;         /* 0x98BADCFE */
+        int h3 = 271733878;           /* 0x10325476 */
+        int h4 = -1009589776;         /* 0xC3D2E1F0 */
+
+        int[] w = new int[80];
+        for (int blk = 0; blk < nblk; blk++) {
+            int base = blk * 64;
+            for (i = 0; i < 16; i++) {
+                int t = base + i * 4;
+                w[i] = (m[t] << 24) | (m[t + 1] << 16) | (m[t + 2] << 8) | m[t + 3];
+            }
+            for (i = 16; i < 80; i++) {
+                w[i] = rotl(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+            }
+            int a = h0, b = h1, c = h2, d = h3, e = h4;
+            for (i = 0; i < 80; i++) {
+                int f = 0;
+                int k = 0;
+                if (i < 20) { f = (b & c) | (~b & d); k = 1518500249; }        /* 0x5A827999 */
+                else if (i < 40) { f = b ^ c ^ d; k = 1859775393; }            /* 0x6ED9EBA1 */
+                else if (i < 60) { f = (b & c) | (b & d) | (c & d); k = -1894007588; } /* 0x8F1BBCDC */
+                else { f = b ^ c ^ d; k = -899497514; }                        /* 0xCA62C1D6 */
+                int tmp = uadd(uadd(rotl(a, 5), f), uadd(uadd(e, k), w[i]));
+                e = d; d = c; c = rotl(b, 30); b = a; a = tmp;
+            }
+            h0 = uadd(h0, a);
+            h1 = uadd(h1, b);
+            h2 = uadd(h2, c);
+            h3 = uadd(h3, d);
+            h4 = uadd(h4, e);
+        }
+
+        int[] out = new int[20];
+        int[] hs = new int[5];
+        hs[0] = h0; hs[1] = h1; hs[2] = h2; hs[3] = h3; hs[4] = h4;
+        for (int j = 0; j < 5; j++) {
+            out[j * 4] = (hs[j] >>> 24) & 255;
+            out[j * 4 + 1] = (hs[j] >>> 16) & 255;
+            out[j * 4 + 2] = (hs[j] >>> 8) & 255;
+            out[j * 4 + 3] = hs[j] & 255;
+        }
+        return out;
+    }
+
 }

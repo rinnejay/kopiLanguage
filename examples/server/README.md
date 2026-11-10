@@ -59,8 +59,9 @@ disimpan sebelum mark (konfigurasi, route) tetap hidup.
 
 - **Single-threaded**: satu koneksi dilayani sampai selesai; belum ada
   thread/process/fork atau event loop.
-- HTTP/1.1 dengan `Connection: close` per respons; belum keep-alive,
-  chunked, multipart, WebSocket, atau HTTP/2.
+- HTTP/1.1 dengan **keep-alive** per koneksi (v1.9.2), HEAD, cookie, dan
+  body request chunked; belum multipart, WebSocket di server HTTP,
+  atau HTTP/2.
 - Tidak ada TLS server; jalankan di belakang reverse proxy bila perlu HTTPS.
 - Routing dilakukan manual (`if/else`) di `main`; belum framework router.
 - Buffer request dibatasi `readRequest(fd, max)`; body lebih besar dari max

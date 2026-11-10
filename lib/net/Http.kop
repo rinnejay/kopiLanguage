@@ -1,8 +1,9 @@
-/* Http.kop — klien HTTP/1.0 minimal untuk Kopi (v1).
+/* Http.kop — klien HTTP untuk Kopi (v1.9.2).
  *
- * Di atas Tcp (yang di atas builtin `Net`). Fitur sengaja dipangkas
- * untuk v1: GET saja, HTTP/1.0 saja (server menutup koneksi sendiri
- * setelah merespons — tidak ada keep-alive/parsing transfer-encoding).
+ * Di atas Tcp (yang di atas builtin `Net`). API lama (v1, HTTP/1.0,
+ * Connection: close) tetap kompatibel; v1.9.2 menambahkan HTTP/1.1:
+ * decode `Transfer-Encoding: chunked`, redirect 301/302/303/307/308,
+ * basic auth, form/JSON POST, dan timeout socket 5 detik.
  *
  * Pemisahan galat yang rapi:
  *   - getInto() → total byte respons (≥ 0) atau kode galat negatif
@@ -11,6 +12,11 @@
  *
  * Konstanta byte demi kejelasan: 13 = '\r', 32 = ' ', 48..57 = digit.
  */
+
+import Str;
+import Tcp;
+import Url;
+import Cipher;
 
 class Http {
 
@@ -230,4 +236,191 @@ class Http {
     static boolean hasHeader(int[] resp, int[] name) {
         return headerValue(resp, name).length > 0;
     }
+
+    /* ═══ v1.9.2: HTTP/1.1 — chunked, redirect, form, auth ═══════ */
+
+    static int hexVal(int c) {
+        if (c >= 48 && c <= 57) return c - 48;
+        if (c >= 65 && c <= 70) return c - 55;
+        if (c >= 97 && c <= 102) return c - 87;
+        return -1;
+    }
+
+    /* cari token (case-insensitive) di nilai header */
+    static boolean hasToken(int[] resp, int[] name, int[] tok) {
+        int[] v = headerValue(resp, name);
+        if (v.length == 0) return false;
+        int n = tok.length;
+        for (int i = 0; i + n <= v.length; i++) {
+            boolean ok = true;
+            for (int j = 0; j < n; j++) {
+                int a = v[i + j];
+                int b = tok[j];
+                if (a >= 65 && a <= 90) a = a + 32;
+                if (b >= 65 && b <= 90) b = b + 32;
+                if (a != b) { ok = false; break; }
+            }
+            if (ok) return true;
+        }
+        return false;
+    }
+
+    /* decode Transfer-Encoding: chunked (hex-size CRLF data CRLF ... 0) */
+    static int[] dechunk(int[] raw) {
+        int[] out = new int[raw.length];
+        int o = 0;
+        int i = 0;
+        while (i < raw.length) {
+            int e = i;
+            while (e < raw.length && raw[e] != 13 && raw[e] != 10) e++;
+            int size = 0;
+            int any = 0;
+            int k = i;
+            while (k < e) {
+                int h = hexVal(raw[k]);
+                if (h < 0) break;              /* ';' ekstensi / spasi */
+                size = size * 16 + h;
+                any = 1;
+                k++;
+            }
+            if (any == 0 || size == 0) break;
+            int s0 = e;
+            while (s0 < raw.length && (raw[s0] == 13 || raw[s0] == 10)) s0++;
+            int cnt = size;
+            if (s0 + cnt > raw.length) cnt = raw.length - s0;
+            for (int j = 0; j < cnt; j++) { out[o] = raw[s0 + j]; o++; }
+            i = s0 + cnt;
+            while (i < raw.length && (raw[i] == 13 || raw[i] == 10)) i++;
+        }
+        int[] r = new int[o];
+        for (int j = 0; j < o; j++) r[j] = out[j];
+        return r;
+    }
+
+    /* body sebenarnya: chunked → decode; Content-Length → potong */
+    static int[] payload(int[] resp) {
+        int[] b = bodyOf(resp);
+        if (hasToken(resp, Net.bytes("Transfer-Encoding"), Net.bytes("chunked")))
+            return dechunk(b);
+        int[] cl = headerValue(resp, Net.bytes("Content-Length"));
+        if (cl.length > 0) {
+            int n = Str.toInt(cl);
+            if (n >= 0 && n < b.length) {
+                int[] r = new int[n];
+                for (int i = 0; i < n; i++) r[i] = b[i];
+                return r;
+            }
+        }
+        return b;
+    }
+
+    /* susun permintaan HTTP/1.1 (keep=1 → keep-alive, else close) */
+    static int[] req11(int[] method, int[] hostHdr, int[] path,
+                       int[] headers, int[] body, int keep) {
+        int[] out = Tcp.cat(method, Net.bytes(" "));
+        out = Tcp.cat(out, path);
+        out = Tcp.cat(out, Net.bytes(" HTTP/1.1\r\nHost: "));
+        out = Tcp.cat(out, hostHdr);
+        out = Tcp.cat(out, Net.bytes("\r\n"));
+        if (headers.length > 0) out = Tcp.cat(out, headers);
+        if (body.length > 0 || method.length == 4) {
+            out = Tcp.cat(out, Net.bytes("Content-Length: "));
+            out = Tcp.cat(out, Tcp.num(body.length));
+            out = Tcp.cat(out, Net.bytes("\r\n"));
+        }
+        if (keep != 0) out = Tcp.cat(out, Net.bytes("Connection: keep-alive\r\n"));
+        else out = Tcp.cat(out, Net.bytes("Connection: close\r\n"));
+        out = Tcp.cat(out, Net.bytes("\r\n"));
+        return out;
+    }
+
+    /* satu transaksi; timeoutMs > 0 memasang SO_RCVTIMEO/SO_SNDTIMEO */
+    static int[] exchange(int addr, int port, int[] method, int[] hostHdr,
+                          int[] path, int[] headers, int[] body, int cap) {
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) {
+            int[] e = new int[1];
+            e[0] = fd;
+            return e;
+        }
+        Net.settimeout(fd, 5000);                  /* jangan menggantung */
+        int[] head = req11(method, hostHdr, path, headers, body, 0);
+        int r = Tcp.sendBuf(fd, head);
+        if (r == 0 && body.length > 0) r = Tcp.sendBuf(fd, body);
+        if (r < 0) {
+            Net.close(fd);
+            int[] e = new int[1];
+            e[0] = r;
+            return e;
+        }
+        int[] buf = new int[cap];
+        int n = Tcp.recvAll(fd, buf);
+        Net.close(fd);
+        if (n <= 0) {
+            int[] e = new int[1];
+            e[0] = -1;
+            return e;
+        }
+        int[] resp = new int[n];
+        for (int i = 0; i < n; i++) resp[i] = buf[i];
+        return resp;
+    }
+
+    static int[] getFull(int addr, int port, int[] hostHdr, int[] path, int cap) {
+        return exchange(addr, port, Net.bytes("GET"), hostHdr, path,
+                        new int[0], new int[0], cap);
+    }
+
+    /* ikuti 301/302/303/307/308 (maks maxHops, host harus sama) */
+    static int[] follow(int addr, int port, int[] hostHdr, int[] path,
+                        int maxHops, int cap) {
+        int[] resp = getFull(addr, port, hostHdr, path, cap);
+        int hops = 0;
+        while (hops < maxHops) {
+            int st = statusOf(resp);
+            if (st != 301 && st != 302 && st != 303 && st != 307 && st != 308) return resp;
+            int[] loc = headerValue(resp, Net.bytes("Location"));
+            if (loc.length == 0) return resp;
+            int[] base = Net.bytes("http://");
+            base = Tcp.cat(base, hostHdr);
+            base = Tcp.cat(base, path);
+            int[] nu = Url.resolve(base, loc);
+            int[] nh = Url.host(nu);
+            if (!Str.eq(nh, hostHdr)) return resp;      /* host lain: berhenti */
+            int np = Url.portOf(nu, port);
+            int[] npath = Url.path(nu);
+            if (npath.length == 0) npath = Net.bytes("/");
+            int[] q = Url.query(nu);
+            if (q.length > 0) {
+                npath = Tcp.cat(npath, Net.bytes("?"));
+                npath = Tcp.cat(npath, q);
+            }
+            resp = getFull(addr, np, hostHdr, npath, cap);
+            hops++;
+        }
+        return resp;
+    }
+
+    /* header "Authorization: Basic ..." dari user:pass */
+    static int[] basic(int[] user, int[] pass) {
+        int[] raw = Tcp.cat(user, Net.bytes(":"));
+        raw = Tcp.cat(raw, pass);
+        int[] out = Net.bytes("Authorization: Basic ");
+        out = Tcp.cat(out, Cipher.b64enc(raw));
+        out = Tcp.cat(out, Net.bytes("\r\n"));
+        return out;
+    }
+
+    static int[] formPost(int addr, int port, int[] hostHdr, int[] path,
+                          int[] form, int cap) {
+        int[] h = Net.bytes("Content-Type: application/x-www-form-urlencoded\r\n");
+        return exchange(addr, port, Net.bytes("POST"), hostHdr, path, h, form, cap);
+    }
+
+    static int[] jsonPost(int addr, int port, int[] hostHdr, int[] path,
+                          int[] jsonBody, int cap) {
+        int[] h = Net.bytes("Content-Type: application/json\r\n");
+        return exchange(addr, port, Net.bytes("POST"), hostHdr, path, h, jsonBody, cap);
+    }
+
 }

@@ -1,0 +1,38 @@
+// http11.kop — uji klien HTTP/1.1 (chunked, redirect, basic, form).
+// Server uji: tools/http_test_server.py <port>
+import Tcp;
+import Http;
+import Str;
+
+class Main {
+    static void show(int[] tag, int[] b) {
+        System.out.println(Str.cat(tag, b));
+    }
+    public static void main(String[] args) {
+        int port = 10020;
+        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+        int addr = Tcp.loopback();
+        int[] host = Net.bytes("127.0.0.1");
+
+        int[] r = Http.getFull(addr, port, host, Net.bytes("/chunked"), 8192);
+        System.out.println(Http.statusOf(r));
+        show(Net.bytes("body="), Http.payload(r));
+
+        int[] f = Http.follow(addr, port, host, Net.bytes("/redirect"), 3, 8192);
+        System.out.println(Http.statusOf(f));
+        show(Net.bytes("final="), Http.payload(f));
+
+        int[] b = Http.basic(Net.bytes("budi"), Net.bytes("rahasia"));
+        int[] r2 = Http.exchange(addr, port, Net.bytes("GET"), host,
+                                 Net.bytes("/whoami"), b, new int[0], 8192);
+        show(Net.bytes("auth="), Http.payload(r2));
+
+        int[] form = Net.bytes("nama=Kopi%20Arena&n=3");
+        int[] r3 = Http.formPost(addr, port, host, Net.bytes("/form"), form, 8192);
+        show(Net.bytes("form="), Http.payload(r3));
+
+        int[] js = Net.bytes("{\"ok\":true}");
+        int[] r4 = Http.jsonPost(addr, port, host, Net.bytes("/json"), js, 8192);
+        show(Net.bytes("json="), Http.payload(r4));
+    }
+}

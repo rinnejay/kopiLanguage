@@ -1,0 +1,66 @@
+// WsEcho.kop — server WebSocket gema minimal (v1.9.3).
+//
+// Pakai: ./WsEcho.bin [port]        (default 8090)
+//
+// Uji cepat dari Python:
+//   ws = websocket.create_connection("ws://127.0.0.1:8090/")
+//   ws.send("halo"); print(ws.recv())
+//
+// Batas jujur: satu frame per read (tanpa fragmentasi), tanpa TLS,
+// single-threaded blocking seperti HttpServer.
+
+import Str;
+import Log;
+import HttpServer;
+import WebSocket;
+
+class Main {
+
+    public static void main(String[] args) {
+        int port = 8090;
+        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+
+        int fd = Net.socket(2, 1);
+        if (fd < 0) { Log.error(Net.bytes("ws"), Net.bytes("socket gagal")); return; }
+        Net.setsockopt(fd, 1, 2, 1);                 /* SO_REUSEADDR */
+        if (Net.bind(fd, 0, port) < 0 || Net.listen(fd, 16) < 0) {
+            Log.error(Net.bytes("ws"), Net.bytes("bind/listen gagal"));
+            return;
+        }
+        Log.info(Net.bytes("ws"), Net.bytes("siap"));
+
+        while (true) {
+            int c = Net.accept(fd);
+            if (c < 0) { Net.sleep(5); continue; }
+
+            int[] req = HttpServer.readRequest(c, 8192);
+            if (!WebSocket.isUpgrade(req)) {
+                HttpServer.send(c, HttpServer.text(400, Net.bytes("bukan websocket\n")));
+                Net.close(c);
+                continue;
+            }
+            Net.sendb(c, WebSocket.handshake(req));
+
+            int[] buf = new int[65536];
+            while (true) {
+                int n = Net.recv1(c, buf);
+                if (n <= 0) break;
+                int mark = Net.memMark();
+                int[] f = WebSocket.decode(buf, n);
+                if (f.length >= 2) {
+                    int op = f[0];
+                    int[] p = WebSocket.payload(f);
+                    if (op == 8) {                            /* close */
+                        Net.sendb(c, WebSocket.close(1000));
+                        Net.memReset(mark);
+                        break;
+                    }
+                    if (op == 9) Net.sendb(c, WebSocket.pong(p));       /* ping */
+                    else if (op == 1 || op == 2) Net.sendb(c, WebSocket.frame(op, p));
+                }
+                Net.memReset(mark);
+            }
+            Net.close(c);
+        }
+    }
+}

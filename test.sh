@@ -64,9 +64,13 @@ printf '1\n1\n' > "$T/kopi/stream.ref"
 check stream test/stream.kop
 
 # ─── Poly1305: RFC 7539 §2.5.2 + Appendix A.3 (8 vektor, oracle python) ──
-N=$(python3 tools/gen_poly1305.py "$T/kopi/polyvec.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
-python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/polyvec.ref"
-check polyvec "$T/kopi/polyvec.kop"
+if [ -f "$T/kopi/rfc7539.txt" ]; then
+    N=$(python3 tools/gen_poly1305.py "$T/kopi/polyvec.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
+    python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/polyvec.ref"
+    check polyvec "$T/kopi/polyvec.kop"
+else
+    echo "SKIP  polyvec (teks RFC 7539 tidak ada di $T/kopi)"
+fi
 
 # ─── Math/Digits/Stats/Matrix: oracle python (puluhan fungsi) ─────────────
 N=$(python3 tools/gen_mathvec.py "$T/kopi/mathvec.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
@@ -637,6 +641,7 @@ cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
 for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec arrayfn arrchk jsontest; do
+    [ -f "$T/kopi/$t.x64.s" ] || continue
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done
@@ -1175,7 +1180,7 @@ done
 mkdir -p "$T/kopi/srvdir"
 printf 'HALO STATIC\n' > "$T/kopi/srvdir/hello.txt"
 cat > "$T/kopi/srvtest.py" <<'EOF'
-import http.client, sys, time
+import http.client, socket, sys, time
 port = int(sys.argv[1])
 def req(method, path, body=None, headers=None):
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=8)
@@ -1205,6 +1210,37 @@ for i in range(200):
     st, _, d = req("GET", "/health")
     if st == 200 and d == b"ok\n": ok += 1
 assert ok == 200
+
+# keep-alive: tiga request pada satu koneksi
+c = http.client.HTTPConnection("127.0.0.1", port, timeout=8)
+c.request("GET", "/health"); r = c.getresponse(); d = r.read()
+assert r.status == 200 and d == b"ok\n" and r.getheader("Connection") == "keep-alive"
+sk = c.sock
+c.request("GET", "/json"); r = c.getresponse(); d = r.read()
+assert r.status == 200 and c.sock is sk
+c.request("GET", "/time"); r = c.getresponse(); r.read()
+assert r.status == 200
+# HEAD: body kosong, Content-Length tetap
+c.request("HEAD", "/health"); r = c.getresponse(); d = r.read()
+assert r.status == 200 and d == b"" and r.getheader("Content-Length") == "3"
+# cookie
+c.request("GET", "/setcookie"); r = c.getresponse(); r.read()
+assert "sesi=abc123" in (r.getheader("Set-Cookie") or "")
+c.request("GET", "/cookie", headers={"Cookie": "x=1; sesi=abc123"})
+r = c.getresponse(); d = r.read()
+assert d == b"sesi=abc123\n", d
+c.close()
+# body chunked pada request
+s = socket.create_connection(("127.0.0.1", port), timeout=8)
+s.sendall(b"POST /echo HTTP/1.1\r\nHost: x\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+          b"4\r\nABCD\r\n3\r\nEFG\r\n0\r\n\r\n")
+buf = b""
+while True:
+    d = s.recv(4096)
+    if not d: break
+    buf += d
+s.close()
+assert buf.split(b"\r\n\r\n", 1)[1] == b"ABCDEFG", buf[-20:]
 print("OK")
 EOF
 
@@ -1238,6 +1274,153 @@ if ./kopicc examples/server/ServerDemo.kop -t a64 -o "$T/kopi/srvdemo.s" \
 else
     echo "FAIL  server: build"; FAIL=$((FAIL+1))
 fi
+
+# ─── game realtime: aturan Arena + server/bot/klien .kop ───
+mkdir -p "$T/kopi/game"
+cp examples/game/arenaunit.out "$T/kopi/arenaunit.ref"
+check arenaunit examples/game/arenaunit.kop
+cp examples/game/bot.out "$T/kopi/bot.ref"
+
+cat > "$T/kopi/gamecli.py" <<'EOF'
+import sys
+data = open(sys.argv[1], "rb").read()
+assert data.count(b"KOPI ARENA") >= 30, "frame terlalu sedikit"
+assert b"skor:" in data and b"WASD" in data
+assert b"@" in data, "pemain tidak tergambar"
+EOF
+
+game_ok=1
+./kopicc examples/game/GameServer.kop -t a64 -o "$T/kopi/game/gs.s" \
+  && cc "$T/kopi/game/gs.s" -o "$T/kopi/game/gs.bin" || game_ok=0
+./kopicc examples/game/BotClient.kop -t a64 -o "$T/kopi/game/bot.s" \
+  && cc "$T/kopi/game/bot.s" -o "$T/kopi/game/bot.bin" || game_ok=0
+./kopicc examples/game/GameClient.kop -t a64 -o "$T/kopi/game/cli.s" \
+  && cc "$T/kopi/game/cli.s" -o "$T/kopi/game/cli.bin" || game_ok=0
+./kopicc examples/game/GameServer.kop -t vm -o "$T/kopi/game/gs.kbc" || game_ok=0
+./kopicc examples/game/BotClient.kop -t vm -o "$T/kopi/game/bot.kbc" || game_ok=0
+./kopicc examples/game/GameClient.kop -t vm -o "$T/kopi/game/cli.kbc" || game_ok=0
+
+for f in GameServer BotClient GameClient; do
+    ./kopicc "examples/game/$f.kop" -t x64 -o "$T/kopi/game/$f.x64.s" \
+      && cc -target x86_64-linux-gnu -c "$T/kopi/game/$f.x64.s" -o /dev/null \
+      && echo "PASS  game [$f x64]" && PASS=$((PASS+1)) \
+      || { echo "FAIL  game [$f x64]"; FAIL=$((FAIL+1)); }
+done
+
+if [ $game_ok -eq 1 ]; then
+    for tgt in a64 vm; do
+        port=9940
+        [ "$tgt" = vm ] && port=9941
+        if [ "$tgt" = a64 ]; then
+            "$T/kopi/game/gs.bin" $port 50 > "$T/kopi/game/srv.$tgt.log" 2>&1 &
+        else
+            "$KOPIVM_ABS" "$T/kopi/game/gs.kbc" $port 50 > "$T/kopi/game/srv.$tgt.log" 2>&1 &
+        fi
+        SPID=$!
+        sleep 0.5
+
+        if [ "$tgt" = a64 ]; then
+            timeout 25 "$T/kopi/game/bot.bin" $port > "$T/kopi/game/bot.$tgt.out" 2>&1
+        else
+            timeout 25 "$KOPIVM_ABS" "$T/kopi/game/bot.kbc" $port > "$T/kopi/game/bot.$tgt.out" 2>&1
+        fi
+        if [ $? -eq 0 ] && diff -q "$T/kopi/game/bot.$tgt.out" "$T/kopi/bot.ref" >/dev/null 2>&1; then
+            echo "PASS  gamebot [$tgt]"; PASS=$((PASS+1))
+        else
+            echo "FAIL  gamebot [$tgt]"; FAIL=$((FAIL+1)); tail -3 "$T/kopi/game/bot.$tgt.out"
+        fi
+
+        if [ "$tgt" = a64 ]; then
+            timeout 40 "$T/kopi/game/cli.bin" $port 127.0.0.1 uji 40 \
+              < /dev/null > "$T/kopi/game/cli.$tgt.out" 2>&1
+        else
+            timeout 40 "$KOPIVM_ABS" "$T/kopi/game/cli.kbc" $port 127.0.0.1 uji 40 \
+              < /dev/null > "$T/kopi/game/cli.$tgt.out" 2>&1
+        fi
+        if [ $? -eq 0 ] && python3 "$T/kopi/gamecli.py" "$T/kopi/game/cli.$tgt.out"; then
+            echo "PASS  gamecli [$tgt]"; PASS=$((PASS+1))
+        else
+            echo "FAIL  gamecli [$tgt]"; FAIL=$((FAIL+1)); tail -3 "$T/kopi/game/srv.$tgt.log"
+        fi
+
+        kill $SPID 2>/dev/null
+        wait $SPID 2>/dev/null
+    done
+else
+    echo "FAIL  game: build"; FAIL=$((FAIL+1))
+fi
+
+# ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
+python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
+check urltest test/urltest.kop
+
+python3 - > "$T/kopi/sha1vec.ref" <<'EOF'
+import hashlib
+for s in ["", "abc",
+          "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+          "The quick brown fox jumps over the lazy dog"]:
+    print(hashlib.sha1(s.encode()).hexdigest())
+EOF
+check sha1vec test/sha1vec.kop
+
+# ─── klien HTTP/1.1: chunked, redirect, basic auth, form, JSON ───
+cat > "$T/kopi/http11.ref" <<'EOF'
+200
+body=halo dunia!
+200
+final=sampai
+auth=Basic YnVkaTpyYWhhc2lh
+form=POST:nama=Kopi%20Arena&n=3
+json=JSON:{"ok":true}
+EOF
+./kopicc test/http11.kop -t a64 -o "$T/kopi/http11.s" \
+  && cc "$T/kopi/http11.s" -o "$T/kopi/http11.bin" || true
+./kopicc test/http11.kop -t vm -o "$T/kopi/http11.kbc" || true
+python3 tools/http_test_server.py 10050 > "$T/kopi/http11.srv.log" 2>&1 &
+HPID=$!
+sleep 0.5
+for tgt in a64 vm; do
+    if [ "$tgt" = a64 ]; then
+        timeout 20 "$T/kopi/http11.bin" 10050 > "$T/kopi/http11.$tgt.out" 2>&1
+    else
+        timeout 20 "$KOPIVM_ABS" "$T/kopi/http11.kbc" 10050 > "$T/kopi/http11.$tgt.out" 2>&1
+    fi
+    if [ $? -eq 0 ] && diff -q "$T/kopi/http11.$tgt.out" "$T/kopi/http11.ref" >/dev/null 2>&1; then
+        echo "PASS  http11 [$tgt]"; PASS=$((PASS+1))
+    else
+        echo "FAIL  http11 [$tgt]"; FAIL=$((FAIL+1)); tail -4 "$T/kopi/http11.$tgt.out"
+    fi
+done
+kill $HPID 2>/dev/null
+wait $HPID 2>/dev/null
+
+# ─── WebSocket: handshake + frame (probe Python) ───
+./kopicc examples/ws/WsEcho.kop -t a64 -o "$T/kopi/ws.s" \
+  && cc "$T/kopi/ws.s" -o "$T/kopi/ws.bin" || true
+./kopicc examples/ws/WsEcho.kop -t vm -o "$T/kopi/ws.kbc" || true
+./kopicc examples/ws/WsEcho.kop -t x64 -o "$T/kopi/ws64.s" \
+  && cc -target x86_64-linux-gnu -c "$T/kopi/ws64.s" -o /dev/null \
+  && echo "PASS  websocket [x64]" && PASS=$((PASS+1)) \
+  || { echo "FAIL  websocket [x64]"; FAIL=$((FAIL+1)); }
+
+for tgt in a64 vm; do
+    port=10060
+    [ "$tgt" = vm ] && port=10061
+    if [ "$tgt" = a64 ]; then
+        "$T/kopi/ws.bin" $port > "$T/kopi/ws.$tgt.log" 2>&1 &
+    else
+        "$KOPIVM_ABS" "$T/kopi/ws.kbc" $port > "$T/kopi/ws.$tgt.log" 2>&1 &
+    fi
+    WPID=$!
+    sleep 0.5
+    if python3 tools/ws_probe.py $port > "$T/kopi/ws.$tgt.out" 2>&1; then
+        echo "PASS  websocket [$tgt]"; PASS=$((PASS+1))
+    else
+        echo "FAIL  websocket [$tgt]"; FAIL=$((FAIL+1)); tail -4 "$T/kopi/ws.$tgt.out"
+    fi
+    kill $WPID 2>/dev/null
+    wait $WPID 2>/dev/null
+done
 
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"

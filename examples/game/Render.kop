@@ -1,0 +1,125 @@
+// Render.kop — gambar arena ke terminal (ANSI) untuk klien game (v1.9.1).
+//
+// `frame` menerima snapshot terurai (lihat Wire.decode) dan mengembalikan
+// satu buffer byte siap ditulis ke stdout:
+//   ESC[H                      pindah ke kiri-atas
+//   baris status
+//   grid peta (tiap baris diakhiri '\n')
+//   papan skor + petunjuk
+//   ESC[J                      hapus sisa layar
+
+import Str;
+
+class Render {
+
+    static int[] esc(int a) {
+        int[] e = new int[2];
+        e[0] = 27;
+        e[1] = a;
+        return e;
+    }
+
+    static int[] csi(int a, int b) {
+        int[] e = new int[3];
+        e[0] = 27;
+        e[1] = 91;
+        e[2] = a;
+        return e;
+    }
+
+    static int[] home() { return csi(72, 0); }          /* ESC [ H */
+    static int[] clearBelow() { return csi(74, 0); }    /* ESC [ J */
+
+    static int[] cursor(int on) {
+        int[] e = new int[6];
+        e[0] = 27; e[1] = 91; e[2] = 63; e[3] = 50; e[4] = 53;
+        e[5] = 108;                                     /* l = sembunyikan */
+        if (on != 0) e[5] = 104;                        /* h = tampilkan */
+        return e;
+    }
+
+    static void plot(int[] g, int w, int h, int x, int y, int ch) {
+        if (x < 1 || y < 1 || x > w - 2 || y > h - 2) return;
+        g[y * (w + 1) + x] = ch;
+    }
+
+    static int[] frame(int[] st, int w, int h, int you, int[] name) {
+        int[] g = new int[(w + 1) * h];
+        for (int y = 0; y < h; y++) {
+            int base = y * (w + 1);
+            for (int x = 0; x < w; x++) g[base + x] = 32;    /* spasi */
+            g[base + w] = 10;                                /* newline */
+        }
+        for (int x = 1; x < w - 1; x++) {
+            g[x] = 45;                                       /* '-' */
+            g[(h - 1) * (w + 1) + x] = 45;
+        }
+        for (int y = 1; y < h - 1; y++) {
+            g[y * (w + 1)] = 124;                            /* '|' */
+            g[y * (w + 1) + w - 1] = 124;
+        }
+        g[0] = 43;
+        g[w - 1] = 43;
+        g[(h - 1) * (w + 1)] = 43;
+        g[(h - 1) * (w + 1) + w - 1] = 43;
+
+        int np = st[2];
+        if (np < 0) np = 0;
+        if (np > 12) np = 12;
+
+        /* koin dulu, pemain menimpanya */
+        int ci = 3 + 4 * np;
+        int nc = st[ci];
+        for (int j = 0; j < nc; j++) {
+            plot(g, w, h, st[ci + 1 + 2 * j] / 1000, st[ci + 2 + 2 * j] / 1000, 42);
+        }
+
+        int myscore = 0;
+        for (int i = 0; i < np; i++) {
+            int id = st[3 + 4 * i];
+            int ch = 65 + id;
+            if (id == you) {
+                ch = 64;                                     /* '@' */
+                myscore = st[3 + 4 * i + 3];
+            }
+            plot(g, w, h, st[3 + 4 * i + 1] / 1000, st[3 + 4 * i + 2] / 1000, ch);
+        }
+
+        int[] h1 = Net.bytes("KOPI ARENA  ");
+        h1 = Str.cat(h1, name);
+        h1 = Str.cat(h1, Net.bytes("  tick "));
+        h1 = Str.cat(h1, Str.fromInt(st[0]));
+        h1 = Str.cat(h1, Net.bytes("  pemain "));
+        h1 = Str.cat(h1, Str.fromInt(np));
+        h1 = Str.cat(h1, Net.bytes("  skor "));
+        h1 = Str.cat(h1, Str.fromInt(myscore));
+
+        int[] h2 = Net.bytes("skor: ");
+        for (int i = 0; i < np; i++) {
+            int id = st[3 + 4 * i];
+            int ch = 65 + id;
+            if (id == you) ch = 64;
+            int[] one = new int[1];
+            one[0] = ch;
+            h2 = Str.cat(h2, one);
+            h2 = Str.cat(h2, Net.bytes(":"));
+            h2 = Str.cat(h2, Str.fromInt(st[3 + 4 * i + 3]));
+            h2 = Str.cat(h2, Net.bytes("  "));
+        }
+
+        int[] h3 = Net.bytes("WASD/panah: gerak   spasi: diam   q: keluar");
+
+        int[] nl = new int[1];
+        nl[0] = 10;
+
+        int[] o = home();
+        o = Str.cat(o, h1);
+        o = Str.cat(o, nl);
+        o = Str.cat(o, g);
+        o = Str.cat(o, h2);
+        o = Str.cat(o, nl);
+        o = Str.cat(o, h3);
+        o = Str.cat(o, clearBelow());
+        return o;
+    }
+}

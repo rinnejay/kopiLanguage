@@ -1,0 +1,13 @@
+// sha1vec.kop — vektor SHA-1 (FIPS 180-4) untuk test.sh.
+import Hash;
+import Cipher;
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes(""))));
+        System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));
+        System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes(
+            "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"))));
+        System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("The quick brown fox jumps over the lazy dog"))));
+    }
+}

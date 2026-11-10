@@ -1395,6 +1395,11 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "argv"))    { bi = 31; want = 1; }
             else if (!strcmp(fn, "getenv"))  { bi = 32; want = 1; }
             else if (!strcmp(fn, "recv1"))   { bi = 33; want = 2; }
+            else if (!strcmp(fn, "setnonblock") || !strcmp(fn, "setNonblock")) { bi = 34; want = 1; }
+            else if (!strcmp(fn, "key"))     { bi = 35; want = 0; }
+            else if (!strcmp(fn, "ttyRaw") || !strcmp(fn, "ttyraw")) { bi = 36; want = 1; }
+            else if (!strcmp(fn, "localport")) { bi = 37; want = 1; }
+            else if (!strcmp(fn, "settimeout")) { bi = 38; want = 2; }
             else die("baris %d: fungsi Net.%s tidak ada", e->line, fn);
 
             int narg = (int)e->ival;
@@ -1470,6 +1475,9 @@ static Ty type_expr_raw(Node *e) {
                         die("baris %d: Net.recv1 argumen fd harus int", e->line);
                     if (i == 1 && t != T_ARI && t != T_STR)
                         die("baris %d: Net.recv1 argumen buffer harus int[]/String", e->line);
+                } else if (bi == 34 || bi == 36 || bi == 37 || bi == 38) {
+                    if (t != T_INT)
+                        die("baris %d: argumen Net.%s harus int", e->line, fn);
                 } else if (bi == 25 || bi == 26 || bi == 27 || bi == 29 || bi == 31) {
                     if (t != T_INT)
                         die("baris %d: argumen Net.%s harus int", e->line, fn);

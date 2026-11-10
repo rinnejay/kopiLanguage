@@ -1,0 +1,50 @@
+// urltest.kop — uji Url.kop terhadap oracle Python (urllib.parse).
+// Dibangkitkan/dibandingkan oleh tools/gen_urlvec.py di test.sh.
+
+import Url;
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(Url.encode(Net.bytes("a b/c?d=1&e")));
+        System.out.println(Url.encode(Net.bytes("A-Z_a~z.0")));
+        System.out.println(Url.encode(Net.bytes("100%")));
+        System.out.println(Url.encode(Net.bytes("")));
+        System.out.println(Url.formEncode(Net.bytes("a b+c")));
+        System.out.println(Url.decode(Net.bytes("a+b%20c")));
+        System.out.println(Url.decode(Net.bytes("%41%42%zz")));
+        System.out.println(Url.pair(Net.bytes("q"), Net.bytes("a b&c")));
+        System.out.println(Url.appendQuery(Net.bytes("a=1"), Net.bytes("q=a%20b")));
+
+        int[] u = Net.bytes("http://user@h:8080/p/x?a=1&b=2#frag");
+        System.out.println(Url.scheme(u));
+        System.out.println(Url.host(u));
+        System.out.println(Url.portOf(u, 80));
+        System.out.println(Url.path(u));
+        System.out.println(Url.query(u));
+        System.out.println(Url.fragment(u));
+        System.out.println(Url.portOf(Net.bytes("http://h/x"), 80));
+
+        int[] base = Net.bytes("http://a/b/c/d;p?q");
+        System.out.println(Url.resolve(base, Net.bytes("g:h")));
+        System.out.println(Url.resolve(base, Net.bytes("g")));
+        System.out.println(Url.resolve(base, Net.bytes("./g")));
+        System.out.println(Url.resolve(base, Net.bytes("g/")));
+        System.out.println(Url.resolve(base, Net.bytes("/g")));
+        System.out.println(Url.resolve(base, Net.bytes("//g")));
+        System.out.println(Url.resolve(base, Net.bytes("?y")));
+        System.out.println(Url.resolve(base, Net.bytes("g?y")));
+        System.out.println(Url.resolve(base, Net.bytes("#s")));
+        System.out.println(Url.resolve(base, Net.bytes("g#s")));
+        System.out.println(Url.resolve(base, Net.bytes("")));
+        System.out.println(Url.resolve(base, Net.bytes("..")));
+        System.out.println(Url.resolve(base, Net.bytes("../g")));
+        System.out.println(Url.resolve(base, Net.bytes("../../g")));
+
+        System.out.println(Url.normalize(Net.bytes("/a/b/../c/./d")));
+        System.out.println(Url.normalize(Net.bytes("/x/../../y")));
+
+        System.out.println(Url.ip4(Net.bytes("127.0.0.1")));
+        System.out.println(Url.ip4(Net.bytes("999.1.1.1")));
+        System.out.println(Url.ip4(Net.bytes("a.b.c.d")));
+    }
+}

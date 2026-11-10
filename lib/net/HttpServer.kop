@@ -1,4 +1,5 @@
-// HttpServer.kop — server HTTP/1.1 minimal murni Kopi (v1.9).
+// HttpServer.kop — server HTTP/1.1 murni Kopi (v1.9.2).
+// Keep-alive, HEAD, cookie, dan body chunked didukung; lihat README.
 // Blocking, satu koneksi pada satu waktu; Connection: close per respons.
 // Pakai bersama Net.listen/accept + Net.memMark/memReset:
 //
@@ -201,21 +202,28 @@ class HttpServer {
 
     static int[] statusText(int code) {
         if (code == 200) return Net.bytes("OK");
+        if (code == 202) return Net.bytes("Accepted");
+        if (code == 206) return Net.bytes("Partial Content");
         if (code == 201) return Net.bytes("Created");
         if (code == 204) return Net.bytes("No Content");
+        if (code == 304) return Net.bytes("Not Modified");
         if (code == 301) return Net.bytes("Moved Permanently");
         if (code == 302) return Net.bytes("Found");
+        if (code == 307) return Net.bytes("Temporary Redirect");
+        if (code == 308) return Net.bytes("Permanent Redirect");
         if (code == 400) return Net.bytes("Bad Request");
         if (code == 401) return Net.bytes("Unauthorized");
         if (code == 403) return Net.bytes("Forbidden");
         if (code == 404) return Net.bytes("Not Found");
         if (code == 405) return Net.bytes("Method Not Allowed");
         if (code == 413) return Net.bytes("Payload Too Large");
+        if (code == 429) return Net.bytes("Too Many Requests");
         if (code == 500) return Net.bytes("Internal Server Error");
+        if (code == 503) return Net.bytes("Service Unavailable");
         return Net.bytes("OK");
     }
 
-    static int[] response(int code, int[] ctype, int[] body) {
+    static int[] responseKA(int code, int[] ctype, int[] body, int keep) {
         int[] s = Net.bytes("HTTP/1.1 ");
         s = Str.cat(s, Str.fromInt(code));
         s = Str.cat(s, Net.bytes(" "));
@@ -224,9 +232,49 @@ class HttpServer {
         s = Str.cat(s, ctype);
         s = Str.cat(s, Net.bytes("\r\nContent-Length: "));
         s = Str.cat(s, Str.fromInt(body.length));
-        s = Str.cat(s, Net.bytes("\r\nConnection: close\r\n\r\n"));
+        if (keep != 0) s = Str.cat(s, Net.bytes("\r\nConnection: keep-alive\r\n\r\n"));
+        else s = Str.cat(s, Net.bytes("\r\nConnection: close\r\n\r\n"));
         s = Str.cat(s, body);
         return s;
+    }
+
+    /* respons dengan header tambahan (mis. Set-Cookie) */
+    static int[] respond(int code, int[] ctype, int[] body, int[] extra, int keep) {
+        int[] s = Net.bytes("HTTP/1.1 ");
+        s = Str.cat(s, Str.fromInt(code));
+        s = Str.cat(s, Net.bytes(" "));
+        s = Str.cat(s, statusText(code));
+        s = Str.cat(s, Net.bytes("\r\nContent-Type: "));
+        s = Str.cat(s, ctype);
+        s = Str.cat(s, Net.bytes("\r\nContent-Length: "));
+        s = Str.cat(s, Str.fromInt(body.length));
+        s = Str.cat(s, Net.bytes("\r\n"));
+        if (extra.length > 0) s = Str.cat(s, extra);
+        if (keep != 0) s = Str.cat(s, Net.bytes("Connection: keep-alive\r\n\r\n"));
+        else s = Str.cat(s, Net.bytes("Connection: close\r\n\r\n"));
+        s = Str.cat(s, body);
+        return s;
+    }
+
+    static int[] response(int code, int[] ctype, int[] body) {
+        return responseKA(code, ctype, body, 0);
+    }
+
+    /* HEAD: header tetap (Content-Length body), tanpa body */
+    static int[] headOnly(int[] resp) {
+        int p = Str.indexOf(resp, CRLF2(), 0);
+        if (p < 0) return resp;
+        return Str.slice(resp, 0, p + 4);
+    }
+
+    static int[] responseFor(int[] req, int code, int[] ctype, int[] body, int keep) {
+        int[] r = responseKA(code, ctype, body, keep);
+        if (methodIs(req, Net.bytes("HEAD"))) return headOnly(r);
+        return r;
+    }
+
+    static boolean methodIs(int[] req, int[] m) {
+        return Str.eq(method(req), m);
     }
 
     static int[] text(int code, int[] body) {
@@ -247,6 +295,99 @@ class HttpServer {
 
     static int[] forbidden() {
         return text(403, Net.bytes("forbidden\n"));
+    }
+
+    /* ── keep-alive, cookie, body chunked (v1.9.2) ─────────────── */
+
+    static boolean keepAlive(int[] req) {
+        int[] v = headerValue(req, Net.bytes("Connection"));
+        int[] ver = version(req);
+        if (Str.contains(ver, Net.bytes("1.1")))
+            return !Str.equalsIgnoreCase(v, Net.bytes("close"));
+        return Str.equalsIgnoreCase(v, Net.bytes("keep-alive"));
+    }
+
+    /* nilai cookie dari header "Cookie: a=1; b=2" */
+    static int[] cookie(int[] req, int[] name) {
+        int[] h = headerValue(req, Net.bytes("Cookie"));
+        int i = 0;
+        while (i < h.length) {
+            while (i < h.length && (h[i] == 32 || h[i] == 59)) i++;   /* spasi ; */
+            int s0 = i;
+            while (i < h.length && h[i] != 61 && h[i] != 59) i++;      /* = ; */
+            int s1 = i;
+            int[] nm = Str.trim(Str.slice(h, s0, s1 - s0));
+            if (i < h.length && h[i] == 61) i++;
+            int v0 = i;
+            while (i < h.length && h[i] != 59) i++;
+            int v1 = i;
+            if (Str.eq(nm, name)) return Str.trim(Str.slice(h, v0, v1 - v0));
+        }
+        return new int[0];
+    }
+
+    /* baris Set-Cookie; maxAge < 0 → tanpa Max-Age */
+    static int[] setCookie(int[] name, int[] value, int[] path, int maxAge) {
+        int[] s = Net.bytes("Set-Cookie: ");
+        s = Str.cat(s, name);
+        s = Str.cat(s, Net.bytes("="));
+        s = Str.cat(s, value);
+        s = Str.cat(s, Net.bytes("; Path="));
+        s = Str.cat(s, path);
+        if (maxAge >= 0) {
+            s = Str.cat(s, Net.bytes("; Max-Age="));
+            s = Str.cat(s, Str.fromInt(maxAge));
+        }
+        s = Str.cat(s, Net.bytes("\r\n"));
+        return s;
+    }
+
+    /* decode body chunked (permintaan upload) */
+    static int hexv2(int c) {
+        if (c >= 48 && c <= 57) return c - 48;
+        if (c >= 65 && c <= 70) return c - 55;
+        if (c >= 97 && c <= 102) return c - 87;
+        return -1;
+    }
+
+    static int[] dechunk(int[] raw) {
+        int[] out = new int[raw.length];
+        int o = 0;
+        int i = 0;
+        while (i < raw.length) {
+            int e = i;
+            while (e < raw.length && raw[e] != 13 && raw[e] != 10) e++;
+            int size = 0;
+            int any = 0;
+            int k = i;
+            while (k < e) {
+                int h = hexv2(raw[k]);
+                if (h < 0) break;
+                size = size * 16 + h;
+                any = 1;
+                k++;
+            }
+            if (any == 0 || size == 0) break;
+            int s0 = e;
+            while (s0 < raw.length && (raw[s0] == 13 || raw[s0] == 10)) s0++;
+            int cnt = size;
+            if (s0 + cnt > raw.length) cnt = raw.length - s0;
+            for (int j = 0; j < cnt; j++) { out[o] = raw[s0 + j]; o++; }
+            i = s0 + cnt;
+            while (i < raw.length && (raw[i] == 13 || raw[i] == 10)) i++;
+        }
+        return Str.slice(out, 0, o);
+    }
+
+    /* body permintaan: chunked bila Transfer-Encoding: chunked */
+    static int[] bodyAny(int[] req) {
+        int[] te = headerValue(req, Net.bytes("Transfer-Encoding"));
+        if (Str.equalsIgnoreCase(te, Net.bytes("chunked"))) {
+            int he = Str.indexOf(req, CRLF2(), 0);
+            if (he < 0) return new int[0];
+            return dechunk(Str.slice(req, he + 4, req.length - he - 4));
+        }
+        return body(req);
     }
 
     static int send(int fd, int[] resp) {

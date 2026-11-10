@@ -1,0 +1,202 @@
+// GameClient.kop — klien terminal realtime untuk Kopi Arena (v1.9.1).
+//
+// Pakai: ./GameClient.bin [port] [host] [nama] [frames]
+//   port    default 9999
+//   host    default 127.0.0.1 (boleh "localhost" atau a.b.c.d)
+//   nama    default "pemain" (maks 12 byte)
+//   frames  bila > 0, keluar setelah N frame (untuk uji/otomasi)
+//
+// Kontrol: W/A/S/D atau panah = arah, spasi = diam, Q = keluar.
+// Input dikirim 10×/detik; snapshot ditampilkan ~15 fps. Terminal
+// dimasukkan ke mode raw (stty) agar tombol terbaca tanpa Enter.
+
+import Str;
+import Wire;
+import Render;
+
+class Main {
+
+    static void sendJoin(int fd, int ip, int port, int[] name) {
+        int[] j = new int[2 + name.length];
+        j[0] = Wire.OP_JOIN();
+        j[1] = name.length;
+        for (int i = 0; i < name.length; i++) j[2 + i] = name[i];
+        Net.sendto(fd, ip, port, j);
+    }
+
+    static void sendInput(int fd, int ip, int port, int seq, int dx, int dy) {
+        int[] b = new int[4];
+        b[0] = Wire.OP_INPUT();
+        b[1] = seq & 255;
+        b[2] = dx & 255;
+        b[3] = dy & 255;
+        Net.sendto(fd, ip, port, b);
+    }
+
+    public static void main(String[] args) {
+        int port = 9999;
+        if (Net.argc() > 0) {
+            int p = Str.toInt(Net.argv(0));
+            if (p > 0) port = p;
+        }
+        int[] hostArg = new int[0];
+        if (Net.argc() > 1) hostArg = Net.argv(1);
+        int ip = Wire.ipOf(hostArg);
+
+        int[] name = Net.bytes("pemain");
+        if (Net.argc() > 2) {
+            int[] n = Net.argv(2);
+            if (n.length > 0) name = n;
+        }
+        if (name.length > 12) name = Str.slice(name, 0, 12);
+
+        int wantFrames = 0;
+        if (Net.argc() > 3) wantFrames = Str.toInt(Net.argv(3));
+
+        int fd = Net.socket(2, 2);                 /* UDP */
+        if (fd < 0) {
+            System.out.println("klien: socket gagal");
+            return;
+        }
+        Net.bind(fd, 0, 0);                        /* port lokal ephemeral */
+        Net.setnonblock(fd);
+
+        int[] rbuf = new int[256];
+        int[] from = new int[4];
+
+        sendJoin(fd, ip, port, name);
+
+        /* tunggu ack (maks 2 detik) */
+        int id = -1;
+        int w = 60;
+        int h = 20;
+        long deadline = Net.mono() + 2000;
+        while (Net.mono() < deadline) {
+            int n = Net.recvfrom(fd, rbuf, from);
+            if (n >= 2) {
+                int op = rbuf[0] & 255;
+                if (op == Wire.OP_ACK()) {
+                    id = rbuf[1] & 255;
+                    w = Wire.get16(rbuf, 2);
+                    h = Wire.get16(rbuf, 4);
+                    break;
+                }
+                if (op == Wire.OP_ERR()) {
+                    System.out.println("server menolak (penuh?)");
+                    return;
+                }
+            }
+            Net.sleep(5);
+        }
+        if (id < 0) {
+            System.out.println("klien: tidak ada balasan dari server");
+            return;
+        }
+
+        int[] snap = new int[256];
+        int snapN = 0;
+        int dx = 0;
+        int dy = 0;
+        int dirty = 1;
+        int seq = 0;
+        int esc = 0;
+        int quit = 0;
+        int drawn = 0;
+        long lastSend = 0;
+        long lastRender = 0;
+        long lastSnap = Net.mono();
+
+        Net.ttyRaw(1);
+        Net.sendb(1, Render.cursor(0));
+
+        while (quit == 0) {
+            int mark = Net.memMark();
+
+            /* ── tombol ─────────────────────────────────────────── */
+            for (int k = 0; k < 8; k++) {
+                int ch = Net.key();
+                if (ch < 0) break;
+                if (esc == 1) {
+                    if (ch == 91) esc = 2;
+                    else esc = 0;
+                } else if (esc == 2) {
+                    if (ch == 65) { dx = 0; dy = -1; dirty = 1; }
+                    if (ch == 66) { dx = 0; dy = 1; dirty = 1; }
+                    if (ch == 67) { dx = 1; dy = 0; dirty = 1; }
+                    if (ch == 68) { dx = -1; dy = 0; dirty = 1; }
+                    esc = 0;
+                } else if (ch == 27) {
+                    esc = 1;
+                } else if (ch == 119 || ch == 87) {
+                    dx = 0; dy = -1; dirty = 1;
+                } else if (ch == 115 || ch == 83) {
+                    dx = 0; dy = 1; dirty = 1;
+                } else if (ch == 97 || ch == 65) {
+                    dx = -1; dy = 0; dirty = 1;
+                } else if (ch == 100 || ch == 68) {
+                    dx = 1; dy = 0; dirty = 1;
+                } else if (ch == 32) {
+                    dx = 0; dy = 0; dirty = 1;
+                } else if (ch == 113 || ch == 81) {
+                    quit = 1;
+                }
+            }
+
+            long now = Net.mono();
+
+            /* ── kirim input 10×/detik atau saat berubah ────────── */
+            if (quit == 0 && (dirty != 0 || now - lastSend >= 100)) {
+                sendInput(fd, ip, port, seq, dx, dy);
+                seq = (seq + 1) & 255;
+                dirty = 0;
+                lastSend = now;
+            }
+
+            /* ── kuras snapshot; simpan yang terbaru ────────────── */
+            for (int k = 0; k < 8; k++) {
+                int n = Net.recvfrom(fd, rbuf, from);
+                if (n <= 0) break;
+                int op = rbuf[0] & 255;
+                if (op == Wire.OP_SNAP()) {
+                    for (int i = 0; i < n && i < snap.length; i++) snap[i] = rbuf[i];
+                    snapN = n;
+                    lastSnap = Net.mono();
+                } else if (op == Wire.OP_ERR()) {
+                    if ((rbuf[1] & 255) == Wire.ERR_BUKAN()) lastSnap = 0;
+                } else if (op == Wire.OP_ACK()) {
+                    id = rbuf[1] & 255;
+                }
+            }
+
+            /* ── server diam? kirim ulang join ──────────────────── */
+            if (quit == 0 && Net.mono() - lastSnap > 1500) {
+                sendJoin(fd, ip, port, name);
+                lastSnap = Net.mono();
+            }
+
+            /* ── gambar ~15 fps ─────────────────────────────────── */
+            if (snapN > 0 && now - lastRender >= 66) {
+                int[] st = Wire.decode(snap, snapN);
+                if (st[1] == id) {
+                    Net.sendb(1, Render.frame(st, w, h, id, name));
+                    lastRender = now;
+                    drawn++;
+                    if (wantFrames > 0 && drawn >= wantFrames) break;
+                }
+            }
+
+            Net.memReset(mark);
+            Net.sleep(2);
+        }
+
+        if (quit == 0) {
+            int[] q = new int[1];
+            q[0] = Wire.OP_QUIT();
+            Net.sendto(fd, ip, port, q);
+        }
+        Net.sendb(1, Render.cursor(1));
+        Net.ttyRaw(0);
+        System.out.println("");
+        Net.close(fd);
+    }
+}

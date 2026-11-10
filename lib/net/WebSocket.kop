@@ -1,0 +1,114 @@
+// WebSocket.kop — server WebSocket (RFC 6455) minimal murni Kopi (v1.9.3).
+//
+// Yang didukung:
+//   - handshake HTTP Upgrade (Sec-WebSocket-Key → SHA-1 + base64)
+//   - frame teks/biner/ping/pong/close (sisi server: tanpa mask)
+//   - decode frame klien (wajib mask); ukuran payload < 64 KiB per frame
+//   - satu frame per panggilan decode; fragmentasi lanjutan belum
+//
+// Contoh server gema: examples/ws/WsEcho.kop
+
+import Str;
+import Hash;
+import Cipher;
+import HttpServer;
+
+class WebSocket {
+
+    static int[] GUID() { return Net.bytes("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"); }
+
+    /* Sec-WebSocket-Accept = base64(SHA1(key + GUID)) */
+    static int[] accept(int[] key) {
+        int[] raw = Str.cat(key, GUID());
+        return Cipher.b64enc(Hash.sha1(raw));
+    }
+
+    static boolean isUpgrade(int[] req) {
+        int[] up = HttpServer.headerValue(req, Net.bytes("Upgrade"));
+        int[] key = HttpServer.headerValue(req, Net.bytes("Sec-WebSocket-Key"));
+        return Str.equalsIgnoreCase(up, Net.bytes("websocket")) && key.length > 0;
+    }
+
+    /* respons 101 Switching Protocols */
+    static int[] handshake(int[] req) {
+        int[] key = HttpServer.headerValue(req, Net.bytes("Sec-WebSocket-Key"));
+        int[] s = Net.bytes("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ");
+        s = Str.cat(s, accept(key));
+        s = Str.cat(s, Net.bytes("\r\n\r\n"));
+        return s;
+    }
+
+    /* ── frame server (tanpa mask) ─────────────────────────────── */
+
+    static int[] frame(int op, int[] payload) {
+        int n = payload.length;
+        if (n > 65535) return new int[0];
+        int extra = 0;
+        if (n > 125) extra = 2;
+        int[] out = new int[2 + extra + n];
+        out[0] = 128 | (op & 15);
+        if (n <= 125) {
+            out[1] = n;
+        } else {
+            out[1] = 126;
+            out[2] = (n >> 8) & 255;
+            out[3] = n & 255;
+        }
+        for (int i = 0; i < n; i++) out[2 + extra + i] = payload[i] & 255;
+        return out;
+    }
+
+    static int[] text(int[] s)  { return frame(1, s); }
+    static int[] binary(int[] s){ return frame(2, s); }
+    static int[] ping(int[] s)  { return frame(9, s); }
+    static int[] pong(int[] s)  { return frame(10, s); }
+    static int[] close(int code) {
+        int[] p = new int[2];
+        p[0] = (code >> 8) & 255;
+        p[1] = code & 255;
+        return frame(8, p);
+    }
+
+    /* ── decode frame klien ────────────────────────────────────── */
+    /* hasil: [opcode, panjang, payload...]; array kosong bila < 2 byte */
+
+    static int[] decode(int[] b, int n) {
+        if (n < 2) return new int[0];
+        int op = b[0] & 15;
+        int masked = 0;
+        if ((b[1] & 128) != 0) masked = 1;
+        int len = b[1] & 127;
+        int pos = 2;
+        if (len == 126) {
+            if (n < 4) return new int[0];
+            len = (b[2] & 255) * 256 + (b[3] & 255);
+            pos = 4;
+        } else if (len == 127) {
+            if (n < 10) return new int[0];
+            len = 0;
+            for (int i = 4; i < 8; i++) len = len * 256 + (b[pos + i] & 255);
+            pos = 10;
+        }
+        int[] mask = new int[4];
+        if (masked != 0) {
+            if (pos + 4 > n) return new int[0];
+            for (int i = 0; i < 4; i++) mask[i] = b[pos + i] & 255;
+            pos = pos + 4;
+        }
+        int cnt = len;
+        if (pos + cnt > n) cnt = n - pos;
+        if (cnt < 0) cnt = 0;
+        int[] out = new int[2 + cnt];
+        out[0] = op;
+        out[1] = cnt;
+        for (int i = 0; i < cnt; i++) {
+            int v = b[pos + i] & 255;
+            if (masked != 0) v = v ^ mask[i % 4];
+            out[2 + i] = v;
+        }
+        return out;
+    }
+
+    static int opcode(int[] f) { return f[0]; }
+    static int[] payload(int[] f) { return Str.slice(f, 2, f[1]); }
+}

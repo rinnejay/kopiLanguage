@@ -1,0 +1,343 @@
+// Url.kop — utilitas URL/URI (RFC 3986) murni Kopi (v1.9.2).
+//
+// Semua string adalah byte-as-int (int[]), sama seperti String native.
+// Fungsi:
+//   encode/decode        percent-encoding (encode: unreserved saja)
+//   formEncode/formDecode  application/x-www-form-urlencoded ('+' = spasi)
+//   pair/appendQuery     menyusun query string
+//   hasScheme/scheme/authority/host/portOf/path/query/fragment
+//   resolve(base, rel)   resolusi referensi relatif (RFC 3986 §5)
+//   normalize(path)      buang segmen "." dan ".."
+//   ip4(dotted)          "a.b.c.d" → alamat IPv4 (0 bila bukan IPv4)
+
+import Str;
+
+class Url {
+
+    static int hexv(int c) {
+        if (c >= 48 && c <= 57) return c - 48;
+        if (c >= 65 && c <= 70) return c - 55;
+        if (c >= 97 && c <= 102) return c - 87;
+        return -1;
+    }
+
+    static int hexc(int v) {
+        if (v < 10) return 48 + v;
+        return 65 + (v - 10);
+    }
+
+    static boolean unreserved(int c) {
+        if (c >= 65 && c <= 90) return true;
+        if (c >= 97 && c <= 122) return true;
+        if (c >= 48 && c <= 57) return true;
+        if (c == 45 || c == 46 || c == 95 || c == 126) return true;  /* - . _ ~ */
+        return false;
+    }
+
+    static int find(int[] s, int b, int from) {
+        for (int i = from; i < s.length; i++) if (s[i] == b) return i;
+        return -1;
+    }
+
+    /* percent-encode semua kecuali unreserved */
+    static int[] encode(int[] s) {
+        int[] out = new int[s.length * 3];
+        int o = 0;
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i] & 255;
+            if (unreserved(c)) {
+                out[o] = c; o++;
+            } else {
+                out[o] = 37; o++;
+                out[o] = hexc(c / 16); o++;
+                out[o] = hexc(c % 16); o++;
+            }
+        }
+        return Str.slice(out, 0, o);
+    }
+
+    /* percent-decode; '+' diperlakukan sebagai spasi */
+    static int[] decode(int[] s) {
+        int[] out = new int[s.length];
+        int o = 0;
+        int i = 0;
+        while (i < s.length) {
+            int c = s[i] & 255;
+            if (c == 43) { out[o] = 32; o++; i++; }
+            else if (c == 37 && i + 2 < s.length) {
+                int a = hexv(s[i + 1] & 255);
+                int b = hexv(s[i + 2] & 255);
+                if (a >= 0 && b >= 0) {
+                    out[o] = a * 16 + b; o++; i = i + 3;
+                } else { out[o] = c; o++; i++; }
+            } else { out[o] = c; o++; i++; }
+        }
+        return Str.slice(out, 0, o);
+    }
+
+    /* form-urlencoded: spasi → '+', lalu encode sisanya */
+    static int[] formEncode(int[] s) {
+        int[] e = encode(s);
+        int[] r = new int[e.length];
+        int o = 0;
+        int i = 0;
+        while (i < e.length) {
+            if (e[i] == 37 && i + 2 < e.length && e[i + 1] == 50 && e[i + 2] == 48) {
+                r[o] = 43; o++; i = i + 3;          /* "%20" → '+' */
+            } else { r[o] = e[i]; o++; i++; }
+        }
+        return Str.slice(r, 0, o);
+    }
+
+    static int[] formDecode(int[] s) { return decode(s); }
+
+    /* nama=nilai (keduanya di-encode sebagai form) */
+    static int[] pair(int[] name, int[] val) {
+        int[] out = formEncode(name);
+        out = Str.cat(out, Net.bytes("="));
+        out = Str.cat(out, formEncode(val));
+        return out;
+    }
+
+    /* gabungkan query: q kosong → p; selain itu q + "&" + p */
+    static int[] appendQuery(int[] q, int[] p) {
+        if (q.length == 0) return p;
+        if (p.length == 0) return q;
+        int[] out = Str.cat(q, Net.bytes("&"));
+        return Str.cat(out, p);
+    }
+
+    /* ── penguraian ───────────────────────────────────────────── */
+
+    /* indeks ':' skema (ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ':') */
+    static int schemeEnd(int[] u) {
+        int c = find(u, 58, 0);                     /* ':' */
+        if (c <= 0) return -1;
+        int a = u[0];
+        if (!((a >= 65 && a <= 90) || (a >= 97 && a <= 122))) return -1;
+        for (int i = 1; i < c; i++) {
+            int x = u[i];
+            boolean ok = (x >= 65 && x <= 90) || (x >= 97 && x <= 122)
+                      || (x >= 48 && x <= 57)
+                      || x == 43 || x == 45 || x == 46;
+            if (!ok) return -1;
+        }
+        return c;
+    }
+
+    static boolean hasScheme(int[] u) { return schemeEnd(u) >= 0; }
+
+    static int[] scheme(int[] u) {
+        int c = schemeEnd(u);
+        if (c < 0) return new int[0];
+        return Str.slice(u, 0, c);
+    }
+
+    /* awal otoritas "//" setelah skema; -1 bila tidak ada */
+    static int authStart(int[] u) {
+        int c = schemeEnd(u);
+        if (c < 0) return -1;
+        if (c + 2 >= u.length) return -1;
+        if (u[c + 1] != 47 || u[c + 2] != 47) return -1;
+        return c + 3;
+    }
+
+    static int authEnd(int[] u) {
+        int st = authStart(u);
+        if (st < 0) return -1;
+        int i = st;
+        while (i < u.length) {
+            int c = u[i];
+            if (c == 47 || c == 63 || c == 35) return i;   /* / ? # */
+            i++;
+        }
+        return u.length;
+    }
+
+    static int[] authority(int[] u) {
+        int st = authStart(u);
+        if (st < 0) return new int[0];
+        return Str.slice(u, st, authEnd(u) - st);
+    }
+
+    static int[] host(int[] u) {
+        int[] a = authority(u);
+        int at = find(a, 64, 0);                    /* '@' userinfo */
+        if (at >= 0) a = Str.slice(a, at + 1, a.length - at - 1);
+        int c = find(a, 58, 0);                     /* ':' port */
+        if (c < 0) return a;
+        return Str.slice(a, 0, c);
+    }
+
+    static int portOf(int[] u, int def) {
+        int[] a = authority(u);
+        int at = find(a, 64, 0);
+        if (at >= 0) a = Str.slice(a, at + 1, a.length - at - 1);
+        int c = find(a, 58, 0);
+        if (c < 0) return def;
+        int[] p = Str.slice(a, c + 1, a.length - c - 1);
+        if (p.length == 0) return def;
+        return Str.toInt(p);
+    }
+
+    static int pathStart(int[] u) {
+        int e = authEnd(u);
+        if (e < 0) {
+            int c = schemeEnd(u);
+            if (c < 0) {
+                int i = 0;
+                while (i < u.length && u[i] != 63 && u[i] != 35) i++;
+                if (i > 0) return 0;
+            }
+            return -1;
+        }
+        if (e < u.length && u[e] == 47) return e;
+        return -1;
+    }
+
+    static int[] path(int[] u) {
+        int st = pathStart(u);
+        if (st < 0) return new int[0];
+        int e = st;
+        while (e < u.length && u[e] != 63 && u[e] != 35) e++;
+        return Str.slice(u, st, e - st);
+    }
+
+    static int[] query(int[] u) {
+        int q = find(u, 63, 0);
+        if (q < 0) return new int[0];
+        int e = find(u, 35, q + 1);
+        if (e < 0) e = u.length;
+        return Str.slice(u, q + 1, e - q - 1);
+    }
+
+    static int[] fragment(int[] u) {
+        int f = find(u, 35, 0);
+        if (f < 0) return new int[0];
+        return Str.slice(u, f + 1, u.length - f - 1);
+    }
+
+    /* empat oktet "a.b.c.d" → ip; 0 bila tidak valid */
+    static int ip4(int[] s) {
+        if (Str.splitCount(s, 46) != 4) return 0;
+        int[] v = new int[4];
+        for (int i = 0; i < 4; i++) {
+            int[] p = Str.splitAt(s, 46, i);
+            if (p.length == 0 || p.length > 3) return 0;
+            int x = 0;
+            for (int k = 0; k < p.length; k++) {
+                if (p[k] < 48 || p[k] > 57) return 0;
+                x = x * 10 + (p[k] - 48);
+            }
+            if (x > 255) return 0;
+            v[i] = x;
+        }
+        return v[0] * 16777216 + v[1] * 65536 + v[2] * 256 + v[3];
+    }
+
+    /* ── normalisasi jalur (RFC 3986 §5.2.4, versi sederhana) ──── */
+
+    static int[] normalize(int[] p) {
+        int[] out = new int[p.length + 2];
+        int o = 0;
+        int[] st = new int[p.length / 2 + 4];
+        int sp = 0;
+        int i = 0;
+        int lead = 0;
+        if (p.length > 0 && p[0] == 47) { lead = 1; i = 1; }
+        while (i <= p.length) {
+            if (i == p.length && o > 0 && out[o - 1] == 47) break;
+            int j = i;
+            while (j < p.length && p[j] != 47) j++;
+            int len = j - i;
+            if (len == 1 && p[i] == 46) {
+                /* "." — lewati */
+            } else if (len == 2 && p[i] == 46 && p[i + 1] == 46) {
+                if (sp > 0) { sp--; o = st[sp]; }
+            } else if (len > 0 || j < p.length) {
+                st[sp] = o; sp++;
+                for (int k = i; k < j; k++) { out[o] = p[k]; o++; }
+                if (j < p.length) { out[o] = 47; o++; }
+            }
+            if (j >= p.length) break;
+            i = j + 1;
+        }
+        int[] r = new int[0];
+        if (lead == 1) {
+            r = new int[o + 1];
+            r[0] = 47;
+            for (int k = 0; k < o; k++) r[k + 1] = out[k];
+        } else {
+            r = Str.slice(out, 0, o);
+        }
+        return r;
+    }
+
+    static int[] dropFragment(int[] u) {
+        int f = find(u, 35, 0);
+        if (f < 0) return u;
+        return Str.slice(u, 0, f);
+    }
+
+    /* resolusi referensi relatif terhadap base absolut */
+    static int[] resolve(int[] base, int[] rel) {
+        if (rel.length == 0) return dropFragment(base);
+        if (hasScheme(rel)) return rel;
+        if (rel.length >= 2 && rel[0] == 47 && rel[1] == 47) {
+            int[] out = scheme(base);
+            out = Str.cat(out, Net.bytes(":"));
+            return Str.cat(out, rel);
+        }
+        if (rel[0] == 47) {                          /* absolut-path */
+            int[] out = scheme(base);
+            if (out.length > 0) out = Str.cat(out, Net.bytes(":"));
+            int[] a = authority(base);
+            if (a.length > 0) {
+                out = Str.cat(out, Net.bytes("//"));
+                out = Str.cat(out, a);
+            }
+            return Str.cat(out, normalize(rel));
+        }
+        if (rel[0] == 63) {                          /* ?query */
+            int[] out = base;
+            int q = find(out, 63, 0);
+            int f = find(out, 35, 0);
+            int cut = out.length;
+            if (q >= 0 && q < cut) cut = q;
+            if (f >= 0 && f < cut) cut = f;
+            return Str.cat(Str.slice(out, 0, cut), rel);
+        }
+        if (rel[0] == 35) {                          /* #frag */
+            int[] out = dropFragment(base);
+            return Str.cat(out, rel);
+        }
+        int q = find(rel, 63, 0);
+        int f = find(rel, 35, 0);
+        int cut = rel.length;
+        if (q >= 0 && q < cut) cut = q;
+        if (f >= 0 && f < cut) cut = f;
+        int[] rp = Str.slice(rel, 0, cut);
+        int[] suffix = Str.slice(rel, cut, rel.length - cut);
+
+        int[] bp = path(base);
+        int slash = -1;
+        for (int i = bp.length - 1; i >= 0; i--) {
+            if (bp[i] == 47) { slash = i; break; }
+        }
+        int[] dir = Net.bytes("/");
+        if (slash >= 0) dir = Str.slice(bp, 0, slash + 1);
+        int[] merged = Str.cat(dir, rp);
+        merged = normalize(merged);
+
+        int[] out = scheme(base);
+        if (out.length > 0) out = Str.cat(out, Net.bytes(":"));
+        int[] a = authority(base);
+        if (a.length > 0) {
+            out = Str.cat(out, Net.bytes("//"));
+            out = Str.cat(out, a);
+        }
+        out = Str.cat(out, merged);
+        out = Str.cat(out, suffix);
+        return out;
+    }
+}

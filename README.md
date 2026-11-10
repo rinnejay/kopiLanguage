@@ -37,8 +37,9 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 | Lokasi | Kelompok | Isi |
 |--------|----------|-----|
 | `lib/core/` | logika dasar & sistem | `Math`, `Digits`, `Stats`, `Matrix`, `Arrays`, **`Json`**, **`Str`** (teks), **`Map`/`Set`/`Deque`**, **`File`/`Path`**, **`Time`** |
-| `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
-| `lib/net/` | jaringan | `Tcp`, `Udp`, `Dns`, `Http` (klien HTTP/1.0), `Rfc`, **`Tls`** (klien TLS 1.3), **`HttpServer`** (server HTTP/1.1 minimal), **`Static`** (file statis) |
+| `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256 + HMAC + **SHA-1**), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
+| `lib/net/` | jaringan | `Tcp`, `Udp`, `Dns`, `Rfc`, `Http` (klien HTTP/1.1 + chunked/redirect/auth), **`Url`** (RFC 3986), **`Tls`** (klien TLS 1.3), **`HttpServer`** (server HTTP/1.1 + keep-alive), **`Static`**, **`Mime`**, **`WebSocket`** |
+| `examples/game/`, `examples/ws/` | contoh | game realtime UDP (server+klien+bot), server WebSocket gema |
 
 ATURAN unik: file test TIDAK boleh bernama sama (kasus tak peduli) dengan
 modul yang diimpor — file lokal selalu menang atas `lib/`.
@@ -47,7 +48,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.9.0 hari ini  ████████████████  87/87 test hijau — HTTP server minimal .kop (listen/accept, arena reset) (a64 + VM)
+v1.9.3 hari ini  ████████████████ 103/103 test hijau — game realtime + HTTP/1.1 + WebSocket (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -64,7 +65,7 @@ v1.9.0 hari ini  ████████████████  87/87 test hi
 | **v1.5d-E4** | **pustaka matematika diperluas besar-besaran** (`int` 32-bit, murni Kopi): `Math` kini mencakup 80+ fungsi — aritmetika modular aman-overflow (`mulMod` doubling, `powMod`, `modInverse` via Bezout), teori bilangan (sieve `primesUpTo`, `primeCount`, `nthPrime`, `factorize`, σ/φ/radikal/Möbius, prima/abundant/deficient), kombinatorika (`binomial`, `permutation`, `catalan`, `derangement`, `stirling2`, `bell`, Lucas/Tribonacci), bit (`popcount`, `highestBit`, `reverseBits`, `nextPow2`), akar/log bulat (`sqrt`, `cbrt`, `log2`, `log10`), geometri integer (`heron16`, `isRightTriangle`, jarak). Modul baru `Digits` (palindrom/Armstrong/akar digital), `Stats` (median/modus/varians/simpangan baku), `Matrix` (aljabar matriks persegi). Uji oracle python: **154 kasus** di `tools/gen_mathvec.py`, lulus di VM & a64, sintaks x64 diperiksa; total suite 63/63 |
 | **v1.6** | **tipe numerik lengkap** (scalar): `long` (64-bit bertanda), `float`/`double` (IEEE-754), `uint8`/`uint16`/`uint32`/`uint64` (unsigned dengan wrap sesuai lebar), literal `L/U/UL/f/d`, hex `0x`, biner `0b`, cast `(tipe)expr`, promosi campuran (int+uint32→long, uint32+uint32→uint32, dst), perbandingan signed/unsigned, `%` float, `println` format per tipe, parameter/return semua tipe, compound assignment (narrowing implisit ala Java). Backend a64 + VM menghasilkan output identik; x64 diperiksa sintaksnya. Uji oracle python `tools/gen_numvec.py` (66 kasus), suite 65/65. Batas jujur: array masih `int[]` (belum `long[]`/`double[]`), lambda masih `int`, dan backend x64 belum dijalankan di mesin x86-64 |
 | **v1.6.1** | **`byte`/`int8` (8-bit bertanda) dan `short`/`int16` (16-bit bertanda)** — melengkapi `long`/`float`/`double`/`uint8..64`. Aritmetika wrap sesuai lebar + sign-extend kanonik, cast, literal `-128`/`-32768`, parameter/return/cetak signed. Sekaligus memperbaiki **tabrakan nilai token**: seluruh keyword & token multi-karakter dipindah ke ≥256 agar tidak bertabrakan dengan kode ASCII operator 1-karakter (`%`, `&`, `!`, …), dan dependensi header ditambahkan ke Makefile. Uji numvec diperluas (byte/short) + suite 65/65 |
-| **v1.6.2** | **UDP + HTTP header**: builtin baru `Net.bind`, `Net.sendto`, `Net.recvfrom`, `Net.shutdown` (syscall langsung di a64/x64, jalur host di VM) + modul `lib/net/Udp.kop` (`open/bind/sendTo/recvFrom/shutdown/close`), sumber datagram dicatat di `from[0]` (ip) / `from[1]` (port). `Tcp.shutdown` ditambahkan. `lib/net/Http.kop` diperluas: `reqEx`, `requestInto`, `getWith`, `postWith` (header permintaan kustom) serta `headerBlock`, `headerValue` (case-insensitive, nilai di-trim), `hasHeader` untuk membaca header respons. Backend x64 kini mendukung **8 argumen** (arg 7–8 lewat stack). Uji: UDP loopback bolak-balik (bind+sendto+recvfrom) dan server HTTP yang memeriksa header kustom + respons header, di VM & a64; sintaks x64 diperiksa. Batas jujur: datagram maks **240 byte** per kirim/terima (penyangga syscall v1) |
+| **v1.6.2** | **UDP + HTTP header**: builtin baru `Net.bind`, `Net.sendto`, `Net.recvfrom`, `Net.shutdown` (syscall langsung di a64/x64, jalur host di VM) + modul `lib/net/Udp.kop` (`open/bind/sendTo/recvFrom/shutdown/close`), sumber datagram dicatat di `from[0]` (ip) / `from[1]` (port). `Tcp.shutdown` ditambahkan. `lib/net/Http.kop` diperluas: `reqEx`, `requestInto`, `getWith`, `postWith` (header permintaan kustom) serta `headerBlock`, `headerValue` (case-insensitive, nilai di-trim), `hasHeader` untuk membaca header respons. Backend x64 kini mendukung **8 argumen** (arg 7–8 lewat stack). Uji: UDP loopback bolak-balik (bind+sendto+recvfrom) dan server HTTP yang memeriksa header kustom + respons header, di VM & a64; sintaks x64 diperiksa. Batas jujur: datagram maks **1200 byte** per kirim/terima (dinaikkan di v1.9.3) |
 | **v1.6.3** | **array fungsional + gula metode**: `Arrays.forEach`, `forEachIndexed`, `map`, `filter`, `reduce`, `any`, `all`, `countWhere`, `findIndex`, `sumBy`, `copy`, `reverse` (semuanya memakai lambda Kopi). Sintaks metode `a.forEach(f)`, `a.map(f)`, dst. didukung lewat desugaring ke `Arrays.*` (butuh `import Arrays;`). Perbaikan array: `Arrays.max/min` tidak lagi meledak pada array kosong, `take` meng-clamp `n < 0`. Uji baru `arrayfn` dan `arrchk` (return array besar 300 elemen, `new int[0]`, identitas) di VM & a64 + sintaks x64; suite 73/73 |
 | **v1.6.4** | **JSON native**: literal `json {...}` / `json [...]` (sampai 8 entri; lebih dari 4 pasangan objek dirangkai via `Json.put`), nilai berupa tape `int[]` sehingga bisa disimpan di variabel, dipassing, dan dikembalikan fungsi. Pustaka `lib/core/Json.kop`: `parse`, `write`, `print`/`line`, `typeOf`/`isNull`/`isBool`/`isNumber`/`isString`/`isArray`/`isObject`, `asInt`/`asDouble`/`asBool`/`asText`, `count`/`at`/`get`/`has`, `put`/`del`/`add` (immutable), konstruktor `nullV`/`boolV`/`num`/`str`/`arrN`/`objN`. Angka disimpan sebagai teks sumber (format dipertahankan), string di-escape saat ditulis, `\uXXXX` didekode ke UTF-8 (tanpa pasangan surrogate). Parser mengenal token `:`; uji `jsontest` di VM & a64 + sintaks x64; suite 75/75 |
 | **v1.6.5** | **uji ketangguhan proyek besar** `examples/proyekbesar/`: **54 file `.kop`** (53 modul + main) saling `import`, memakai pustaka (`Math`, `Arrays`, `Stats`, `Matrix`, `Json`, `Cipher`, `Hash`) dan modul lokal (struktur data, algoritma, CSV/JSON, inventory/order/billing, lexer/compiler/evaluator/VM mini). Harness `bench.py`: kompilasi a64/VM/x64 **paralel**, eksekusi a64 & VM **paralel** dengan timeout 120 s, sampling `VmHWM` untuk puncak RSS, banding output byte-per-byte, lalu **4 proses a64 paralel**. Hasil acuan: kompilasi ~0,13 s; a64 ~0,14 s, VM ~0,94 s; puncak RSS ~24 MB; 102 baris output identik; tanpa hang/OOM (fase memori ≈21,6 MB payload pada arena/heap 32 MB). Juga ditambahkan `Json.write` (publik) dan `proyekbesar` masuk `test.sh` (a64/VM/x64) |
@@ -73,6 +74,9 @@ v1.9.0 hari ini  ████████████████  87/87 test hi
 | **v1.8.0** | **tipe `String` native**: literal `"..."` **dan** `'...'` bertipe `String`, concat `+`, perbandingan isi `==`/`!=`, `.length`, indeks `s[i]` (byte), parameter/return `String`, serta **interop dua arah dengan `int[]`** (perpustakaan `Str`/`File`/`Path`/`Json` tetap bekerja). `System.out.println/print` menerima `String`; template `{s}` mendukung `String`; builtin `Net.cat`, `Net.sequal`, `Net.sne`. Escape `\0` ditolak (tak ada pemotongan cpool diam-diam). Uji `strnative` VM+a64 + sintaks x64; suite 85/85 |
 | **v1.8.1** | **`Net.bytes` tidak lagi wajib**: literal `"..."`/`'...'` sudah `String` dan bisa langsung dipakai sebagai path/buffer/parameter `int[]` (interop implisit). Pemeriksaan argumen builtin `Net.*` (openb/mkdirb/unlinkb/renameb/sendto/recvfrom/recvb/sendb) kini menerima `String` maupun `int[]`. `Net.bytes` dipertahankan hanya untuk kompatibilitas dan sebagai cara eksplisit membuat byte-array dari literal (tetap literal-only). Uji `strnative` diperluas: `int[] a = "abc"`, `Json.parse("...")`, `File.create("...")`, dan `Net.openb("...")` langsung. Suite 85/85 |
 | **v1.9.0** | **server minimal**: builtin `Net.listen`, `Net.accept` (accept4 — `accept` diblokir seccomp Android), `Net.setsockopt`, `Net.memMark/memReset` (arena per-request), `Net.argc/argv/getenv`, `Net.recv1` (satu `read`, bukan blocking-until-full). Library **`.kop`**: `MapStr` (peta String→int), `HttpServer` (parser request HTTP/1.1, method/path/query/header/body/urlDecode, response builder, kirim), `Static` (MIME + file statis + tolak `..`), `Log` (stderr + timestamp UTC). Contoh `examples/server/ServerDemo.kop`: listen → accept → parse → route → response → `memReset`, dengan endpoint `/`, `/health`, `/json`, `/time`, `/echo`, `/sum`, `/header`, `/static/*`, 404/403. Diuji 200 request beruntun tanpa OOM di a64 & VM, plus x64 sintaks; suite 87/87 |
+| **v1.9.1** | **game realtime `Kopi Arena`**: contoh `examples/game/` — server UDP otoritatif 20 tick/detik, klien terminal (WASD/panah, ANSI, raw mode), bot penguji. Modul contoh (bukan `lib/`): `Arena`, `ArenaServer`, `Wire`, `Render`. Builtin baru `Net.setnonblock`, `Net.key` (stdin non-blocking), `Net.ttyRaw`, `Net.localport`. Arena memakai `memMark/memReset` per iterasi, jadi server jalan lama tanpa OOM. Uji: unit aturan arena, bot (join/gerak/snapshot/quit), klien 40 frame, 2 backend + sintaks x64 |
+| **v1.9.2** | **HTTP/1.1 + URL + MIME**: `lib/net/Url.kop` (encode/decode, form, `pair`, `resolve` RFC 3986, `normalize`, `ip4`) diuji lawan `urllib.parse`; `Http` diperluas `getFull`, `exchange`, `follow` (redirect 301/302/303/307/308), `payload`/`dechunk`, `basic`, `formPost`, `jsonPost`, timeout 5 dtk; `HttpServer` dapat `keepAlive`, `responseKA`/`respond`/`responseFor` (HEAD), `cookie`/`setCookie`, `bodyAny`/`dechunk`; `Mime.kop` + `Static.serveKA`. Builtin `Net.settimeout(fd, ms)` (SO_RCVTIMEO/SO_SNDTIMEO). Eksperimen: `ServerDemo` kini keep-alive per koneksi, `/setcookie`, `/cookie`, HEAD, body chunked; diuji Python di a64 & VM |
+| **v1.9.3** | **WebSocket + SHA-1**: `Hash.sha1` (vektor FIPS 180-4) dan `lib/net/WebSocket.kop` (handshake RFC 6455, frame teks/biner/ping/pong/close, decode frame klien bermask). Contoh `examples/ws/WsEcho.kop`; probe Python memverifikasi `Sec-WebSocket-Accept` contoh RFC, gema, ping→pong, frame 200 byte, close. Juga memperbaiki **kebocoran stack `Net.recvfrom` a64** (sp +96 → +80) yang membuat loop server merusak variabel lokal; datagram dinaikkan 240 → **1200 byte** |
 
 ## Bangun
 
@@ -703,10 +707,121 @@ Library `.kop`:
 Contoh lengkap: `examples/server/ServerDemo.kop` (endpoint `/`, `/health`,
 `/json`, `/time`, `/echo`, `/sum`, `/header`, `/static/*`, 404/403).
 
-Batas jujur: **single-threaded blocking**, `Connection: close` per respons,
-tanpa keep-alive/chunked/multipart/WebSocket/HTTP2, tanpa TLS server,
-routing manual `if/else`, dan ukuran request dibatasi buffer. Untuk produksi
+**v1.9.2** menambahkan keep-alive per koneksi, HEAD, cookie, dan body
+request `Transfer-Encoding: chunked`:
+
+```java
+while (true) {
+    int c = Net.accept(fd);
+    while (true) {
+        int mark = Net.memMark();
+        int[] req = HttpServer.readRequest(c, 16384);
+        if (req.length == 0) { Net.memReset(mark); break; }
+        boolean keep = HttpServer.keepAlive(req);
+        int[] resp = HttpServer.responseFor(req, 200, ctype, body, keep ? 1 : 0);
+        HttpServer.send(c, resp);
+        Net.memReset(mark);
+        if (!keep) break;
+    }
+    Net.close(c);
+}
+```
+
+Bantuan respons: `response`, `responseKA`, `respond` (header tambahan),
+`responseFor` (otomatis tanpa body untuk HEAD), `keepAlive`, `cookie`,
+`setCookie`, `bodyAny` (chunked), `methodIs`.
+
+Batas jujur: **single-threaded blocking**, tanpa multipart/WebSocket di
+server HTTP (WebSocket punya modul sendiri), tanpa HTTP/2, tanpa TLS server,
+routing manual `if/else`, ukuran request dibatasi buffer. Untuk produksi
 jalankan di belakang reverse proxy dan tambahkan worker/process.
+
+## Game realtime: `Kopi Arena` (v1.9.1)
+
+Contoh lengkap server + klien di `examples/game/` — **semuanya `.kop`**
+(tidak masuk `lib/` supaya pustaka inti tetap bersih):
+
+| Berkas | Isi |
+|---|---|
+| `Arena.kop` | dunia server-authoritative: 60×20 sel, posisi mili-sel, 8 pemain, 4 koin, RNG LCG, timeout 3 dtk |
+| `ArenaServer.kop` | loop UDP non-blocking 20 tick/dtk, join/input/ping/quit, siaran snapshot, `memReset` per iterasi |
+| `Wire.kop` | protokol biner 1 datagram/pesan (`J/I/P/Q` → `A/S/X`) |
+| `Render.kop` | gambar ANSI 15 fps (peta, koin, papan skor) |
+| `GameServer.kop`, `GameClient.kop`, `BotClient.kop` | program contoh + bot penguji |
+| `arenaunit.kop` | uji deterministik aturan dunia (tanpa jaringan) |
+
+```sh
+cd examples/game
+../../kopicc GameServer.kop -t a64 -o srv.s && cc srv.s -o srv.bin
+../../kopicc GameClient.kop -t a64 -o cli.s && cc cli.s -o cli.bin
+./srv.bin 9999 &
+./cli.bin 9999 127.0.0.1 budi      # terminal lain; WASD/panah, spasi diam, q keluar
+```
+
+Klien memakai `Net.ttyRaw` + `Net.key` (tanpa Enter), mengirim input 10×/dtk,
+dan menggambar snapshot terbaru ~15 fps. Server mengirim ~80 byte/pemain/tick
+sehingga 1200-byte datagram lebih dari cukup.
+
+Batas jujur: UDP tanpa retransmisi (paket hilang = satu tick terlewat),
+tanpa interpolasi/prediksi gerak, tanpa rooms/auth/TLS, satu proses
+single-thread, dan nama pemain belum disiarkan (papan skor memakai huruf id).
+
+## URL — `lib/net/Url.kop` (v1.9.2)
+
+Implementasi RFC 3986 yang diuji baris-per-baris terhadap `urllib.parse`:
+
+```java
+import Url;
+
+int[] u = Url.resolve("http://a/b/c/d;p?q", "../g");   // http://a/b/g
+int[] q = Url.appendQuery(Url.pair("q", "a b"), Url.pair("n", "3"));
+// q = "q=a+b&n=3"
+```
+
+`encode decode formEncode formDecode pair appendQuery hasScheme scheme
+authority host portOf path query fragment ip4 normalize resolve`.
+
+## Klien HTTP/1.1 (v1.9.2)
+
+`lib/net/Http.kop` tetap kompatibel dengan API lama, plus:
+
+| Fungsi | Guna |
+|---|---|
+| `getFull(addr, port, host, path, cap)` | GET HTTP/1.1, `Connection: close`, timeout 5 dtk |
+| `exchange(addr, port, method, host, path, headers, body, cap)` | transaksi bebas |
+| `payload(resp)` | body sebenarnya (memotong `Content-Length`, decode chunked) |
+| `follow(addr, port, host, path, maxHops, cap)` | ikuti redirect (host harus sama) |
+| `basic(user, pass)` | header `Authorization: Basic …` |
+| `formPost` / `jsonPost` | POST ter-encode + Content-Type tepat |
+
+`statusOf`, `bodyOf`, `headerValue`, `hasHeader` tidak berubah.
+
+## WebSocket — `lib/net/WebSocket.kop` (v1.9.3)
+
+Server WebSocket minimal (RFC 6455): handshake + frame teks/biner/ping/pong/
+close. `Hash.sha1` ditambahkan untuk `Sec-WebSocket-Accept`.
+
+```java
+int[] req = HttpServer.readRequest(c, 8192);
+if (WebSocket.isUpgrade(req)) {
+    Net.sendb(c, WebSocket.handshake(req));
+    int[] buf = new int[65536];
+    while (true) {
+        int n = Net.recv1(c, buf);
+        if (n <= 0) break;
+        int[] f = WebSocket.decode(buf, n);        // [opcode, len, payload...]
+        if (f[0] == 8) { Net.sendb(c, WebSocket.close(1000)); break; }
+        if (f[0] == 9) Net.sendb(c, WebSocket.pong(WebSocket.payload(f)));
+        else if (f[0] == 1) Net.sendb(c, WebSocket.text(WebSocket.payload(f)));
+    }
+}
+```
+
+Contoh: `examples/ws/WsEcho.kop` (port default 8090). Batas: satu frame per
+`read` (tanpa fragmentasi/continuation), payload < 64 KiB, tanpa TLS dan
+tanpa kompresi `permessage-deflate`.
+
+
 
 ## Jaringan: TCP, UDP, HTTP (v1.6.2)
 
@@ -722,6 +837,14 @@ Builtin `Net` adalah syscall Linux langsung tanpa libc. Set lengkapnya:
 | `Net.sendb` / `Net.recvb` | TCP: kirim/terima buffer (byte-as-int) |
 | `Net.rdb` / `Net.wrb` | baca/tulis satu byte |
 | `Net.shutdown(fd, how)` | half-close: 0=RD, 1=WR, 2=RDWR |
+| `Net.listen(fd, backlog)` / `Net.accept(fd)` | server TCP (`accept4`) |
+| `Net.setsockopt(fd, lvl, opt, val)` | opsi socket (SO_REUSEADDR, TCP_NODELAY, …) |
+| `Net.settimeout(fd, ms)` | SO_RCVTIMEO + SO_SNDTIMEO (**v1.9.2**) |
+| `Net.setnonblock(fd)` / `Net.localport(fd)` | non-blocking; port lokal |
+| `Net.memMark()` / `Net.memReset(m)` | arena per-request (pengganti GC) |
+| `Net.recv1(fd, buf)` | satu `read` (untuk HTTP/WebSocket) |
+| `Net.argc/argv/getenv` | argumen program & environment |
+| `Net.key()` / `Net.ttyRaw(on)` | tombol non-blocking + mode raw terminal |
 | `Net.openr`, `Net.close`, `Net.bytes` | file & literal byte |
 
 ### UDP — `lib/net/Udp.kop`
@@ -737,7 +860,7 @@ class Main {
         int cli = Udp.open();
         Udp.sendTo(cli, Udp.loopback(), 9918, Net.bytes("HALO"));
 
-        int[] buf  = new int[240];
+        int[] buf  = new int[1200];
         int[] from = new int[2];
         int n = Udp.recvFrom(srv, buf, from);   // buf[0..n-1], from[0]=ip, from[1]=port
         Udp.sendTo(srv, from[0], from[1], Net.bytes("BALAS"));
@@ -746,9 +869,9 @@ class Main {
 ```
 
 `Udp.sendTo`/`Udp.recvFrom` memakai **satu datagram per panggilan**. Batas
-v1: payload yang dikirim/diterima maksimal **240 byte** (penyangga syscall
-`kop_iobuf` 256 byte); lebih dari itu dipotong. Tidak ada
-retransmisi/urutan (memang sifat UDP).
+v1.9.3: payload maksimal **1200 byte** (penyangga `kop_iobuf` 4096 byte);
+lebih dari itu dipotong. Tidak ada retransmisi/urutan (memang sifat UDP).
+Kirim sebesar 1200 byte juga aman untuk MTU Ethernet standar.
 
 ### HTTP — `lib/net/Http.kop`
 
@@ -943,7 +1066,7 @@ kopi/
 - optimasi `-O1`: register allocation (jangan semua lewat stack),
   const-folding
 - **Server lanjutan**: keep-alive/chunked/multipart, WebSocket, HTTP/2, TLS server,
-  thread/event-loop, datagram UDP > 240 byte, routing framework
+  thread/event-loop, routing framework
 - **TLS lanjutan** (klien 1.3 sudah ada): verifikasi tanda **ECDSA P-256**
   untuk CertificateVerify, validasi rantai/PKI + hostname + masa berlaku,
   session resumption/PSK, dan dukungan `u64` asli supaya X25519 tidak lagi

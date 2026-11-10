@@ -1,0 +1,56 @@
+// arenaunit.kop — uji deterministik aturan Arena (tanpa jaringan).
+// Dipakai test.sh; output harus sama di backend a64 & VM.
+
+import Arena;
+import Wire;
+
+class Main {
+    public static void main(String[] args) {
+        int[] w = Arena.make();
+        System.out.println(Arena.W());
+        System.out.println(Arena.H());
+
+        int a = Arena.join(w, 7, 7000);
+        int b = Arena.join(w, 8, 8000);
+        System.out.println(a);
+        System.out.println(b);
+        System.out.println(w[Arena.WNP()]);
+
+        /* pemain a dipindah tepat ke koin 0 → skor +1, koin pindah */
+        w[Arena.p(a, 3)] = w[Arena.c(0, 1)];
+        w[Arena.p(a, 4)] = w[Arena.c(0, 2)];
+        int cx = w[Arena.c(0, 1)];
+        Arena.step(w);
+        System.out.println(w[Arena.p(a, 7)]);
+        System.out.println(w[Arena.c(0, 1)] == cx);
+
+        /* b bergerak kanan 3 tick → +900 mili-sel */
+        int x0 = w[Arena.p(b, 3)];
+        Arena.input(w, b, 1, 0);
+        Arena.step(w);
+        Arena.step(w);
+        Arena.step(w);
+        System.out.println(w[Arena.p(b, 3)] - x0);
+
+        /* clamp di tepi kanan */
+        w[Arena.p(b, 3)] = Arena.W() * Arena.SCALE() - 10;
+        Arena.step(w);
+        System.out.println(w[Arena.p(b, 3)]);
+
+        /* timeout: b hilang setelah > TIMEOUT tick tanpa paket */
+        w[Arena.p(b, 8)] = w[Arena.WTICK()] - Arena.TIMEOUT() - 1;
+        Arena.step(w);
+        System.out.println(w[Arena.WNP()]);
+
+        /* snapshot: 1 pemain, 4 koin, ack-decode konsisten */
+        int[] s = Arena.snapshot(w, a);
+        int[] st = Wire.decode(s, s.length);
+        System.out.println(s[0]);
+        System.out.println(st[1]);
+        System.out.println(st[2]);
+        int ci = 3 + 4 * st[2];
+        System.out.println(st[ci]);
+        System.out.println(st[3 + 4 * 0] == a);
+        System.out.println(st[3 + 4 * 0 + 3]);
+    }
+}

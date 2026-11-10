@@ -1,0 +1,29 @@
+// GameServer.kop — server game realtime Kopi Arena (v1.9.1).
+//
+// Pakai: ./GameServer.bin [port] [tickMs]
+//   port    default 9999 (UDP)
+//   tickMs  default 50   (20 tick/detik)
+//
+// Jalankan beberapa klien (GameClient) di terminal berbeda; semuanya
+// berbagi satu dunia: siapa cepat memungut koin, skor tertinggi menang.
+
+import Str;
+import Log;
+import ArenaServer;
+
+class Main {
+    public static void main(String[] args) {
+        int port = 9999;
+        int tick = 50;
+        if (Net.argc() > 0) {
+            int p = Str.toInt(Net.argv(0));
+            if (p > 0) port = p;
+        }
+        if (Net.argc() > 1) {
+            int t = Str.toInt(Net.argv(1));
+            if (t > 0) tick = t;
+        }
+        Log.info(Net.bytes("boot"), Net.bytes("mulai"));
+        ArenaServer.serve(port, tick);
+    }
+}

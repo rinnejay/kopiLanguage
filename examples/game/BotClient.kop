@@ -1,0 +1,124 @@
+// BotClient.kop — klien uji tanpa layar untuk Kopi Arena (v1.9.1).
+//
+// Pakai: ./BotClient.bin [port] [host]
+// Keluar dengan kode 1 bila salah satu pemeriksaan gagal. Dipakai test.sh
+// untuk membuktikan jalur klien (join, input, snapshot, gerak, quit) jalan
+// di backend a64 maupun VM.
+
+import Str;
+import Wire;
+
+class Main {
+
+    static void fail(int[] msg) {
+        System.out.println(Str.cat(Net.bytes("GAGAL: "), msg));
+        Net.exit(1);
+    }
+
+    public static void main(String[] args) {
+        int port = 9999;
+        if (Net.argc() > 0) {
+            int p = Str.toInt(Net.argv(0));
+            if (p > 0) port = p;
+        }
+        int[] hostArg = new int[0];
+        if (Net.argc() > 1) hostArg = Net.argv(1);
+        int ip = Wire.ipOf(hostArg);
+
+        int fd = Net.socket(2, 2);
+        if (fd < 0) fail(Net.bytes("socket"));
+        Net.bind(fd, 0, 0);
+        Net.setnonblock(fd);
+
+        int[] rbuf = new int[256];
+        int[] from = new int[4];
+
+        int[] j = new int[8];
+        j[0] = Wire.OP_JOIN();
+        j[1] = 3;
+        j[2] = 98; j[3] = 111; j[4] = 116;          /* "bot" */
+        Net.sendto(fd, ip, port, j);
+
+        int id = -1;
+        int w = 0;
+        int h = 0;
+        long deadline = Net.mono() + 2000;
+        while (Net.mono() < deadline) {
+            int n = Net.recvfrom(fd, rbuf, from);
+            if (n >= 6 && (rbuf[0] & 255) == Wire.OP_ACK()) {
+                id = rbuf[1] & 255;
+                w = Wire.get16(rbuf, 2);
+                h = Wire.get16(rbuf, 4);
+                break;
+            }
+            Net.sleep(5);
+        }
+        if (id < 0) fail(Net.bytes("tidak dapat ack join"));
+        if (w <= 0 || h <= 0) fail(Net.bytes("ukuran dunia tidak masuk akal"));
+        System.out.println("join ok");
+
+        int[] snap = new int[256];
+        int snapN = 0;
+        int startX = -1;
+        int lastX = -1;
+        int seen = 0;
+        int seq = 0;
+        long lastSend = 0;
+        long end = Net.mono() + 1500;
+
+        while (Net.mono() < end) {
+            long now = Net.mono();
+            int dir = 1;
+            if (startX > w * 500) dir = -1;         /* menjauh dari tepi terdekat */
+
+            if (now - lastSend >= 50) {
+                int[] in = new int[4];
+                in[0] = Wire.OP_INPUT();
+                in[1] = seq & 255;
+                in[2] = dir & 255;
+                in[3] = 0;
+                Net.sendto(fd, ip, port, in);
+                seq = (seq + 1) & 255;
+                lastSend = now;
+            }
+
+            for (int k = 0; k < 8; k++) {
+                int n = Net.recvfrom(fd, rbuf, from);
+                if (n <= 0) break;
+                if ((rbuf[0] & 255) != Wire.OP_SNAP()) continue;
+                for (int i = 0; i < n && i < snap.length; i++) snap[i] = rbuf[i];
+                snapN = n;
+                seen++;
+                int[] st = Wire.decode(snap, snapN);
+                int np = st[2];
+                for (int i = 0; i < np; i++) {
+                    if (st[3 + 4 * i] == id) {
+                        int x = st[3 + 4 * i + 1];
+                        if (startX < 0) startX = x;
+                        lastX = x;
+                    }
+                }
+            }
+            Net.sleep(5);
+        }
+
+        if (seen < 10) fail(Net.bytes("snapshot terlalu sedikit"));
+        if (startX < 0 || lastX < 0) fail(Net.bytes("pemain tidak ada di snapshot"));
+        if (dirOf(startX, lastX) == 0) fail(Net.bytes("pemain tidak bergerak"));
+        System.out.println("snap ok");
+        System.out.println("gerak ok");
+
+        int[] q = new int[1];
+        q[0] = Wire.OP_QUIT();
+        Net.sendto(fd, ip, port, q);
+        Net.sleep(20);
+        System.out.println("quit ok");
+        Net.close(fd);
+    }
+
+    static int dirOf(int a, int b) {
+        if (b > a) return 1;
+        if (b < a) return -1;
+        return 0;
+    }
+}

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -547,7 +548,7 @@ static void run(void) {
                 sa.sin_port = htons((uint16_t)((long)port & 0xffff));
                 sa.sin_addr.s_addr = htonl((uint32_t)((long)ipbe & 0xffffffff));
                 long len = buf[0];
-                if (len > 240) len = 240;         /* batas penyangga v1 */
+                if (len > 1200) len = 1200;       /* batas penyangga v1 */
                 unsigned char *tmp = (unsigned char *)malloc((size_t)(len > 0 ? len : 1));
                 if (!tmp) dievm("Net.sendto: memori habis");
                 for (long i = 0; i < len; i++) tmp[i] = (unsigned char)(buf[1 + i] & 0xff);
@@ -559,7 +560,7 @@ static void run(void) {
                 long *fromArr = (long *)stackv[--sp];
                 long *buf = (long *)stackv[--sp];
                 int64_t fdi = stackv[--sp];
-                unsigned char tmp[240];
+                unsigned char tmp[1200];
                 struct sockaddr_in sa;
                 socklen_t sl = sizeof sa;
                 memset(&sa, 0, sizeof sa);
@@ -691,6 +692,36 @@ static void run(void) {
                 ssize_t n = read((int)fdi, tmp, (size_t)(len > 0 ? len : 1));
                 if (n > 0) for (long i = 0; i < n; i++) buf[1 + i] = (long)tmp[i];
                 stackv[sp++] = (n < 0) ? -errno : (int64_t)n;
+            } else if (bi == 38) {                /* settimeout(fd, ms) */
+                int64_t ms = stackv[--sp], fdi = stackv[--sp];
+                struct timeval tv;
+                tv.tv_sec = (time_t)(ms / 1000);
+                tv.tv_usec = (suseconds_t)((ms % 1000) * 1000);
+                int r = setsockopt((int)fdi, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+                if (r == 0)
+                    r = setsockopt((int)fdi, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
+                stackv[sp++] = (r < 0) ? -errno : 0;
+            } else if (bi == 37) {                /* localport(fd) */
+                int64_t fdi = stackv[--sp];
+                struct sockaddr_in sa;
+                socklen_t sl = sizeof sa;
+                memset(&sa, 0, sizeof sa);
+                int r = getsockname((int)fdi, (struct sockaddr *)&sa, &sl);
+                stackv[sp++] = (r < 0) ? -errno : (int64_t)ntohs(sa.sin_port);
+            } else if (bi == 34) {                /* setnonblock(fd) */
+                int64_t fdi = stackv[--sp];
+                int fl = fcntl((int)fdi, F_GETFL, 0);
+                int r = (fl < 0) ? -1 : fcntl((int)fdi, F_SETFL, fl | O_NONBLOCK);
+                stackv[sp++] = (r < 0) ? -errno : 0;
+            } else if (bi == 35) {                /* key(): stdin nonblocking */
+                fcntl(0, F_SETFL, fcntl(0, F_GETFL, 0) | O_NONBLOCK);
+                unsigned char ch;
+                ssize_t n = read(0, &ch, 1);
+                stackv[sp++] = (n == 1) ? (int64_t)ch : -1;
+            } else if (bi == 36) {                /* ttyRaw(on) */
+                int64_t on = stackv[--sp];
+                int r = system(on ? "stty raw -echo 2>/dev/null" : "stty sane 2>/dev/null");
+                stackv[sp++] = (r == -1) ? -1 : 0;
             } else {
                 dievm("Net builtin tidak dikenal");
             }

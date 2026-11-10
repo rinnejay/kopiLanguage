@@ -1,0 +1,176 @@
+// Arena.kop — dunia game realtime "Kopi Arena" (server-authoritative).
+//
+// Peta sel W×H; posisi disimpan dalam mili-sel (1000 = 1 sel) agar gerak
+// halus. Server berjalan 20 tick/detik: setiap tick memindahkan pemain
+// sesuai arah terakhir, memungut koin, lalu menyiarkan snapshot.
+//
+// Semua status dalam satu int[] (tanpa objek):
+//   [0] tick          [1] jumlah pemain aktif     [2] state RNG
+//   pemain ke-i (i<MAXP), basis PBASE + i*PSTRIDE:
+//     +0 aktif  +1 ip  +2 port  +3 x  +4 y  +5 dx  +6 dy
+//     +7 skor   +8 tickTerakhir  +9 seq  +10,+11 cadangan
+//   koin ke-k (k<NCOIN), basis CBASE + k*CSTRIDE:
+//     +0 aktif  +1 x  +2 y  +3 cadangan
+
+import Str;
+import Wire;
+
+class Arena {
+
+    static int W()        { return 60; }      /* lebar peta (sel) */
+    static int H()        { return 20; }      /* tinggi peta (sel) */
+    static int SCALE()    { return 1000; }    /* mili-sel per sel */
+    static int MAXP()     { return 8; }       /* pemain maksimum */
+    static int NCOIN()    { return 4; }
+    static int SPEED()    { return 300; }     /* mili-sel per tick = 6 sel/dtk */
+    static int GRAB()     { return 800; }     /* radius pungut (mili-sel) */
+    static int TIMEOUT()  { return 60; }      /* 3 detik tanpa paket */
+    static int PBASE()    { return 8; }
+    static int PSTRIDE()  { return 12; }
+    static int CBASE()    { return 104; }     /* 8 + 12*8 */
+    static int CSTRIDE()  { return 4; }
+    static int WTICK()    { return 0; }
+    static int WNP()      { return 1; }
+    static int WSEED()    { return 2; }
+
+    static int p(int i, int f) { return PBASE() + i * PSTRIDE() + f; }
+    static int c(int i, int f) { return CBASE() + i * CSTRIDE() + f; }
+
+    /* ── dunia ─────────────────────────────────────────────────── */
+
+    static int[] make() {
+        int[] w = new int[CBASE() + NCOIN() * CSTRIDE()];
+        w[WSEED()] = 20261109;
+        for (int i = 0; i < NCOIN(); i++) {
+            w[c(i, 0)] = 1;
+            placeCoin(w, i);
+        }
+        return w;
+    }
+
+    static int rnd(int[] w, int mod) {
+        int v = w[WSEED()] * 1103515245 + 12345;
+        w[WSEED()] = v;
+        int pos = v & 2147483647;
+        return (pos / 65536) % mod;
+    }
+
+    static void placeCoin(int[] w, int i) {
+        w[c(i, 1)] = rnd(w, W() * SCALE() - 2000) + 1000;
+        w[c(i, 2)] = rnd(w, H() * SCALE() - 2000) + 1000;
+    }
+
+    static int abs(int v) { if (v < 0) return -v; return v; }
+
+    /* ── pemain ────────────────────────────────────────────────── */
+
+    static int find(int[] w, int ip, int port) {
+        for (int i = 0; i < MAXP(); i++) {
+            if (w[p(i, 0)] != 0 && w[p(i, 1)] == ip && w[p(i, 2)] == port)
+                return i;
+        }
+        return -1;
+    }
+
+    /* hasil = id pemain (0..MAXP-1) atau -1 bila penuh */
+    static int join(int[] w, int ip, int port) {
+        int slot = find(w, ip, port);
+        if (slot >= 0) return slot;
+        for (int i = 0; i < MAXP(); i++) {
+            if (w[p(i, 0)] == 0) {
+                w[p(i, 0)] = 1;
+                w[p(i, 1)] = ip;
+                w[p(i, 2)] = port;
+                w[p(i, 3)] = rnd(w, W() * SCALE() - 2000) + 1000;
+                w[p(i, 4)] = rnd(w, H() * SCALE() - 2000) + 1000;
+                w[p(i, 5)] = 0;
+                w[p(i, 6)] = 0;
+                w[p(i, 7)] = 0;
+                w[p(i, 8)] = w[WTICK()];
+                w[p(i, 9)] = 0;
+                w[WNP()] = w[WNP()] + 1;
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    static void leave(int[] w, int i) {
+        if (w[p(i, 0)] == 0) return;
+        w[p(i, 0)] = 0;
+        w[WNP()] = w[WNP()] - 1;
+        if (w[WNP()] < 0) w[WNP()] = 0;
+    }
+
+    static void input(int[] w, int i, int dx, int dy) {
+        if (dx < -1) dx = -1;
+        if (dx > 1) dx = 1;
+        if (dy < -1) dy = -1;
+        if (dy > 1) dy = 1;
+        w[p(i, 5)] = dx;
+        w[p(i, 6)] = dy;
+        w[p(i, 8)] = w[WTICK()];
+    }
+
+    static void touch(int[] w, int i) { w[p(i, 8)] = w[WTICK()]; }
+
+    /* ── satu langkah simulasi ─────────────────────────────────── */
+
+    static void step(int[] w) {
+        w[WTICK()] = w[WTICK()] + 1;
+        int t = w[WTICK()];
+        int xmax = W() * SCALE() - 1;
+        int ymax = H() * SCALE() - 1;
+
+        for (int i = 0; i < MAXP(); i++) {
+            if (w[p(i, 0)] == 0) continue;
+            if (t - w[p(i, 8)] > TIMEOUT()) {
+                leave(w, i);
+                continue;
+            }
+            int nx = w[p(i, 3)] + w[p(i, 5)] * SPEED();
+            int ny = w[p(i, 4)] + w[p(i, 6)] * SPEED();
+            if (nx < 0) nx = 0;
+            if (nx > xmax) nx = xmax;
+            if (ny < 0) ny = 0;
+            if (ny > ymax) ny = ymax;
+            w[p(i, 3)] = nx;
+            w[p(i, 4)] = ny;
+
+            for (int k = 0; k < NCOIN(); k++) {
+                if (w[c(k, 0)] == 0) continue;
+                if (abs(nx - w[c(k, 1)]) <= GRAB() && abs(ny - w[c(k, 2)]) <= GRAB()) {
+                    w[p(i, 7)] = w[p(i, 7)] + 1;
+                    placeCoin(w, k);
+                }
+            }
+        }
+    }
+
+    /* ── snapshot untuk pemain `you` ───────────────────────────── */
+
+    static int[] snapshot(int[] w, int you) {
+        int[] b = new int[8 + MAXP() * 7 + 1 + NCOIN() * 4];
+        int k = 0;
+        k = Wire.put8(b, k, Wire.OP_SNAP());
+        k = Wire.put8(b, k, you);
+        k = Wire.put32(b, k, w[WTICK()]);
+        k = Wire.put8(b, k, w[WNP()]);
+        for (int i = 0; i < MAXP(); i++) {
+            if (w[p(i, 0)] == 0) continue;
+            k = Wire.put8(b, k, i);
+            k = Wire.put16(b, k, w[p(i, 3)]);
+            k = Wire.put16(b, k, w[p(i, 4)]);
+            k = Wire.put16(b, k, w[p(i, 7)]);
+        }
+        int nc = 0;
+        for (int j = 0; j < NCOIN(); j++) if (w[c(j, 0)] != 0) nc++;
+        k = Wire.put8(b, k, nc);
+        for (int j = 0; j < NCOIN(); j++) {
+            if (w[c(j, 0)] == 0) continue;
+            k = Wire.put16(b, k, w[c(j, 1)]);
+            k = Wire.put16(b, k, w[c(j, 2)]);
+        }
+        return Str.slice(b, 0, k);
+    }
+}

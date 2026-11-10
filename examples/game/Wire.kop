@@ -1,0 +1,118 @@
+// Wire.kop — protokol biner server game realtime (v1.9.1).
+//
+// Satu datagram UDP = satu pesan. Semua angka big-endian.
+//
+// Klien → server
+//   'J' nameLen name...          bergabung (nameLen ≤ 12)
+//   'I' seq dx dy                input arah (-1/0/1 per byte bertanda)
+//   'P'                          keepalive
+//   'Q'                          keluar
+//
+// Server → klien
+//   'A' id w:16 h:16             ack join
+//   'X' kode                     galat (1 penuh, 2 bukan pemain)
+//   'S' you tick:32 np:8
+//       ( id x:16 y:16 score:16 )*      pemain aktif
+//       nc:8 ( x:16 y:16 )*             koin aktif
+//
+// Posisi dalam mili-sel (1000 = 1 sel); layar Arena.W() x Arena.H().
+
+import Str;
+
+class Wire {
+
+    static int OP_JOIN()  { return 74; }   /* 'J' */
+    static int OP_INPUT() { return 73; }   /* 'I' */
+    static int OP_PING()  { return 80; }   /* 'P' */
+    static int OP_QUIT()  { return 81; }   /* 'Q' */
+    static int OP_ACK()   { return 65; }   /* 'A' */
+    static int OP_SNAP()  { return 83; }   /* 'S' */
+    static int OP_ERR()   { return 88; }   /* 'X' */
+
+    static int ERR_PENUH()  { return 1; }
+    static int ERR_BUKAN()  { return 2; }
+
+    /* ── tulis ─────────────────────────────────────────────────── */
+
+    static int put8(int[] b, int i, int v) {
+        b[i] = v & 255;
+        return i + 1;
+    }
+
+    static int put16(int[] b, int i, int v) {
+        b[i] = (v >> 8) & 255;
+        b[i + 1] = v & 255;
+        return i + 2;
+    }
+
+    static int put32(int[] b, int i, int v) {
+        b[i] = (v >> 24) & 255;
+        b[i + 1] = (v >> 16) & 255;
+        b[i + 2] = (v >> 8) & 255;
+        b[i + 3] = v & 255;
+        return i + 4;
+    }
+
+    /* ── baca ──────────────────────────────────────────────────── */
+
+    static int get8(int[] b, int i) { return b[i] & 255; }
+
+    static int getS8(int[] b, int i) {
+        int v = b[i] & 255;
+        if (v >= 128) v = v - 256;
+        return v;
+    }
+
+    static int get16(int[] b, int i) {
+        return ((b[i] & 255) << 8) | (b[i + 1] & 255);
+    }
+
+    static int get32(int[] b, int i) {
+        return ((b[i] & 255) << 24) | ((b[i + 1] & 255) << 16)
+             | ((b[i + 2] & 255) << 8) | (b[i + 3] & 255);
+    }
+
+    /* ── alamat ────────────────────────────────────────────────── */
+
+    static int ipOf(int[] s) {
+        if (s.length == 0) return 2130706433;              /* 127.0.0.1 */
+        if (Str.eq(s, Net.bytes("localhost"))) return 2130706433;
+        if (Str.splitCount(s, 46) != 4) return 2130706433;
+        int a = Str.toInt(Str.splitAt(s, 46, 0));
+        int b = Str.toInt(Str.splitAt(s, 46, 1));
+        int c = Str.toInt(Str.splitAt(s, 46, 2));
+        int d = Str.toInt(Str.splitAt(s, 46, 3));
+        if (a < 0 || b < 0 || c < 0 || d < 0) return 2130706433;
+        return a * 16777216 + b * 65536 + c * 256 + d;
+    }
+
+    /* ── snapshot → array datar untuk klien ────────────────────── */
+    /* hasil: [tick, you, np, (id,x,y,score)*, nc, (x,y)*]         */
+
+    static int[] decode(int[] b, int n) {
+        int[] st = new int[3 + 4 * 12 + 1 + 2 * 8];
+        if (n < 7) return st;
+        int k = 1;
+        st[1] = get8(b, k); k++;
+        st[0] = get32(b, k); k = k + 4;
+        int np = get8(b, k); k++;
+        if (np > 12) np = 12;
+        st[2] = np;
+        for (int i = 0; i < np; i++) {
+            int base = 3 + 4 * i;
+            st[base] = get8(b, k); k++;
+            st[base + 1] = get16(b, k); k = k + 2;
+            st[base + 2] = get16(b, k); k = k + 2;
+            st[base + 3] = get16(b, k); k = k + 2;
+        }
+        int ci = 3 + 4 * np;
+        int nc = get8(b, k); k++;
+        if (nc > 8) nc = 8;
+        st[ci] = nc;
+        for (int j = 0; j < nc; j++) {
+            st[ci + 1 + 2 * j] = get16(b, k); k = k + 2;
+            st[ci + 2 + 2 * j] = get16(b, k); k = k + 2;
+        }
+        return st;
+    }
+}

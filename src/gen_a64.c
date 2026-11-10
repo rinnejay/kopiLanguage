@@ -872,9 +872,10 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tstrb\tw4, [sp, #0]");
                 /* pak ke iobuf (maks 240 byte per datagram, batas v1) */
                 emit("\tldr\tw11, [x10]");
-                emit("\tcmp\tw11, #240");
+                emit("\tmov\tw3, #1200");
+                emit("\tcmp\tw11, w3");
                 emit("\tb.ls\t.LST%dc", ln);
-                emit("\tmov\tw11, #240");
+                emit("\tmov\tw11, #1200");
                 emit(".LST%dc:", ln);
                 emit("\tadrp\tx17, kop_iobuf");
                 emit("\tadd\tx17, x17, :lo12:kop_iobuf");
@@ -910,7 +911,7 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tadd\tx17, x17, :lo12:kop_iobuf");
                 emit("\tldr\tx0, [sp, #64]");           /* fd */
                 emit("\tmov\tx1, x17");
-                emit("\tmov\tw2, #240");
+                emit("\tmov\tw2, #1200");
                 emit("\tmov\tx3, #0");
                 emit("\tadd\tx4, sp, #16");
                 emit("\tmov\tx5, sp");
@@ -954,7 +955,7 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tb\t.LRF%dh", ln);
                 emit(".LRF%de:", ln);                    /* galat → x0 apa adanya */
                 emit(".LRF%dh:", ln);
-                emit("\tadd\tsp, sp, #96");
+                emit("\tadd\tsp, sp, #80");
                 return 0;
             }
         }
@@ -1316,6 +1317,114 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tadd\tsp, sp, #32");
             return 0;
         }
+        if (e->ival == 38) {                /* settimeout(fd, ms) */
+            gen_expr(m, e->a);
+            push_val(0);
+            gen_expr(m, e->a->next);
+            push_val(0);
+            emit("\tldr\tw1, [sp, #0]");          /* ms */
+            emit("\tmov\tw3, #1000");
+            emit("\tudiv\tw2, w1, w3");           /* detik */
+            emit("\tmsub\tw4, w2, w3, w1");       /* sisa ms */
+            emit("\tmov\tw5, #1000");
+            emit("\tmul\tw4, w4, w5");            /* mikrodetik */
+            emit("\tstp\txzr, xzr, [sp, #-16]!");
+            emit("\tsxtw\tx2, w2");
+            emit("\tstr\tx2, [sp]");
+            emit("\tsxtw\tx4, w4");
+            emit("\tstr\tx4, [sp, #8]");
+            emit("\tldr\tw0, [sp, #32]");         /* fd */
+            emit("\tmov\tx1, #1");                /* SOL_SOCKET */
+            emit("\tmov\tx2, #20");               /* SO_RCVTIMEO */
+            emit("\tmov\tx3, sp");
+            emit("\tmov\tx4, #16");
+            emit("\tmov\tx8, #208");
+            emit("\tsvc\t#0");
+            emit("\tldr\tw0, [sp, #32]");
+            emit("\tmov\tx1, #1");
+            emit("\tmov\tx2, #21");               /* SO_SNDTIMEO */
+            emit("\tmov\tx3, sp");
+            emit("\tmov\tx4, #16");
+            emit("\tmov\tx8, #208");
+            emit("\tsvc\t#0");
+            emit("\tadd\tsp, sp, #16");
+            emit("\tadd\tsp, sp, #32");
+            return 0;
+        }
+        if (e->ival == 37) {                /* localport(fd) -> port | -1 */
+            gen_expr(m, e->a);
+            push_val(0);
+            emit("\tsub\tsp, sp, #32");
+            emit("\tmov\tw9, #16");
+            emit("\tstr\tw9, [sp]");
+            emit("\tadd\tx1, sp, #16");
+            emit("\tldr\tw0, [sp, #32]");
+            emit("\tmov\tx2, sp");
+            emit("\tmov\tx8, #204");          /* __NR_getsockname */
+            emit("\tsvc\t#0");
+            emit("\tcmp\tx0, #0");
+            emit("\tb.lt\t.LPORT%de", ln);
+            emit("\tldrb\tw3, [sp, #18]");
+            emit("\tldrb\tw4, [sp, #19]");
+            emit("\tlsl\tw3, w3, #8");
+            emit("\torr\tw0, w3, w4");
+            emit("\tb\t.LPORT%dd", ln);
+            emit(".LPORT%de:", ln);
+            emit("\tmov\tw0, #-1");
+            emit(".LPORT%dd:", ln);
+            emit("\tadd\tsp, sp, #48");
+            return 0;
+        }
+        if (e->ival == 34) {                /* setnonblock(fd) -> 0/-errno */
+            gen_expr(m, e->a);
+            push_val(0);
+            emit("\tldr\tw0, [sp, #0]");
+            emit("\tmov\tx1, #4");            /* F_SETFL */
+            emit("\tmov\tx2, #2048");         /* O_NONBLOCK */
+            emit("\tmov\tx8, #25");           /* __NR_fcntl */
+            emit("\tsvc\t#0");
+            emit("\tadd\tsp, sp, #16");
+            return 0;
+        }
+        if (e->ival == 35) {                /* key() -> byte | -1 */
+            emit("\tmov\tx0, #0");
+            emit("\tmov\tx1, #4");
+            emit("\tmov\tx2, #2048");
+            emit("\tmov\tx8, #25");
+            emit("\tsvc\t#0");
+            emit("\tadrp\tx17, kop_iobuf");
+            emit("\tadd\tx17, x17, :lo12:kop_iobuf");
+            emit("\tmov\tx0, #0");
+            emit("\tmov\tx1, x17");
+            emit("\tmov\tx2, #1");
+            emit("\tmov\tx8, #63");           /* __NR_read */
+            emit("\tsvc\t#0");
+            emit("\tcmp\tx0, #1");
+            emit("\tb.ne\t.LKEY%de", ln);
+            emit("\tldrb\tw0, [x17]");
+            emit("\tb\t.LKEY%dd", ln);
+            emit(".LKEY%de:", ln);
+            emit("\tmov\tw0, #-1");
+            emit(".LKEY%dd:", ln);
+            return 0;
+        }
+        if (e->ival == 36) {                /* ttyRaw(on) -> 0 */
+            gen_expr(m, e->a);
+            push_val(0);
+            emit("\tldr\tw0, [sp, #0]");
+            emit("\tcbz\tw0, .LTTY%ds", ln);
+            emit("\tadrp\tx0, .Lstty_raw");
+            emit("\tadd\tx0, x0, :lo12:.Lstty_raw");
+            emit("\tb\t.LTTY%dc", ln);
+            emit(".LTTY%ds:", ln);
+            emit("\tadrp\tx0, .Lstty_sane");
+            emit("\tadd\tx0, x0, :lo12:.Lstty_sane");
+            emit(".LTTY%dc:", ln);
+            emit("\tbl\tsystem");
+            emit("\tmov\tw0, #0");
+            emit("\tadd\tsp, sp, #16");
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -1666,6 +1775,8 @@ void gen_a64(const char *outpath) {
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");
     emit(".Lempty_str: .asciz \"%s\"", "");
+    emit(".Lstty_raw: .asciz \"%s\"", "stty raw -echo 2>/dev/null");
+    emit(".Lstty_sane: .asciz \"%s\"", "stty sane 2>/dev/null");
     emit(".Lfmt_sn: .asciz \"%s\"", "%s\\n");
     emit(".Lfmt_ld: .asciz \"%s\"", "%ld");
     emit(".Lfmt_ldn: .asciz \"%s\"", "%ld\\n");

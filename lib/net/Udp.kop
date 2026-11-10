@@ -1,7 +1,6 @@
 /* Udp.kop — datagram UDP di atas builtin `Net` (v1.6.2).
  *
- * UDP connectionless: tiap `sendTo` = satu datagram (maks 240 byte pada
- * v1 ini karena penyangga syscall; batas jujur, lihat README).
+ * UDP connectionless: tiap `sendTo` = satu datagram (maks 1200 byte (v1.9.3)).
  * `recvFrom` menerima satu datagram dan mencatat sumbernya di `from`:
  *   from[0] = alamat IPv4 (bentuk ipBE seperti Tcp.ip)
  *   from[1] = port host (mis. 9914)
@@ -9,7 +8,7 @@
  * Contoh server gema sederhana:
  *   int fd = Udp.open();
  *   Udp.bind(fd, Udp.loopback(), 9914);
- *   int[] buf = new int[240];
+ *   int[] buf = new int[1200];
  *   int[] from = new int[2];
  *   int n = Udp.recvFrom(fd, buf, from);
  *   Udp.sendTo(fd, from[0], from[1], buf);
@@ -31,7 +30,7 @@ class Udp {
         return Net.bind(fd, addr, port);
     }
 
-    /* kirim satu datagram: data[0..len-1] (maks 240 byte) → n | -errno */
+    /* kirim satu datagram: data[0..len-1] (maks 1200 byte) → n | -errno */
     static int sendTo(int fd, int addr, int port, int[] data) {
         return Net.sendto(fd, addr, port, data);
     }

@@ -892,9 +892,9 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tmovw $2, (%%rsp)");
                 /* pak ke kop_iobuf, cap 240 */
                 emit("\tmovl (%%r10), %%r11d");      /* len */
-                emit("\tcmpl $240, %%r11d");
+                emit("\tcmpl $1200, %%r11d");
                 emit("\tjle .LSD%dc", ln);
-                emit("\tmovl $240, %%r11d");
+                emit("\tmovl $1200, %%r11d");
                 emit(".LSD%dc:", ln);
                 emit("\tleaq kop_iobuf(%%rip), %%rbx");
                 emit("\txorl %%ecx, %%ecx");
@@ -925,7 +925,7 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tleaq kop_iobuf(%%rip), %%rbx");
                 emit("\tmovl 48(%%rsp), %%edi");      /* fd */
                 emit("\tmovq %%rbx, %%rsi");
-                emit("\tmovl $240, %%edx");
+                emit("\tmovl $1200, %%edx");
                 emit("\txorl %%r10d, %%r10d");
                 emit("\tmovq %%rsp, %%r8");
                 emit("\tleaq 16(%%rsp), %%r9");
@@ -1306,6 +1306,110 @@ static int gen_expr(Method *m, Node *e) {
             emit("\taddq $16, %%rsp");
             return 0;
         }
+        if (e->ival == 38) {                       /* settimeout(fd, ms) */
+            gen_expr(m, e->a); spush();
+            gen_expr(m, e->a->next); spush();
+            emit("\tmovq (%%rsp), %%rax");        /* ms */
+            emit("\txorl %%edx, %%edx");
+            emit("\tmovq $1000, %%rcx");
+            emit("\tdivq %%rcx");                 /* rax=detik, rdx=sisa ms */
+            emit("\timulq $1000, %%rdx, %%rdx");
+            emit("\tsubq $16, %%rsp");
+            emit("\tmovq %%rax, (%%rsp)");
+            emit("\tmovq %%rdx, 8(%%rsp)");
+            emit("\tmovl 32(%%rsp), %%edi");      /* fd */
+            emit("\tmovl $1, %%esi");
+            emit("\tmovl $20, %%edx");            /* SO_RCVTIMEO */
+            emit("\tmovq %%rsp, %%r10");
+            emit("\tmovl $16, %%r8d");
+            emit("\tmovl $54, %%eax");
+            emit("\tsyscall");
+            emit("\tmovl 32(%%rsp), %%edi");
+            emit("\tmovl $1, %%esi");
+            emit("\tmovl $21, %%edx");            /* SO_SNDTIMEO */
+            emit("\tmovq %%rsp, %%r10");
+            emit("\tmovl $16, %%r8d");
+            emit("\tmovl $54, %%eax");
+            emit("\tsyscall");
+            emit("\taddq $16, %%rsp");
+            emit("\taddq $16, %%rsp");
+            par ^= 0;
+            return 0;
+        }
+        if (e->ival == 37) {                       /* localport(fd) */
+            gen_expr(m, e->a); spush();
+            emit("\tsubq $32, %%rsp");
+            emit("\tmovl $16, (%%rsp)");
+            emit("\tleaq 16(%%rsp), %%rsi");
+            emit("\tmovl 32(%%rsp), %%edi");
+            emit("\tmovq %%rsp, %%rdx");
+            emit("\tmovl $51, %%eax");            /* getsockname */
+            emit("\tsyscall");
+            emit("\ttestq %%rax, %%rax");
+            emit("\tjs .LPORTX%de", ln);
+            emit("\tmovzbl 18(%%rsp), %%eax");
+            emit("\tshll $8, %%eax");
+            emit("\tmovzbl 19(%%rsp), %%ecx");
+            emit("\torl %%ecx, %%eax");
+            emit("\tjmp .LPORTX%dd", ln);
+            emit(".LPORTX%de:", ln);
+            emit("\tmovl $-1, %%eax");
+            emit(".LPORTX%dd:", ln);
+            emit("\taddq $48, %%rsp");
+            par ^= 1;
+            return 0;
+        }
+        if (e->ival == 34) {                       /* setnonblock(fd) */
+            gen_expr(m, e->a); spush();
+            emit("\tmovl (%%rsp), %%edi");
+            emit("\tmovl $4, %%esi");               /* F_SETFL */
+            emit("\tmovl $2048, %%edx");            /* O_NONBLOCK */
+            emit("\tmovl $72, %%eax");              /* fcntl */
+            emit("\tsyscall");
+            emit("\taddq $8, %%rsp");
+            par ^= 1;
+            return 0;
+        }
+        if (e->ival == 35) {                       /* key() */
+            emit("\txorl %%edi, %%edi");
+            emit("\tmovl $4, %%esi");
+            emit("\tmovl $2048, %%edx");
+            emit("\tmovl $72, %%eax");
+            emit("\tsyscall");
+            emit("\tleaq kop_iobuf(%%rip), %%rsi");
+            emit("\txorl %%edi, %%edi");
+            emit("\tmovl $1, %%edx");
+            emit("\txorl %%eax, %%eax");            /* read */
+            emit("\tsyscall");
+            emit("\tcmpq $1, %%rax");
+            emit("\tjne .LKEYX%de", ln);
+            emit("\tleaq kop_iobuf(%%rip), %%rcx");
+            emit("\tmovzbl (%%rcx), %%eax");
+            emit("\tjmp .LKEYX%dd", ln);
+            emit(".LKEYX%de:", ln);
+            emit("\tmovl $-1, %%eax");
+            emit(".LKEYX%dd:", ln);
+            return 0;
+        }
+        if (e->ival == 36) {                       /* ttyRaw(on) */
+            gen_expr(m, e->a); spush();
+            emit("\tmovl (%%rsp), %%edi");
+            emit("\taddq $8, %%rsp");
+            par ^= 1;
+            emit("\ttestl %%edi, %%edi");
+            emit("\tje .LTTYX%ds", ln);
+            emit("\tleaq .Lstty_raw(%%rip), %%rdi");
+            emit("\tjmp .LTTYX%dc", ln);
+            emit(".LTTYX%ds:", ln);
+            emit("\tleaq .Lstty_sane(%%rip), %%rdi");
+            emit(".LTTYX%dc:", ln);
+            int pad = par;
+            if (pad) emit("\tsubq $8, %%rsp");
+            emit("\tcall system@PLT");
+            if (pad) emit("\taddq $8, %%rsp");
+            emit("\tmovl $0, %%eax");
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -1630,6 +1734,8 @@ void gen_x64(const char *outpath) {
     emit(".Lfmt_gf: .asciz \"%s\"", "%.9g");
     emit(".Lfmt_gfn: .asciz \"%s\"", "%.9g\\n");
     emit(".Lempty_str: .asciz \"%s\"", "");
+    emit(".Lstty_raw: .asciz \"%s\"", "stty raw -echo 2>/dev/null");
+    emit(".Lstty_sane: .asciz \"%s\"", "stty sane 2>/dev/null");
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");

@@ -1,0 +1,139 @@
+// ArenaServer.kop — loop server game realtime (v1.9.1).
+//
+// UDP, satu socket, non-blocking, satu proses. Setiap iterasi:
+//   1) kuras paket masuk (maks 32) — join/input/ping/quit
+//   2) bila waktunya, majukan simulasi (default 20 tick/detik) + siarkan snapshot
+//   3) Net.memReset(mark) — buang alokasi sementara (tanpa GC)
+//
+// Dunia `w` dialokasikan sebelum mark, jadi bertahan sepanjang hidup server.
+
+import Str;
+import Wire;
+import Arena;
+import Log;
+
+class ArenaServer {
+
+    static void sendErr(int fd, int ip, int port, int code) {
+        int[] e = new int[2];
+        e[0] = Wire.OP_ERR();
+        e[1] = code & 255;
+        Net.sendto(fd, ip, port, e);
+    }
+
+    static void sendAck(int fd, int ip, int port, int id) {
+        int[] a = new int[6];
+        a[0] = Wire.OP_ACK();
+        a[1] = id & 255;
+        Wire.put16(a, 2, Arena.W());
+        Wire.put16(a, 4, Arena.H());
+        Net.sendto(fd, ip, port, a);
+    }
+
+    static void handle(int fd, int[] w, int[] b, int n, int ip, int port) {
+        if (n <= 0) return;
+        int op = b[0] & 255;
+
+        if (op == Wire.OP_JOIN()) {
+            int id = Arena.join(w, ip, port);
+            if (id < 0) {
+                sendErr(fd, ip, port, Wire.ERR_PENUH());
+                return;
+            }
+            int ln = b[1] & 255;
+            if (ln > 12) ln = 12;
+            if (ln + 2 > n) ln = n - 2;
+            if (ln < 0) ln = 0;
+            int[] name = new int[ln];
+            for (int i = 0; i < ln; i++) name[i] = b[2 + i];
+            sendAck(fd, ip, port, id);
+            Log.info(Net.bytes("join"), name);
+            return;
+        }
+
+        int id = Arena.find(w, ip, port);
+
+        if (op == Wire.OP_INPUT()) {
+            if (id < 0) {
+                sendErr(fd, ip, port, Wire.ERR_BUKAN());
+                return;
+            }
+            Arena.input(w, id, Wire.getS8(b, 2), Wire.getS8(b, 3));
+            return;
+        }
+
+        if (op == Wire.OP_PING()) {
+            if (id >= 0) Arena.touch(w, id);
+            return;
+        }
+
+        if (op == Wire.OP_QUIT()) {
+            if (id >= 0) {
+                Arena.leave(w, id);
+                Log.info(Net.bytes("quit"), Net.bytes("pemain keluar"));
+            }
+            return;
+        }
+    }
+
+    static void broadcast(int fd, int[] w) {
+        for (int i = 0; i < Arena.MAXP(); i++) {
+            if (w[Arena.p(i, 0)] == 0) continue;
+            int[] s = Arena.snapshot(w, i);
+            Net.sendto(fd, w[Arena.p(i, 1)], w[Arena.p(i, 2)], s);
+        }
+    }
+
+    static int serve(int port, int tickMs) {
+        int fd = Net.socket(2, 2);                 /* AF_INET, SOCK_DGRAM */
+        if (fd < 0) {
+            Log.error(Net.bytes("boot"), Net.bytes("socket gagal"));
+            return 1;
+        }
+        if (Net.bind(fd, 0, port) < 0) {
+            Log.error(Net.bytes("boot"), Net.bytes("bind gagal"));
+            return 2;
+        }
+        Net.setnonblock(fd);
+
+        int[] w = Arena.make();
+        int[] buf = new int[256];                  /* datagram game ≤ ~90 B */
+        int[] from = new int[4];
+        long next = Net.mono();
+
+        Log.info(Net.bytes("boot"), Net.bytes("arena siap"));
+        int[] hello = Net.bytes("Kopi Arena server: port=");
+        hello = Str.cat(hello, Str.fromInt(port));
+        hello = Str.cat(hello, Net.bytes(" tick="));
+        hello = Str.cat(hello, Str.fromInt(tickMs));
+        hello = Str.cat(hello, Net.bytes("ms"));
+        System.out.println(hello);
+
+        while (true) {
+            int mark = Net.memMark();
+
+            int got = 0;
+            while (got < 32) {
+                int n = Net.recvfrom(fd, buf, from);
+                if (n <= 0) break;                 /* -EAGAIN saat idle */
+                handle(fd, w, buf, n, from[0], from[1]);
+                got++;
+            }
+
+            long now = Net.mono();
+            if (now >= next) {
+                int steps = 0;
+                while (now >= next && steps < 4) {
+                    Arena.step(w);
+                    broadcast(fd, w);
+                    next = next + tickMs;
+                    steps++;
+                }
+                if (now >= next + tickMs) next = now + tickMs;
+            }
+
+            Net.memReset(mark);                    /* bebas alokasi sementara */
+            Net.sleep(1);
+        }
+    }
+}
