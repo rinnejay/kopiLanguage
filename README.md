@@ -36,7 +36,7 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 
 | Lokasi | Kelompok | Isi |
 |--------|----------|-----|
-| `lib/core/` | logika dasar bahasa | `Math`, `Digits`, `Arrays` |
+| `lib/core/` | logika dasar bahasa | `Math` (lengkap: modular, teori bilangan, kombinatorika, bit, geometri), `Digits`, `Stats` (statistik), `Matrix` (aljabar matriks), `Arrays` |
 | `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
 | `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard), **`Tls`** (klien TLS 1.3 — lihat bagian khusus di bawah) |
 
@@ -61,6 +61,7 @@ v1.5d-E2 hari ini ████████████████  61/61 test h
 | **v1.5d-E** | **klien TLS 1.3 (RFC 8446) murni Kopi** di `lib/net/Tls.kop` + `lib/crypto/Der.kop` (pin SPKI) : record layer AEAD ChaCha20-Poly1305, key schedule penuh (§7.1), X25519, sertifikat di-pin (TOFU), server Finished **diverifikasi** (HMAC finished_key atas transkrip), client Finished dikirim, `writeApp`/`readApp` untuk data aplikasi dua arah. Lolos lawan `openssl s_server` (2× NewSessionTicket, `close_notify` warning) dan server echo TLS |
 | **v1.5d-E2** | **akar-akar bug TLS dibereskan** (semua diverifikasi oracle python/RFC, bukan tambal nilai): ① `Kdf.expandLabel` — urutan `HkdfLabel` §7.1 salah (panjang label harus termasuk `"tls13 "`). ② **Poly1305** — carry `carPass` bisa tersisa di slot 9 (`2^135 ≡ 160 mod p`) lalu dibuang `mulFold` berikutnya → tag benar untuk pesan pendek dan salah ~50% untuk 700–900 B; kini dikuras `fold9()` tiap blok. ③ nonce record — seq 64-bit **big-endian** di byte 4..11 (§5.2), shift ≥32 dihindari (UB C/ARM). ④ `seal()` — loop menyalin melewati batas array (panjang record salah). ⑤ key schedule — `early = Extract(0³²,0³²)`, `master = Extract(DS(hs,"derived",H("")),0³²)`, `c_ap`/`s_ap` dari transkrip s.d. **server Finished**. ⑥ client Finished — kunci handshake klien (CH+SH), seq reset 0, inner type **22**. Test 61/61; generator Poly1305 menambah 3 vektor panjang deterministik, `gen_kdf.py` diperbaiki ke label RFC |
 | **v1.5d-E3** | **penamaan pustaka inti jadi Inggris**: `Matematika`→**`Math`** (`pangkat`→`pow`, `akar`→`sqrt`, `prima`→`isPrime`, `faktorial`→`factorial`, `genap`→`isEven`), `Angka`→**`Digits`** (`balik`→`reverse`, `jumlahDigit`→`digitSum`, `panjang`→`digitCount`, `deka`→`pow10`, `cetakBasis`→`printBase`); `examples/pakai_lib.kop` + `test.sh` + README diselaraskan |
+| **v1.5d-E4** | **pustaka matematika diperluas besar-besaran** (`int` 32-bit, murni Kopi): `Math` kini mencakup 80+ fungsi — aritmetika modular aman-overflow (`mulMod` doubling, `powMod`, `modInverse` via Bezout), teori bilangan (sieve `primesUpTo`, `primeCount`, `nthPrime`, `factorize`, σ/φ/radikal/Möbius, prima/abundant/deficient), kombinatorika (`binomial`, `permutation`, `catalan`, `derangement`, `stirling2`, `bell`, Lucas/Tribonacci), bit (`popcount`, `highestBit`, `reverseBits`, `nextPow2`), akar/log bulat (`sqrt`, `cbrt`, `log2`, `log10`), geometri integer (`heron16`, `isRightTriangle`, jarak). Modul baru `Digits` (palindrom/Armstrong/akar digital), `Stats` (median/modus/varians/simpangan baku), `Matrix` (aljabar matriks persegi). Uji oracle python: **154 kasus** di `tools/gen_mathvec.py`, lulus di VM & a64, sintaks x64 diperiksa; total suite 63/63 |
 
 ## Bangun
 
@@ -261,18 +262,32 @@ Kopi, bukan kode built-in compiler:
 
 | File              | Isi                                                                 |
 |-------------------|---------------------------------------------------------------------|
-| `lib/core/Math.kop`    | `abs min max gcd lcm pow sqrt isPrime factorial fib isEven` |
-| `lib/core/Digits.kop`  | `reverse` (12345→54321), `digitSum`, `digitCount`, `pow10`, `printBase` (2..10) |
+| `lib/core/Math.kop`    | **dasar** `abs sign min max min3 max3 clamp diff sumTo avgFloor`; **bit** `isEven isOdd popcount highestBit lowestBit bitLength isPowerOfTwo nextPow2 prevPow2 reverseBits`; **pangkat/akar/log** `pow mod addMod mulMod powMod sqrt cbrt log2 log10 isPerfectSquare isPerfectCube`; **FPB/modular** `gcd gcd3 lcm lcm3 isCoprime extendedGcd modInverse`; **prima** `isPrime nextPrime prevPrime primesUpTo primeCount nthPrime factorize numDivisors sumDivisors aliquotSum isPerfect isAbundant isDeficient eulerPhi radical mobius`; **kombinatorika** `factorial binomial permutation catalan fib lucas tribonacci triangular derangement stirling2 bell`; **geometri** `distanceSq manhattan rectArea rectPerimeter isRightTriangle heron16 isTriangle` |
+| `lib/core/Digits.kop`  | `reverse digitSum digitCount pow10 digitProduct isPalindrome isArmstrong digitalRoot sumSquareDigits sumCubeDigits printBase` |
+| `lib/core/Stats.kop`   | `sum product min max range mean sumSquares sumCubes median mode variance stddev countEven countOdd` |
+| `lib/core/Matrix.kop`  | `zero identity add sub scale transpose mul trace det1 det2 det3 det det isIdentity` (matriks persegi, `int[]` datar) |
 | `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge sort` (merge sort O(n log n)) + `binSearch` |
 | `lib/crypto/Crypto.kop`   | `bitxor` (per-bit, tanpa operator bitwise), `fnv1a` (FNV-1a 32-bit), `nextRand`/`randRange` (Lehmer/Schrage), `xorStream` (XOR cipher nirl), `caesar`/`uncaesar` |
+
+### Batas jujur pustaka matematika
+
+Semua fungsi di atas bekerja pada **`int` 32-bit bertanda** (semantik Java):
+hasil yang melampaui ±2³¹ **membungkus (wrap)**, bukan melempar galat —
+rentang aman didokumentasikan per fungsi. Belum ada `long`/`double`, jadi
+**tidak ada** trigonometri, logaritma real, pecahan, atau bilangan besar
+umum; `sqrt`/`cbrt`/`log2`/`log10` adalah versi **bulat**. `primesUpTo`/
+`primeCount` memakai sieve O(n) memori; `Matrix` hanya matriks persegi dan
+`det` umum dibatasi n ≤ 3. Untuk kriptografi, pakai `lib/crypto/` yang punya
+aritmetika modular khusus (`Big`, `X25519`) — bukan `Math` umum.
 
 `Arrays` dan `Crypto` adalah bukti paling kuat bahasanya benar-benar
 *bahasa*: keduanya ditulis 100% dalam Kopi murni, tanpa satu pun builtin
 baru — `bitxor` misalnya mengekstrak bit dengan `a % 2` / `a / 2` lewat satu
 loop 31 iterasi, karena fungsi v1.2 belum punya operator `^ & | <<`.
 Konvensi byte = `int` 0..255. Kualitas: cocok untuk hash-cache/PRNG/cipher
-edukatif; **bukan** kriptografi produksi (belum ada operator bitwise & mod
-2^32 asli). Hak intelektual fungsi tetap standar (FNV-1a, Lehmer).
+edukatif; **bukan** kriptografi produksi. Ditulis sebelum operator bitwise
+native lahir — kini `& | ^ << >> >>>` sudah tersedia di bahasa. Hak
+intelektual fungsi tetap standar (FNV-1a, Lehmer).
 
 ```java
 import Math;

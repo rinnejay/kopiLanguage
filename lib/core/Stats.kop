@@ -1,0 +1,135 @@
+// Stats.kop — statistik deskriptif untuk int[] (100% bahasa Kopi).
+//
+// Konvensi: array kosong menghasilkan 0 untuk fungsi skalar (median/mode
+// juga 0) — pemanggil yang tahu konteks sebaiknya cek panjang lebih dulu.
+// Pembagian memakai semantik Java (pemotongan ke arah nol), jadi nilai
+// negatif membulat ke atas; didokumentasikan agar tidak menipu.
+
+import Arrays;
+import Math;
+
+class Stats {
+
+    static int sum(int[] xs) {
+        int s = 0;
+        for (int i = 0; i < xs.length; i++) {
+            s = s + xs[i];
+        }
+        return s;
+    }
+
+    /* hasil kali semua elemen (mudah meluap) */
+    static int product(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        int p = 1;
+        for (int i = 0; i < xs.length; i++) {
+            p = p * xs[i];
+        }
+        return p;
+    }
+
+    static int min(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        int m = xs[0];
+        for (int i = 1; i < xs.length; i++) {
+            if (xs[i] < m) { m = xs[i]; }
+        }
+        return m;
+    }
+
+    static int max(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        int m = xs[0];
+        for (int i = 1; i < xs.length; i++) {
+            if (xs[i] > m) { m = xs[i]; }
+        }
+        return m;
+    }
+
+    static int range(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        return max(xs) - min(xs);
+    }
+
+    /* rata-rata dengan pembagian bulat (pemotongan ke arah nol) */
+    static int mean(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        return sum(xs) / xs.length;
+    }
+
+    static int sumSquares(int[] xs) {
+        int s = 0;
+        for (int i = 0; i < xs.length; i++) {
+            s = s + xs[i] * xs[i];
+        }
+        return s;
+    }
+
+    static int sumCubes(int[] xs) {
+        int s = 0;
+        for (int i = 0; i < xs.length; i++) {
+            s = s + xs[i] * xs[i] * xs[i];
+        }
+        return s;
+    }
+
+    /* median; genap → rata-rata bulat dua tengah */
+    static int median(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        int[] ys = Arrays.sort(xs);
+        int n = ys.length;
+        if (n % 2 == 1) {
+            return ys[n / 2];
+        }
+        return (ys[n / 2 - 1] + ys[n / 2]) / 2;
+    }
+
+    /* modus; seri → nilai terkecil yang menang */
+    static int mode(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        int best = xs[0];
+        int bestCount = 0;
+        for (int i = 0; i < xs.length; i++) {
+            int v = xs[i];
+            int c = 0;
+            for (int j = 0; j < xs.length; j++) {
+                if (xs[j] == v) { c = c + 1; }
+            }
+            if (c > bestCount || (c == bestCount && v < best)) {
+                bestCount = c;
+                best = v;
+            }
+        }
+        return best;
+    }
+
+    /* variansi populasi (bulat, pendekatan): E[x²] − (E[x])² */
+    static int variance(int[] xs) {
+        if (xs.length == 0) { return 0; }
+        int n = xs.length;
+        int m = mean(xs);
+        return sumSquares(xs) / n - m * m;
+    }
+
+    /* simpangan baku populasi (akar bulat dari variansi) */
+    static int stddev(int[] xs) {
+        return Math.sqrt(variance(xs));
+    }
+
+    /* jumlah elemen genap / ganjil */
+    static int countEven(int[] xs) {
+        int c = 0;
+        for (int i = 0; i < xs.length; i++) {
+            if (xs[i] % 2 == 0) { c = c + 1; }
+        }
+        return c;
+    }
+
+    static int countOdd(int[] xs) {
+        int c = 0;
+        for (int i = 0; i < xs.length; i++) {
+            if (xs[i] % 2 != 0) { c = c + 1; }
+        }
+        return c;
+    }
+}
