@@ -32,7 +32,7 @@ sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 
 ```
 Pengembangan  ██████████░░░░░░  ~62%  menuju bahasa serius (v2)
-v1.5d-C hari ini ████████████████  57/57 test hijau — Poly1305 8 vektor RFC lulus di 3 backend
+v1.5d-D hari ini ████████████████  59/59 test hijau — AEAD RFC §2.8.2 lulus di 3 backend
 ```
 
 | Versi | Isi |
@@ -42,8 +42,7 @@ v1.5d-C hari ini ████████████████  57/57 test hi
 | **v1.2** | **array `int[]` + arena memori `kopalloc`** (bump allocator, 1 batas 8 MB): `new int[n]`, `a[i]`, `a[i] = v`, `a.length`, bounds check runtime (`kopi: array tidak valid`, OOM rapi); fix ABI entry `main` (frame x30 sendiri); pustaka `lib/Arrays.kop` (sort/binSearch/find/count/...) dan `lib/Crypto.kop` (bitxor + FNV-1a + PRNG Lehmer + XOR-stream/Caesar) — **100% ditulis dalam bahasa Kopi** di atas aritmetika murni |
 | **v1.2.1** | scoping per-blok (`if/else`, `while`, `for`, blok `{}` telanjang — deklarasi direset di akhir blok, shadow antar cabang diperbolehkan ala sibling) + multi-deklarasi `int a = 0, b = 1;` — library kini bisa memakai nama loop yang sama di metode yang sama |
 | **v1.3** | **jaringan**: builtin `Net.*` = syscall Linux langsung tanpa libc — `socket`, `connect`, `rdb` (baca 1 byte), `wrb` (tulis 1 byte), `close`, dan `Net.bytes("literal")` (byte-as-int, dikonversi compile-time). Codegen native a64 (`svc #0`) & x64 (`syscall`) membangun `sockaddr_in` di stack sendiri; VM KOP1 jalur op `OP_NET`. Pustaka `lib/Tcp.kop` (open/send/recvAll/cat/indexOf — 100% Kopi) dan `lib/Http.kop` (klien HTTP/1.0 minimal: statusOf/bodyOf/getInto) + `examples/httpget.kop`; uji loopback (echo + `python -m http.server`) masuk test.sh (33 tes) |
-| **v1.5d-C** | **Poly1305 murni Kopi** (`lib/Poly.kop`): 9 limb radiks-15 (135 bit, slot-9 sisa), fold `2^(15k) ≡ 160·2^(15(k−9))` (karena 2^135 = 2^5·2^130 ≡ 160), schoolbook carry-per-slot 9×9 → 18 slot (aman int32: t ≤ 2^30+2^15+carry), r di-clamp mask RFC per byte LE, `tag = (acc + s) mod 2^128`; **8/8 vektor lulus** di VM, native a64, sintaks x64: vektor §2.5.2 ("Cryptographic Forum Research Group") + 7 edge-case Appendix A.3 (r=0 → tag=s; 2^130−5 eksak; carry-131-bit lim intern `5H+L`; 2^130−6 eksak; ffd.. add-chain) — masing-masing **diverifikasi oracle python murni dulu** ke tag RFC sebelum jadi test (generator menolak bila oracle ≠ RFC); jebakan: foldAll harus pakai `v.length` (acc 10-slot vs pr 18-slot) dan indexed `+=` tidak ada di Kopi — semua di-ekspansi manual\n`test.sh` memverifikasi **konsistensi output antar-backend**: program yang sama
-harus menghasilkan output byte-per-byte identik di VM, native aarch64, dan
+| **v1.5d-D** | **AEAD ChaCha20-Poly1305 murni Kopi** (`lib/Aead.kop`): otk = 32 byte pertama blok counter-0, ct = ChaCha20 counter-1, `macData = aad ‖ pad16 ‖ ct ‖ pad16 ‖ lenLE64(aad) ‖ lenLE64(ct)`, tag = Poly1305(otk); **lulus vektor §2.8.2 RFC 7539 = RFC 8439** (key `80..9f`, nonce `00000007 40414243 44454647`, tag `1ae10b59 …`) + roundtrip dekripsi + kasus-ganti ciphertext terdeteksi, di VM, native a64, sintaks x64. Generator fail-keras: oracle python murni (mod p, int besar) wajib mereproduksi ct & tag RFC sebelum test dibuat. Jebakan hari ini: (1) tag `d63103…` yang tadinya menjadi kecurigaan benilai tak berlaku — 7539 dan 8439 sama-sama `1ae10b59…`; (2) nonce AEAD LE-word: `07 00 00 00 40 41 42 43 …` (word13 = 7), bukan `00 00 00 07 …`; (3) otk butuh feed 32 byte-nol — 16 byte menghasilkan s kosong dan tag menyertainya salah\nharus menghasilkan output byte-per-byte identik di VM, native aarch64, dan
 (sintaks assembly) x86-64.
 
 ## Bangun

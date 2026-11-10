@@ -1,0 +1,72 @@
+/* Aead.kop — AEAD_CHACHA20_POLY1305 (RFC 7539 §2.8 / RFC 8439 §2.8) murni Kopi.
+ *
+ * Komposisi:
+ *   otk = ChaCha20(key, nonce, counter=0) → 32 byte pertama
+ *   r = otk[0..15] (Poly.mac yang clamp), s = otk[16..31]
+ *   ct = ChaCha20(key, nonce, counter=1, msg)
+ *   macData = aad ‖ pad16 ‖ ct ‖ pad16 ‖ lenLE64(aad) ‖ lenLE64(ct)
+ *   tag = Poly1305(r, s, macData)
+ *
+ * Dekripsi: verifikasi tag dulu (tagEq), lalu XOR-balik dengan counter 1.
+ */
+
+import ChaCha;
+import Poly;
+
+class Aead {
+
+    static int[] concat(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) out[i] = a[i];
+        for (int i = 0; i < b.length; i++) out[a.length + i] = b[i];
+        return out;
+    }
+
+    /* nol-kan sampai kelipatan 16 (RFC 7539 §2.8 pad16) */
+    static int[] pad16(int[] a) {
+        int rem = a.length % 16;
+        int need = 16 - rem;
+        if (need == 16) return a;
+        int[] z = new int[need];
+        return concat(a, z);
+    }
+
+    /* panjang 64-bit little-endian (8 byte) */
+    static int[] le64(int n) {
+        int[] b = new int[8];
+        for (int i = 0; i < 4; i++) {
+            b[i] = (n >>> (i * 8)) & 255;
+        }
+        return b;
+    }
+
+    /* one-time poly key: 32 byte pertama blok counter-0 */
+    static int[] otkPair(int[] key, int[] nonce) {
+        int[] zero32 = new int[32];
+        return ChaCha.xctr(key, nonce, 0, zero32);
+    }
+
+    static int[] ctOf(int[] key, int[] nonce, int[] msg) {
+        return ChaCha.xctr(key, nonce, 1, msg);
+    }
+
+    static int[] tagOf(int[] key, int[] nonce, int[] aad, int[] ct) {
+        int[] otk = otkPair(key, nonce);
+        int[] r = new int[16];
+        int[] s = new int[16];
+        for (int i = 0; i < 16; i++) {
+            r[i] = otk[i];
+            s[i] = otk[16 + i];
+        }
+        int[] md = concat(pad16(aad), pad16(ct));
+        md = concat(md, le64(aad.length));
+        md = concat(md, le64(ct.length));
+        return Poly.mac(r, s, md);
+    }
+
+    static int eq(int[] a, int[] b) {
+        if (a.length != b.length) return 0;
+        for (int i = 0; i < a.length; i++) if (a[i] != b[i]) return 0;
+        return 1;
+    }
+}
