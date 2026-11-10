@@ -26,20 +26,112 @@ static void gen_stmts(Method *m, Node *lst);
 static int netlbl;      /* label EX_NET unik per kemunculan */
 static int cur_ret_label;
 
-/* 32-bit int/bool vs 64-bit (pointer lambda/array) */
-static int is64ty(Ty t) { return t == T_FN || t == T_ARI; }
+/* 32-bit int/bool vs 64-bit (pointer / numerik baru / float bits) */
+static int is64ty(Ty t) {
+    return t == T_FN || t == T_ARI || t == T_LONG || t == T_UINT64 ||
+           t == T_UINT8 || t == T_UINT16 || t == T_UINT32 ||
+           t == T_FLOAT || t == T_DOUBLE;
+}
+
+/* rax kanonik: int sign-extended; bool zero; uint* zero; float bits low32 */
+static void widen_ty(Ty t) {
+    if (t == T_INT) emit("\tmovslq %%eax, %%rax");
+    else if (t == T_BOOL) emit("\tmovl %%eax, %%eax");
+}
+
+static void norm_ty(Ty t) {
+    switch (t) {
+    case T_INT:    emit("\tmovslq %%eax, %%rax"); break;
+    case T_UINT32: emit("\tmovl %%eax, %%eax"); break;
+    case T_UINT16: emit("\tmovzwl %%ax, %%eax"); break;
+    case T_UINT8:  emit("\tmovzbl %%al, %%eax"); break;
+    case T_BOOL:   emit("\tandl $1, %%eax"); break;
+    default: break;
+    }
+}
+
+/* konversi kanonik rax dari from ke to */
+static void conv_ty(Ty from, Ty to) {
+    if (from == to) return;
+    if (ty_is_float(to)) {
+        if (ty_is_float(from)) {
+            if (from == T_FLOAT && to == T_DOUBLE) {
+                emit("\tmovd %%eax, %%xmm0");
+                emit("\tcvtss2sd %%xmm0, %%xmm0");
+                emit("\tmovq %%xmm0, %%rax");
+            } else if (from == T_DOUBLE && to == T_FLOAT) {
+                emit("\tmovq %%rax, %%xmm0");
+                emit("\tcvtsd2ss %%xmm0, %%xmm0");
+                emit("\tmovd %%xmm0, %%eax");
+            }
+            return;
+        }
+        int uns = ty_is_uint(from);
+        const char *ops = (to == T_FLOAT) ? "ss" : "sd";
+        if (!uns) {
+            if (ty_width(from) == 64) emit("\t%s %%rax, %%xmm0", to == T_FLOAT ? "cvtsi2ssq" : "cvtsi2sdq");
+            else emit("\t%s %%eax, %%xmm0", to == T_FLOAT ? "cvtsi2ssl" : "cvtsi2sdl");
+            if (to == T_FLOAT) emit("\tmovd %%xmm0, %%eax");
+            else emit("\tmovq %%xmm0, %%rax");
+            return;
+        }
+        /* unsigned: uint8/16/32 selalu < 2^31 → jalur signed aman;
+         * uint64 >= 2^63 ditangani dengan trik (v>>1)|(v&1) lalu ×2 */
+        if (from == T_UINT64) {
+            int l1 = nlab++, l2 = nlab++;
+            emit("\ttestq %%rax, %%rax");
+            emit("\tjs .L%d", l1);
+            emit("\t%s %%rax, %%xmm0", to == T_FLOAT ? "cvtsi2ssq" : "cvtsi2sdq");
+            emit("\tjmp .L%d", l2);
+            emit(".L%d:", l1);
+            emit("\tmovq %%rax, %%rcx");
+            emit("\tshrq $1, %%rcx");
+            emit("\tandl $1, %%eax");
+            emit("\torq %%rax, %%rcx");
+            emit("\t%s %%rcx, %%xmm0", to == T_FLOAT ? "cvtsi2ssq" : "cvtsi2sdq");
+            if (to == T_FLOAT) emit("\taddss %%xmm0, %%xmm0");
+            else emit("\taddsd %%xmm0, %%xmm0");
+            emit(".L%d:", l2);
+        } else {
+            /* uint8/16/32 kanonik zero-extended → konversi 64-bit signed aman */
+            emit("\t%s %%rax, %%xmm0", to == T_FLOAT ? "cvtsi2ssq" : "cvtsi2sdq");
+        }
+        if (to == T_FLOAT) emit("\tmovd %%xmm0, %%eax");
+        else emit("\tmovq %%xmm0, %%rax");
+        return;
+    }
+    if (ty_is_float(from)) {
+        int uns = ty_is_uint(to);
+        if (from == T_FLOAT) emit("\tmovd %%eax, %%xmm0");
+        else emit("\tmovq %%rax, %%xmm0");
+        (void)uns;
+        if (ty_width(to) == 64) {
+            emit("\t%s %%xmm0, %%rax", from == T_FLOAT ? "cvttss2siq" : "cvttsd2siq");
+        } else {
+            emit("\t%s %%xmm0, %%eax", from == T_FLOAT ? "cvttss2sil" : "cvttsd2sil");
+        }
+        norm_ty(to);
+        return;
+    }
+    switch (to) {
+    case T_INT:    emit("\tmovslq %%eax, %%rax"); break;
+    case T_UINT32: emit("\tmovl %%eax, %%eax"); break;
+    case T_UINT16: emit("\tmovzwl %%ax, %%eax"); break;
+    case T_UINT8:  emit("\tmovzbl %%al, %%eax"); break;
+    case T_LONG: case T_UINT64: break;
+    default: break;
+    }
+}
 
 /* hasil ekspresi: 0 = int/bool di %eax; 1 = pointer closure di %rax */
 
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
-        gen_expr(m, s->a);
-        if (is64ty((Ty)s->dty)) emit("\tmovq %%rax, -%ld(%%rbp)", (s->ival + 1) * 8);
-        else emit("\tmovl %%eax, -%ld(%%rbp)", (s->ival + 1) * 8);
-        break;
     case ST_ASSIGN:
         gen_expr(m, s->a);
+        widen_ty((Ty)s->a->dty);
+        conv_ty((Ty)s->a->dty, (Ty)s->dty);
         if (is64ty((Ty)s->dty)) emit("\tmovq %%rax, -%ld(%%rbp)", (s->ival + 1) * 8);
         else emit("\tmovl %%eax, -%ld(%%rbp)", (s->ival + 1) * 8);
         break;
@@ -108,8 +200,13 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_BRK: emit("\tjmp .L%d", brk_lab[brk_sp - 1]); break;
     case ST_CONT: emit("\tjmp .L%d", cont_lab[brk_sp - 1]); break;
     case ST_RETURN: {
-        if (s->a) gen_expr(m, s->a);
-        else emit("\tmovl $0, %%eax");
+        if (s->a) {
+            gen_expr(m, s->a);
+            widen_ty((Ty)s->a->dty);
+            conv_ty((Ty)s->a->dty, m->ret);
+        } else {
+            emit("\tmovl $0, %%eax");
+        }
         emit("\tjmp .Lret%d", cur_ret_label);
         break;
     }
@@ -119,10 +216,30 @@ static void gen_stmt(Method *m, Node *s) {
             emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "sn" : "s");
         } else {
             gen_expr(m, s->a);
-            emit("\tmovl %%eax, %%esi");
-            emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "in" : "i");
+            Ty pt = (Ty)s->a->dty;
+            if (pt == T_INT || pt == T_BOOL) {
+                emit("\tmovl %%eax, %%esi");
+                emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "in" : "i");
+                emit("\txorl %%eax, %%eax");
+            } else if (pt == T_LONG || pt == T_UINT64) {
+                emit("\tmovq %%rax, %%rsi");
+                emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? (pt == T_LONG ? "ldn" : "lun") : (pt == T_LONG ? "ld" : "lu"));
+                emit("\txorl %%eax, %%eax");
+            } else if (pt == T_UINT8 || pt == T_UINT16 || pt == T_UINT32) {
+                emit("\tmovl %%eax, %%esi");
+                emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "un" : "u");
+                emit("\txorl %%eax, %%eax");
+            } else {
+                if (pt == T_FLOAT) {
+                    emit("\tmovd %%eax, %%xmm0");
+                    emit("\tcvtss2sd %%xmm0, %%xmm0");
+                } else {
+                    emit("\tmovq %%rax, %%xmm0");
+                }
+                emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? (pt == T_FLOAT ? "gfn" : "gn") : (pt == T_FLOAT ? "gf" : "g"));
+                emit("\tmovl $1, %%eax");
+            }
         }
-        emit("\txorl %%eax, %%eax");
         emit("\tcall printf@PLT");
         break;
     case ST_EXPR:
@@ -145,9 +262,18 @@ static void gen_stmts(Method *m, Node *lst) {
 static void x64_call(Method *m, Node *e) {
     int n = 0;
     int w64[64];
-    for (Node *a = e->a; a; a = a->next) {
+    Param *pp = e->meth ? e->meth->params : 0;
+    for (Node *a = e->a; a; a = a->next, pp = pp ? pp->next : 0) {
         if (n >= 6) die("baris %d: maksimal 6 argumen untuk target x86-64", e->line);
-        w64[n] = gen_expr(m, a);
+        Ty at = (Ty)a->dty;
+        Ty pt = pp ? (Ty)pp->ty : T_INT;
+        gen_expr(m, a);
+        if (pt == T_FN) w64[n] = 1;
+        else {
+            widen_ty(at);
+            conv_ty(at, pt);
+            w64[n] = is64ty(pt);
+        }
         spush();
         n++;
     }
@@ -191,11 +317,153 @@ static void gen_bool_chain(Method *m, Node *e) {
     emit(".L%d:", lend);
 }
 
+static int gen_bin_typed(Method *m, Node *e) {
+    Ty lt = (Ty)e->a->dty, rt = (Ty)e->b->dty;
+    char op = e->str[0];
+    int two = e->str[1] != 0;
+    int isShift = !strcmp(e->str, "<<") || !strcmp(e->str, ">>") ||
+                  !strcmp(e->str, ">>>");
+    int isCmp = (op == '=' || op == '!') && two;
+    if (!isCmp)
+        isCmp = op == '<' || op == '>' || !strcmp(e->str, "<=") ||
+                !strcmp(e->str, ">=");
+    Ty P = isShift ? lt : ty_promote(lt, rt);
+
+    gen_expr(m, e->a);
+    widen_ty(lt);
+    conv_ty(lt, P);
+    spush();
+    gen_expr(m, e->b);
+    widen_ty(rt);
+    if (!isShift) conv_ty(rt, P);
+    spop("rcx");
+
+    if (ty_is_float(P)) {
+        if (P == T_FLOAT) {
+            emit("\tmovd %%ecx, %%xmm0");
+            emit("\tmovd %%eax, %%xmm1");
+        } else {
+            emit("\tmovq %%rcx, %%xmm0");
+            emit("\tmovq %%rax, %%xmm1");
+        }
+        const char *pre = P == T_FLOAT ? "ss" : "sd";
+        if (isCmp) {
+            emit("\tucomi%s %%xmm1, %%xmm0", pre);
+            if (op == '=') {
+                emit("\tsete %%al");
+                emit("\tsetnp %%dl");
+                emit("\tandb %%dl, %%al");
+            } else if (op == '!') {
+                emit("\tsetne %%al");
+                emit("\tsetp %%dl");
+                emit("\torb %%dl, %%al");
+            } else if (!strcmp(e->str, "<=")) {
+                emit("\tsetbe %%al");
+                emit("\tsetnp %%dl");
+                emit("\tandb %%dl, %%al");
+            } else if (!strcmp(e->str, ">=")) {
+                emit("\tsetae %%al");
+            } else if (op == '<') {
+                emit("\tsetb %%al");
+                emit("\tsetnp %%dl");
+                emit("\tandb %%dl, %%al");
+            } else {
+                emit("\tseta %%al");
+            }
+            emit("\tmovzbl %%al, %%eax");
+            return 0;
+        }
+        if (op == '+') emit("\tadd%s %%xmm1, %%xmm0", pre);
+        else if (op == '-') emit("\tsub%s %%xmm1, %%xmm0", pre);
+        else if (op == '*') emit("\tmul%s %%xmm1, %%xmm0", pre);
+        else if (op == '/') emit("\tdiv%s %%xmm1, %%xmm0", pre);
+        else if (op == '%') {
+            emit("\tdiv%s %%xmm1, %%xmm0", pre);
+            if (P == T_FLOAT) emit("\tcvttss2sil %%xmm0, %%eax");
+            else emit("\tcvttsd2siq %%xmm0, %%rax");
+            if (P == T_FLOAT) emit("\tcvtsi2ssl %%eax, %%xmm2");
+            else emit("\tcvtsi2sdq %%rax, %%xmm2");
+            emit("\tmul%s %%xmm1, %%xmm2", pre);
+            emit("\tsub%s %%xmm2, %%xmm0", pre);
+        } else die("gen_x64: operator float '%s'", e->str);
+        if (P == T_FLOAT) emit("\tmovd %%xmm0, %%eax");
+        else emit("\tmovq %%xmm0, %%rax");
+        return is64ty(P);
+    }
+
+    if (isShift) {
+        int mask = ty_width(P) - 1;
+        if (mask <= 0) mask = 31;
+        emit("\tmovq %%rax, %%rdx");    /* right */
+        emit("\tmovq %%rcx, %%rax");    /* left */
+        emit("\tmovl %%edx, %%ecx");    /* count */
+        emit("\tandl $%d, %%ecx", mask);
+        if (!strcmp(e->str, "<<")) emit("\tshlq %%cl, %%rax");
+        else if (!strcmp(e->str, ">>")) emit("\tsarq %%cl, %%rax");
+        else emit("\tshrq %%cl, %%rax");
+        norm_ty(P);
+        return is64ty(P);
+    }
+    if (isCmp) {
+        int uns = ty_is_uint(P);
+        emit("\tcmpq %%rax, %%rcx");
+        if (op == '=') emit("\tsete %%al");
+        else if (op == '!') emit("\tsetne %%al");
+        else if (!strcmp(e->str, "<=")) emit(uns ? "\tsetbe %%al" : "\tsetle %%al");
+        else if (!strcmp(e->str, ">=")) emit(uns ? "\tsetae %%al" : "\tsetge %%al");
+        else if (op == '<') emit(uns ? "\tsetb %%al" : "\tsetl %%al");
+        else emit(uns ? "\tseta %%al" : "\tsetg %%al");
+        emit("\tmovzbl %%al, %%eax");
+        return 0;
+    }
+    int uns = ty_is_uint(P);
+    switch (op) {
+    case '+': emit("\tleaq (%%rcx,%%rax), %%rax"); break;
+    case '-': emit("\tmovq %%rcx, %%rdx"); emit("\tsubq %%rax, %%rdx"); emit("\tmovq %%rdx, %%rax"); break;
+    case '*': emit("\timulq %%rcx, %%rax"); break;
+    case '/':
+        emit("\tmovq %%rax, %%r10");
+        emit("\tmovq %%rcx, %%rax");
+        if (uns) { emit("\txorl %%edx, %%edx"); emit("\tdivq %%r10"); }
+        else { emit("\tcqto"); emit("\tidivq %%r10"); }
+        break;
+    case '%':
+        emit("\tmovq %%rax, %%r10");
+        emit("\tmovq %%rcx, %%rax");
+        if (uns) { emit("\txorl %%edx, %%edx"); emit("\tdivq %%r10"); }
+        else { emit("\tcqto"); emit("\tidivq %%r10"); }
+        emit("\tmovq %%rdx, %%rax");
+        break;
+    case '&': emit("\tmovq %%rcx, %%rax"); emit("\tandq %%rcx, %%rax"); break;
+    case '|': emit("\tmovq %%rcx, %%rax"); emit("\torq %%rcx, %%rax"); break;
+    case '^': emit("\tmovq %%rcx, %%rax"); emit("\txorq %%rcx, %%rax"); break;
+    default: die("gen_x64: operator '%s'", e->str);
+    }
+    norm_ty(P);
+    return is64ty(P);
+}
+
 static int gen_expr(Method *m, Node *e) {
     switch (e->kind) {
-    case EX_INT:
-        emit("\tmovl $%ld, %%eax", e->ival);
+    case EX_INT: {
+        Ty t = (Ty)e->dty;
+        if (t == T_INT) {
+            emit("\tmovl $%ld, %%eax", e->ival);
+        } else if (t == T_FLOAT) {
+            union { float f; uint32_t u; } cv;
+            cv.f = (float)e->fval;
+            emit("\tmovl $%lu, %%eax", (unsigned long)cv.u);
+        } else if (t == T_DOUBLE) {
+            union { double d; uint64_t u; } cv;
+            cv.d = e->fval;
+            emit("\tmovabsq $%llu, %%rax", (unsigned long long)cv.u);
+        } else if (t == T_UINT32 || t == T_UINT8 || t == T_UINT16) {
+            emit("\tmovl $%lu, %%eax", (unsigned long)e->ival);
+        } else {
+            emit("\tmovabsq $%ld, %%rax", e->ival);
+        }
         break;
+    }
     case EX_BOOL:
         emit("\tmovl $%d, %%eax", (int)e->ival);
         break;
@@ -206,12 +474,32 @@ static int gen_expr(Method *m, Node *e) {
         }
         emit("\tmovl -%ld(%%rbp), %%eax", (e->ival + 1) * 8);
         break;
-    case EX_UN:
+    case EX_CAST: {
+        Ty from = (Ty)e->a->dty, to = (Ty)e->dty;
         gen_expr(m, e->a);
-        if (e->str[0] == '-') emit("\tnegl %%eax");
-        else if (e->str[0] == '~') emit("\tnotl %%eax");
-        else emit("\txorl $1, %%eax");
-        break;
+        widen_ty(from);
+        conv_ty(from, to);
+        return is64ty(to);
+    }
+    case EX_UN: {
+        Ty t = (Ty)e->dty;
+        gen_expr(m, e->a);
+        if (e->str[0] == '!') { emit("\txorl $1, %%eax"); break; }
+        if (ty_is_float(t)) {
+            if (t == T_FLOAT) emit("\tbtcq $31, %%rax");
+            else emit("\tbtcq $63, %%rax");
+            return 1;
+        }
+        if (!is64ty(t)) {
+            if (e->str[0] == '-') emit("\tnegl %%eax");
+            else emit("\tnotl %%eax");
+            break;
+        }
+        if (e->str[0] == '-') emit("\tnegq %%rax");
+        else emit("\tnotq %%rax");
+        norm_ty(t);
+        return 1;
+    }
     case EX_CALL:
         x64_call(m, e);
         return is64ty((Ty)e->dty);       /* int[] / fn → %rax; int → %eax */
@@ -554,6 +842,11 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tmovl %ld(%%rax), %%eax", 24 + 8 * (long)e->ival);
         break;
     case EX_BIN: {
+        Ty bl = (Ty)e->a->dty, br = (Ty)e->b->dty, bres = (Ty)e->dty;
+        if (!((bl == T_INT || bl == T_BOOL) && (br == T_INT || br == T_BOOL) &&
+              (bres == T_INT || bres == T_BOOL))) {
+            return gen_bin_typed(m, e);
+        }
         char op = e->str[0];
         if ((op == '&' || op == '|') && e->str[1] != 0) { gen_bool_chain(m, e); break; }
         gen_expr(m, e->a);
@@ -726,6 +1019,16 @@ void gen_x64(const char *outpath) {
     emit(".Lfmt_in: .asciz \"%s\"", "%d\\n");
     emit(".Lfmt_s: .asciz \"%s\"", "%s");
     emit(".Lfmt_sn: .asciz \"%s\"", "%s\\n");
+    emit(".Lfmt_ld: .asciz \"%s\"", "%ld");
+    emit(".Lfmt_ldn: .asciz \"%s\"", "%ld\\n");
+    emit(".Lfmt_lu: .asciz \"%s\"", "%lu");
+    emit(".Lfmt_lun: .asciz \"%s\"", "%lu\\n");
+    emit(".Lfmt_u: .asciz \"%s\"", "%u");
+    emit(".Lfmt_un: .asciz \"%s\"", "%u\\n");
+    emit(".Lfmt_g: .asciz \"%s\"", "%.15g");
+    emit(".Lfmt_gn: .asciz \"%s\"", "%.15g\\n");
+    emit(".Lfmt_gf: .asciz \"%s\"", "%.9g");
+    emit(".Lfmt_gfn: .asciz \"%s\"", "%.9g\\n");
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");

@@ -24,6 +24,9 @@ static struct { const char *kw; int type; } kws[] = {
     {"class", KW_CLASS}, {"public", KW_PUBLIC}, {"private", KW_PRIVATE},
     {"static", KW_STATIC}, {"final", KW_FINAL}, {"int", KW_INT},
     {"boolean", KW_BOOL}, {"void", KW_VOID}, {"String", KW_STRING},
+    {"long", KW_LONG}, {"double", KW_DOUBLE}, {"float", KW_FLOAT},
+    {"uint8", KW_UINT8}, {"uint16", KW_UINT16},
+    {"uint32", KW_UINT32}, {"uint64", KW_UINT64},
     {"if", KW_IF}, {"else", KW_ELSE}, {"while", KW_WHILE}, {"for", KW_FOR},
     {"return", KW_RETURN}, {"true", KW_TRUE}, {"false", KW_FALSE},
     {"break", KW_BREAK}, {"continue", KW_CONTINUE}, {"import", KW_IMPORT},
@@ -89,8 +92,88 @@ Tok *lex_file(const char *path, int *ntoks) {
         }
         if (isdigit((unsigned char)*p)) {
             char *start = p;
-            while (isdigit((unsigned char)*p)) p++;
-            PUSH(T_NUM, 0, strtol(start, 0, 10));
+            int base = 10, isflt = 0, suf = 0;
+            char *digend;
+            if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+                base = 16; p += 2;
+                while (isxdigit((unsigned char)*p)) p++;
+            } else if (p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) {
+                base = 2; p += 2;
+                while (*p == '0' || *p == '1') p++;
+            } else {
+                while (isdigit((unsigned char)*p)) p++;
+                if (*p == '.') {
+                    isflt = 1; p++;
+                    while (isdigit((unsigned char)*p)) p++;
+                }
+                if (*p == 'e' || *p == 'E') {
+                    isflt = 1; p++;
+                    if (*p == '+' || *p == '-') p++;
+                    while (isdigit((unsigned char)*p)) p++;
+                }
+            }
+            digend = p;
+            if (*p == 'l' || *p == 'L') { suf = 'L'; p++; }
+            else if (*p == 'f' || *p == 'F') { suf = 'F'; p++; }
+            else if (*p == 'd' || *p == 'D') { suf = 'D'; p++; }
+            else if (*p == 'u' || *p == 'U') {
+                suf = 'U'; p++;
+                if (*p == 'l' || *p == 'L') {
+                    suf = 'V'; p++;
+                    if (*p == 'l' || *p == 'L') p++;
+                }
+            }
+            if (isflt || suf == 'F' || suf == 'D') {
+                char tmp[512];
+                size_t ln = (size_t)(digend - start);
+                if (ln >= sizeof tmp) die("baris %d: angka terlalu panjang", line);
+                memcpy(tmp, start, ln); tmp[ln] = 0;
+                double dv = strtod(tmp, 0);
+                PUSH(T_NUM, 0, 0);
+                toks[n - 1].fnum = dv;
+                toks[n - 1].numty = (suf == 'F') ? (int)T_FLOAT : (int)T_DOUBLE;
+            } else {
+                unsigned long long uv;
+                int ty;
+                if (base == 2) {
+                    uv = 0;
+                    char *q = start + 2;
+                    while (q < digend) { uv = uv * 2 + (unsigned)(*q - '0'); q++; }
+                } else if (base == 16) {
+                    char tmp[512];
+                    size_t ln = (size_t)(digend - start);
+                    if (ln >= sizeof tmp) die("baris %d: angka terlalu panjang", line);
+                    memcpy(tmp, start, ln); tmp[ln] = 0;
+                    uv = strtoull(tmp, 0, 0);
+                } else {
+                    char tmp[512];
+                    size_t ln = (size_t)(digend - start);
+                    if (ln >= sizeof tmp) die("baris %d: angka terlalu panjang", line);
+                    memcpy(tmp, start, ln); tmp[ln] = 0;
+                    uv = strtoull(tmp, 0, 10);
+                }
+                if (suf == 'L') {
+                    if (uv > 9223372036854775807ULL)
+                        die("baris %d: literal long terlalu besar", line);
+                    ty = (int)T_LONG;
+                } else if (suf == 'U') {
+                    if (uv > 4294967295ULL)
+                        die("baris %d: literal uint32 terlalu besar", line);
+                    ty = (int)T_UINT32;
+                } else if (suf == 'V') {
+                    ty = (int)T_UINT64;
+                } else if (uv <= 2147483647ULL) {
+                    ty = (int)T_INT;
+                } else if (uv <= 9223372036854775807ULL) {
+                    ty = (int)T_LONG;
+                } else {
+                    die("baris %d: literal melebihi long (pakai suffix ul untuk uint64)", line);
+                    ty = (int)T_LONG;
+                }
+                PUSH(T_NUM, 0, (long)uv);
+                toks[n - 1].numty = ty;
+                toks[n - 1].fnum = 0.0;
+            }
             continue;
         }
         if (isalpha((unsigned char)*p) || *p == '_') {

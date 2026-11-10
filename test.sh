@@ -73,6 +73,10 @@ N=$(python3 tools/gen_mathvec.py "$T/kopi/mathvec.kop" | sed -n 's/^kasus: \([0-
 python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/mathvec.ref"
 check mathvec "$T/kopi/mathvec.kop"
 
+# ─── tipe numerik baru: long/float/double/uint8..64 (oracle python) ──────
+python3 tools/gen_numvec.py "$T/kopi/numvec.kop" "$T/kopi/numvec.ref" >/dev/null
+check numvec "$T/kopi/numvec.kop"
+
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
 printf '1\n1\n1\n0\n' > "$T/kopi/aeadvec.ref"
@@ -235,7 +239,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done

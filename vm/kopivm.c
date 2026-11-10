@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <math.h>
+#include "ast.h"
 
 enum {
     OP_HALT = 0, OP_ICONST, OP_ILOAD, OP_ISTORE, OP_POP,
@@ -20,6 +22,19 @@ enum {
     OP_NEWARR,                      /* lambda/closure + array arena */
     OP_NET,                         /* builtin Net.* (ubit syscall host) */
     OP_BAND, OP_BOR, OP_BXOR, OP_SHL, OP_SHR, OP_USHR, OP_BNOT,   /* v1.5 bitwise */
+    /* v1.6 tipe numerik baru */
+    OP_ICONST64,
+    OP_ADD64, OP_SUB64, OP_MUL64, OP_DIV64, OP_MOD64,
+    OP_UDIV64, OP_UMOD64, OP_AND64, OP_OR64, OP_XOR64,
+    OP_SHL64, OP_SHR64, OP_USHR64, OP_NEG64, OP_BNOT64,
+    OP_LT64, OP_GT64, OP_LE64, OP_GE64,
+    OP_LTU64, OP_GTU64, OP_LEU64, OP_GEU64,
+    OP_EQ64, OP_NE64,
+    OP_FADD, OP_FSUB, OP_FMUL, OP_FDIV, OP_FMOD, OP_FNEG,
+    OP_FLT, OP_FGT, OP_FLE, OP_FGE, OP_FEQ, OP_FNE,
+    OP_CONV,        /* 2 byte: from,to */
+    OP_NORM,        /* 1 byte: tipe */
+    OP_PRINTNUM,    /* 2 byte: tipe, newline */
 };
 
 #define MAXM 4096
@@ -113,6 +128,56 @@ static long sp;
 static Frame frames[MAXFRAMES];
 static int nframes;
 static int64_t localsv[MAXFRAMES][MAXLOC];
+
+static uint64_t rd64code(Meth *m, long *pc) {
+    uint64_t v = 0;
+    for (int i = 0; i < 8; i++) v |= (uint64_t)m->code[(*pc)++] << (8 * i);
+    return v;
+}
+
+static int64_t norm_val(int64_t v, int t) {
+    switch (t) {
+    case T_INT:    return (int32_t)v;
+    case T_LONG:   return v;
+    case T_UINT8:  return (uint8_t)v;
+    case T_UINT16: return (uint16_t)v;
+    case T_UINT32: return (uint32_t)v;
+    case T_UINT64: return v;
+    default:       return v;
+    }
+}
+
+static double bits_d(int64_t b) { double d; memcpy(&d, &b, 8); return d; }
+static int64_t d_bits(double d) { int64_t b; memcpy(&b, &d, 8); return b; }
+static float bits_f(int64_t b) { uint32_t u = (uint32_t)b; float f; memcpy(&f, &u, 4); return f; }
+static int64_t f_bits(float f) { uint32_t u; memcpy(&u, &f, 4); return (int64_t)u; }
+
+static double dtrunc_safe(double x) {
+    if (x >= 9223372036854775807.0) return x;
+    if (x <= -9223372036854775808.0) return x;
+    return (double)(int64_t)x;
+}
+
+static int64_t conv_val(int64_t v, int from, int to) {
+    if (from == to) return v;
+    if (ty_is_float(from)) {
+        double d = (from == T_FLOAT) ? (double)bits_f(v) : bits_d(v);
+        if (ty_is_float(to))
+            return (to == T_FLOAT) ? f_bits((float)d) : d_bits(d);
+        double t = dtrunc_safe(d);
+        int64_t r;
+        if (t >= 9223372036854775807.0) r = INT64_MAX;
+        else if (t <= -9223372036854775808.0) r = INT64_MIN;
+        else r = (int64_t)t;
+        return norm_val(r, to);
+    }
+    if (ty_is_float(to)) {
+        if (ty_is_uint(from))
+            return (to == T_FLOAT) ? f_bits((float)(uint64_t)v) : d_bits((double)(uint64_t)v);
+        return (to == T_FLOAT) ? f_bits((float)v) : d_bits((double)v);
+    }
+    return norm_val(v, to);
+}
 
 static void run(void) {
     int mid = -1;
@@ -439,6 +504,148 @@ static void run(void) {
             } else {
                 dievm("Net builtin tidak dikenal");
             }
+            break;
+        }
+        case OP_ICONST64: {
+            uint64_t v = rd64code(m, &f->pc);
+            if (sp >= MAXSTACK) dievm("operand stack penuh");
+            stackv[sp++] = (int64_t)v;
+            break;
+        }
+        case OP_ADD64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a + b; break;
+        case OP_SUB64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a - b; break;
+        case OP_MUL64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a * b; break;
+        case OP_DIV64:
+            b = stackv[--sp]; a = stackv[--sp];
+            if (b == 0) dievm("pembagian dengan nol");
+            stackv[sp++] = a / b;
+            break;
+        case OP_MOD64:
+            b = stackv[--sp]; a = stackv[--sp];
+            if (b == 0) dievm("modulus dengan nol");
+            stackv[sp++] = a % b;
+            break;
+        case OP_UDIV64:
+            b = stackv[--sp]; a = stackv[--sp];
+            if (b == 0) dievm("pembagian dengan nol");
+            stackv[sp++] = (int64_t)((uint64_t)a / (uint64_t)b);
+            break;
+        case OP_UMOD64:
+            b = stackv[--sp]; a = stackv[--sp];
+            if (b == 0) dievm("modulus dengan nol");
+            stackv[sp++] = (int64_t)((uint64_t)a % (uint64_t)b);
+            break;
+        case OP_AND64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a & b; break;
+        case OP_OR64:  b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a | b; break;
+        case OP_XOR64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a ^ b; break;
+        case OP_SHL64:
+        case OP_SHR64:
+        case OP_USHR64: {
+            int mask = m->code[f->pc++];
+            b = stackv[--sp]; a = stackv[--sp];
+            int c = (int)(b & mask);
+            if (op == OP_SHL64) stackv[sp++] = (int64_t)((uint64_t)a << c);
+            else if (op == OP_SHR64) stackv[sp++] = a >> c;
+            else stackv[sp++] = (int64_t)((uint64_t)a >> c);
+            break;
+        }
+        case OP_NEG64: a = stackv[--sp]; stackv[sp++] = -a; break;
+        case OP_BNOT64: a = stackv[--sp]; stackv[sp++] = ~a; break;
+        case OP_LT64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a < b; break;
+        case OP_GT64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a > b; break;
+        case OP_LE64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a <= b; break;
+        case OP_GE64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a >= b; break;
+        case OP_LTU64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (uint64_t)a < (uint64_t)b; break;
+        case OP_GTU64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (uint64_t)a > (uint64_t)b; break;
+        case OP_LEU64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (uint64_t)a <= (uint64_t)b; break;
+        case OP_GEU64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (uint64_t)a >= (uint64_t)b; break;
+        case OP_EQ64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a == b; break;
+        case OP_NE64: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a != b; break;
+        case OP_FADD:
+        case OP_FSUB:
+        case OP_FMUL:
+        case OP_FDIV:
+        case OP_FMOD: {
+            int sub = m->code[f->pc++];
+            b = stackv[--sp]; a = stackv[--sp];
+            if (sub == 0) {
+                float x = bits_f(a), y = bits_f(b);
+                if (op == OP_FADD) stackv[sp++] = f_bits(x + y);
+                else if (op == OP_FSUB) stackv[sp++] = f_bits(x - y);
+                else if (op == OP_FMUL) stackv[sp++] = f_bits(x * y);
+                else if (op == OP_FDIV) stackv[sp++] = f_bits(x / y);
+                else {
+                    double q = dtrunc_safe((double)(x / y));
+                    stackv[sp++] = f_bits((float)((double)x - q * (double)y));
+                }
+            } else {
+                double x = bits_d(a), y = bits_d(b);
+                if (op == OP_FADD) stackv[sp++] = d_bits(x + y);
+                else if (op == OP_FSUB) stackv[sp++] = d_bits(x - y);
+                else if (op == OP_FMUL) stackv[sp++] = d_bits(x * y);
+                else if (op == OP_FDIV) stackv[sp++] = d_bits(x / y);
+                else {
+                    double q = dtrunc_safe(x / y);
+                    stackv[sp++] = d_bits(x - q * y);
+                }
+            }
+            break;
+        }
+        case OP_FNEG: {
+            int sub = m->code[f->pc++];
+            a = stackv[--sp];
+            stackv[sp++] = (sub == 0) ? f_bits(-bits_f(a)) : d_bits(-bits_d(a));
+            break;
+        }
+        case OP_FLT:
+        case OP_FGT:
+        case OP_FLE:
+        case OP_FGE:
+        case OP_FEQ:
+        case OP_FNE: {
+            int sub = m->code[f->pc++];
+            b = stackv[--sp]; a = stackv[--sp];
+            if (sub == 0) {
+                float x = bits_f(a), y = bits_f(b);
+                if (op == OP_FLT) stackv[sp++] = x < y;
+                else if (op == OP_FGT) stackv[sp++] = x > y;
+                else if (op == OP_FLE) stackv[sp++] = x <= y;
+                else if (op == OP_FGE) stackv[sp++] = x >= y;
+                else if (op == OP_FEQ) stackv[sp++] = x == y;
+                else stackv[sp++] = x != y;
+            } else {
+                double x = bits_d(a), y = bits_d(b);
+                if (op == OP_FLT) stackv[sp++] = x < y;
+                else if (op == OP_FGT) stackv[sp++] = x > y;
+                else if (op == OP_FLE) stackv[sp++] = x <= y;
+                else if (op == OP_FGE) stackv[sp++] = x >= y;
+                else if (op == OP_FEQ) stackv[sp++] = x == y;
+                else stackv[sp++] = x != y;
+            }
+            break;
+        }
+        case OP_CONV: {
+            int from = m->code[f->pc++];
+            int to = m->code[f->pc++];
+            a = stackv[--sp];
+            stackv[sp++] = conv_val(a, from, to);
+            break;
+        }
+        case OP_NORM: {
+            int t = m->code[f->pc++];
+            stackv[sp - 1] = norm_val(stackv[sp - 1], t);
+            break;
+        }
+        case OP_PRINTNUM: {
+            int t = m->code[f->pc++];
+            int ln = m->code[f->pc++];
+            int64_t v = stackv[--sp];
+            if (t == T_LONG) printf("%" PRId64 "%s", v, ln ? "\n" : "");
+            else if (t == T_UINT64) printf("%" PRIu64 "%s", (uint64_t)v, ln ? "\n" : "");
+            else if (t == T_UINT8 || t == T_UINT16 || t == T_UINT32)
+                printf("%" PRIu32 "%s", (uint32_t)v, ln ? "\n" : "");
+            else if (t == T_FLOAT) printf("%.9g%s", (double)bits_f(v), ln ? "\n" : "");
+            else printf("%.15g%s", bits_d(v), ln ? "\n" : "");
             break;
         }
         case OP_HALT:

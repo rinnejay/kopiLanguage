@@ -8,7 +8,7 @@ kopicc: $(SRC)
 	$(CC) $(CFLAGS) -o $@ $(SRC)
 
 kopivm: vm/kopivm.c
-	$(CC) $(CFLAGS) -o $@ vm/kopivm.c
+	$(CC) $(CFLAGS) -I src -o $@ vm/kopivm.c
 
 clean:
 	rm -f kopicc kopivm out.s out.kbc

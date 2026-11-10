@@ -25,8 +25,90 @@ static int netlbl;      /* label EX_NET unik per kemunculan */
 static int cur_ret_label;
 
 /* push hasil ekspresi: 32-bit (w0) atau pointer closure 64-bit (x0) */
-/* 32-bit int/bool vs 64-bit (pointer lambda/array) */
-static int is64ty(Ty t) { return t == T_FN || t == T_ARI; }
+/* 32-bit int/bool vs 64-bit (pointer / numerik baru / float bits) */
+static int is64ty(Ty t) {
+    return t == T_FN || t == T_ARI || t == T_LONG || t == T_UINT64 ||
+           t == T_UINT8 || t == T_UINT16 || t == T_UINT32 ||
+           t == T_FLOAT || t == T_DOUBLE;
+}
+
+static void push_x(void) { emit("\tstr\tx0, [sp, #-16]!"); }
+static void pop_x(const char *r) { emit("\tldr\t%s, [sp], #16", r); }
+
+/* muat immediate 64-bit ke x0 */
+static void mov64_imm(unsigned long long v) {
+    emit("\tmovz\tx0, #0x%llx", v & 0xffffULL);
+    if ((v >> 16) & 0xffffULL) emit("\tmovk\tx0, #0x%llx, lsl #16", (v >> 16) & 0xffffULL);
+    if ((v >> 32) & 0xffffULL) emit("\tmovk\tx0, #0x%llx, lsl #32", (v >> 32) & 0xffffULL);
+    if ((v >> 48) & 0xffffULL) emit("\tmovk\tx0, #0x%llx, lsl #48", (v >> 48) & 0xffffULL);
+}
+
+/* nilai dari w0 (int/bool) → kanonik x0 */
+static void widen_ty(Ty t) {
+    if (t == T_INT) emit("\tsxtw\tx0, w0");
+    else if (t == T_BOOL) emit("\tmov\tw0, w0");
+}
+
+/* normalisasi nilai x0 sesuai lebar/tanda tipe */
+static void norm_ty(Ty t) {
+    switch (t) {
+    case T_INT:    emit("\tsxtw\tx0, w0"); break;
+    case T_UINT32: emit("\tmov\tw0, w0"); break;
+    case T_UINT16: emit("\tuxth\tw0, w0"); break;
+    case T_UINT8:  emit("\tuxtb\tw0, w0"); break;
+    case T_BOOL:   emit("\tand\tw0, w0, #1"); break;
+    default: break;                      /* long/uint64/float/double */
+    }
+}
+
+/* konversi nilai kanonik x0 dari tipe from ke tipe to */
+static void conv_ty(Ty from, Ty to) {
+    if (from == to) return;
+    if (ty_is_float(to)) {
+        if (ty_is_float(from)) {
+            if (to == T_DOUBLE) {
+                emit("\tfmov\ts0, w0");
+                emit("\tfcvt\td0, s0");
+                emit("\tfmov\tx0, d0");
+            } else {
+                emit("\tfmov\td0, x0");
+                emit("\tfcvt\ts0, d0");
+                emit("\tfmov\tw0, s0");
+            }
+        } else {
+            int uns = ty_is_uint(from);
+            if (to == T_DOUBLE) {
+                emit(uns ? "\tucvtf\td0, x0" : "\tscvtf\td0, x0");
+                emit("\tfmov\tx0, d0");
+            } else {
+                emit(uns ? "\tucvtf\ts0, x0" : "\tscvtf\ts0, x0");
+                emit("\tfmov\tw0, s0");
+            }
+        }
+        return;
+    }
+    if (ty_is_float(from)) {
+        int uns = ty_is_uint(to);
+        if (from == T_FLOAT) emit("\tfmov\ts0, w0");
+        else emit("\tfmov\td0, x0");
+        const char *fl = from == T_FLOAT ? "s0" : "d0";
+        if (ty_width(to) == 64)
+            emit(uns ? "\tfcvtzu\tx0, %s" : "\tfcvtzs\tx0, %s", fl);
+        else
+            emit(uns ? "\tfcvtzu\tw0, %s" : "\tfcvtzs\tw0, %s", fl);
+        norm_ty(to);
+        return;
+    }
+    switch (to) {
+    case T_INT:    emit("\tsxtw\tx0, w0"); break;
+    case T_UINT32: emit("\tmov\tw0, w0"); break;
+    case T_UINT16: emit("\tuxth\tw0, w0"); break;
+    case T_UINT8:  emit("\tuxtb\tw0, w0"); break;
+    case T_LONG:   /* int/bool/uint* kanonik sudah benar */
+    case T_UINT64: break;
+    default: break;
+    }
+}
 
 /* alamat lokal slot n: x27 = x29 - off (dipakai bila off > 255 —
  * batas immediat unscaled ldr/str aarch64). x27 tidak dipakai backend lain */
@@ -59,13 +141,13 @@ static void push_val(int is64) {
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
+    case ST_ASSIGN: {
         gen_expr(m, s->a);
+        widen_ty((Ty)s->a->dty);
+        conv_ty((Ty)s->a->dty, (Ty)s->dty);
         loc_store((s->ival + 1) * 8, is64ty((Ty)s->dty) ? "x0" : "w0");
         break;
-    case ST_ASSIGN:
-        gen_expr(m, s->a);
-        loc_store((s->ival + 1) * 8, is64ty((Ty)s->dty) ? "x0" : "w0");
-        break;
+    }
     case ST_IDXASG: {
         gen_expr(m, s->c);               /* nilai */
         push_val(0);
@@ -125,8 +207,13 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_BRK: emit("\tb\t.L%d", brk_lab[brk_sp - 1]); break;
     case ST_CONT: emit("\tb\t.L%d", cont_lab[brk_sp - 1]); break;
     case ST_RETURN: {
-        if (s->a) gen_expr(m, s->a);
-        else emit("\tmov\tw0, wzr");
+        if (s->a) {
+            gen_expr(m, s->a);
+            widen_ty((Ty)s->a->dty);
+            conv_ty((Ty)s->a->dty, m->ret);
+        } else {
+            emit("\tmov\tw0, wzr");
+        }
         emit("\tb\t.Lret%d", cur_ret_label);
         break;
     }
@@ -141,10 +228,39 @@ static void gen_stmt(Method *m, Node *s) {
             emit("\tbl\tprintf");
         } else {
             gen_expr(m, s->a);
-            const char *fmt = s->ival ? ".Lfmt_in" : ".Lfmt_i";
-            emit("\tsxtw\tx1, w0");
-            emit("\tadrp\tx0, :got:%s", fmt);
-            emit("\tldr\tx0, [x0, :got_lo12:%s]", fmt);
+            Ty pt = (Ty)s->a->dty;
+            if (pt == T_INT || pt == T_BOOL) {
+                const char *fmt = s->ival ? ".Lfmt_in" : ".Lfmt_i";
+                emit("\tsxtw\tx1, w0");
+                emit("\tadrp\tx0, :got:%s", fmt);
+                emit("\tldr\tx0, [x0, :got_lo12:%s]", fmt);
+            } else if (pt == T_LONG) {
+                const char *fmt = s->ival ? ".Lfmt_ldn" : ".Lfmt_ld";
+                emit("\tmov\tx1, x0");
+                emit("\tadrp\tx0, :got:%s", fmt);
+                emit("\tldr\tx0, [x0, :got_lo12:%s]", fmt);
+            } else if (pt == T_UINT64) {
+                const char *fmt = s->ival ? ".Lfmt_lun" : ".Lfmt_lu";
+                emit("\tmov\tx1, x0");
+                emit("\tadrp\tx0, :got:%s", fmt);
+                emit("\tldr\tx0, [x0, :got_lo12:%s]", fmt);
+            } else if (pt == T_UINT8 || pt == T_UINT16 || pt == T_UINT32) {
+                const char *fmt = s->ival ? ".Lfmt_un" : ".Lfmt_u";
+                emit("\tmov\tw1, w0");
+                emit("\tadrp\tx0, :got:%s", fmt);
+                emit("\tldr\tx0, [x0, :got_lo12:%s]", fmt);
+            } else if (pt == T_FLOAT) {
+                const char *fmt = s->ival ? ".Lfmt_gfn" : ".Lfmt_gf";
+                emit("\tfmov\ts0, w0");
+                emit("\tfcvt\td0, s0");
+                emit("\tadrp\tx0, :got:%s", fmt);
+                emit("\tldr\tx0, [x0, :got_lo12:%s]", fmt);
+            } else {
+                const char *fmt = s->ival ? ".Lfmt_gn" : ".Lfmt_g";
+                emit("\tfmov\td0, x0");
+                emit("\tadrp\tx0, :got:%s", fmt);
+                emit("\tldr\tx0, [x0, :got_lo12:%s]", fmt);
+            }
             emit("\tbl\tprintf");
         }
         break;
@@ -167,20 +283,138 @@ static void gen_stmts(Method *m, Node *lst) {
 static void push_w0(void) { emit("\tstr\tw0, [sp, #-16]!"); }
 static void pop_w(const char *r) { emit("\tldr\t%s, [sp], #16", r); }
 
+/* operasi biner untuk tipe numerik baru (long, uint*, float, double) */
+static int gen_bin_typed(Method *m, Node *e) {
+    Ty lt = (Ty)e->a->dty, rt = (Ty)e->b->dty;
+    char op = e->str[0];
+    int two = e->str[1] != 0;
+    int isShift = !strcmp(e->str, "<<") || !strcmp(e->str, ">>") ||
+                  !strcmp(e->str, ">>>");
+    int isCmp = (op == '=' || op == '!') && two;
+    if (!isCmp)
+        isCmp = op == '<' || op == '>' || !strcmp(e->str, "<=") ||
+                !strcmp(e->str, ">=");
+    Ty P = isShift ? lt : ty_promote(lt, rt);
+
+    gen_expr(m, e->a);
+    widen_ty(lt);
+    conv_ty(lt, P);
+    push_x();
+    gen_expr(m, e->b);
+    widen_ty(rt);
+    if (!isShift) conv_ty(rt, P);
+    pop_x("x9");
+
+    if (ty_is_float(P)) {
+        const char *pre = P == T_FLOAT ? "s" : "d";
+        if (P == T_FLOAT) { emit("\tfmov\ts0, w9"); emit("\tfmov\ts1, w0"); }
+        else { emit("\tfmov\td0, x9"); emit("\tfmov\td1, x0"); }
+        if (isCmp) {
+            emit("\tfcmp\t%s0, %s1", pre, pre);
+            if (op == '=') emit("\tcset\tw0, eq");
+            else if (op == '!') emit("\tcset\tw0, ne");
+            else if (!strcmp(e->str, "<=")) emit("\tcset\tw0, le");
+            else if (!strcmp(e->str, ">=")) emit("\tcset\tw0, ge");
+            else if (op == '<') emit("\tcset\tw0, lt");
+            else emit("\tcset\tw0, gt");
+            return 0;
+        }
+        if (op == '+') emit("\tfadd\t%s0, %s0, %s1", pre, pre, pre);
+        else if (op == '-') emit("\tfsub\t%s0, %s0, %s1", pre, pre, pre);
+        else if (op == '*') emit("\tfmul\t%s0, %s0, %s1", pre, pre, pre);
+        else if (op == '/') emit("\tfdiv\t%s0, %s0, %s1", pre, pre, pre);
+        else if (op == '%') {
+            emit("\tfdiv\t%s2, %s0, %s1", pre, pre, pre);
+            emit("\tfrintz\t%s2, %s2", pre, pre);
+            emit("\tfmul\t%s2, %s2, %s1", pre, pre, pre);
+            emit("\tfsub\t%s0, %s0, %s2", pre, pre, pre);
+        } else {
+            die("gen_a64: operator float '%s'", e->str);
+        }
+        if (P == T_FLOAT) emit("\tfmov\tw0, s0");
+        else emit("\tfmov\tx0, d0");
+        return is64ty(P);
+    }
+
+    if (isShift) {
+        int mask = ty_width(P) - 1;
+        if (mask <= 0) mask = 31;
+        emit("\tmov\tw10, #%d", mask);
+        emit("\tand\tw10, w0, w10");
+        if (!strcmp(e->str, "<<")) emit("\tlslv\tx0, x9, x10");
+        else if (!strcmp(e->str, ">>")) emit("\tasrv\tx0, x9, x10");
+        else emit("\tlsrv\tx0, x9, x10");
+        norm_ty(P);
+        return is64ty(P);
+    }
+    if (isCmp) {
+        int uns = ty_is_uint(P);
+        emit("\tcmp\tx9, x0");
+        if (op == '=') emit("\tcset\tw0, eq");
+        else if (op == '!') emit("\tcset\tw0, ne");
+        else if (!strcmp(e->str, "<=")) emit(uns ? "\tcset\tw0, ls" : "\tcset\tw0, le");
+        else if (!strcmp(e->str, ">=")) emit(uns ? "\tcset\tw0, hs" : "\tcset\tw0, ge");
+        else if (op == '<') emit(uns ? "\tcset\tw0, lo" : "\tcset\tw0, lt");
+        else emit(uns ? "\tcset\tw0, hi" : "\tcset\tw0, gt");
+        return 0;
+    }
+    int uns = ty_is_uint(P);
+    switch (op) {
+    case '+': emit("\tadd\tx0, x9, x0"); break;
+    case '-': emit("\tsub\tx0, x9, x0"); break;
+    case '*': emit("\tmul\tx0, x9, x0"); break;
+    case '/': emit(uns ? "\tudiv\tx0, x9, x0" : "\tsdiv\tx0, x9, x0"); break;
+    case '%':
+        emit(uns ? "\tudiv\tx10, x9, x0" : "\tsdiv\tx10, x9, x0");
+        emit("\tmsub\tx0, x10, x0, x9");
+        break;
+    case '&': emit("\tand\tx0, x9, x0"); break;
+    case '|': emit("\torr\tx0, x9, x0"); break;
+    case '^': emit("\teor\tx0, x9, x0"); break;
+    default: die("gen_a64: operator '%s'", e->str);
+    }
+    norm_ty(P);
+    return is64ty(P);
+}
+
 /* hasil: 0 = int/bool di w0 (32-bit); 1 = POINTER closure di x0 (64-bit) */
 static int gen_expr(Method *m, Node *e) {
     switch (e->kind) {
     case EX_INT: {
-        long v = e->ival;
-        if (v >= 0 && v <= 65535) {
-            emit("\tmov\tw0, #%ld", v);
-        } else {
-            uint32_t u = (uint32_t)v;
-            emit("\tmovz\tw0, #0x%lx", (long)(u & 0xffff));
-            if ((u >> 16) & 0xffff)
-                emit("\tmovk\tw0, #0x%lx, lsl #16", (long)((u >> 16) & 0xffff));
+        Ty t = (Ty)e->dty;
+        if (t == T_INT) {
+            long v = e->ival;
+            if (v >= 0 && v <= 65535) {
+                emit("\tmov\tw0, #%ld", v);
+            } else {
+                uint32_t u = (uint32_t)v;
+                emit("\tmovz\tw0, #0x%lx", (long)(u & 0xffff));
+                if ((u >> 16) & 0xffff)
+                    emit("\tmovk\tw0, #0x%lx, lsl #16", (long)((u >> 16) & 0xffff));
+            }
+            return 0;
         }
-        return 0;
+        if (t == T_FLOAT) {
+            union { float f; uint32_t u; } cv;
+            cv.f = (float)e->fval;
+            emit("\tmovz\tw0, #0x%lx", (long)(cv.u & 0xffff));
+            if (cv.u >> 16) emit("\tmovk\tw0, #0x%lx, lsl #16", (long)(cv.u >> 16));
+            return 1;
+        }
+        if (t == T_DOUBLE) {
+            union { double d; unsigned long long u; } cv;
+            cv.d = e->fval;
+            mov64_imm(cv.u);
+            return 1;
+        }
+        if (t == T_UINT32) {
+            uint32_t u = (uint32_t)e->ival;
+            emit("\tmovz\tw0, #0x%lx", (long)(u & 0xffff));
+            if (u >> 16) emit("\tmovk\tw0, #0x%lx, lsl #16", (long)(u >> 16));
+            return 1;
+        }
+        mov64_imm((unsigned long long)e->ival);
+        return 1;
     }
     case EX_BOOL:
         if (e->ival) emit("\tmov\tw0, #1");
@@ -193,18 +427,43 @@ static int gen_expr(Method *m, Node *e) {
         }
         loc_load((e->ival + 1) * 8, "w0");
         return 0;
-    case EX_UN:
+    case EX_UN: {
+        Ty t = (Ty)e->dty;
+        int wide = is64ty(t);
         gen_expr(m, e->a);
-        if (e->str[0] == '-') emit("\tneg\tw0, w0");
-        else if (e->str[0] == '~') emit("\tmvn\tw0, w0");
-        else emit("\teor\tw0, w0, #1");
-        return 0;
+        if (e->str[0] == '!') { emit("\teor\tw0, w0, #1"); return 0; }
+        if (ty_is_float(t)) {
+            if (t == T_FLOAT) { emit("\tfmov\ts0, w0"); emit("\tfneg\ts0, s0"); emit("\tfmov\tw0, s0"); }
+            else { emit("\tfmov\td0, x0"); emit("\tfneg\td0, d0"); emit("\tfmov\tx0, d0"); }
+            return 1;
+        }
+        if (!wide) {
+            if (e->str[0] == '-') emit("\tneg\tw0, w0");
+            else emit("\tmvn\tw0, w0");
+            return 0;
+        }
+        widen_ty(t);
+        if (e->str[0] == '-') emit("\tneg\tx0, x0");
+        else emit("\tmvn\tx0, x0");
+        norm_ty(t);
+        return 1;
+    }
     case EX_CALL: {
         int n = 0;
         int w64[64];
-        for (Node *a = e->a; a; a = a->next) {
+        Param *pp = e->meth ? e->meth->params : 0;
+        for (Node *a = e->a; a; a = a->next, pp = pp ? pp->next : 0) {
             if (n >= 8) die("baris %d: maksimal 8 argumen untuk target native", e->line);
-            w64[n] = gen_expr(m, a);
+            Ty at = (Ty)a->dty;
+            Ty pt = pp ? (Ty)pp->ty : T_INT;
+            gen_expr(m, a);
+            if (pt == T_FN) {
+                w64[n] = 1;
+            } else {
+                widen_ty(at);
+                conv_ty(at, pt);
+                w64[n] = is64ty(pt);
+            }
             push_val(w64[n]);
             n++;
         }
@@ -551,7 +810,18 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tldr\tx0, [x29, #-8]");   /* slot 0 = param $env */
         emit("\tldr\tw0, [x0, #%ld]", 24 + 8 * (long)e->ival);
         return 0;
+    case EX_CAST: {
+        Ty from = (Ty)e->a->dty, to = (Ty)e->dty;
+        gen_expr(m, e->a);
+        widen_ty(from);
+        conv_ty(from, to);
+        return is64ty(to);
+    }
     case EX_BIN: {
+        Ty bl = (Ty)e->a->dty, br = (Ty)e->b->dty, bres = (Ty)e->dty;
+        if (!((bl == T_INT || bl == T_BOOL) && (br == T_INT || br == T_BOOL) &&
+              (bres == T_INT || bres == T_BOOL)))
+            return gen_bin_typed(m, e);
         char op = e->str[0];
         if ((op == '&' || op == '|') && e->str[1] != 0) {
             /* hasil 0/1 keduanya: and/or langsung karena operand boolean 0/1 */
@@ -751,6 +1021,16 @@ void gen_a64(const char *outpath) {
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");
     emit(".Lfmt_sn: .asciz \"%s\"", "%s\\n");
+    emit(".Lfmt_ld: .asciz \"%s\"", "%ld");
+    emit(".Lfmt_ldn: .asciz \"%s\"", "%ld\\n");
+    emit(".Lfmt_lu: .asciz \"%s\"", "%lu");
+    emit(".Lfmt_lun: .asciz \"%s\"", "%lu\\n");
+    emit(".Lfmt_u: .asciz \"%s\"", "%u");
+    emit(".Lfmt_un: .asciz \"%s\"", "%u\\n");
+    emit(".Lfmt_g: .asciz \"%s\"", "%.15g");
+    emit(".Lfmt_gn: .asciz \"%s\"", "%.15g\\n");
+    emit(".Lfmt_gf: .asciz \"%s\"", "%.9g");
+    emit(".Lfmt_gfn: .asciz \"%s\"", "%.9g\\n");
     for (int i = 0; i < prog.ncp; i++) {
         char esc[1200];
         asm_escape(prog.cpool[i], esc, sizeof esc);

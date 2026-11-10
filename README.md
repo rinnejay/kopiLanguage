@@ -46,8 +46,8 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 ## Status & changelog
 
 ```
-Pengembangan     ███████████░░░░░  ~68%  menuju bahasa serius (v2)
-v1.5d-E2 hari ini ████████████████  61/61 test hijau — klien TLS 1.3 end-to-end (a64 + VM)
+Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
+v1.6 hari ini    ████████████████  65/65 test hijau — long/float/double/uint8..64 (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -62,6 +62,7 @@ v1.5d-E2 hari ini ████████████████  61/61 test h
 | **v1.5d-E2** | **akar-akar bug TLS dibereskan** (semua diverifikasi oracle python/RFC, bukan tambal nilai): ① `Kdf.expandLabel` — urutan `HkdfLabel` §7.1 salah (panjang label harus termasuk `"tls13 "`). ② **Poly1305** — carry `carPass` bisa tersisa di slot 9 (`2^135 ≡ 160 mod p`) lalu dibuang `mulFold` berikutnya → tag benar untuk pesan pendek dan salah ~50% untuk 700–900 B; kini dikuras `fold9()` tiap blok. ③ nonce record — seq 64-bit **big-endian** di byte 4..11 (§5.2), shift ≥32 dihindari (UB C/ARM). ④ `seal()` — loop menyalin melewati batas array (panjang record salah). ⑤ key schedule — `early = Extract(0³²,0³²)`, `master = Extract(DS(hs,"derived",H("")),0³²)`, `c_ap`/`s_ap` dari transkrip s.d. **server Finished**. ⑥ client Finished — kunci handshake klien (CH+SH), seq reset 0, inner type **22**. Test 61/61; generator Poly1305 menambah 3 vektor panjang deterministik, `gen_kdf.py` diperbaiki ke label RFC |
 | **v1.5d-E3** | **penamaan pustaka inti jadi Inggris**: `Matematika`→**`Math`** (`pangkat`→`pow`, `akar`→`sqrt`, `prima`→`isPrime`, `faktorial`→`factorial`, `genap`→`isEven`), `Angka`→**`Digits`** (`balik`→`reverse`, `jumlahDigit`→`digitSum`, `panjang`→`digitCount`, `deka`→`pow10`, `cetakBasis`→`printBase`); `examples/pakai_lib.kop` + `test.sh` + README diselaraskan |
 | **v1.5d-E4** | **pustaka matematika diperluas besar-besaran** (`int` 32-bit, murni Kopi): `Math` kini mencakup 80+ fungsi — aritmetika modular aman-overflow (`mulMod` doubling, `powMod`, `modInverse` via Bezout), teori bilangan (sieve `primesUpTo`, `primeCount`, `nthPrime`, `factorize`, σ/φ/radikal/Möbius, prima/abundant/deficient), kombinatorika (`binomial`, `permutation`, `catalan`, `derangement`, `stirling2`, `bell`, Lucas/Tribonacci), bit (`popcount`, `highestBit`, `reverseBits`, `nextPow2`), akar/log bulat (`sqrt`, `cbrt`, `log2`, `log10`), geometri integer (`heron16`, `isRightTriangle`, jarak). Modul baru `Digits` (palindrom/Armstrong/akar digital), `Stats` (median/modus/varians/simpangan baku), `Matrix` (aljabar matriks persegi). Uji oracle python: **154 kasus** di `tools/gen_mathvec.py`, lulus di VM & a64, sintaks x64 diperiksa; total suite 63/63 |
+| **v1.6** | **tipe numerik lengkap** (scalar): `long` (64-bit bertanda), `float`/`double` (IEEE-754), `uint8`/`uint16`/`uint32`/`uint64` (unsigned dengan wrap sesuai lebar), literal `L/U/UL/f/d`, hex `0x`, biner `0b`, cast `(tipe)expr`, promosi campuran (int+uint32→long, uint32+uint32→uint32, dst), perbandingan signed/unsigned, `%` float, `println` format per tipe, parameter/return semua tipe, compound assignment (narrowing implisit ala Java). Backend a64 + VM menghasilkan output identik; x64 diperiksa sintaksnya. Uji oracle python `tools/gen_numvec.py` (66 kasus), suite 65/65. Batas jujur: array masih `int[]` (belum `long[]`/`double[]`), lambda masih `int`, dan backend x64 belum dijalankan di mesin x86-64 |
 
 ## Bangun
 
@@ -124,7 +125,8 @@ Fitur v1.0 (semua sudah diuji di backend a64 maupun vm):
 | Fitur                             | Keterangan                                        |
 |-----------------------------------|---------------------------------------------------|
 | `class`, metode `static`          | multi-class, panggilan lintas-class `Cls.nama()`  |
-| tipe `int`, `boolean`, `void`     | checker tipe sederhana (deteksi salah tipe)       |
+| tipe numerik                      | `int` (32-bit), `long` (64), `float`/`double`, `uint8/16/32/64`; literal `L/U/UL/f/d`, hex `0x`, biner `0b`, cast `(tipe)x` |
+| tipe `boolean`, `void`            | checker tipe sederhana (deteksi salah tipe)       |
 | array `int[]`                     | `new int[n]`, `a[i]`, `a[i] = v`, `a.length` — heap arena `kopalloc` + bounds check runtime |
 | aritmetika                        | `+ - * / %` (semantik Java: trunc ke 0)           |
 | pembanding                        | `< > <= >= == !=`                                 |
@@ -137,6 +139,56 @@ Fitur v1.0 (semua sudah diuji di backend a64 maupun vm):
 | laporan error                     | `kopicc: error: file: baris N: pesan`             |
 | `System.out.println/print`        | string literal atau term int/boolean              |
 | komentar                          | `//` dan `/* ... */`                              |
+
+## Tipe numerik (v1.6)
+
+Kopi kini punya tipe angka lengkap (masih **scalar**; array tetap `int[]`):
+
+| Tipe | Lebar | Semantik | Contoh literal |
+|------|-------|----------|----------------|
+| `int` | 32 | bertanda, wrap | `42`, `0x2A`, `0b101010` |
+| `long` | 64 | bertanda, wrap | `42L`, `0x1F4L` |
+| `float` | 32 | IEEE-754 binary32 | `1.5f` |
+| `double` | 64 | IEEE-754 binary64 | `1.5`, `1.5d`, `1e-3` |
+| `uint8` | 8 | unsigned, wrap | `255`, `(uint8)300` |
+| `uint16` | 16 | unsigned, wrap | `65535` |
+| `uint32` | 32 | unsigned, wrap | `4294967295U`, `0xFFFFFFFFU` |
+| `uint64` | 64 | unsigned, wrap | `18446744073709551615UL` |
+
+```java
+long   total = 5000000000L;
+uint8  kecil = (uint8)(250 + 10);      // 260 → 4 (wrap 8-bit)
+uint32 besar = 4294967290U + 10U;      // → 4
+double rasio = (double)7 / 2.0;        // 3.5
+float  f     = 1.5f + 2.25f;           // 3.75
+```
+
+**Aturan konversi**
+
+- Pelebaran implisit (tanpa cast): `uint8→uint16→uint32→uint64`,
+  `int→long`, dan semua integer → `float`/`double`, `float→double`.
+- Penyempitan (`long→int`, `double→int`, `int→uint8`, …) **wajib cast**
+  eksplisit `(tipe)x`, kecuali:
+  - **literal** yang nilainya muat (`uint8 x = 250;`, `f(200)` untuk
+    parameter `uint8`), dan
+  - **compound assignment** (`x++`, `x += 1`) yang memakai semantik cast
+    implisit seperti Java.
+- Campuran signed/unsigned: `int + uint32` → `long`; `uint32 + uint32` →
+  `uint32`; `uint64 + long` → `long` (reinterpretasi bit 64-bit).
+  Aturan ini eksplisit (Java tidak punya unsigned) dan diuji oracle.
+- `%` untuk `float`/`double` = sisa truncasi (`a - trunc(a/b)*b`).
+- `println` memakai format per tipe: `%ld` (long), `%lu` (uint64),
+  `%u` (uint8/16/32), `%.9g` (float), `%.15g` (double).
+
+**Batas jujur**
+
+- Array baru tersedia untuk `int[]`; `long[]`, `double[]`, dll. belum.
+- Lambda (`fn`) masih menerima/mengembalikan `int` saja.
+- Overflow membungkus (wrap), tidak melempar galat; `float→int` memakai
+  truncation + saturasi backend (perilaku nilai ekstrem/NaN didokumentasikan
+  sebagai batas, bukan jaminan lintas-CPU).
+- Backend **x64** menerima tipe baru (assembly lolos `cc -target`, diuji
+  sintaks); eksekusi runtime baru diverifikasi di **aarch64** dan **VM**.
 
 ## Lambda (`fn` / arrow function)
 
@@ -271,14 +323,15 @@ Kopi, bukan kode built-in compiler:
 
 ### Batas jujur pustaka matematika
 
-Semua fungsi di atas bekerja pada **`int` 32-bit bertanda** (semantik Java):
+Pustaka `Math`/`Stats`/`Matrix` masih bekerja pada **`int` 32-bit bertanda**:
 hasil yang melampaui ±2³¹ **membungkus (wrap)**, bukan melempar galat —
-rentang aman didokumentasikan per fungsi. Belum ada `long`/`double`, jadi
-**tidak ada** trigonometri, logaritma real, pecahan, atau bilangan besar
-umum; `sqrt`/`cbrt`/`log2`/`log10` adalah versi **bulat**. `primesUpTo`/
-`primeCount` memakai sieve O(n) memori; `Matrix` hanya matriks persegi dan
-`det` umum dibatasi n ≤ 3. Untuk kriptografi, pakai `lib/crypto/` yang punya
-aritmetika modular khusus (`Big`, `X25519`) — bukan `Math` umum.
+rentang aman didokumentasikan per fungsi. Bahasa kini punya `long`, `float`,
+`double`, dan `uint8..64` (v1.6), tetapi fungsi pustaka ini belum dinaikkan
+ke tipe tersebut; trigonometri/log real juga belum ada. `sqrt`/`cbrt`/
+`log2`/`log10` adalah versi **bulat**. `primesUpTo`/`primeCount` memakai
+sieve O(n) memori; `Matrix` hanya matriks persegi dan `det` umum dibatasi
+n ≤ 3. Untuk kriptografi, pakai `lib/crypto/` yang punya aritmetika modular
+khusus (`Big`, `X25519`) — bukan `Math` umum.
 
 `Arrays` dan `Crypto` adalah bukti paling kuat bahasanya benar-benar
 *bahasa*: keduanya ditulis 100% dalam Kopi murni, tanpa satu pun builtin
@@ -430,7 +483,7 @@ kopi/
 
 ## Roadmap (fondasinya sudah rapi)
 
-- `long` (64-bit), `double`, `char`, `String` sebagai tipe sebenarnya
+- `char`, `String` sebagai tipe sebenarnya; **array bertipe** (`long[]`, `double[]`, ...); lambda dengan tipe numerik baru
 - operator bitwise `& ^ | << >>` (Crypto bisa diubah jadi native shift) +
   ternary `? :`
 - instance class (field, `new`, virtual dispatch / vtable)

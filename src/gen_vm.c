@@ -16,6 +16,16 @@ enum {
     OP_NEWARR,                      /* lambda/closure + array arena */
     OP_NET,                         /* builtin Net.* (syscall host) */
     OP_BAND, OP_BOR, OP_BXOR, OP_SHL, OP_SHR, OP_USHR, OP_BNOT,   /* v1.5 bitwise */
+    OP_ICONST64,
+    OP_ADD64, OP_SUB64, OP_MUL64, OP_DIV64, OP_MOD64,
+    OP_UDIV64, OP_UMOD64, OP_AND64, OP_OR64, OP_XOR64,
+    OP_SHL64, OP_SHR64, OP_USHR64, OP_NEG64, OP_BNOT64,
+    OP_LT64, OP_GT64, OP_LE64, OP_GE64,
+    OP_LTU64, OP_GTU64, OP_LEU64, OP_GEU64,
+    OP_EQ64, OP_NE64,
+    OP_FADD, OP_FSUB, OP_FMUL, OP_FDIV, OP_FMOD, OP_FNEG,
+    OP_FLT, OP_FGT, OP_FLE, OP_FGE, OP_FEQ, OP_FNE,
+    OP_CONV, OP_NORM, OP_PRINTNUM,
 };
 
 typedef struct {
@@ -28,6 +38,7 @@ typedef struct {
 } Ctx;
 
 static Ctx cx;
+static Method *cur_meth;
 static int brk_lab[64], cont_lab[64], brk_sp;
 
 static void em8(int v) { cx.buf[cx.len++] = (uint8_t)v; }
@@ -36,6 +47,12 @@ static void em32(long v) {
     em8((int)(v & 0xff)); em8((int)((v >> 8) & 0xff));
     em8((int)((v >> 16) & 0xff)); em8((int)((v >> 24) & 0xff));
 }
+
+static void emit_conv(Ty from, Ty to) {
+    if (from == to) return;
+    em8(OP_CONV); em8((int)from); em8((int)to);
+}
+static void emit_norm(Ty t) { em8(OP_NORM); em8((int)t); }
 
 static int newlab(void) { return cx.nlab++; }
 static void mark(int lab) { cx.labpos[lab] = cx.len; }
@@ -53,11 +70,9 @@ static void gen_stmts(Node *lst);
 static void gen_stmt(Node *s) {
     switch (s->kind) {
     case ST_VAR:
-        gen_expr(s->a);
-        em8(OP_ISTORE); em16((int)s->ival);
-        break;
     case ST_ASSIGN:
         gen_expr(s->a);
+        emit_conv((Ty)s->a->dty, (Ty)s->dty);
         em8(OP_ISTORE); em16((int)s->ival);
         break;
     case ST_IF: {
@@ -104,8 +119,12 @@ static void gen_stmt(Node *s) {
     case ST_BRK: jmp(OP_JMP, brk_lab[brk_sp - 1]); break;
     case ST_CONT: jmp(OP_JMP, cont_lab[brk_sp - 1]); break;
     case ST_RETURN:
-        if (s->a) gen_expr(s->a);
-        else { em8(OP_ICONST); em32(0); }
+        if (s->a) {
+            gen_expr(s->a);
+            emit_conv((Ty)s->a->dty, cur_meth->ret);
+        } else {
+            em8(OP_ICONST); em32(0);
+        }
         em8(OP_RET);
         break;
     case ST_PRINT:
@@ -113,7 +132,12 @@ static void gen_stmt(Node *s) {
             em8(s->ival ? OP_PRINTSLN : OP_PRINTS); em16((int)s->cp);
         } else {
             gen_expr(s->a);
-            em8(s->ival ? OP_PRINTILN : OP_PRINTI);
+            Ty pt = (Ty)s->a->dty;
+            if (pt == T_INT || pt == T_BOOL) {
+                em8(s->ival ? OP_PRINTILN : OP_PRINTI);
+            } else {
+                em8(OP_PRINTNUM); em8((int)pt); em8(s->ival ? 1 : 0);
+            }
         }
         break;
     case ST_EXPR:
@@ -138,18 +162,133 @@ static void gen_stmts(Node *lst) {
     for (Node *n = lst; n; n = n->next) gen_stmt(n);
 }
 
+static void gen_bin_typed(Node *e) {
+    Ty lt = (Ty)e->a->dty, rt = (Ty)e->b->dty;
+    char op = e->str[0];
+    int two = e->str[1] != 0;
+    int isShift = !strcmp(e->str, "<<") || !strcmp(e->str, ">>") ||
+                  !strcmp(e->str, ">>>");
+    int isCmp = (op == '=' || op == '!') && two;
+    if (!isCmp)
+        isCmp = op == '<' || op == '>' || !strcmp(e->str, "<=") ||
+                !strcmp(e->str, ">=");
+    Ty P = isShift ? lt : ty_promote(lt, rt);
+
+    gen_expr(e->a);
+    emit_conv(lt, P);
+    gen_expr(e->b);
+    if (!isShift) emit_conv(rt, P);
+
+    if (ty_is_float(P)) {
+        int sub = (P == T_FLOAT) ? 0 : 1;
+        if (isCmp) {
+            if (op == '=') em8(OP_FEQ);
+            else if (op == '!') em8(OP_FNE);
+            else if (!strcmp(e->str, "<=")) em8(OP_FLE);
+            else if (!strcmp(e->str, ">=")) em8(OP_FGE);
+            else if (op == '<') em8(OP_FLT);
+            else em8(OP_FGT);
+            em8(sub);
+        } else {
+            if (op == '+') em8(OP_FADD);
+            else if (op == '-') em8(OP_FSUB);
+            else if (op == '*') em8(OP_FMUL);
+            else if (op == '/') em8(OP_FDIV);
+            else if (op == '%') em8(OP_FMOD);
+            else die("gen_vm: operator float '%s'", e->str);
+            em8(sub);
+        }
+        return;
+    }
+    int uns = ty_is_uint(P);
+    if (isShift) {
+        int mask = ty_width(P) - 1;
+        if (mask <= 0) mask = 31;
+        if (!strcmp(e->str, "<<")) em8(OP_SHL64);
+        else if (!strcmp(e->str, ">>")) em8(OP_SHR64);
+        else em8(OP_USHR64);
+        em8(mask);
+        emit_norm(P);
+        return;
+    }
+    if (isCmp) {
+        if (op == '=') em8(OP_EQ64);
+        else if (op == '!') em8(OP_NE64);
+        else if (!strcmp(e->str, "<=")) em8(uns ? OP_LEU64 : OP_LE64);
+        else if (!strcmp(e->str, ">=")) em8(uns ? OP_GEU64 : OP_GE64);
+        else if (op == '<') em8(uns ? OP_LTU64 : OP_LT64);
+        else em8(uns ? OP_GTU64 : OP_GT64);
+        return;
+    }
+    switch (op) {
+    case '+': em8(OP_ADD64); break;
+    case '-': em8(OP_SUB64); break;
+    case '*': em8(OP_MUL64); break;
+    case '/': em8(uns ? OP_UDIV64 : OP_DIV64); break;
+    case '%': em8(uns ? OP_UMOD64 : OP_MOD64); break;
+    case '&': em8(OP_AND64); break;
+    case '|': em8(OP_OR64); break;
+    case '^': em8(OP_XOR64); break;
+    default: die("gen_vm: operator '%s'", e->str);
+    }
+    emit_norm(P);
+}
+
 static void gen_expr(Node *e) {
     switch (e->kind) {
-    case EX_INT: em8(OP_ICONST); em32(e->ival); break;
-    case EX_BOOL: em8(OP_ICONST); em32(e->ival); break;
-    case EX_VAR: em8(OP_ILOAD); em16((int)e->ival); break;
-    case EX_UN:
-        gen_expr(e->a);
-        em8(e->str[0] == '-' ? OP_NEG : e->str[0] == '~' ? OP_BNOT : OP_NOT);
+    case EX_INT: {
+        Ty t = (Ty)e->dty;
+        if (t == T_INT) {
+            em8(OP_ICONST); em32(e->ival);
+        } else {
+            unsigned long long bits;
+            if (t == T_FLOAT) {
+                union { float f; uint32_t u; } cv;
+                cv.f = (float)e->fval;
+                bits = cv.u;
+            } else if (t == T_DOUBLE) {
+                union { double d; uint64_t u; } cv;
+                cv.d = e->fval;
+                bits = cv.u;
+            } else {
+                bits = (unsigned long long)e->ival;
+            }
+            em8(OP_ICONST64);
+            for (int k = 0; k < 8; k++) em8((int)((bits >> (8 * k)) & 0xff));
+        }
         break;
+    }
+    case EX_BOOL: em8(OP_ICONST); em32(e->ival); break;
+    case EX_CAST:
+        gen_expr(e->a);
+        emit_conv((Ty)e->a->dty, (Ty)e->dty);
+        break;
+    case EX_VAR: em8(OP_ILOAD); em16((int)e->ival); break;
+    case EX_UN: {
+        Ty t = (Ty)e->dty;
+        gen_expr(e->a);
+        if (e->str[0] == '!') { em8(OP_NOT); break; }
+        if (ty_is_float(t)) {
+            em8(OP_FNEG);
+            em8(t == T_FLOAT ? 0 : 1);
+            break;
+        }
+        if (t == T_INT) {
+            em8(e->str[0] == '-' ? OP_NEG : OP_BNOT);
+            break;
+        }
+        em8(e->str[0] == '-' ? OP_NEG64 : OP_BNOT64);
+        emit_norm(t);
+        break;
+    }
     case EX_CALL: {
         int i = 0;
-        for (Node *a = e->a; a; a = a->next) { gen_expr(a); i++; }
+        Param *pp = e->meth ? e->meth->params : 0;
+        for (Node *a = e->a; a; a = a->next, pp = pp ? pp->next : 0) {
+            gen_expr(a);
+            if (pp) emit_conv((Ty)a->dty, (Ty)pp->ty);
+            i++;
+        }
         em8(OP_CALL); em16((int)e->ival); em16(i);
         break;
     }
@@ -194,6 +333,12 @@ static void gen_expr(Node *e) {
         em8(OP_ALEN);
         break;
     case EX_BIN: {
+        Ty bl = (Ty)e->a->dty, br = (Ty)e->b->dty, bres = (Ty)e->dty;
+        if (!((bl == T_INT || bl == T_BOOL) && (br == T_INT || br == T_BOOL) &&
+              (bres == T_INT || bres == T_BOOL))) {
+            gen_bin_typed(e);
+            break;
+        }
         char op = e->str[0];
         if ((op == '&' || op == '|') && e->str[1] != 0) {
             /* short-circuit: hasil selalu 0/1 */
@@ -243,6 +388,7 @@ static void gen_expr(Node *e) {
 
 /* tulis satu metode: isi buffer bytecode lalu flush sebagai entri file */
 static void write_method(FILE *f, Method *m) {
+    cur_meth = m;
     cx.len = 0; cx.nfixes = 0; cx.nlab = 0;
     memset(cx.labpos, 0xff, sizeof(cx.labpos));
 

@@ -45,12 +45,25 @@ static Method *cur_method;
 
 /* ---------- tipe ---------- */
 
-static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) */
+static int is_type_tok(int t) {
+    return t == KW_INT || t == KW_BOOL || t == KW_VOID || t == KW_FN ||
+           t == KW_STRING || t == KW_LONG || t == KW_DOUBLE || t == KW_FLOAT ||
+           t == KW_UINT8 || t == KW_UINT16 || t == KW_UINT32 || t == KW_UINT64;
+}
+
+static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) | numerik baru */
     if (at(KW_INT)) {
         advance();
         if (at('[')) { advance(); expect(']', "']' setelah '[' pada int[]"); return T_ARI; }
         return T_INT;
     }
+    if (at(KW_LONG))   { advance(); return T_LONG; }
+    if (at(KW_DOUBLE)) { advance(); return T_DOUBLE; }
+    if (at(KW_FLOAT))  { advance(); return T_FLOAT; }
+    if (at(KW_UINT8))  { advance(); return T_UINT8; }
+    if (at(KW_UINT16)) { advance(); return T_UINT16; }
+    if (at(KW_UINT32)) { advance(); return T_UINT32; }
+    if (at(KW_UINT64)) { advance(); return T_UINT64; }
     if (at(KW_BOOL)) { advance(); return T_BOOL; }
     if (at(KW_VOID)) { advance(); return T_VOID; }
     if (at(KW_FN)) { advance(); return T_FN; }
@@ -144,6 +157,7 @@ static Node *compound_assign(int line, int eat_semi) {
         bin->b = expr();
     }
     n->a = bin;
+    n->cp = 1;                    /* penanda: compound assignment (narrowing implisit) */
     if (eat_semi) expect(';', "';'");
     return n;
 }
@@ -198,7 +212,8 @@ static Node *stmt_single(void) {
     int line = t->line;
 
     switch (t->type) {
-    case KW_INT: case KW_BOOL: case KW_FN: {
+    case KW_INT: case KW_BOOL: case KW_FN: case KW_LONG: case KW_DOUBLE:
+    case KW_FLOAT: case KW_UINT8: case KW_UINT16: case KW_UINT32: case KW_UINT64: {
         Ty ty = type_opt();
         /* multi-deklarasi: int a = 0, b = 1; → rantai ST_VAR via ->next */
         Node *head = 0, *tailst = 0;
@@ -241,7 +256,7 @@ static Node *stmt_single(void) {
         advance();
         expect('(', "'(' setelah for");
         /* init */
-        if (at(KW_INT) || at(KW_BOOL) || at(KW_FN)) {
+        if (is_type_tok(peek()->type)) {
             Node *v = newnode(ST_VAR, line);
             v->dty = (int)type_opt();
             v->str = xs(peek()->text);
@@ -450,10 +465,31 @@ static Node *parse_lambda(int line) {
 
 /* ---------- ekspresi (precedence climbing) ---------- */
 
+static Node *postfix(void);   /* deklarasi maju: operand cast */
+
 static Node *primary(void) {
     Tok *t = peek();
     int line = t->line;
-    if (at(T_NUM)) { Node *n = newnode(EX_INT, line); n->ival = t->num; advance(); return n; }
+    if (at(T_NUM)) {
+        Node *n = newnode(EX_INT, line);
+        n->ival = t->num;
+        n->fval = t->fnum;
+        n->dty = t->numty;
+        advance();
+        return n;
+    }
+    /* cast eksplisit gaya Java: (tipe) unary — tipe numerik saja */
+    if (at('(') && is_type_tok(ts[ti + 1].type)) {
+        advance();
+        Ty ct = type_opt();
+        expect(')', "')' setelah tipe pada cast");
+        if (!ty_is_num(ct))
+            die("baris %d: cast hanya untuk tipe numerik", line);
+        Node *n = newnode(EX_CAST, line);
+        n->dty = (int)ct;
+        n->a = postfix();
+        return n;
+    }
     if (at(KW_TRUE)) { Node *n = newnode(EX_BOOL, line); n->ival = 1; advance(); return n; }
     if (at(KW_FALSE)) { Node *n = newnode(EX_BOOL, line); n->ival = 0; advance(); return n; }
     if (lambda_ahead()) return parse_lambda(line);
@@ -838,48 +874,94 @@ static Ty resolve_lambda(Node *ar) {
     return hm->ret;
 }
 
+static Ty type_expr_raw(Node *e);
+static int fits_literal(Ty dst, Node *e);
+
 static Ty type_expr(Node *e) {
+    Ty t = type_expr_raw(e);
+    e->dty = (int)t;          /* semua ekspresi menyimpan tipe hasilnya */
+    return t;
+}
+
+static Ty type_expr_raw(Node *e) {
     g_linefile = e->file;
     switch (e->kind) {
-    case EX_INT: return T_INT;
+    case EX_INT:  return (Ty)e->dty;      /* tipe literal ditentukan lexer */
     case EX_BOOL: return T_BOOL;
+    case EX_CAST: {
+        Ty from = type_expr(e->a);
+        Ty to = (Ty)e->dty;
+        if (!ty_is_num(from) || !ty_is_num(to))
+            die("baris %d: cast hanya antar tipe numerik", e->line);
+        return to;
+    }
     case EX_VAR: { SVar *v = resolve_name(e->str, e->line); e->ival = v->slot; e->dty = (int)v->ty; return v->ty; }
     case EX_UN: {
         Ty t = type_expr(e->a);
-        if (e->str[0] == '-' && t != T_INT)
-            die("baris %d: '-' butuh operand int", e->line);
-        if (e->str[0] == '!' && t != T_BOOL)
-            die("baris %d: '!' butuh operand boolean", e->line);
-        if (e->str[0] == '~') {
-            if (t != T_INT) die("baris %d: '~' butuh operand int", e->line);
-            return T_INT;
+        if (e->str[0] == '!') {
+            if (t != T_BOOL)
+                die("baris %d: '!' butuh operand boolean", e->line);
+            return T_BOOL;
         }
-        return e->str[0] == '-' ? T_INT : T_BOOL;
+        if (e->str[0] == '~') {
+            if (!ty_is_int(t))
+                die("baris %d: '~' butuh operand integer", e->line);
+            return t;
+        }
+        if (!ty_is_num(t))
+            die("baris %d: '-' butuh operand numerik", e->line);
+        return t;
     }
     case EX_BIN: {
         Ty lt = type_expr(e->a), rt = type_expr(e->b);
         char op = e->str[0];
-        if ((op == '&' || op == '|') && e->str[1] != 0) {   /* "&&" / "||" saja */
+        int two = e->str[1] != 0;
+        if ((op == '&' || op == '|') && two) {      /* "&&" / "||" saja */
             if (lt != T_BOOL || rt != T_BOOL)
                 die("baris %d: '&&' / '||' butuh operand boolean", e->line);
             return T_BOOL;
         }
-        if (op == '=' || op == '!' ) {         /* == != */
-            if (lt != rt) die("baris %d: tipe operand '==' / '!=' beda", e->line);
+        int isShift = !strcmp(e->str, "<<") || !strcmp(e->str, ">>") ||
+                      !strcmp(e->str, ">>>");
+        if (isShift) {
+            if (!ty_is_int(lt) || !ty_is_int(rt))
+                die("baris %d: operator '%s' butuh operand integer", e->line, e->str);
+            return lt;
+        }
+        if ((op == '=' || op == '!') && two) {      /* == != */
+            if (lt == T_BOOL && rt == T_BOOL) return T_BOOL;
+            if (!ty_is_num(lt) || !ty_is_num(rt))
+                die("baris %d: '==' / '!=' butuh operand numerik/boolean", e->line);
+            Ty p = ty_promote(lt, rt);
+            if (!ty_can_implicit(p, lt) || !ty_can_implicit(p, rt))
+                die("baris %d: operand '==' / '!=' perlu cast eksplisit", e->line);
             return T_BOOL;
         }
-        if ((op == '<' || op == '>') && e->str[1] == 0) {   /* relasional, bukan << / >> */
-            if (lt != T_INT || rt != T_INT)
-                die("baris %d: tanda pembanding butuh int", e->line);
+        if (op == '<' || op == '>' || !strcmp(e->str, "<=") || !strcmp(e->str, ">=")) {
+            if (!ty_is_num(lt) || !ty_is_num(rt))
+                die("baris %d: tanda pembanding butuh numerik", e->line);
+            Ty p = ty_promote(lt, rt);
+            if (!ty_can_implicit(p, lt) || !ty_can_implicit(p, rt))
+                die("baris %d: operand pembanding perlu cast eksplisit", e->line);
             return T_BOOL;
         }
-        if (!strcmp(e->str, "<=") || !strcmp(e->str, ">=")) {
-            if (lt != T_INT || rt != T_INT)
-                die("baris %d: tanda pembanding butuh int", e->line);
-            return T_BOOL;
+        if (op == '&' || op == '|' || op == '^') {
+            if (!ty_is_int(lt) || !ty_is_int(rt))
+                die("baris %d: operator '%s' butuh operand integer", e->line, e->str);
+            Ty p = ty_promote(lt, rt);
+            if (!ty_can_implicit(p, lt) || !ty_can_implicit(p, rt))
+                die("baris %d: operand '%s' perlu cast eksplisit", e->line, e->str);
+            return p;
         }
-        if (lt != T_INT || rt != T_INT)
-            die("baris %d: operator '%s' butuh operand int", e->line, e->str);
+        if (op == '+' || op == '-' || op == '*' || op == '/' || op == '%') {
+            if (!ty_is_num(lt) || !ty_is_num(rt))
+                die("baris %d: operator '%s' butuh operand numerik", e->line, e->str);
+            Ty p = ty_promote(lt, rt);
+            if (!ty_can_implicit(p, lt) || !ty_can_implicit(p, rt))
+                die("baris %d: operand '%s' perlu cast eksplisit", e->line, e->str);
+            return p;
+        }
+        die("baris %d: operator '%s' tidak didukung", e->line, e->str);
         return T_INT;
     }
     case EX_CALL: {
@@ -962,6 +1044,7 @@ static Ty type_expr(Node *e) {
                 die("baris %d: maksimal 5 argumen pemanggilan lambda", e->line);
             return T_INT;   /* tipe kembalian lambda dinamis: int (v1) */
         }
+        e->meth = m;
         int i = 0;
         for (Node *aa = e->a; aa; aa = aa->next, i++) {
             Ty at = type_expr(aa);
@@ -971,12 +1054,13 @@ static Ty type_expr(Node *e) {
                 for (int k = 0; k < i && p; k++) p = p->next;
                 if (p) pt = (Ty)p->ty;
             }
-            if (pt == (Ty)T_INT && at != T_INT)
-                die("baris %d: argumen %s harus int", e->line, e->str);
-            if (pt == (Ty)T_BOOL && at != T_BOOL)
-                die("baris %d: argumen %s harus boolean", e->line, e->str);
-            if (pt == (Ty)T_FN && at != T_FN)
-                die("baris %d: argumen %s butuh lambda (fn)", e->line, e->str);
+            if (pt == T_FN) {
+                if (at != T_FN)
+                    die("baris %d: argumen %s butuh lambda (fn)", e->line, e->str);
+            } else if (!ty_can_implicit(pt, at) && !fits_literal(pt, aa)) {
+                die("baris %d: argumen %d %s tipe tidak cocok — butuh cast eksplisit",
+                    e->line, i, e->str);
+            }
         }
         int want = m->nparams, got = (int)e->ival;
         if (want != got)
@@ -1012,6 +1096,21 @@ static Ty type_expr(Node *e) {
 
 static void resolve_stmts(Node *lst);
 
+/* literal int yang muat ke tipe tujuan (Java: constant narrowing) */
+static int fits_literal(Ty dst, Node *e) {
+    if (e->kind != EX_INT || !ty_is_int(dst)) return 0;
+    long v = e->ival;
+    switch (dst) {
+    case T_INT:    return v >= -2147483648L && v <= 2147483647L;
+    case T_LONG:   return 1;
+    case T_UINT8:  return v >= 0 && v <= 255;
+    case T_UINT16: return v >= 0 && v <= 65535;
+    case T_UINT32: return v >= 0 && v <= 4294967295L;
+    case T_UINT64: return 1;
+    default: return 0;
+    }
+}
+
 static void resolve_stmt(Node *s) {
     g_linefile = s->file;
     switch (s->kind) {
@@ -1019,16 +1118,20 @@ static void resolve_stmt(Node *s) {
         if (nscope >= 1020) die("terlalu banyak variabel lokal");
         scope_push(s->str, nextslot++, (Ty)s->dty);
         Ty et = type_expr(s->a);
-        if (et != (Ty)s->dty)
-            die("baris %d: inisialisasi '%s' tidak cocok dengan tipe deklarasinya", s->line, s->str);
+        if (!ty_can_implicit((Ty)s->dty, et) && !fits_literal((Ty)s->dty, s->a))
+            die("baris %d: inisialisasi '%s' tidak cocok dengan tipe deklarasinya (butuh cast)",
+                s->line, s->str);
         s->ival = nextslot - 1;
         break;
     }
     case ST_ASSIGN: {
         SVar *v = resolve_name(s->str, s->line);
         Ty et = type_expr(s->a);
-        if (et != v->ty)
-            die("baris %d: assignment '%s' tidak cocok tipe", s->line, s->str);
+        int compound = (int)s->cp;
+        if (!ty_can_implicit(v->ty, et) &&
+            !(compound && ty_is_int(v->ty) && ty_is_int(et)) &&
+            !fits_literal(v->ty, s->a))
+            die("baris %d: assignment '%s' tidak cocok tipe (butuh cast)", s->line, s->str);
         s->ival = v->slot;
         s->dty = (int)v->ty;   /* stamp tipe → codegen 32/64-bit */
         break;
@@ -1073,8 +1176,9 @@ static void resolve_stmt(Node *s) {
             Ty et = type_expr(s->a);
             /* ret metode aktif: cari lewat prog? simpan global current */
             if (!cur_method) die("internal: return tanpa metode");
-            if (et != cur_method->ret)
-                die("baris %d: return tidak cocok dengan tipe metode", s->line);
+            if (!ty_can_implicit(cur_method->ret, et) &&
+                !fits_literal(cur_method->ret, s->a))
+                die("baris %d: return tidak cocok dengan tipe metode (butuh cast)", s->line);
         } else if (cur_method->ret != T_VOID) {
             die("baris %d: metode ini harus return nilai", s->line);
         }
@@ -1083,8 +1187,8 @@ static void resolve_stmt(Node *s) {
     case ST_PRINT: {
         if (s->str) return;
         Ty et = type_expr(s->a);
-        if (et != T_INT && et != T_BOOL)
-            die("baris %d: println/print hanya menerima int, boolean, atau string literal", s->line);
+        if (!ty_is_num(et) && et != T_BOOL)
+            die("baris %d: println/print hanya menerima numerik, boolean, atau string literal", s->line);
         break;
     }
     case ST_EXPR:

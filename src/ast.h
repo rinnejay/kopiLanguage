@@ -1,7 +1,98 @@
 #ifndef AST_H
 #define AST_H
 
-typedef enum { T_INT, T_BOOL, T_VOID, T_STR, T_FN, T_ARI } Ty;
+typedef enum {
+    T_INT, T_BOOL, T_VOID, T_STR, T_FN, T_ARI,
+    /* tipe numerik tambahan (v1.6) */
+    T_LONG, T_DOUBLE, T_FLOAT,
+    T_UINT8, T_UINT16, T_UINT32, T_UINT64
+} Ty;
+
+/* ── sifat tipe numerik ─────────────────────────────────────────── */
+
+static inline int ty_is_float(Ty t) {
+    return t == T_FLOAT || t == T_DOUBLE;
+}
+
+static inline int ty_is_uint(Ty t) {
+    return t == T_UINT8 || t == T_UINT16 || t == T_UINT32 || t == T_UINT64;
+}
+
+/* semua integer bertanda/unsigned (bukan bool) */
+static inline int ty_is_int(Ty t) {
+    return t == T_INT || t == T_LONG || ty_is_uint(t);
+}
+
+static inline int ty_is_num(Ty t) {
+    return ty_is_int(t) || ty_is_float(t);
+}
+
+/* lebar bit; 0 untuk non-numerik */
+static inline int ty_width(Ty t) {
+    switch (t) {
+    case T_INT: case T_UINT32: return 32;
+    case T_LONG: case T_UINT64: return 64;
+    case T_UINT8: return 8;
+    case T_UINT16: return 16;
+    case T_FLOAT: return 32;
+    case T_DOUBLE: return 64;
+    default: return 0;
+    }
+}
+
+/* peringkat promosi (makin besar makin lebar/umum).
+ * Aturan Kopi: int + uint32 → int (signed menang pada lebar sama);
+ * long + uint64 → long. Ini bukan aturan Java (Java tak punya unsigned),
+ * didefinisikan eksplisit dan diuji. */
+static inline int ty_rank(Ty t) {
+    switch (t) {
+    case T_UINT8:  return 1;
+    case T_UINT16: return 2;
+    case T_UINT32: return 3;
+    case T_INT:    return 4;
+    case T_UINT64: return 5;
+    case T_LONG:   return 6;
+    case T_FLOAT:  return 7;
+    case T_DOUBLE: return 8;
+    default:       return 0;
+    }
+}
+
+static inline Ty ty_promote(Ty a, Ty b) {
+    if (ty_is_float(a) || ty_is_float(b))
+        return ty_rank(a) >= ty_rank(b) ? a : b;
+    if (!ty_is_int(a) || !ty_is_int(b)) return T_INT;
+    int ua = ty_is_uint(a), ub = ty_is_uint(b);
+    if (ua == ub)
+        return ty_width(a) >= ty_width(b) ? a : b;
+    /* campuran signed/unsigned: perlu tipe signed yang lebih lebar
+     * (int+uint32 → long; uint64+long → long dengan reinterpretasi bit) */
+    Ty sg = ua ? b : a;
+    Ty un = ua ? a : b;
+    if (ty_width(sg) > ty_width(un)) return sg;
+    if (ty_width(un) < 32) return T_INT;
+    return T_LONG;
+}
+
+/* boleh dikonversi implisit (pelebaran), selain itu butuh cast eksplisit */
+static inline int ty_can_implicit(Ty dst, Ty src) {
+    if (dst == src) return 1;
+    if (!ty_is_num(dst) || !ty_is_num(src)) return 0;
+    if (ty_is_float(dst)) {
+        if (ty_is_float(src)) return ty_rank(dst) >= ty_rank(src);
+        /* int apa pun → float/double: Java mengizinkan int→float/double,
+         * long→float boleh (presisi hilang tetapi legal di Java) */
+        return 1;
+    }
+    if (ty_is_float(src)) return 0;             /* butuh cast */
+    /* dua-duanya integer */
+    if (ty_is_uint(dst) == ty_is_uint(src))
+        return ty_width(dst) >= ty_width(src);
+    if (ty_is_uint(dst))                        /* signed → unsigned */
+        return ty_width(dst) > ty_width(src) && src != T_LONG;
+    /* unsigned → signed (lebar sama boleh: reinterpretasi bit) */
+    return ty_width(dst) >= ty_width(src);
+}
 
 /* Node kinds */
 enum {
@@ -15,6 +106,7 @@ enum {
     EX_LEN,        /* a.length : a=array expr                             */
     EX_NET,        /* builtin Net.* : ival=idx builtin, a=args            */
     EX_STRLIT,     /* string literal dalam ekspresi (khusus Net.bytes)    */
+    EX_CAST,       /* (tipe) expr : a=operand, dty=tipe tujuan            */
     /* statements */
     ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
@@ -26,10 +118,12 @@ typedef struct Node {
     int kind;
     const char *str;   /* nama / operator / string literal */
     long ival;         /* nilai literal; slot ter resolusi / scratch codegen */
+    double fval;       /* literal float/double atau nilai cast compile-time */
     long cp;           /* index cpool (ST_PRINT string atau grep codegen) */
-    int dty;           /* tipe deklarasi ST_VAR */
+    int dty;           /* tipe deklarasi / tipe hasil ekspresi */
     int line;
     const char *file;  /* file sumber AST — untuk laporan error */
+    struct Method *meth; /* EX_CALL: metode target (untuk konversi argumen) */
     struct Node *a, *b, *c, *d;   /* anak generik */
     struct Node *next;        /* penghubung list statement */
 } Node;
