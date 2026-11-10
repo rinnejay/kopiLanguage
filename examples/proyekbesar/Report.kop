@@ -1,0 +1,14 @@
+import Bytes;
+import Conv;
+import StatsX;
+
+class Report {
+    static int[] summary(int[] values) {
+        int[] o = Bytes.cat(Net.bytes("n="), Conv.itoa(values.length));
+        o = Bytes.cat(o, Net.bytes(" mean="));
+        o = Bytes.cat(o, Conv.itoa(StatsX.mean(values)));
+        o = Bytes.cat(o, Net.bytes(" max="));
+        o = Bytes.cat(o, Conv.itoa(StatsX.max(values)));
+        return o;
+    }
+}

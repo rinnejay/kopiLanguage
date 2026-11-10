@@ -196,6 +196,13 @@ printf '%s\n' \
  '5' '20' '1' '3' '1' '2.5' '1' '1000' '0' > "$T/kopi/jsontest.ref"
 check jsontest "$T/kopi/jsontest.kop"
 
+# ─── proyek besar: 54 file saling import + fase memori ──────────────────
+cp examples/proyekbesar/expected.out "$T/kopi/proyekbesar.ref"
+check proyekbesar examples/proyekbesar/ProyekBesar.kop
+./kopicc examples/proyekbesar/ProyekBesar.kop -t x64 -o "$T/kopi/proyekbesar64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/proyekbesar64.s" -o /dev/null \
+    && echo "PASS  proyekbesar [x64]" || { echo "FAIL  proyekbesar [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
 printf '1\n1\n1\n0\n' > "$T/kopi/aeadvec.ref"

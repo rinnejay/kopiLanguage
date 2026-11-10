@@ -1,0 +1,36 @@
+import Case;
+
+class LexerX {
+    static int tokCount(int[] s) {
+        int n = 0;
+        int i = 0;
+        while (i < s.length) {
+            int c = s[i];
+            if (c == 32) { i++; continue; }
+            if (Case.isDigit(c)) {
+                while (i < s.length && Case.isDigit(s[i])) i++;
+                n++;
+            } else { n++; i++; }
+        }
+        return n;
+    }
+    static int[] tokens(int[] s) {
+        int[] o = new int[s.length];
+        int k = 0;
+        int i = 0;
+        while (i < s.length) {
+            int c = s[i];
+            if (c == 32) { i++; continue; }
+            if (Case.isDigit(c)) {
+                int v = 0;
+                while (i < s.length && Case.isDigit(s[i])) { v = v * 10 + (s[i] - 48); i++; }
+                o[k] = v; k++;
+            } else {
+                o[k] = c + 1000; k++; i++;
+            }
+        }
+        int[] r = new int[k];
+        for (int j = 0; j < k; j++) r[j] = o[j];
+        return r;
+    }
+}

@@ -1,0 +1,13 @@
+import SortX;
+import StatsX;
+import Billing;
+
+class Pipeline {
+    static int run(int[] xs) {
+        int[] s = SortX.insertion(xs);
+        int m = StatsX.median(s);
+        int t = Billing.grand(m, 110, 5);
+        return t + StatsX.max(s);
+    }
+    static int stages() { return 4; }
+}

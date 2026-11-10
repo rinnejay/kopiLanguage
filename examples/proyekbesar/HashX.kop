@@ -1,0 +1,7 @@
+import Hash;
+import Bytes;
+
+class HashX {
+    static int[] sha(int[] data) { return Hash.sha256(data); }
+    static int firstByte(int[] data) { int[] h = Hash.sha256(data); return h[0]; }
+}

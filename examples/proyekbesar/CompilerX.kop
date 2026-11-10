@@ -1,0 +1,35 @@
+import LexerX;
+import StackX;
+
+class CompilerX {
+    static int prec(int t) {
+        if (t == 1043) return 1;
+        if (t == 1045) return 1;
+        if (t == 1042) return 2;
+        if (t == 1047) return 2;
+        return 0;
+    }
+    static int[] postfix(int[] s) {
+        int[] tk = LexerX.tokens(s);
+        int[] out = new int[tk.length];
+        int[] st = new int[tk.length + 1];
+        int k = 0;
+        for (int i = 0; i < tk.length; i++) {
+            int t = tk[i];
+            if (t < 1000) { out[k] = t; k++; }
+            else if (t == 1040 || t == 1041) {
+                while (StackX.size(st) > 0 && StackX.peek(st) != 1040) { out[k] = StackX.pop(st); k++; }
+                StackX.pop(st);
+            } else {
+                while (StackX.size(st) > 0 && prec(StackX.peek(st)) >= prec(t)) {
+                    out[k] = StackX.pop(st); k++;
+                }
+                StackX.push(st, t);
+            }
+        }
+        while (StackX.size(st) > 0) { out[k] = StackX.pop(st); k++; }
+        int[] r = new int[k];
+        for (int i = 0; i < k; i++) r[i] = out[i];
+        return r;
+    }
+}

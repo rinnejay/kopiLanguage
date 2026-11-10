@@ -1,0 +1,15 @@
+class Rng {
+    static int[] make(int seed) {
+        int[] st = new int[1];
+        st[0] = seed;
+        return st;
+    }
+    static int next(int[] st) {
+        st[0] = st[0] * 1103515245 + 12345;
+        return (st[0] >> 16) & 32767;
+    }
+    static int nextMod(int[] st, int m) {
+        if (m <= 0) return 0;
+        return next(st) % m;
+    }
+}

@@ -1,0 +1,12 @@
+class Billing {
+    static int tax(int subtotal, int permille) { return subtotal * permille / 1000; }
+    static int discount(int subtotal, int percent) {
+        if (percent <= 0) return 0;
+        return subtotal * percent / 100;
+    }
+    static int grand(int subtotal, int taxPermille, int discountPercent) {
+        int t = tax(subtotal, taxPermille);
+        int d = discount(subtotal, discountPercent);
+        return subtotal + t - d;
+    }
+}

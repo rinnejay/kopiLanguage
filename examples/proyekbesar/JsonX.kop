@@ -1,0 +1,14 @@
+import Json;
+
+class JsonX {
+    static int[] config(int port, int workers) {
+        return Json.obj4(Net.bytes("app"), Json.str(Net.bytes("KopiMart")),
+                         Net.bytes("port"), Json.num(Conv.itoa(port)),
+                         Net.bytes("workers"), Json.num(Conv.itoa(workers)),
+                         Net.bytes("debug"), Json.boolV(0));
+    }
+    static int getInt(int[] j, int[] key) {
+        return Json.asInt(Json.get(j, key));
+    }
+    static int[] write(int[] j) { return Json.write(j); }
+}

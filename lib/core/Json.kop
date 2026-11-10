@@ -579,6 +579,9 @@ class Json {
         return slice(obj, p, skip(obj, p) - p);
     }
 
+    /* API publik: serialisasi ke teks */
+    static int[] write(int[] v) { return wr(v); }
+
     /* tulis ke stdout (fd 1) byte demi byte — melengkapi println(int) */
     static void print(int[] v) {
         int[] s = wr(v);

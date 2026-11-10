@@ -1,0 +1,9 @@
+import Math;
+
+class MathX {
+    static int gcd(int a, int b) { return Math.gcd(a, b); }
+    static int lcm(int a, int b) { return Math.lcm(a, b); }
+    static int modpow(int a, int e, int m) { return Math.powMod(a, e, m); }
+    static int isqrt(int n) { return Math.sqrt(n); }
+    static boolean isPrime(int n) { return Math.isPrime(n); }
+}

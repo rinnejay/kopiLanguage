@@ -1,0 +1,7 @@
+import Arrays;
+
+class ArraysX {
+    static int[] sorted(int[] xs) { return Arrays.sort(xs); }
+    static int sum(int[] xs) { return Arrays.sum(xs); }
+    static int[] reversed(int[] xs) { return Arrays.reverse(xs); }
+}

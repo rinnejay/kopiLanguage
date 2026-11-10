@@ -1,0 +1,42 @@
+class Conv {
+    static int[] itoa(int v) {
+        boolean neg = v < 0;
+        int n = v;
+        if (neg) n = -n;
+        int[] tmp = new int[12];
+        int k = 0;
+        if (n == 0) { tmp[0] = 48; k = 1; }
+        while (n > 0) { tmp[k] = 48 + n % 10; k++; n = n / 10; }
+        int off = 0;
+        if (neg) off = 1;
+        int[] o = new int[k + off];
+        if (neg) o[0] = 45;
+        for (int i = 0; i < k; i++) o[off + i] = tmp[k - 1 - i];
+        return o;
+    }
+    static int atoi(int[] s) {
+        int i = 0;
+        boolean neg = false;
+        if (i < s.length && s[i] == 45) { neg = true; i++; }
+        int r = 0;
+        while (i < s.length) {
+            int c = s[i];
+            if (c < 48 || c > 57) break;
+            r = r * 10 + (c - 48);
+            i++;
+        }
+        if (neg) r = -r;
+        return r;
+    }
+    static int[] hex(int v) {
+        int[] tab = new int[16];
+        int[] dig = new int[16];
+        int k = 0;
+        int n = v;
+        if (n == 0) { int[] z = new int[1]; z[0] = 48; return z; }
+        while (n > 0) { int d = n % 16; if (d < 10) dig[k] = 48 + d; else dig[k] = 87 + d; k++; n = n / 16; }
+        int[] o = new int[k];
+        for (int i = 0; i < k; i++) o[i] = dig[k - 1 - i];
+        return o;
+    }
+}

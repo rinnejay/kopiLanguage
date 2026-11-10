@@ -1,0 +1,7 @@
+import Matrix;
+
+class MatrixX {
+    static int[] mul(int n, int[] a, int[] b) { return Matrix.mul(n, a, b); }
+    static int det3(int[] a) { return Matrix.det3(a); }
+    static int trace(int n, int[] a) { return Matrix.trace(n, a); }
+}

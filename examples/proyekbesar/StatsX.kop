@@ -1,0 +1,8 @@
+import Stats;
+
+class StatsX {
+    static int mean(int[] xs) { return Stats.mean(xs); }
+    static int median(int[] xs) { return Stats.median(xs); }
+    static int variance(int[] xs) { return Stats.variance(xs); }
+    static int max(int[] xs) { return Stats.max(xs); }
+}

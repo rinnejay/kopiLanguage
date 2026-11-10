@@ -1,0 +1,25 @@
+import Conv;
+
+class RleX {
+    static int[] encode(int[] s) {
+        int[] o = new int[0];
+        int i = 0;
+        while (i < s.length) {
+            int c = s[i];
+            int n = 1;
+            while (i + n < s.length && s[i + n] == c) n++;
+            o = BytesCat(o, Conv.itoa(n));
+            o = BytesCat(o, one(c));
+            i = i + n;
+        }
+        return o;
+    }
+    static int[] one(int v) { int[] a = new int[1]; a[0] = v; return a; }
+    static int[] BytesCat(int[] a, int[] b) {
+        int[] o = new int[a.length + b.length];
+        int k = 0;
+        for (int i = 0; i < a.length; i++) { o[k] = a[i]; k++; }
+        for (int i = 0; i < b.length; i++) { o[k] = b[i]; k++; }
+        return o;
+    }
+}

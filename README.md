@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.6.4 hari ini  ████████████████  75/75 test hijau — JSON: literal, parse, akses, ubah, tulis (a64 + VM)
+v1.6.5 hari ini  ████████████████  77/77 test hijau — proyek 54 file, eksekusi paralel, ~24 MB RSS, tanpa hang
 ```
 
 | Versi | Isi |
@@ -67,6 +67,7 @@ v1.6.4 hari ini  ████████████████  75/75 test hi
 | **v1.6.2** | **UDP + HTTP header**: builtin baru `Net.bind`, `Net.sendto`, `Net.recvfrom`, `Net.shutdown` (syscall langsung di a64/x64, jalur host di VM) + modul `lib/net/Udp.kop` (`open/bind/sendTo/recvFrom/shutdown/close`), sumber datagram dicatat di `from[0]` (ip) / `from[1]` (port). `Tcp.shutdown` ditambahkan. `lib/net/Http.kop` diperluas: `reqEx`, `requestInto`, `getWith`, `postWith` (header permintaan kustom) serta `headerBlock`, `headerValue` (case-insensitive, nilai di-trim), `hasHeader` untuk membaca header respons. Backend x64 kini mendukung **8 argumen** (arg 7–8 lewat stack). Uji: UDP loopback bolak-balik (bind+sendto+recvfrom) dan server HTTP yang memeriksa header kustom + respons header, di VM & a64; sintaks x64 diperiksa. Batas jujur: datagram maks **240 byte** per kirim/terima (penyangga syscall v1) |
 | **v1.6.3** | **array fungsional + gula metode**: `Arrays.forEach`, `forEachIndexed`, `map`, `filter`, `reduce`, `any`, `all`, `countWhere`, `findIndex`, `sumBy`, `copy`, `reverse` (semuanya memakai lambda Kopi). Sintaks metode `a.forEach(f)`, `a.map(f)`, dst. didukung lewat desugaring ke `Arrays.*` (butuh `import Arrays;`). Perbaikan array: `Arrays.max/min` tidak lagi meledak pada array kosong, `take` meng-clamp `n < 0`. Uji baru `arrayfn` dan `arrchk` (return array besar 300 elemen, `new int[0]`, identitas) di VM & a64 + sintaks x64; suite 73/73 |
 | **v1.6.4** | **JSON native**: literal `json {...}` / `json [...]` (sampai 8 entri; lebih dari 4 pasangan objek dirangkai via `Json.put`), nilai berupa tape `int[]` sehingga bisa disimpan di variabel, dipassing, dan dikembalikan fungsi. Pustaka `lib/core/Json.kop`: `parse`, `write`, `print`/`line`, `typeOf`/`isNull`/`isBool`/`isNumber`/`isString`/`isArray`/`isObject`, `asInt`/`asDouble`/`asBool`/`asText`, `count`/`at`/`get`/`has`, `put`/`del`/`add` (immutable), konstruktor `nullV`/`boolV`/`num`/`str`/`arrN`/`objN`. Angka disimpan sebagai teks sumber (format dipertahankan), string di-escape saat ditulis, `\uXXXX` didekode ke UTF-8 (tanpa pasangan surrogate). Parser mengenal token `:`; uji `jsontest` di VM & a64 + sintaks x64; suite 75/75 |
+| **v1.6.5** | **uji ketangguhan proyek besar** `examples/proyekbesar/`: **54 file `.kop`** (53 modul + main) saling `import`, memakai pustaka (`Math`, `Arrays`, `Stats`, `Matrix`, `Json`, `Cipher`, `Hash`) dan modul lokal (struktur data, algoritma, CSV/JSON, inventory/order/billing, lexer/compiler/evaluator/VM mini). Harness `bench.py`: kompilasi a64/VM/x64 **paralel**, eksekusi a64 & VM **paralel** dengan timeout 120 s, sampling `VmHWM` untuk puncak RSS, banding output byte-per-byte, lalu **4 proses a64 paralel**. Hasil acuan: kompilasi ~0,13 s; a64 ~0,14 s, VM ~0,94 s; puncak RSS ~24 MB; 102 baris output identik; tanpa hang/OOM (fase memori ≈21,6 MB payload pada arena/heap 32 MB). Juga ditambahkan `Json.write` (publik) dan `proyekbesar` masuk `test.sh` (a64/VM/x64) |
 
 ## Bangun
 
@@ -647,6 +648,40 @@ ClientFinished.
   tertimpa.
 - `DIV/MOD` dengan nol, bounds array, arena habis → pesan runtime error,
   bukan crash panik.
+
+## Uji ketangguhan: `examples/proyekbesar`
+
+Proyek contoh berisi **54 file `.kop`** yang saling import (53 modul + main),
+mencakup pustaka standar dan modul lokal: struktur data, algoritma, CSV/JSON,
+inventory/order/billing, lexer→compiler→evaluator, dan VM mini. Semua
+deterministik (PRNG seed tetap, tanpa jaringan/waktu).
+
+```sh
+cd examples/proyekbesar
+./run.sh
+```
+
+`bench.py` melakukan:
+
+1. kompilasi **a64, VM, x64 paralel** (x64 diperiksa sintaksnya);
+2. eksekusi **a64 & VM paralel** dengan **timeout 120 s** (deteksi hang)
+   dan sampling `VmHWM` (puncak RSS);
+3. perbandingan output byte-per-byte;
+4. **4 proses a64 paralel** dengan output harus tetap identik.
+
+Hasil acuan di Termux aarch64:
+
+| Metrik | a64 | VM |
+|---|---|---|
+| kompilasi | ~0,13 s | ~0,13 s |
+| eksekusi | ~0,14 s | ~0,94 s |
+| puncak RSS | ~24 MB | ~24 MB |
+| output | 102 baris | 102 baris (identik) |
+
+Fase memori mengalokasikan 3×400.000 + 3×500.000 elemen `int[]`
+(≈21,6 MB payload) di atas arena native / heap VM 32 MB — tidak OOM.
+Empat proses a64 paralel selesai < 0,3 s tanpa hang, semua output sama.
+`expected.out` menjadi acuan dan dipakai di `test.sh` utama.
 
 ## Struktur proyek
 

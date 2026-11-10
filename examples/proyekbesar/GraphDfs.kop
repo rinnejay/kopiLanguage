@@ -1,0 +1,14 @@
+import BitsetX;
+
+class GraphDfs {
+    static int reachable(int n, int[] adj, int start) {
+        int[] seen = new int[(n + 31) / 32];
+        dvisit(start, n, adj, seen);
+        return BitsetX.count(seen);
+    }
+    static void dvisit(int u, int n, int[] adj, int[] seen) {
+        if (BitsetX.get(seen, u)) return;
+        BitsetX.set(seen, u);
+        for (int v = 0; v < n; v++) if (adj[u * n + v] != 0) dvisit(v, n, adj, seen);
+    }
+}

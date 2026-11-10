@@ -1,0 +1,22 @@
+class Crc {
+    static int crc16(int[] data) {
+        int crc = 65535;
+        for (int i = 0; i < data.length; i++) {
+            crc = crc ^ (data[i] & 255);
+            for (int b = 0; b < 8; b++) {
+                if ((crc & 1) != 0) crc = (crc >> 1) ^ 40961;
+                else crc = crc >> 1;
+            }
+        }
+        return crc & 65535;
+    }
+    static int adler(int[] data) {
+        int a = 1;
+        int b = 0;
+        for (int i = 0; i < data.length; i++) {
+            a = (a + data[i]) % 65521;
+            b = (b + a) % 65521;
+        }
+        return (b << 16) | a;
+    }
+}

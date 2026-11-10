@@ -1,0 +1,21 @@
+class Inventory {
+    static int total(int[] qty) {
+        int s = 0;
+        for (int i = 0; i < qty.length; i++) s = s + qty[i];
+        return s;
+    }
+    static int add(int[] qty, int idx, int n) {
+        qty[idx] = qty[idx] + n;
+        return qty[idx];
+    }
+    static int lowStock(int[] qty, int threshold) {
+        int n = 0;
+        for (int i = 0; i < qty.length; i++) if (qty[i] < threshold) n++;
+        return n;
+    }
+    static int value(int[] qty, int[] price) {
+        int s = 0;
+        for (int i = 0; i < qty.length; i++) s = s + qty[i] * price[i];
+        return s;
+    }
+}

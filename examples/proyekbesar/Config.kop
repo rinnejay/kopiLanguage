@@ -1,0 +1,8 @@
+import Bytes;
+
+class Config {
+    static int maxWorkers() { return 8; }
+    static int pageSize() { return 64; }
+    static int[] appName() { return Net.bytes("KopiMart"); }
+    static boolean isProd() { return true; }
+}

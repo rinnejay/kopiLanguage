@@ -1,0 +1,7 @@
+import Cipher;
+
+class CipherX {
+    static int[] rc4(int[] data, int[] key) { return Cipher.rc4(data, key); }
+    static int[] vigenere(int[] data, int[] key) { return Cipher.vigenere(data, key); }
+    static int[] unvigenere(int[] data, int[] key) { return Cipher.unvigenere(data, key); }
+}

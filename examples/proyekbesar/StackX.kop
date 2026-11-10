@@ -1,0 +1,19 @@
+class StackX {
+    static int size(int[] st) { return st[0]; }
+    static boolean push(int[] st, int v) {
+        if (st[0] >= st.length - 1) return false;
+        st[0] = st[0] + 1;
+        st[st[0]] = v;
+        return true;
+    }
+    static int pop(int[] st) {
+        if (st[0] <= 0) return -1;
+        int v = st[st[0]];
+        st[0] = st[0] - 1;
+        return v;
+    }
+    static int peek(int[] st) {
+        if (st[0] <= 0) return -1;
+        return st[st[0]];
+    }
+}

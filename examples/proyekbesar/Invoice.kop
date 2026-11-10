@@ -1,0 +1,16 @@
+import Bytes;
+import Conv;
+
+class Invoice {
+    static int[] header(int no) {
+        return Bytes.cat(Net.bytes("INV-"), Conv.itoa(no));
+    }
+    static int[] line(int sku, int qty, int price) {
+        int[] o = Bytes.cat(Net.bytes("SKU="), Conv.itoa(sku));
+        o = Bytes.cat(o, Net.bytes(" QTY="));
+        o = Bytes.cat(o, Conv.itoa(qty));
+        o = Bytes.cat(o, Net.bytes(" TOTAL="));
+        o = Bytes.cat(o, Conv.itoa(qty * price));
+        return o;
+    }
+}

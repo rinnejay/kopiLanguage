@@ -1,0 +1,24 @@
+class DijkstraX {
+    static int shortest(int n, int[] w, int src, int dst) {
+        int[] d = new int[n];
+        int[] done = new int[n];
+        for (int i = 0; i < n; i++) d[i] = 1000000000;
+        d[src] = 0;
+        for (int it = 0; it < n; it++) {
+            int u = -1;
+            int best = 1000000000;
+            for (int i = 0; i < n; i++) {
+                if (done[i] == 0 && d[i] < best) { best = d[i]; u = i; }
+            }
+            if (u < 0) break;
+            done[u] = 1;
+            for (int v = 0; v < n; v++) {
+                if (w[u * n + v] > 0) {
+                    int nd = d[u] + w[u * n + v];
+                    if (nd < d[v]) d[v] = nd;
+                }
+            }
+        }
+        return d[dst];
+    }
+}

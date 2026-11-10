@@ -1,0 +1,21 @@
+import QueueX;
+
+class GraphBfs {
+    static int[] dist(int n, int[] adj, int start) {
+        int[] d = new int[n];
+        for (int i = 0; i < n; i++) d[i] = -1;
+        int[] q = new int[n + 3];
+        d[start] = 0;
+        QueueX.push(q, start);
+        while (QueueX.size(q) > 0) {
+            int u = QueueX.pop(q);
+            for (int v = 0; v < n; v++) {
+                if (adj[u * n + v] != 0 && d[v] < 0) {
+                    d[v] = d[u] + 1;
+                    QueueX.push(q, v);
+                }
+            }
+        }
+        return d;
+    }
+}

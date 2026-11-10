@@ -1,0 +1,17 @@
+import Bytes;
+import Conv;
+
+class LogX {
+    static void append(int[] buf, int[] s) {
+        int p = buf[0];
+        for (int i = 0; i < s.length; i++) { buf[1 + p] = s[i]; p++; }
+        buf[0] = p;
+    }
+    static void appendInt(int[] buf, int v) { append(buf, Conv.itoa(v)); }
+    static int size(int[] buf) { return buf[0]; }
+    static int checksum(int[] buf) {
+        int s = 0;
+        for (int i = 0; i < buf[0]; i++) s = s + buf[1 + i];
+        return s;
+    }
+}

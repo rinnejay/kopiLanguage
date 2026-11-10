@@ -1,0 +1,56 @@
+class Bytes {
+    static boolean eq(int[] a, int[] b) {
+        if (a.length != b.length) return false;
+        for (int i = 0; i < a.length; i++) if (a[i] != b[i]) return false;
+        return true;
+    }
+    static int cmp(int[] a, int[] b) {
+        int n = a.length;
+        if (b.length < n) n = b.length;
+        for (int i = 0; i < n; i++) {
+            if (a[i] < b[i]) return -1;
+            if (a[i] > b[i]) return 1;
+        }
+        if (a.length < b.length) return -1;
+        if (a.length > b.length) return 1;
+        return 0;
+    }
+    static int[] copy(int[] a) {
+        int[] o = new int[a.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        return o;
+    }
+    static int[] cat(int[] a, int[] b) {
+        int[] o = new int[a.length + b.length];
+        int k = 0;
+        for (int i = 0; i < a.length; i++) { o[k] = a[i]; k++; }
+        for (int i = 0; i < b.length; i++) { o[k] = b[i]; k++; }
+        return o;
+    }
+    static int[] slice(int[] a, int from, int len) {
+        int[] o = new int[len];
+        for (int i = 0; i < len; i++) o[i] = a[from + i];
+        return o;
+    }
+    static int indexOf(int[] hay, int[] ndl, int from) {
+        int lim = hay.length - ndl.length;
+        for (int i = from; i <= lim; i++) {
+            int j = 0;
+            while (j < ndl.length && hay[i + j] == ndl[j]) j++;
+            if (j == ndl.length) return i;
+        }
+        return -1;
+    }
+    static boolean startsWith(int[] s, int[] p) {
+        if (p.length > s.length) return false;
+        for (int i = 0; i < p.length; i++) if (s[i] != p[i]) return false;
+        return true;
+    }
+    static void print(int[] s) {
+        for (int i = 0; i < s.length; i++) Net.wrb(1, s[i]);
+    }
+    static void println(int[] s) {
+        print(s);
+        Net.wrb(1, 10);
+    }
+}

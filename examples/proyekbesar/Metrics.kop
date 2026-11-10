@@ -1,0 +1,10 @@
+class Metrics {
+    static void inc(int[] m, int idx) { m[idx] = m[idx] + 1; }
+    static void add(int[] m, int idx, int v) { m[idx] = m[idx] + v; }
+    static int get(int[] m, int idx) { return m[idx]; }
+    static int total(int[] m) {
+        int s = 0;
+        for (int i = 0; i < m.length; i++) s = s + m[i];
+        return s;
+    }
+}

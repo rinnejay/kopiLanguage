@@ -1,0 +1,17 @@
+class SortX {
+    static int[] insertion(int[] xs) {
+        int[] a = new int[xs.length];
+        for (int i = 0; i < xs.length; i++) a[i] = xs[i];
+        for (int i = 1; i < a.length; i++) {
+            int v = a[i];
+            int j = i - 1;
+            while (j >= 0 && a[j] > v) { a[j + 1] = a[j]; j--; }
+            a[j + 1] = v;
+        }
+        return a;
+    }
+    static boolean isSorted(int[] a) {
+        for (int i = 1; i < a.length; i++) if (a[i - 1] > a[i]) return false;
+        return true;
+    }
+}

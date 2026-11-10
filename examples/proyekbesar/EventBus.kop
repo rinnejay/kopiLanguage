@@ -1,0 +1,7 @@
+import QueueX;
+
+class EventBus {
+    static int publish(int[] q, int ev) { if (QueueX.push(q, ev)) return 1; return 0; }
+    static int consume(int[] q) { return QueueX.pop(q); }
+    static int pending(int[] q) { return QueueX.size(q); }
+}

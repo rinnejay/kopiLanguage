@@ -1,0 +1,17 @@
+class Orders {
+    static int total(int[] prices, int[] qty) {
+        int s = 0;
+        for (int i = 0; i < prices.length; i++) s = s + prices[i] * qty[i];
+        return s;
+    }
+    static int countAbove(int[] totals, int limit) {
+        int n = 0;
+        for (int i = 0; i < totals.length; i++) if (totals[i] > limit) n++;
+        return n;
+    }
+    static int maxOrder(int[] totals) {
+        int m = 0;
+        for (int i = 0; i < totals.length; i++) if (totals[i] > m) m = totals[i];
+        return m;
+    }
+}

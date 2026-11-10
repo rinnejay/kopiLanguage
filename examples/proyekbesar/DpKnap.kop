@@ -1,0 +1,14 @@
+class DpKnap {
+    static int solve(int[] w, int[] v, int cap) {
+        int[] dp = new int[cap + 1];
+        for (int i = 0; i < w.length; i++) {
+            int j = cap;
+            while (j >= w[i]) {
+                int cand = dp[j - w[i]] + v[i];
+                if (cand > dp[j]) dp[j] = cand;
+                j = j - 1;
+            }
+        }
+        return dp[cap];
+    }
+}

@@ -1,0 +1,10 @@
+class BitsetX {
+    static void set(int[] b, int i) { b[i / 32] = b[i / 32] | (1 << (i % 32)); }
+    static void clear(int[] b, int i) { b[i / 32] = b[i / 32] & ~(1 << (i % 32)); }
+    static boolean get(int[] b, int i) { return (b[i / 32] & (1 << (i % 32))) != 0; }
+    static int count(int[] b) {
+        int n = 0;
+        for (int i = 0; i < b.length * 32; i++) if (get(b, i)) n++;
+        return n;
+    }
+}

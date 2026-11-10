@@ -1,0 +1,27 @@
+class HeapX {
+    static void push(int[] h, int v) {
+        if (h[0] >= h.length - 1) return;
+        h[0] = h[0] + 1;
+        int i = h[0];
+        h[i] = v;
+        while (i > 1 && h[i / 2] > h[i]) {
+            int t = h[i / 2]; h[i / 2] = h[i]; h[i] = t;
+            i = i / 2;
+        }
+    }
+    static int pop(int[] h) {
+        if (h[0] <= 0) return -1;
+        int top = h[1];
+        h[1] = h[h[0]];
+        h[0] = h[0] - 1;
+        int i = 1;
+        while (i * 2 <= h[0]) {
+            int c = i * 2;
+            if (c + 1 <= h[0] && h[c + 1] < h[c]) c = c + 1;
+            if (h[i] <= h[c]) break;
+            int t = h[i]; h[i] = h[c]; h[c] = t;
+            i = c;
+        }
+        return top;
+    }
+}

@@ -1,0 +1,6 @@
+import Cipher;
+
+class Base64X {
+    static int[] enc(int[] data) { return Cipher.b64enc(data); }
+    static int[] dec(int[] txt) { return Cipher.b64dec(txt); }
+}

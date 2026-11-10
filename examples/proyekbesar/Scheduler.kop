@@ -1,0 +1,18 @@
+import QueueX;
+
+class Scheduler {
+    static int run(int[] tasks, int quantum) {
+        int done = 0;
+        int time = 0;
+        int n = tasks.length;
+        int i = 0;
+        while (done < n) {
+            if (tasks[i] > 0) {
+                if (tasks[i] <= quantum) { time = time + tasks[i]; tasks[i] = 0; done++; }
+                else { tasks[i] = tasks[i] - quantum; time = time + quantum; }
+            }
+            i = (i + 1) % n;
+        }
+        return time;
+    }
+}

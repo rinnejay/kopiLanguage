@@ -1,0 +1,22 @@
+class Case {
+    static boolean isDigit(int c) { return c >= 48 && c <= 57; }
+    static boolean isAlpha(int c) { return (c >= 65 && c <= 90) || (c >= 97 && c <= 122); }
+    static int[] upper(int[] s) {
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i];
+            if (c >= 97 && c <= 122) c = c - 32;
+            o[i] = c;
+        }
+        return o;
+    }
+    static int[] lower(int[] s) {
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i];
+            if (c >= 65 && c <= 90) c = c + 32;
+            o[i] = c;
+        }
+        return o;
+    }
+}

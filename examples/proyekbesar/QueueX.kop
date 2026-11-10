@@ -1,0 +1,17 @@
+class QueueX {
+    static int size(int[] q) { return q[2]; }
+    static boolean push(int[] q, int v) {
+        if (q[2] >= q.length - 3) return false;
+        q[3 + q[1]] = v;
+        q[1] = (q[1] + 1) % (q.length - 3);
+        q[2] = q[2] + 1;
+        return true;
+    }
+    static int pop(int[] q) {
+        if (q[2] <= 0) return -1;
+        int v = q[3 + q[0]];
+        q[0] = (q[0] + 1) % (q.length - 3);
+        q[2] = q[2] - 1;
+        return v;
+    }
+}

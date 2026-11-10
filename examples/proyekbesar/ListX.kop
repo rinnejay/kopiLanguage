@@ -1,0 +1,19 @@
+class ListX {
+    static boolean append(int[] xs, int v) {
+        if (xs[0] >= xs.length - 1) return false;
+        xs[0] = xs[0] + 1;
+        xs[xs[0]] = v;
+        return true;
+    }
+    static int indexOf(int[] xs, int v) {
+        for (int i = 1; i <= xs[0]; i++) if (xs[i] == v) return i - 1;
+        return -1;
+    }
+    static int removeAt(int[] xs, int at) {
+        if (at < 0 || at >= xs[0]) return -1;
+        int v = xs[at + 1];
+        for (int i = at + 1; i < xs[0]; i++) xs[i] = xs[i + 1];
+        xs[0] = xs[0] - 1;
+        return v;
+    }
+}
