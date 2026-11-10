@@ -1,0 +1,594 @@
+/* Json.kop — parser/penulis JSON murni Kopi (v1.6.4).
+ *
+ * Nilai JSON direpresentasikan sebagai **tape `int[]`** yang berdiri sendiri
+ * (bisa disimpan di variabel, dipassing, dikembalikan fungsi, ditaruh di
+ * array lain). Tagnya:
+ *
+ *   0 null                      → {0}
+ *   1 bool                      → {1, b}
+ *   2 number (teks asli)        → {2, len, byte...}
+ *   3 string                    → {3, len, byte...}
+ *   4 array                     → {4, count, nilai...}
+ *   5 object                    → {5, count, (klen, key..., nilai)...}
+ *
+ * Angka disimpan sebagai teks sumber (presisi/format dipertahankan saat
+ * ditulis ulang). `asInt` memotong bagian pecahan; `asDouble` menghitung
+ * nilai double dari teks. Semua operasi bersifat immutable: `put`/`add`
+ * mengembalikan tape baru.
+ *
+ * Literal bahasa: `json {"a": 1, "b": [true, null]}` (maks 8 entri per
+ * objek/array) didesugar compiler menjadi pemanggilan `Json.*`.
+ */
+
+class Json {
+
+    static int NULLV()  { return 0; }
+    static int BOOLV()  { return 1; }
+    static int NUMV()   { return 2; }
+    static int STRV()   { return 3; }
+    static int ARRV()   { return 4; }
+    static int OBJV()   { return 5; }
+
+    /* ── utilitas tape ─────────────────────────────────────────── */
+
+    static int[] cat(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        int k = 0;
+        for (int i = 0; i < a.length; i++) { out[k] = a[i]; k++; }
+        for (int i = 0; i < b.length; i++) { out[k] = b[i]; k++; }
+        return out;
+    }
+
+    static int[] slice(int[] a, int from, int len) {
+        int[] out = new int[len];
+        for (int i = 0; i < len; i++) out[i] = a[from + i];
+        return out;
+    }
+
+    static int[] one(int v) {
+        int[] a = new int[1];
+        a[0] = v;
+        return a;
+    }
+
+    static int[] two(int a, int b) {
+        int[] v = new int[2];
+        v[0] = a;
+        v[1] = b;
+        return v;
+    }
+
+    /* ── konstruktor nilai ─────────────────────────────────────── */
+
+    static int[] nullV() {
+        return one(NULLV());
+    }
+
+    static int[] boolV(int b) {
+        int[] v = two(BOOLV(), 0);
+        if (b != 0) v[1] = 1;
+        return v;
+    }
+
+    static int[] num(int[] text) {
+        int[] v = two(NUMV(), text.length);
+        return cat(v, text);
+    }
+
+    static int[] str(int[] s) {
+        int[] v = two(STRV(), s.length);
+        return cat(v, s);
+    }
+
+    static int[] arr0() {
+        return two(ARRV(), 0);
+    }
+
+    static int[] obj0() {
+        return two(OBJV(), 0);
+    }
+
+    /* peta nilai: dipakai untuk skip/akses */
+    static int skip(int[] t, int p) {
+        int tag = t[p];
+        p = p + 1;
+        if (tag == NULLV()) return p;
+        if (tag == BOOLV()) return p + 1;
+        if (tag == NUMV() || tag == STRV()) {
+            int l = t[p];
+            return p + 1 + l;
+        }
+        if (tag == ARRV()) {
+            int c = t[p];
+            p = p + 1;
+            int i = 0;
+            while (i < c) { p = skip(t, p); i++; }
+            return p;
+        }
+        /* object: (klen,key,value) × count */
+        int c = t[p];
+        p = p + 1;
+        int i = 0;
+        while (i < c) {
+            int kl = t[p];
+            p = p + 1 + kl;
+            p = skip(t, p);
+            i++;
+        }
+        return p;
+    }
+
+    static int typeOf(int[] v) {
+        if (v.length == 0) return -1;
+        return v[0];
+    }
+
+    static boolean isNull(int[] v) { return typeOf(v) == NULLV(); }
+    static boolean isBool(int[] v) { return typeOf(v) == BOOLV(); }
+    static boolean isNumber(int[] v) { return typeOf(v) == NUMV(); }
+    static boolean isString(int[] v) { return typeOf(v) == STRV(); }
+    static boolean isArray(int[] v) { return typeOf(v) == ARRV(); }
+    static boolean isObject(int[] v) { return typeOf(v) == OBJV(); }
+
+    static int asBool(int[] v) {
+        if (typeOf(v) == BOOLV()) return v[1];
+        return 0;
+    }
+
+    /* teks mentah untuk number/string */
+    static int[] asText(int[] v) {
+        int t = typeOf(v);
+        if (t == NUMV() || t == STRV()) return slice(v, 2, v[1]);
+        return new int[0];
+    }
+
+    /* jumlah elemen array / pasangan objek */
+    static int count(int[] v) {
+        int t = typeOf(v);
+        if (t == ARRV() || t == OBJV()) return v[1];
+        return 0;
+    }
+
+    static int[] at(int[] arr, int idx) {
+        if (typeOf(arr) != ARRV() || idx < 0 || idx >= arr[1]) return new int[0];
+        int p = 2;
+        int i = 0;
+        while (i < idx) { p = skip(arr, p); i++; }
+        return slice(arr, p, skip(arr, p) - p);
+    }
+
+    static boolean keyEq(int[] t, int at, int len, int[] key) {
+        if (len != key.length) return false;
+        for (int i = 0; i < len; i++) {
+            if (t[at + i] != key[i]) return false;
+        }
+        return true;
+    }
+
+    static int[] get(int[] obj, int[] key) {
+        if (typeOf(obj) != OBJV()) return new int[0];
+        int c = obj[1];
+        int p = 2;
+        for (int i = 0; i < c; i++) {
+            int kl = obj[p];
+            p++;
+            int ks = p;
+            p = p + kl;
+            int vs = p;
+            int ve = skip(obj, p);
+            if (keyEq(obj, ks, kl, key)) return slice(obj, vs, ve - vs);
+            p = ve;
+        }
+        return new int[0];
+    }
+
+    static boolean has(int[] obj, int[] key) {
+        return get(obj, key).length > 0;
+    }
+
+    /* objek baru dengan key diganti/ditambah (immutable) */
+    static int[] put(int[] obj, int[] key, int[] val) {
+        if (typeOf(obj) != OBJV()) return obj;
+        int c = obj[1];
+        int p = 2;
+        int found = 0;
+        int[] out = two(OBJV(), c);
+        for (int i = 0; i < c; i++) {
+            int kl = obj[p];
+            p++;
+            int ks = p;
+            p = p + kl;
+            int vs = p;
+            int ve = skip(obj, p);
+            int[] vv = val;
+            if (keyEq(obj, ks, kl, key)) {
+                vv = val;
+                found = 1;
+            } else {
+                vv = slice(obj, vs, ve - vs);
+            }
+            out = cat(out, one(kl));
+            out = cat(out, slice(obj, ks, kl));
+            out = cat(out, vv);
+            p = ve;
+        }
+        if (found == 0) {
+            out[1] = out[1] + 1;
+            out = cat(out, one(key.length));
+            out = cat(out, key);
+            out = cat(out, val);
+        }
+        return out;
+    }
+
+    static int[] del(int[] obj, int[] key) {
+        if (typeOf(obj) != OBJV()) return obj;
+        int c = obj[1];
+        int p = 2;
+        int kept = 0;
+        int[] out = two(OBJV(), c);
+        for (int i = 0; i < c; i++) {
+            int kl = obj[p];
+            p++;
+            int ks = p;
+            p = p + kl;
+            int vs = p;
+            int ve = skip(obj, p);
+            if (!keyEq(obj, ks, kl, key)) {
+                out = cat(out, one(kl));
+                out = cat(out, slice(obj, ks, kl));
+                out = cat(out, slice(obj, vs, ve - vs));
+                kept++;
+            }
+            p = ve;
+        }
+        out[1] = kept;
+        return out;
+    }
+
+    /* array baru + satu elemen di belakang */
+    static int[] add(int[] arr, int[] val) {
+        if (typeOf(arr) != ARRV()) return arr;
+        int[] out = cat(arr, val);
+        out[1] = out[1] + 1;
+        return out;
+    }
+
+    /* ── objN / arrN untuk literal ─────────────────────────────── */
+
+    static int[] arr1(int[] a) { return add(arr0(), a); }
+    static int[] arr2(int[] a, int[] b) { return add(arr1(a), b); }
+    static int[] arr3(int[] a, int[] b, int[] c) { return add(arr2(a, b), c); }
+    static int[] arr4(int[] a, int[] b, int[] c, int[] d) { return add(arr3(a, b, c), d); }
+    static int[] arr5(int[] a, int[] b, int[] c, int[] d, int[] e) { return add(arr4(a, b, c, d), e); }
+    static int[] arr6(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f) { return add(arr5(a, b, c, d, e), f); }
+    static int[] arr7(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f, int[] g) { return add(arr6(a, b, c, d, e, f), g); }
+    static int[] arr8(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f, int[] g, int[] h) { return add(arr7(a, b, c, d, e, f, g), h); }
+
+    static int[] obj1(int[] k1, int[] v1) { return put(obj0(), k1, v1); }
+    static int[] obj2(int[] k1, int[] v1, int[] k2, int[] v2) { return put(obj1(k1, v1), k2, v2); }
+    static int[] obj3(int[] k1, int[] v1, int[] k2, int[] v2, int[] k3, int[] v3) { return put(obj2(k1, v1, k2, v2), k3, v3); }
+    static int[] obj4(int[] k1, int[] v1, int[] k2, int[] v2, int[] k3, int[] v3, int[] k4, int[] v4) { return put(obj3(k1, v1, k2, v2, k3, v3), k4, v4); }
+
+    /* ── konversi angka ────────────────────────────────────────── */
+
+    /* integer dari teks number (bagian pecahan dipotong); wrap int32 */
+    static int asInt(int[] v) {
+        if (typeOf(v) == BOOLV()) return v[1];
+        int[] t = asText(v);
+        int i = 0;
+        int neg = 0;
+        if (i < t.length && t[i] == 45) { neg = 1; i++; }
+        int r = 0;
+        while (i < t.length) {
+            int c = t[i];
+            if (c < 48 || c > 57) break;
+            r = r * 10 + (c - 48);
+            i++;
+        }
+        if (neg != 0) r = -r;
+        return r;
+    }
+
+    /* double dari teks number (dukung pecahan & eksponen) */
+    static double asDouble(int[] v) {
+        int[] t = asText(v);
+        int i = 0;
+        int neg = 0;
+        if (i < t.length && t[i] == 45) { neg = 1; i++; }
+        double r = 0.0;
+        while (i < t.length) {
+            int c = t[i];
+            if (c < 48 || c > 57) break;
+            r = r * 10.0 + (double)(c - 48);
+            i++;
+        }
+        if (i < t.length && t[i] == 46) {
+            i++;
+            double f = 0.1;
+            while (i < t.length) {
+                int c = t[i];
+                if (c < 48 || c > 57) break;
+                r = r + (double)(c - 48) * f;
+                f = f * 0.1;
+                i++;
+            }
+        }
+        if (i < t.length && (t[i] == 101 || t[i] == 69)) {
+            i++;
+            int eneg = 0;
+            if (i < t.length && (t[i] == 43 || t[i] == 45)) {
+                if (t[i] == 45) eneg = 1;
+                i++;
+            }
+            int e = 0;
+            while (i < t.length) {
+                int c = t[i];
+                if (c < 48 || c > 57) break;
+                e = e * 10 + (c - 48);
+                i++;
+            }
+            while (e > 0) {
+                if (eneg != 0) r = r / 10.0;
+                else r = r * 10.0;
+                e = e - 1;
+            }
+        }
+        if (neg != 0) r = -r;
+        return r;
+    }
+
+    /* ── parser ────────────────────────────────────────────────── */
+
+    static boolean isWs(int c) {
+        return c == 32 || c == 9 || c == 10 || c == 13;
+    }
+
+    static void pws(int[] t, int[] pos) {
+        while (pos[0] < t.length && isWs(t[pos[0]])) pos[0] = pos[0] + 1;
+    }
+
+    static int hexv(int c) {
+        if (c >= 48 && c <= 57) return c - 48;
+        if (c >= 65 && c <= 70) return c - 55;
+        if (c >= 97 && c <= 102) return c - 87;
+        return -1;
+    }
+
+    static int[] putByte(int[] a, int b) {
+        int[] o = cat(a, one(b));
+        return o;
+    }
+
+    /* parse string JSON; hasil = byte array (sudah di-unescape) */
+    static int[] pstr(int[] t, int[] pos) {
+        int[] out = new int[0];
+        if (pos[0] >= t.length || t[pos[0]] != 34) return out;
+        pos[0] = pos[0] + 1;
+        while (pos[0] < t.length) {
+            int c = t[pos[0]];
+            pos[0] = pos[0] + 1;
+            if (c == 34) return out;
+            if (c != 92) { out = putByte(out, c); continue; }
+            if (pos[0] >= t.length) return new int[0];
+            int e = t[pos[0]];
+            pos[0] = pos[0] + 1;
+            if (e == 34) out = putByte(out, 34);
+            else if (e == 92) out = putByte(out, 92);
+            else if (e == 47) out = putByte(out, 47);
+            else if (e == 98) out = putByte(out, 8);
+            else if (e == 102) out = putByte(out, 12);
+            else if (e == 110) out = putByte(out, 10);
+            else if (e == 114) out = putByte(out, 13);
+            else if (e == 116) out = putByte(out, 9);
+            else if (e == 117) {
+                int cp = 0;
+                int k = 0;
+                while (k < 4 && pos[0] < t.length) {
+                    int hv = hexv(t[pos[0]]);
+                    if (hv < 0) return new int[0];
+                    cp = cp * 16 + hv;
+                    pos[0] = pos[0] + 1;
+                    k++;
+                }
+                /* UTF-8 sederhana (tanpa pasangan surrogate) */
+                if (cp < 128) out = putByte(out, cp);
+                else if (cp < 2048) {
+                    out = putByte(out, 192 + cp / 64);
+                    out = putByte(out, 128 + cp % 64);
+                } else {
+                    out = putByte(out, 224 + cp / 4096);
+                    out = putByte(out, 128 + (cp / 64) % 64);
+                    out = putByte(out, 128 + cp % 64);
+                }
+            } else return new int[0];
+        }
+        return new int[0];
+    }
+
+    static int[] pval(int[] t, int[] pos) {
+        pws(t, pos);
+        if (pos[0] >= t.length) return new int[0];
+        int c = t[pos[0]];
+        if (c == 110) {                     /* null */
+            if (pos[0] + 4 <= t.length && t[pos[0]+1] == 117 &&
+                t[pos[0]+2] == 108 && t[pos[0]+3] == 108) {
+                pos[0] = pos[0] + 4;
+                return nullV();
+            }
+            return new int[0];
+        }
+        if (c == 116) {                     /* true */
+            if (pos[0] + 4 <= t.length && t[pos[0]+1] == 114 &&
+                t[pos[0]+2] == 117 && t[pos[0]+3] == 101) {
+                pos[0] = pos[0] + 4;
+                return boolV(1);
+            }
+            return new int[0];
+        }
+        if (c == 102) {                     /* false */
+            if (pos[0] + 5 <= t.length && t[pos[0]+1] == 97 &&
+                t[pos[0]+2] == 108 && t[pos[0]+3] == 115 &&
+                t[pos[0]+4] == 101) {
+                pos[0] = pos[0] + 5;
+                return boolV(0);
+            }
+            return new int[0];
+        }
+        if (c == 34) {
+            int[] s = pstr(t, pos);
+            if (s.length == 0 && pos[0] < t.length && t[pos[0]-1] != 34) return new int[0];
+            return str(s);
+        }
+        if (c == 123) {                     /* object */
+            pos[0] = pos[0] + 1;
+            int[] obj = obj0();
+            pws(t, pos);
+            if (pos[0] < t.length && t[pos[0]] == 125) { pos[0] = pos[0] + 1; return obj; }
+            while (pos[0] < t.length) {
+                pws(t, pos);
+                int[] key = pstr(t, pos);
+                if (key.length == 0 && (pos[0] >= t.length || t[pos[0]-1] != 34)) return new int[0];
+                pws(t, pos);
+                if (pos[0] >= t.length || t[pos[0]] != 58) return new int[0];
+                pos[0] = pos[0] + 1;
+                int[] val = pval(t, pos);
+                if (val.length == 0) return new int[0];
+                obj = put(obj, key, val);
+                pws(t, pos);
+                if (pos[0] < t.length && t[pos[0]] == 44) { pos[0] = pos[0] + 1; continue; }
+                if (pos[0] < t.length && t[pos[0]] == 125) { pos[0] = pos[0] + 1; return obj; }
+                return new int[0];
+            }
+            return new int[0];
+        }
+        if (c == 91) {                      /* array */
+            pos[0] = pos[0] + 1;
+            int[] arr = arr0();
+            pws(t, pos);
+            if (pos[0] < t.length && t[pos[0]] == 93) { pos[0] = pos[0] + 1; return arr; }
+            while (pos[0] < t.length) {
+                int[] val = pval(t, pos);
+                if (val.length == 0) return new int[0];
+                arr = add(arr, val);
+                pws(t, pos);
+                if (pos[0] < t.length && t[pos[0]] == 44) { pos[0] = pos[0] + 1; continue; }
+                if (pos[0] < t.length && t[pos[0]] == 93) { pos[0] = pos[0] + 1; return arr; }
+                return new int[0];
+            }
+            return new int[0];
+        }
+        /* number: salin teks sampai pemisah */
+        int s0 = pos[0];
+        while (pos[0] < t.length && !isWs(t[pos[0]]) && t[pos[0]] != 44 &&
+               t[pos[0]] != 93 && t[pos[0]] != 125 && t[pos[0]] != 58) {
+            pos[0] = pos[0] + 1;
+        }
+        if (pos[0] == s0) return new int[0];
+        return num(slice(t, s0, pos[0] - s0));
+    }
+
+    static int[] parse(int[] text) {
+        int[] pos = one(0);
+        int[] v = pval(text, pos);
+        if (v.length == 0) return new int[0];
+        pws(text, pos);
+        if (pos[0] != text.length) return new int[0];
+        return v;
+    }
+
+    /* ── penulis ───────────────────────────────────────────────── */
+
+    static int hexdig(int v) {
+        if (v < 10) return 48 + v;
+        return 87 + v;
+    }
+
+    static int[] quote(int[] s) {
+        int[] out = one(34);
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i];
+            if (c == 34) { out = cat(out, cat(one(92), one(34))); }
+            else if (c == 92) { out = cat(out, cat(one(92), one(92))); }
+            else if (c == 10) { out = cat(out, cat(one(92), one(110))); }
+            else if (c == 13) { out = cat(out, cat(one(92), one(114))); }
+            else if (c == 9) { out = cat(out, cat(one(92), one(116))); }
+            else if (c < 32) {
+                out = cat(out, cat(cat(cat(one(92), one(117)), one(48)), one(48)));
+                out = putByte(out, hexdig(c / 16));
+                out = putByte(out, hexdig(c % 16));
+            } else out = putByte(out, c);
+        }
+        return putByte(out, 34);
+    }
+
+    static int[] wr(int[] v) {
+        int t = typeOf(v);
+        if (t == NULLV()) return Net.bytes("null");
+        if (t == BOOLV()) {
+            if (v[1] != 0) return Net.bytes("true");
+            return Net.bytes("false");
+        }
+        if (t == NUMV()) return asText(v);
+        if (t == STRV()) return quote(asText(v));
+        if (t == ARRV()) {
+            int[] out = Net.bytes("[");
+            for (int i = 0; i < v[1]; i++) {
+                if (i > 0) out = cat(out, Net.bytes(","));
+                out = cat(out, wr(at(v, i)));
+            }
+            return cat(out, Net.bytes("]"));
+        }
+        if (t == OBJV()) {
+            int[] out = Net.bytes("{");
+            for (int i = 0; i < v[1]; i++) {
+                if (i > 0) out = cat(out, Net.bytes(","));
+                out = cat(out, quote(keyAt(v, i)));
+                out = cat(out, Net.bytes(":"));
+                out = cat(out, wr(valAt(v, i)));
+            }
+            return cat(out, Net.bytes("}"));
+        }
+        return Net.bytes("null");
+    }
+
+    static int[] keyAt(int[] obj, int idx) {
+        int p = 2;
+        int i = 0;
+        while (i < idx) {
+            int kl = obj[p];
+            p = p + 1 + kl;
+            p = skip(obj, p);
+            i++;
+        }
+        int kl = obj[p];
+        return slice(obj, p + 1, kl);
+    }
+
+    static int[] valAt(int[] obj, int idx) {
+        int p = 2;
+        int i = 0;
+        while (i < idx) {
+            int kl = obj[p];
+            p = p + 1 + kl;
+            p = skip(obj, p);
+            i++;
+        }
+        int kl = obj[p];
+        p = p + 1 + kl;
+        return slice(obj, p, skip(obj, p) - p);
+    }
+
+    /* tulis ke stdout (fd 1) byte demi byte — melengkapi println(int) */
+    static void print(int[] v) {
+        int[] s = wr(v);
+        for (int i = 0; i < s.length; i++) {
+            Net.wrb(1, s[i]);
+        }
+    }
+
+    static void line(int[] v) {
+        print(v);
+        Net.wrb(1, 10);
+    }
+}

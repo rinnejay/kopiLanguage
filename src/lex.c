@@ -32,7 +32,7 @@ static struct { const char *kw; int type; } kws[] = {
     {"if", KW_IF}, {"else", KW_ELSE}, {"while", KW_WHILE}, {"for", KW_FOR},
     {"return", KW_RETURN}, {"true", KW_TRUE}, {"false", KW_FALSE},
     {"break", KW_BREAK}, {"continue", KW_CONTINUE}, {"import", KW_IMPORT},
-    {"fn", KW_FN},
+    {"fn", KW_FN}, {"json", KW_JSON},
     {0, 0},
 };
 
@@ -134,6 +134,7 @@ Tok *lex_file(const char *path, int *ntoks) {
                 PUSH(T_NUM, 0, 0);
                 toks[n - 1].fnum = dv;
                 toks[n - 1].numty = (suf == 'F') ? (int)T_FLOAT : (int)T_DOUBLE;
+                toks[n - 1].text = xstrndup(start, (size_t)(digend - start));
             } else {
                 unsigned long long uv;
                 int ty;
@@ -175,6 +176,7 @@ Tok *lex_file(const char *path, int *ntoks) {
                 PUSH(T_NUM, 0, (long)uv);
                 toks[n - 1].numty = ty;
                 toks[n - 1].fnum = 0.0;
+                toks[n - 1].text = xstrndup(start, (size_t)(digend - start));
             }
             continue;
         }
@@ -228,7 +230,7 @@ Tok *lex_file(const char *path, int *ntoks) {
         if (p[0] == '>' && p[1] == '>' && p[2] == '>') { PUSH(T_USHR, 0, 0);  p += 3; continue; }
         if (p[0] == '>' && p[1] == '>' && p[2] == '=') { PUSH(T_SHREQ, 0, 0);  p += 3; continue; }
         if (p[0] == '>' && p[1] == '>') { PUSH(T_SHR, 0, 0);     p += 2; continue; }
-        if (strchr("+-*/%(){};,.=!<>[]&|^~", *p) && *p) {
+        if (strchr("+-*/%(){};:,.=!<>[]&|^~", *p) && *p) {
             PUSH((unsigned char)*p, 0, 0);
             p++;
             continue;

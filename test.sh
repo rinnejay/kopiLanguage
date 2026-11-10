@@ -154,6 +154,48 @@ EOF
 printf '300\n0\n897\n450\n300\n134550\n0\n1\n0\n' > "$T/kopi/arrchk.ref"
 check arrchk "$T/kopi/arrchk.kop"
 
+# ─── JSON: literal, parse, akses, ubah, tulis ───────────────────────────
+cat > "$T/kopi/jsontest.kop" <<'EOF'
+import Json;
+
+class Main {
+    public static void main(String[] args) {
+        int[] j = json { "nama": "budi", "umur": 20, "aktif": true, "nilai": [1, 2.5, null] };
+        Json.line(j);
+        System.out.println(Json.typeOf(j));
+        System.out.println(Json.asInt(Json.get(j, Net.bytes("umur"))));
+        System.out.println(Json.isBool(Json.get(j, Net.bytes("aktif"))));
+        Json.line(Json.get(j, Net.bytes("nilai")));
+        int[] n = Json.get(j, Net.bytes("nilai"));
+        System.out.println(Json.count(n));
+        System.out.println(Json.asInt(Json.at(n, 0)));
+        System.out.println(Json.asDouble(Json.at(n, 1)));
+        System.out.println(Json.isNull(Json.at(n, 2)));
+
+        int[] j2 = Json.put(j, Net.bytes("umur"), Json.num(Net.bytes("21")));
+        Json.line(j2);
+        int[] j3 = Json.add(Json.get(j2, Net.bytes("nilai")), Json.str(Net.bytes("x")));
+        Json.line(j3);
+        int[] j4 = Json.parse(Net.bytes("{ \"a\" : [ true, 1e3, {\"b\":\"c\\n\"} ], \"z\": null }"));
+        Json.line(j4);
+        System.out.println(Json.asDouble(Json.at(Json.get(j4, Net.bytes("a")), 1)));
+        Json.line(Json.parse(Net.bytes("[]")));
+        System.out.println(Json.parse(Net.bytes("{rusak")).length);
+        Json.line(Json.del(j, Net.bytes("aktif")));
+    }
+}
+EOF
+printf '%s\n' \
+ '{"nama":"budi","umur":20,"aktif":true,"nilai":[1,2.5,null]}' \
+ '[1,2.5,null]' \
+ '{"nama":"budi","umur":21,"aktif":true,"nilai":[1,2.5,null]}' \
+ '[1,2.5,null,"x"]' \
+ '{"a":[true,1e3,{"b":"c\n"}],"z":null}' \
+ '[]' \
+ '{"nama":"budi","umur":20,"nilai":[1,2.5,null]}' \
+ '5' '20' '1' '3' '1' '2.5' '1' '1000' '0' > "$T/kopi/jsontest.ref"
+check jsontest "$T/kopi/jsontest.kop"
+
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
 printf '1\n1\n1\n0\n' > "$T/kopi/aeadvec.ref"
@@ -316,7 +358,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec arrayfn arrchk; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec arrayfn arrchk jsontest; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done

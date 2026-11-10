@@ -469,6 +469,136 @@ static Node *parse_lambda(int line) {
 
 /* ---------- ekspresi (precedence climbing) ---------- */
 
+/* ── literal JSON: json { ... } / json [ ... ] (v1.6.4) ─────────────
+ * Didesugar menjadi pemanggilan Json.objN/arrN/str/num/bool/nullV.
+ * Batas: maksimal 8 entri per objek/array dalam satu literal. */
+
+static int cp_push(const char *s);
+
+static Node *mk_netbytes(const char *text, int line) {
+    Node *n = newnode(EX_NET, line);
+    n->ival = 5;
+    n->str = xs(text);        /* cpool diisi nanti saat type_expr */
+    n->dty = (int)T_ARI;
+    return n;
+}
+
+static Node *mk_call(const char *name, Node **args, int nargs, int line) {
+    Node *c = newnode(EX_CALL, line);
+    c->str = xs(name);
+    c->ival = nargs;
+    Node *head = 0, *tail = 0;
+    for (int i = 0; i < nargs; i++) {
+        if (tail) tail->next = args[i]; else head = args[i];
+        tail = args[i];
+    }
+    if (tail) tail->next = 0;
+    c->a = head;
+    return c;
+}
+
+static Node *mk_call1(const char *name, Node *a, int line) {
+    Node *args[1]; args[0] = a;
+    return mk_call(name, args, 1, line);
+}
+
+static Node *json_value(void);
+
+static Node *json_string_node(void) {
+    Tok *t = peek();
+    expect(TK_STR, "string JSON");
+    return mk_call1("Json.str", mk_netbytes(t->text, t->line), t->line);
+}
+
+static Node *json_number_node(void) {
+    int line = peek()->line;
+    int neg = 0;
+    if (at('-')) { neg = 1; advance(); }
+    if (!at(T_NUM)) die("baris %d: angka JSON tidak valid", line);
+    Tok *t = peek();
+    if (t->numty != T_INT && t->numty != T_DOUBLE) {
+        /* long/uint/float literal: pakai teks aslinya juga */
+    }
+    char buf[512];
+    if (neg) snprintf(buf, sizeof buf, "-%s", t->text ? t->text : "0");
+    else snprintf(buf, sizeof buf, "%s", t->text ? t->text : "0");
+    advance();
+    return mk_call1("Json.num", mk_netbytes(buf, line), line);
+}
+
+static Node *json_value(void) {
+    Tok *t = peek();
+    int line = t->line;
+    if (at('{')) {
+        advance();
+        Node *args[16];
+        int n = 0;
+        if (!at('}')) {
+            do {
+                if (n / 2 >= 8)
+                    die("baris %d: literal JSON objek maksimal 8 pasangan", line);
+                Tok *k = peek();
+                expect(TK_STR, "kunci string JSON");
+                args[n] = mk_netbytes(k->text, k->line);
+                n++;
+                expect(':', "':' setelah kunci JSON");
+                args[n] = json_value();
+                n++;
+                if (at(',')) { advance(); continue; }
+                break;
+            } while (1);
+        }
+        expect('}', "'}' penutup objek JSON");
+        int pairs = n / 2;
+        if (pairs <= 4) {
+            char name[32];
+            snprintf(name, sizeof name, "Json.obj%d", pairs);
+            return mk_call(name, args, n, line);
+        }
+        /* >4 pasangan: bangun obj4 lalu Json.put untuk sisanya */
+        Node *cur = mk_call("Json.obj4", args, 8, line);
+        for (int q = 4; q < pairs; q++) {
+            Node *pa[3];
+            pa[0] = cur;
+            pa[1] = args[q * 2];
+            pa[2] = args[q * 2 + 1];
+            cur = mk_call("Json.put", pa, 3, line);
+        }
+        return cur;
+    }
+    if (at('[')) {
+        advance();
+        Node *args[8];
+        int n = 0;
+        if (!at(']')) {
+            do {
+                if (n >= 8)
+                    die("baris %d: literal JSON array maksimal 8 elemen", line);
+                args[n] = json_value();
+                n++;
+                if (at(',')) { advance(); continue; }
+                break;
+            } while (1);
+        }
+        expect(']', "']' penutup array JSON");
+        char name[32];
+        snprintf(name, sizeof name, "Json.arr%d", n);
+        return mk_call(name, args, n, line);
+    }
+    if (at(TK_STR)) return json_string_node();
+    if (at(T_NUM) || at('-')) return json_number_node();
+    if (at(KW_TRUE))  { advance(); Node *a[1]; a[0] = newnode(EX_INT, line); a[0]->ival = 1; a[0]->dty = T_INT;
+                        return mk_call1("Json.boolV", a[0], line); }
+    if (at(KW_FALSE)) { advance(); Node *a[1]; a[0] = newnode(EX_INT, line); a[0]->ival = 0; a[0]->dty = T_INT;
+                        return mk_call1("Json.boolV", a[0], line); }
+    if (at(T_ID) && !strcmp(xs(peek()->text), "null")) {
+        advance();
+        return mk_call("Json.nullV", 0, 0, line);
+    }
+    die("baris %d: nilai JSON tidak dikenal (pakai null/true/false/angka/string/{}/[])", line);
+    return 0;
+}
+
 static Node *postfix(void);   /* deklarasi maju: operand cast */
 
 static Node *primary(void) {
@@ -481,6 +611,12 @@ static Node *primary(void) {
         n->dty = t->numty;
         advance();
         return n;
+    }
+    if (at(KW_JSON)) {
+        advance();
+        if (!at('{') && !at('['))
+            die("baris %d: setelah 'json' butuh objek '{...}' atau array '[...]'", line);
+        return json_value();
     }
     /* cast eksplisit gaya Java: (tipe) unary — tipe numerik saja */
     if (at('(') && is_type_tok(ts[ti + 1].type)) {
@@ -938,6 +1074,15 @@ static Ty type_expr_raw(Node *e) {
     switch (e->kind) {
     case EX_INT:  return (Ty)e->dty;      /* tipe literal ditentukan lexer */
     case EX_BOOL: return T_BOOL;
+    case EX_NET: {
+        if ((e->ival == 5 || e->ival == 6) && e->str) {
+            e->cp = cp_push(e->str);
+            e->str = 0;
+        }
+        if (e->ival == 5 || e->ival == 6) return (Ty)e->dty;
+        for (Node *aa = e->a; aa; aa = aa->next) type_expr(aa);
+        return T_INT;
+    }
     case EX_CAST: {
         Ty from = type_expr(e->a);
         Ty to = (Ty)e->dty;

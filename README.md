@@ -36,7 +36,7 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 
 | Lokasi | Kelompok | Isi |
 |--------|----------|-----|
-| `lib/core/` | logika dasar bahasa | `Math` (lengkap: modular, teori bilangan, kombinatorika, bit, geometri), `Digits`, `Stats` (statistik), `Matrix` (aljabar matriks), `Arrays` |
+| `lib/core/` | logika dasar bahasa | `Math` (lengkap: modular, teori bilangan, kombinatorika, bit, geometri), `Digits`, `Stats` (statistik), `Matrix` (aljabar matriks), `Arrays` (termasuk fungsional), **`Json`** (parse/tulis JSON) |
 | `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
 | `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard), **`Udp`** (datagram: bind/sendTo/recvFrom/shutdown), **`Tls`** (klien TLS 1.3 — lihat bagian khusus di bawah) |
 
@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.6.3 hari ini  ████████████████  73/73 test hijau — array fungsional + `.forEach` (a64 + VM)
+v1.6.4 hari ini  ████████████████  75/75 test hijau — JSON: literal, parse, akses, ubah, tulis (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -66,6 +66,7 @@ v1.6.3 hari ini  ████████████████  73/73 test hi
 | **v1.6.1** | **`byte`/`int8` (8-bit bertanda) dan `short`/`int16` (16-bit bertanda)** — melengkapi `long`/`float`/`double`/`uint8..64`. Aritmetika wrap sesuai lebar + sign-extend kanonik, cast, literal `-128`/`-32768`, parameter/return/cetak signed. Sekaligus memperbaiki **tabrakan nilai token**: seluruh keyword & token multi-karakter dipindah ke ≥256 agar tidak bertabrakan dengan kode ASCII operator 1-karakter (`%`, `&`, `!`, …), dan dependensi header ditambahkan ke Makefile. Uji numvec diperluas (byte/short) + suite 65/65 |
 | **v1.6.2** | **UDP + HTTP header**: builtin baru `Net.bind`, `Net.sendto`, `Net.recvfrom`, `Net.shutdown` (syscall langsung di a64/x64, jalur host di VM) + modul `lib/net/Udp.kop` (`open/bind/sendTo/recvFrom/shutdown/close`), sumber datagram dicatat di `from[0]` (ip) / `from[1]` (port). `Tcp.shutdown` ditambahkan. `lib/net/Http.kop` diperluas: `reqEx`, `requestInto`, `getWith`, `postWith` (header permintaan kustom) serta `headerBlock`, `headerValue` (case-insensitive, nilai di-trim), `hasHeader` untuk membaca header respons. Backend x64 kini mendukung **8 argumen** (arg 7–8 lewat stack). Uji: UDP loopback bolak-balik (bind+sendto+recvfrom) dan server HTTP yang memeriksa header kustom + respons header, di VM & a64; sintaks x64 diperiksa. Batas jujur: datagram maks **240 byte** per kirim/terima (penyangga syscall v1) |
 | **v1.6.3** | **array fungsional + gula metode**: `Arrays.forEach`, `forEachIndexed`, `map`, `filter`, `reduce`, `any`, `all`, `countWhere`, `findIndex`, `sumBy`, `copy`, `reverse` (semuanya memakai lambda Kopi). Sintaks metode `a.forEach(f)`, `a.map(f)`, dst. didukung lewat desugaring ke `Arrays.*` (butuh `import Arrays;`). Perbaikan array: `Arrays.max/min` tidak lagi meledak pada array kosong, `take` meng-clamp `n < 0`. Uji baru `arrayfn` dan `arrchk` (return array besar 300 elemen, `new int[0]`, identitas) di VM & a64 + sintaks x64; suite 73/73 |
+| **v1.6.4** | **JSON native**: literal `json {...}` / `json [...]` (sampai 8 entri; lebih dari 4 pasangan objek dirangkai via `Json.put`), nilai berupa tape `int[]` sehingga bisa disimpan di variabel, dipassing, dan dikembalikan fungsi. Pustaka `lib/core/Json.kop`: `parse`, `write`, `print`/`line`, `typeOf`/`isNull`/`isBool`/`isNumber`/`isString`/`isArray`/`isObject`, `asInt`/`asDouble`/`asBool`/`asText`, `count`/`at`/`get`/`has`, `put`/`del`/`add` (immutable), konstruktor `nullV`/`boolV`/`num`/`str`/`arrN`/`objN`. Angka disimpan sebagai teks sumber (format dipertahankan), string di-escape saat ditulis, `\uXXXX` didekode ke UTF-8 (tanpa pasangan surrogate). Parser mengenal token `:`; uji `jsontest` di VM & a64 + sintaks x64; suite 75/75 |
 
 ## Bangun
 
@@ -196,6 +197,64 @@ float  f     = 1.5f + 2.25f;           // 3.75
   sebagai batas, bukan jaminan lintas-CPU).
 - Backend **x64** menerima tipe baru (assembly lolos `cc -target`, diuji
   sintaks); eksekusi runtime baru diverifikasi di **aarch64** dan **VM**.
+
+## JSON (v1.6.4)
+
+JSON adalah nilai kelas satu: literal `json { ... }` / `json [ ... ]`
+menghasilkan **tape `int[]`** yang bisa disimpan di variabel, dipassing ke
+fungsi, dikembalikan, atau ditaruh di array lain.
+
+```java
+import Json;
+
+class Main {
+    public static void main(String[] args) {
+        int[] j = json {
+            "nama": "budi",
+            "umur": 20,
+            "aktif": true,
+            "nilai": [1, 2.5, null]
+        };
+        Json.line(j);                       // {"nama":"budi","umur":20,...}
+
+        int[] umur = Json.get(j, Net.bytes("umur"));
+        System.out.println(Json.asInt(umur));          // 20
+
+        int[] nilai = Json.get(j, Net.bytes("nilai"));
+        System.out.println(Json.count(nilai));         // 3
+        System.out.println(Json.asDouble(Json.at(nilai, 1))); // 2.5
+        System.out.println(Json.isNull(Json.at(nilai, 2)));   // 1
+
+        int[] j2 = Json.put(j, Net.bytes("umur"), Json.num(Net.bytes("21")));
+        int[] j3 = Json.del(j2, Net.bytes("aktif"));
+        int[] lebih = Json.add(nilai, Json.str(Net.bytes("x")));
+
+        int[] dariTeks = Json.parse(Net.bytes("{ \"a\": [true, 1e3] }"));
+        if (dariTeks.length == 0) { /* teks JSON tidak valid */ }
+    }
+}
+```
+
+API ringkas:
+
+| Kelompok | Fungsi |
+|---|---|
+| Baca | `parse`, `typeOf`, `isNull/isBool/isNumber/isString/isArray/isObject`, `count`, `at`, `get`, `has`, `asInt`, `asDouble`, `asBool`, `asText` |
+| Tulis | `write` (tape teks), `print`/`line` (langsung ke stdout), `put`/`del`/`add` (immutable, hasil baru) |
+| Bangun | `nullV`, `boolV`, `num`, `str`, `arr0..arr8`, `obj0..obj4` |
+
+Batas jujur:
+
+- Literal `json {...}` maksimal **8 pasangan** (objek >4 dirangkai otomatis
+  dengan `Json.put`), array literal maksimal **8 elemen**.
+- Angka disimpan sebagai **teks sumber**, jadi `1.50` tetap ditulis `1.50`;
+  `asInt` memotong bagian pecahan, `asDouble` menghitung nilai double.
+- `put`/`add`/`del` bersifat immutable (menyalin tape) — mudah dipakai,
+  O(n²) untuk penambahan berulang; cocok untuk dokumen kecil/menengah.
+- `\uXXXX` didekode ke UTF-8 sederhana (pasangan surrogate belum digabung).
+- `Json.print/line` menulis langsung ke fd 1 (byte-per-byte), sedangkan
+  `System.out.println` memakai buffer stdio: bila dicampur, urutan output
+  bisa berbeda; gunakan salah satu gaya per blok.
 
 ## Array fungsional & `.forEach` (v1.6.3)
 
@@ -377,6 +436,7 @@ Kopi, bukan kode built-in compiler:
 | `lib/core/Stats.kop`   | `sum product min max range mean sumSquares sumCubes median mode variance stddev countEven countOdd` |
 | `lib/core/Matrix.kop`  | `zero identity add sub scale transpose mul trace det1 det2 det3 det det isIdentity` (matriks persegi, `int[]` datar) |
 | `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge copy reverse sort` (merge sort O(n log n)) + `binSearch`; **fungsional**: `forEach forEachIndexed map filter reduce any all countWhere findIndex sumBy` |
+| `lib/core/Json.kop`       | `parse write print line typeOf isNull isBool isNumber isString isArray isObject asInt asDouble asBool asText count at get has put del add nullV boolV num str arrN objN` |
 | `lib/crypto/Crypto.kop`   | `bitxor` (per-bit, tanpa operator bitwise), `fnv1a` (FNV-1a 32-bit), `nextRand`/`randRange` (Lehmer/Schrage), `xorStream` (XOR cipher nirl), `caesar`/`uncaesar` |
 
 ### Batas jujur pustaka matematika
