@@ -987,7 +987,11 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "openr"))   { bi = 6; want = 1; }
             else if (!strcmp(fn, "recvb"))   { bi = 7; want = 2; }
             else if (!strcmp(fn, "sendb"))   { bi = 8; want = 2; }
-            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes openr recvb sendb)", e->line, fn);
+            else if (!strcmp(fn, "bind"))    { bi = 9; want = 3; }
+            else if (!strcmp(fn, "sendto"))  { bi = 10; want = 4; }
+            else if (!strcmp(fn, "recvfrom")){ bi = 11; want = 3; }
+            else if (!strcmp(fn, "shutdown")){ bi = 12; want = 2; }
+            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes openr recvb sendb bind sendto recvfrom shutdown)", e->line, fn);
 
             int narg = (int)e->ival;
             if (bi == 5) {
@@ -1019,6 +1023,24 @@ static Ty type_expr_raw(Node *e) {
                         die("baris %d: Net.%s argumen %d harus int", e->line, i, fn);
                     if (i == 1 && t != T_ARI)
                         die("baris %d: Net.%s argumen %d harus int[] buffer", e->line, i, fn);
+                } else if (bi == 9) {
+                    if (t != T_INT)
+                        die("baris %d: Net.bind membutuhkan (fd int, ip int, port int)", e->line);
+                } else if (bi == 10) {
+                    if (i < 3 && t != T_INT)
+                        die("baris %d: Net.sendto argumen %d harus int", e->line, i);
+                    if (i == 3 && t != T_ARI)
+                        die("baris %d: Net.sendto argumen buffer harus int[]", e->line);
+                } else if (bi == 11) {
+                    if (i == 0 && t != T_INT)
+                        die("baris %d: Net.recvfrom argumen fd harus int", e->line);
+                    if (i == 1 && t != T_ARI)
+                        die("baris %d: Net.recvfrom argumen buffer harus int[]", e->line);
+                    if (i == 2 && t != T_ARI)
+                        die("baris %d: Net.recvfrom argumen from harus int[2]", e->line);
+                } else if (bi == 12) {
+                    if (t != T_INT)
+                        die("baris %d: Net.shutdown membutuhkan (fd int, how int)", e->line);
                 } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
             }

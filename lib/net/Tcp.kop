@@ -53,6 +53,11 @@ class Tcp {
         return Net.close(fd);
     }
 
+    /* half-close: SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2 */
+    static int shutdown(int fd, int how) {
+        return Net.shutdown(fd, how);
+    }
+
     /* ── transfer byte ──────────────────────────────────────────── */
 
     /* kirim len byte pertama buf. sukses → 0; gagal → kode negatif

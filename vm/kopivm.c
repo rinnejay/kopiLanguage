@@ -503,6 +503,54 @@ static void run(void) {
                     terkirim += nwr;
                 }
                 stackv[sp++] = (terkirim >= 0) ? (int64_t)0 : (int64_t)-1;
+            } else if (bi == 9) {                 /* bind(fd, ip, port) */
+                int64_t port = stackv[--sp], ipbe = stackv[--sp], fdi = stackv[--sp];
+                struct sockaddr_in sa;
+                memset(&sa, 0, sizeof sa);
+                sa.sin_family = AF_INET;
+                sa.sin_port = htons((uint16_t)((long)port & 0xffff));
+                sa.sin_addr.s_addr = htonl((uint32_t)((long)ipbe & 0xffffffff));
+                int r = bind((int)fdi, (struct sockaddr *)&sa, sizeof sa);
+                stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 10) {                /* sendto(fd, ip, port, buf) */
+                long *buf = (long *)stackv[--sp];
+                int64_t port = stackv[--sp], ipbe = stackv[--sp], fdi = stackv[--sp];
+                struct sockaddr_in sa;
+                memset(&sa, 0, sizeof sa);
+                sa.sin_family = AF_INET;
+                sa.sin_port = htons((uint16_t)((long)port & 0xffff));
+                sa.sin_addr.s_addr = htonl((uint32_t)((long)ipbe & 0xffffffff));
+                long len = buf[0];
+                if (len > 240) len = 240;         /* batas penyangga v1 */
+                unsigned char *tmp = (unsigned char *)malloc((size_t)(len > 0 ? len : 1));
+                if (!tmp) dievm("Net.sendto: memori habis");
+                for (long i = 0; i < len; i++) tmp[i] = (unsigned char)(buf[1 + i] & 0xff);
+                ssize_t n = sendto((int)fdi, tmp, (size_t)len, 0,
+                                   (struct sockaddr *)&sa, sizeof sa);
+                free(tmp);
+                stackv[sp++] = (n < 0) ? -errno : (int64_t)n;
+            } else if (bi == 11) {                /* recvfrom(fd, buf, from) */
+                long *fromArr = (long *)stackv[--sp];
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                unsigned char tmp[240];
+                struct sockaddr_in sa;
+                socklen_t sl = sizeof sa;
+                memset(&sa, 0, sizeof sa);
+                ssize_t n = recvfrom((int)fdi, tmp, sizeof tmp, 0,
+                                     (struct sockaddr *)&sa, &sl);
+                if (n < 0) {
+                    stackv[sp++] = -errno;
+                } else {
+                    for (long i = 0; i < n; i++) buf[1 + i] = (long)tmp[i];
+                    fromArr[1] = (long)ntohl((uint32_t)sa.sin_addr.s_addr);
+                    fromArr[2] = (long)ntohs(sa.sin_port);
+                    stackv[sp++] = (int64_t)n;
+                }
+            } else if (bi == 12) {                /* shutdown(fd, how) */
+                int64_t how = stackv[--sp], fdi = stackv[--sp];
+                int r = shutdown((int)fdi, (int)how);
+                stackv[sp++] = (r < 0) ? -errno : r;
             } else {
                 dievm("Net builtin tidak dikenal");
             }

@@ -732,6 +732,160 @@ static int gen_expr(Method *m, Node *e) {
             emit(".LRS%dh:", ln);
             return 0;
         }
+        if (e->ival >= 9 && e->ival <= 12) {
+            /* bind/sendto/recvfrom/shutdown — argumen array di-push 64-bit */
+            int idx = 0;
+            for (Node *aa = e->a; aa; aa = aa->next, idx++) {
+                int isArr = (e->ival == 10 && idx == 3) ||
+                            (e->ival == 11 && (idx == 1 || idx == 2));
+                gen_expr(m, aa);
+                push_val(isArr);
+            }
+            if (e->ival == 9) {             /* bind(fd, ip, port) → 0/-errno */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tldr\tw6, [sp, #32]");           /* ip */
+                emit("\tldr\tw7, [sp, #16]");           /* port */
+                emit("\tlsr\tw4, w7, #8");
+                emit("\tstrb\tw4, [sp, #2]");
+                emit("\tand\tw4, w7, #0xff");
+                emit("\tstrb\tw4, [sp, #3]");
+                emit("\tlsr\tw4, w6, #24");
+                emit("\tstrb\tw4, [sp, #4]");
+                emit("\tlsr\tw4, w6, #16");
+                emit("\tand\tw4, w4, #0xff");
+                emit("\tstrb\tw4, [sp, #5]");
+                emit("\tlsr\tw4, w6, #8");
+                emit("\tand\tw4, w4, #0xff");
+                emit("\tstrb\tw4, [sp, #6]");
+                emit("\tand\tw4, w6, #0xff");
+                emit("\tstrb\tw4, [sp, #7]");
+                emit("\tmovz\tw4, #2");
+                emit("\tstrb\tw4, [sp, #0]");
+                emit("\tldr\tx0, [sp, #48]");           /* fd */
+                emit("\tmov\tx1, sp");
+                emit("\tmov\tw2, #16");
+                emit("\tmov\tx8, #200");                /* __NR_bind */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #64");
+                return 0;
+            }
+            if (e->ival == 12) {            /* shutdown(fd, how) */
+                emit("\tldr\tw0, [sp, #16]");
+                emit("\tldr\tw1, [sp, #0]");
+                emit("\tmov\tx8, #210");                /* __NR_shutdown */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #32");
+                return 0;
+            }
+            if (e->ival == 10) {            /* sendto(fd, ip, port, buf) → n */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");  /* sa */
+                emit("\tldr\tx10, [sp, #16]");          /* buf */
+                emit("\tldr\tw6, [sp, #48]");           /* ip */
+                emit("\tldr\tw7, [sp, #32]");           /* port */
+                emit("\tlsr\tw4, w7, #8");
+                emit("\tstrb\tw4, [sp, #2]");
+                emit("\tand\tw4, w7, #0xff");
+                emit("\tstrb\tw4, [sp, #3]");
+                emit("\tlsr\tw4, w6, #24");
+                emit("\tstrb\tw4, [sp, #4]");
+                emit("\tlsr\tw4, w6, #16");
+                emit("\tand\tw4, w4, #0xff");
+                emit("\tstrb\tw4, [sp, #5]");
+                emit("\tlsr\tw4, w6, #8");
+                emit("\tand\tw4, w4, #0xff");
+                emit("\tstrb\tw4, [sp, #6]");
+                emit("\tand\tw4, w6, #0xff");
+                emit("\tstrb\tw4, [sp, #7]");
+                emit("\tmovz\tw4, #2");
+                emit("\tstrb\tw4, [sp, #0]");
+                /* pak ke iobuf (maks 240 byte per datagram, batas v1) */
+                emit("\tldr\tw11, [x10]");
+                emit("\tcmp\tw11, #240");
+                emit("\tb.ls\t.LST%dc", ln);
+                emit("\tmov\tw11, #240");
+                emit(".LST%dc:", ln);
+                emit("\tadrp\tx17, kop_iobuf");
+                emit("\tadd\tx17, x17, :lo12:kop_iobuf");
+                emit("\tmov\tw13, #0");
+                emit(".LST%dk:", ln);
+                emit("\tcmp\tw13, w11");
+                emit("\tb.hs\t.LST%df", ln);
+                emit("\tsxtw\tx15, w13");
+                emit("\tlsl\tx15, x15, #3");
+                emit("\tadd\tx15, x15, #8");
+                emit("\tldr\tx16, [x10, x15]");
+                emit("\tstrb\tw16, [x17, x13]");
+                emit("\tadd\tw13, w13, #1");
+                emit("\tb\t.LST%dk", ln);
+                emit(".LST%df:", ln);
+                emit("\tldr\tx0, [sp, #64]");           /* fd */
+                emit("\tmov\tx1, x17");
+                emit("\tmov\tw2, w11");
+                emit("\tmov\tx3, #0");
+                emit("\tmov\tx4, sp");
+                emit("\tmov\tx5, #16");
+                emit("\tmov\tx8, #206");                /* __NR_sendto */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #80");
+                return 0;
+            }
+            if (e->ival == 11) {            /* recvfrom(fd, buf, from) → n */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");  /* sa */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");  /* addrlen */
+                emit("\tmov\tw9, #16");
+                emit("\tstr\tw9, [sp]");
+                emit("\tadrp\tx17, kop_iobuf");
+                emit("\tadd\tx17, x17, :lo12:kop_iobuf");
+                emit("\tldr\tx0, [sp, #64]");           /* fd */
+                emit("\tmov\tx1, x17");
+                emit("\tmov\tw2, #240");
+                emit("\tmov\tx3, #0");
+                emit("\tadd\tx4, sp, #16");
+                emit("\tmov\tx5, sp");
+                emit("\tmov\tx8, #207");                /* __NR_recvfrom */
+                emit("\tsvc\t#0");
+                emit("\tcmp\tx0, #0");
+                emit("\tb.lt\t.LRF%de", ln);
+                emit("\tmov\tw11, w0");                /* simpan n */
+                emit("\tldr\tx10, [sp, #48]");          /* buf */
+                emit("\tmov\tw13, #0");
+                emit(".LRF%dk:", ln);
+                emit("\tcmp\tw13, w11");
+                emit("\tb.hs\t.LRF%df", ln);
+                emit("\tldrb\tw16, [x17, x13]");
+                emit("\tsxtw\tx15, w13");
+                emit("\tlsl\tx15, x15, #3");
+                emit("\tadd\tx15, x15, #8");
+                emit("\tstr\tx16, [x10, x15]");
+                emit("\tadd\tw13, w13, #1");
+                emit("\tb\t.LRF%dk", ln);
+                emit(".LRF%df:", ln);
+                /* from[0] = ip, from[1] = port (host order) */
+                emit("\tldr\tx12, [sp, #32]");
+                emit("\tldrb\tw6, [sp, #20]");
+                emit("\tlsl\tw6, w6, #24");
+                emit("\tldrb\tw4, [sp, #21]");
+                emit("\tlsl\tw4, w4, #16");
+                emit("\torr\tw6, w6, w4");
+                emit("\tldrb\tw4, [sp, #22]");
+                emit("\tlsl\tw4, w4, #8");
+                emit("\torr\tw6, w6, w4");
+                emit("\tldrb\tw4, [sp, #23]");
+                emit("\torr\tw6, w6, w4");
+                emit("\tldrb\tw3, [sp, #18]");
+                emit("\tlsl\tw3, w3, #8");
+                emit("\tldrb\tw4, [sp, #19]");
+                emit("\torr\tw3, w3, w4");
+                emit("\tstr\tw6, [x12, #8]");
+                emit("\tstr\tw3, [x12, #16]");
+                emit("\tmov\tw0, w11");
+                emit("\tb\t.LRF%dh", ln);
+                emit(".LRF%de:", ln);                    /* galat → x0 apa adanya */
+                emit(".LRF%dh:", ln);
+                emit("\tadd\tsp, sp, #96");
+                return 0;
+            }
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);

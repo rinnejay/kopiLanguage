@@ -38,7 +38,7 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 |--------|----------|-----|
 | `lib/core/` | logika dasar bahasa | `Math` (lengkap: modular, teori bilangan, kombinatorika, bit, geometri), `Digits`, `Stats` (statistik), `Matrix` (aljabar matriks), `Arrays` |
 | `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
-| `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard), **`Tls`** (klien TLS 1.3 — lihat bagian khusus di bawah) |
+| `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard), **`Udp`** (datagram: bind/sendTo/recvFrom/shutdown), **`Tls`** (klien TLS 1.3 — lihat bagian khusus di bawah) |
 
 ATURAN unik: file test TIDAK boleh bernama sama (kasus tak peduli) dengan
 modul yang diimpor — file lokal selalu menang atas `lib/`.
@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.6.1 hari ini  ████████████████  65/65 test hijau — numerik lengkap termasuk byte/short (a64 + VM)
+v1.6.2 hari ini  ████████████████  69/69 test hijau — UDP (bind/sendto/recvfrom) + HTTP header (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -64,6 +64,7 @@ v1.6.1 hari ini  ████████████████  65/65 test hi
 | **v1.5d-E4** | **pustaka matematika diperluas besar-besaran** (`int` 32-bit, murni Kopi): `Math` kini mencakup 80+ fungsi — aritmetika modular aman-overflow (`mulMod` doubling, `powMod`, `modInverse` via Bezout), teori bilangan (sieve `primesUpTo`, `primeCount`, `nthPrime`, `factorize`, σ/φ/radikal/Möbius, prima/abundant/deficient), kombinatorika (`binomial`, `permutation`, `catalan`, `derangement`, `stirling2`, `bell`, Lucas/Tribonacci), bit (`popcount`, `highestBit`, `reverseBits`, `nextPow2`), akar/log bulat (`sqrt`, `cbrt`, `log2`, `log10`), geometri integer (`heron16`, `isRightTriangle`, jarak). Modul baru `Digits` (palindrom/Armstrong/akar digital), `Stats` (median/modus/varians/simpangan baku), `Matrix` (aljabar matriks persegi). Uji oracle python: **154 kasus** di `tools/gen_mathvec.py`, lulus di VM & a64, sintaks x64 diperiksa; total suite 63/63 |
 | **v1.6** | **tipe numerik lengkap** (scalar): `long` (64-bit bertanda), `float`/`double` (IEEE-754), `uint8`/`uint16`/`uint32`/`uint64` (unsigned dengan wrap sesuai lebar), literal `L/U/UL/f/d`, hex `0x`, biner `0b`, cast `(tipe)expr`, promosi campuran (int+uint32→long, uint32+uint32→uint32, dst), perbandingan signed/unsigned, `%` float, `println` format per tipe, parameter/return semua tipe, compound assignment (narrowing implisit ala Java). Backend a64 + VM menghasilkan output identik; x64 diperiksa sintaksnya. Uji oracle python `tools/gen_numvec.py` (66 kasus), suite 65/65. Batas jujur: array masih `int[]` (belum `long[]`/`double[]`), lambda masih `int`, dan backend x64 belum dijalankan di mesin x86-64 |
 | **v1.6.1** | **`byte`/`int8` (8-bit bertanda) dan `short`/`int16` (16-bit bertanda)** — melengkapi `long`/`float`/`double`/`uint8..64`. Aritmetika wrap sesuai lebar + sign-extend kanonik, cast, literal `-128`/`-32768`, parameter/return/cetak signed. Sekaligus memperbaiki **tabrakan nilai token**: seluruh keyword & token multi-karakter dipindah ke ≥256 agar tidak bertabrakan dengan kode ASCII operator 1-karakter (`%`, `&`, `!`, …), dan dependensi header ditambahkan ke Makefile. Uji numvec diperluas (byte/short) + suite 65/65 |
+| **v1.6.2** | **UDP + HTTP header**: builtin baru `Net.bind`, `Net.sendto`, `Net.recvfrom`, `Net.shutdown` (syscall langsung di a64/x64, jalur host di VM) + modul `lib/net/Udp.kop` (`open/bind/sendTo/recvFrom/shutdown/close`), sumber datagram dicatat di `from[0]` (ip) / `from[1]` (port). `Tcp.shutdown` ditambahkan. `lib/net/Http.kop` diperluas: `reqEx`, `requestInto`, `getWith`, `postWith` (header permintaan kustom) serta `headerBlock`, `headerValue` (case-insensitive, nilai di-trim), `hasHeader` untuk membaca header respons. Backend x64 kini mendukung **8 argumen** (arg 7–8 lewat stack). Uji: UDP loopback bolak-balik (bind+sendto+recvfrom) dan server HTTP yang memeriksa header kustom + respons header, di VM & a64; sintaks x64 diperiksa. Batas jujur: datagram maks **240 byte** per kirim/terima (penyangga syscall v1) |
 
 ## Bangun
 
@@ -369,6 +370,76 @@ Urutan pencarian `import Nama`:
 Contoh siap pakai: `examples/pakai_lib.kop` (→ diuji di semua backend oleh
 `test.sh`).
 
+## Jaringan: TCP, UDP, HTTP (v1.6.2)
+
+Builtin `Net` adalah syscall Linux langsung tanpa libc. Set lengkapnya:
+
+| Builtin | Arti |
+|---|---|
+| `Net.socket(domain, type)` | `type` 1 = TCP, 2 = UDP |
+| `Net.connect(fd, ipBE, port)` | sambung/atur peer |
+| `Net.bind(fd, ipBE, port)` | ikat alamat lokal (server UDP) |
+| `Net.sendto(fd, ipBE, port, buf)` | kirim satu datagram → n / -errno |
+| `Net.recvfrom(fd, buf, from)` | terima satu datagram; `from[0]`=ip, `from[1]`=port |
+| `Net.sendb` / `Net.recvb` | TCP: kirim/terima buffer (byte-as-int) |
+| `Net.rdb` / `Net.wrb` | baca/tulis satu byte |
+| `Net.shutdown(fd, how)` | half-close: 0=RD, 1=WR, 2=RDWR |
+| `Net.openr`, `Net.close`, `Net.bytes` | file & literal byte |
+
+### UDP — `lib/net/Udp.kop`
+
+```java
+import Udp;
+
+class Main {
+    public static void main(String[] args) {
+        int srv = Udp.open();
+        Udp.bind(srv, Udp.loopback(), 9918);
+
+        int cli = Udp.open();
+        Udp.sendTo(cli, Udp.loopback(), 9918, Net.bytes("HALO"));
+
+        int[] buf  = new int[240];
+        int[] from = new int[2];
+        int n = Udp.recvFrom(srv, buf, from);   // buf[0..n-1], from[0]=ip, from[1]=port
+        Udp.sendTo(srv, from[0], from[1], Net.bytes("BALAS"));
+    }
+}
+```
+
+`Udp.sendTo`/`Udp.recvFrom` memakai **satu datagram per panggilan**. Batas
+v1: payload yang dikirim/diterima maksimal **240 byte** (penyangga syscall
+`kop_iobuf` 256 byte); lebih dari itu dipotong. Tidak ada
+retransmisi/urutan (memang sifat UDP).
+
+### HTTP — `lib/net/Http.kop`
+
+Selain `getInto`/`postInto`/`statusOf`/`bodyOf`, tersedia permintaan
+dengan header kustom dan pembacaan header respons:
+
+```java
+import Tcp;
+import Http;
+
+int[] headers = Net.bytes("X-Kopi: 123\r\nUser-Agent: Kopi/1\r\n");
+int[] buf = new int[2048];
+int n = Http.getWith(Tcp.loopback(), 8080, Net.bytes("127.0.0.1"),
+                     Net.bytes("/halo"), headers, buf);
+
+int[] resp = /* potong buf sebanyak n */;
+System.out.println(Http.statusOf(resp));                       // 201
+System.out.println(Http.hasHeader(resp, Net.bytes("Content-Length")));
+int[] v = Http.headerValue(resp, Net.bytes("content-length")); // "5" sebagai byte
+```
+
+- `headers` adalah blok mentah baris `"Nama: nilai\r\n"` (boleh kosong).
+- `headerValue` membandingkan nama **case-insensitive**, memangkas spasi
+  tepi, dan mengembalikan array kosong bila tidak ada.
+- `postWith` menambahkan `Content-Length` otomatis; `requestInto` menerima
+  method/body bebas.
+- Masih HTTP/1.0: server menutup koneksi setelah respons (tanpa keep-alive,
+  chunked, atau HTTP/2).
+
 ## Klien TLS 1.3 (`lib/net/Tls.kop`)
 
 Klien TLS 1.3 ditulis **100% dalam bahasa Kopi** di atas pustaka kripto
@@ -498,10 +569,8 @@ kopi/
 - `switch`, `do/while`, `try/catch` terbatas
 - optimasi `-O1`: register allocation (jangan semua lewat stack),
   const-folding
-- **UDP & shutdown**: builtin `snd/rcv` (datagram — satu syscall = satu paket)
-  dan syscall `shutdown` (half-close) — klien TCP v1.4 berjalan penuh
-  tanpa keduanya; server-side `bind/listen/accept` tinggal tiga syscall
-  di atas kerangka `Net` yang sama
+- **TCP server** (`listen`/`accept`), datagram UDP > 240 byte, dan
+  HTTP/1.1 (keep-alive, chunked, header respons berulang)
 - **TLS lanjutan** (klien 1.3 sudah ada): verifikasi tanda **ECDSA P-256**
   untuk CertificateVerify, validasi rantai/PKI + hostname + masa berlaku,
   session resumption/PSK, dan dukungan `u64` asli supaya X25519 tidak lagi

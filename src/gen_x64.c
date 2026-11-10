@@ -269,7 +269,7 @@ static void x64_call(Method *m, Node *e) {
     int w64[64];
     Param *pp = e->meth ? e->meth->params : 0;
     for (Node *a = e->a; a; a = a->next, pp = pp ? pp->next : 0) {
-        if (n >= 6) die("baris %d: maksimal 6 argumen untuk target x86-64", e->line);
+        if (n >= 8) die("baris %d: maksimal 8 argumen untuk target x86-64", e->line);
         Ty at = (Ty)a->dty;
         Ty pt = pp ? (Ty)pp->ty : T_INT;
         gen_expr(m, a);
@@ -284,11 +284,17 @@ static void x64_call(Method *m, Node *e) {
     }
     static const char *reg32[6] = {"edi", "esi", "edx", "ecx", "r8d", "r9d"};
     static const char *reg64[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-    for (int k = 0; k < n; k++) {
+    int extra = n > 6 ? n - 6 : 0;
+    for (int k = 0; k < n && k < 6; k++) {
         const char *r = w64[k] ? reg64[k] : reg32[k];
         emit("\t%s %d(%%rsp), %%%s", w64[k] ? "movq" : "movl", (n - 1 - k) * 8, r);
     }
+    /* argumen ke-7/8 lewat stack: simpan dulu ke r10/r11 */
+    if (extra > 0) emit("\tmovq %d(%%rsp), %%r10", (n - 1 - 6) * 8);
+    if (extra > 1) emit("\tmovq %d(%%rsp), %%r11", (n - 1 - 7) * 8);
     if (n > 0) { emit("\taddq $%d, %%rsp", n * 8); par ^= (n & 1); }
+    if (extra > 1) { emit("\tpushq %%r11"); par ^= 1; }
+    if (extra > 0) { emit("\tpushq %%r10"); par ^= 1; }
     int need = par;
     if (need) emit("\tsubq $8, %%rsp");
     const char *dot = strchr(e->str, '.');
@@ -296,6 +302,7 @@ static void x64_call(Method *m, Node *e) {
     memcpy(cls, e->str, (size_t)(dot - e->str)); cls[dot - e->str] = 0;
     emit("\tcall %s__%s", cls, dot + 1);
     if (need) emit("\taddq $8, %%rsp");
+    if (extra > 0) { emit("\taddq $%d, %%rsp", extra * 8); par ^= (extra & 1); }
 }
 
 static void gen_bool_chain(Method *m, Node *e) {
@@ -757,6 +764,150 @@ static int gen_expr(Method *m, Node *e) {
             emit(".LSX%dh:", ln);
             return 0;
         }
+        if (e->ival >= 9 && e->ival <= 12) {
+            int idx = 0;
+            for (Node *aa = e->a; aa; aa = aa->next, idx++) {
+                gen_expr(m, aa);
+                spush();
+            }
+            emit("\tsubq $32, %%rsp");                  /* sa + addrlen */
+            emit("\tmovq $0, (%%rsp)");
+            emit("\tmovq $0, 8(%%rsp)");
+            emit("\tmovq $0, 16(%%rsp)");
+            emit("\tmovq $0, 24(%%rsp)");
+            if (e->ival == 9) {                        /* bind(fd, ip, port) */
+                emit("\tmovl 40(%%rsp), %%r8d");       /* ip */
+                emit("\tmovl 32(%%rsp), %%r9d");       /* port */
+                emit("\tmovl %%r9d, %%eax");
+                emit("\tshrl $8, %%eax");
+                emit("\tmovb %%al, 2(%%rsp)");
+                emit("\tmovl %%r9d, %%eax");
+                emit("\tmovb %%al, 3(%%rsp)");
+                emit("\tmovl $4, %%ecx");
+                emit(".LSB%da:", ln);
+                emit("\tmovl %%r8d, %%eax");
+                emit("\tshrl $24, %%eax");
+                emit("\tmovb %%al, (%%rsp,%%rcx)");
+                emit("\tshll $8, %%r8d");
+                emit("\tincl %%ecx");
+                emit("\tcmpl $8, %%ecx");
+                emit("\tjne .LSB%da", ln);
+                emit("\tmovw $2, (%%rsp)");
+                emit("\tmovl 48(%%rsp), %%edi");      /* fd */
+                emit("\tmovq %%rsp, %%rsi");
+                emit("\tmovl $16, %%edx");
+                emit("\tmovl $49, %%eax");            /* __NR_bind */
+                emit("\tsyscall");
+                emit("\taddq $32, %%rsp");
+                emit("\taddq $24, %%rsp");
+                return 0;
+            }
+            if (e->ival == 12) {                       /* shutdown(fd, how) */
+                emit("\tmovl 40(%%rsp), %%edi");
+                emit("\tmovl 32(%%rsp), %%esi");
+                emit("\tmovl $48, %%eax");            /* __NR_shutdown */
+                emit("\tsyscall");
+                emit("\taddq $32, %%rsp");
+                emit("\taddq $16, %%rsp");
+                return 0;
+            }
+            if (e->ival == 10) {                       /* sendto(fd,ip,port,buf) */
+                emit("\tmovq 32(%%rsp), %%r10");      /* buf */
+                emit("\tmovl 48(%%rsp), %%r8d");      /* ip */
+                emit("\tmovl 40(%%rsp), %%r9d");      /* port */
+                emit("\tmovl %%r9d, %%eax");
+                emit("\tshrl $8, %%eax");
+                emit("\tmovb %%al, 2(%%rsp)");
+                emit("\tmovl %%r9d, %%eax");
+                emit("\tmovb %%al, 3(%%rsp)");
+                emit("\tmovl $4, %%ecx");
+                emit(".LSD%da:", ln);
+                emit("\tmovl %%r8d, %%eax");
+                emit("\tshrl $24, %%eax");
+                emit("\tmovb %%al, (%%rsp,%%rcx)");
+                emit("\tshll $8, %%r8d");
+                emit("\tincl %%ecx");
+                emit("\tcmpl $8, %%ecx");
+                emit("\tjne .LSD%da", ln);
+                emit("\tmovw $2, (%%rsp)");
+                /* pak ke kop_iobuf, cap 240 */
+                emit("\tmovl (%%r10), %%r11d");      /* len */
+                emit("\tcmpl $240, %%r11d");
+                emit("\tjle .LSD%dc", ln);
+                emit("\tmovl $240, %%r11d");
+                emit(".LSD%dc:", ln);
+                emit("\tleaq kop_iobuf(%%rip), %%rbx");
+                emit("\txorl %%ecx, %%ecx");
+                emit(".LSD%dk:", ln);
+                emit("\tcmpl %%r11d, %%ecx");
+                emit("\tjge .LSD%df", ln);
+                emit("\tmovl %%ecx, %%eax");
+                emit("\tshlq $3, %%rax");
+                emit("\tmovq 8(%%r10,%%rax), %%rax");
+                emit("\tmovb %%al, (%%rbx,%%rcx)");
+                emit("\tincl %%ecx");
+                emit("\tjmp .LSD%dk", ln);
+                emit(".LSD%df:", ln);
+                emit("\tmovl 56(%%rsp), %%edi");      /* fd */
+                emit("\tmovq %%rbx, %%rsi");
+                emit("\tmovl %%r11d, %%edx");
+                emit("\txorl %%r10d, %%r10d");
+                emit("\tmovq %%rsp, %%r8");
+                emit("\tmovl $16, %%r9d");
+                emit("\tmovl $44, %%eax");            /* __NR_sendto */
+                emit("\tsyscall");
+                emit("\taddq $32, %%rsp");
+                emit("\taddq $32, %%rsp");
+                return 0;
+            }
+            if (e->ival == 11) {                       /* recvfrom(fd,buf,from) */
+                emit("\tmovl $16, 16(%%rsp)");        /* addrlen */
+                emit("\tleaq kop_iobuf(%%rip), %%rbx");
+                emit("\tmovl 48(%%rsp), %%edi");      /* fd */
+                emit("\tmovq %%rbx, %%rsi");
+                emit("\tmovl $240, %%edx");
+                emit("\txorl %%r10d, %%r10d");
+                emit("\tmovq %%rsp, %%r8");
+                emit("\tleaq 16(%%rsp), %%r9");
+                emit("\tmovl $45, %%eax");            /* __NR_recvfrom */
+                emit("\tsyscall");
+                emit("\ttestq %%rax, %%rax");
+                emit("\tjs .LSF%de", ln);
+                emit("\tmovq 40(%%rsp), %%r10");      /* buf */
+                emit("\txorl %%ecx, %%ecx");
+                emit(".LSF%dk:", ln);
+                emit("\tcmpq %%rax, %%rcx");
+                emit("\tjge .LSF%df", ln);
+                emit("\tmovzbl (%%rbx,%%rcx), %%edx");
+                emit("\tmovl %%ecx, %%r11d");
+                emit("\tshlq $3, %%r11");
+                emit("\tmovq %%rdx, 8(%%r10,%%r11)");
+                emit("\tincl %%ecx");
+                emit("\tjmp .LSF%dk", ln);
+                emit(".LSF%df:", ln);
+                emit("\tmovq 32(%%rsp), %%r11");      /* from[] */
+                emit("\tmovzbl 4(%%rsp), %%edx");
+                emit("\tshll $24, %%edx");
+                emit("\tmovzbl 5(%%rsp), %%esi");
+                emit("\tshll $16, %%esi");
+                emit("\torl %%esi, %%edx");
+                emit("\tmovzbl 6(%%rsp), %%esi");
+                emit("\tshll $8, %%esi");
+                emit("\torl %%esi, %%edx");
+                emit("\tmovzbl 7(%%rsp), %%esi");
+                emit("\torl %%esi, %%edx");
+                emit("\tmovzbl 2(%%rsp), %%esi");
+                emit("\tshll $8, %%esi");
+                emit("\tmovzbl 3(%%rsp), %%edi");
+                emit("\torl %%edi, %%esi");
+                emit("\tmovq %%rdx, 8(%%r11)");
+                emit("\tmovq %%rsi, 16(%%r11)");
+                emit(".LSF%de:", ln);
+                emit("\taddq $32, %%rsp");
+                emit("\taddq $24, %%rsp");
+                return 0;
+            }
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -936,7 +1087,11 @@ void gen_x64(const char *outpath) {
             static const char *regs64[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
             int i = 0;
             for (Param *p = m->params; p; p = p->next, i++) {
-                if (i >= 6) break;
+                if (i >= 6) {
+                    emit("\tmovq %d(%%rbp), %%rax", 16 + 8 * (i - 6));
+                    emit("\tmovq %%rax, -%ld(%%rbp)", (i + 1) * 8);
+                    continue;
+                }
                 if (is64ty((Ty)p->ty))   /* param lambda/array disalin 64-bit */
                     emit("\tmovq %%%s, -%ld(%%rbp)", regs64[i], (i + 1) * 8);
                 else

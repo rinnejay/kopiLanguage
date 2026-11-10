@@ -1,0 +1,53 @@
+/* Udp.kop — datagram UDP di atas builtin `Net` (v1.6.2).
+ *
+ * UDP connectionless: tiap `sendTo` = satu datagram (maks 240 byte pada
+ * v1 ini karena penyangga syscall; batas jujur, lihat README).
+ * `recvFrom` menerima satu datagram dan mencatat sumbernya di `from`:
+ *   from[0] = alamat IPv4 (bentuk ipBE seperti Tcp.ip)
+ *   from[1] = port host (mis. 9914)
+ *
+ * Contoh server gema sederhana:
+ *   int fd = Udp.open();
+ *   Udp.bind(fd, Udp.loopback(), 9914);
+ *   int[] buf = new int[240];
+ *   int[] from = new int[2];
+ *   int n = Udp.recvFrom(fd, buf, from);
+ *   Udp.sendTo(fd, from[0], from[1], buf);
+ */
+
+class Udp {
+
+    static int loopback() {
+        return 2130706433;                    /* 127.0.0.1 */
+    }
+
+    /* buka socket UDP (AF_INET, SOCK_DGRAM) → fd | negatif */
+    static int open() {
+        return Net.socket(2, 2);
+    }
+
+    /* ikat ke alamat lokal → 0 | -errno */
+    static int bind(int fd, int addr, int port) {
+        return Net.bind(fd, addr, port);
+    }
+
+    /* kirim satu datagram: data[0..len-1] (maks 240 byte) → n | -errno */
+    static int sendTo(int fd, int addr, int port, int[] data) {
+        return Net.sendto(fd, addr, port, data);
+    }
+
+    /* terima satu datagram ke buf; sumber diisi ke from[0]=ip, from[1]=port.
+     * hasil = jumlah byte (≥0) atau kode negatif. */
+    static int recvFrom(int fd, int[] buf, int[] from) {
+        return Net.recvfrom(fd, buf, from);
+    }
+
+    /* half-close (SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2) */
+    static int shutdown(int fd, int how) {
+        return Net.shutdown(fd, how);
+    }
+
+    static int close(int fd) {
+        return Net.close(fd);
+    }
+}

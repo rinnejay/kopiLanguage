@@ -113,4 +113,121 @@ class Http {
         for (int i = 0; i < n; i++) resp[i] = buf[i];
         return bodyOf(resp);
     }
+
+    /* ── header permintaan (v1.6.2) ─────────────────────────────── */
+
+    /* kirim permintaan generik dengan header tambahan.
+     * `headers` berisi baris mentah "Nama: nilai\r\n" (boleh kosong).
+     * body kosong (length 0) → tanpa Content-Length (GET/HEAD).
+     * HTTP/1.0: server menutup koneksi setelah respons. */
+    static int[] reqEx(int[] method, int[] host, int[] path,
+                       int[] headers, int[] body) {
+        int[] out = Tcp.cat(method, Net.bytes(" "));
+        out = Tcp.cat(out, path);
+        out = Tcp.cat(out, Net.bytes(" HTTP/1.0\r\nHost: "));
+        out = Tcp.cat(out, host);
+        out = Tcp.cat(out, Net.bytes("\r\n"));
+        if (headers.length > 0) out = Tcp.cat(out, headers);
+        if (body.length > 0) {
+            out = Tcp.cat(out, Net.bytes("Content-Length: "));
+            out = Tcp.cat(out, Tcp.num(body.length));
+            out = Tcp.cat(out, Net.bytes("\r\n"));
+        }
+        out = Tcp.cat(out, Net.bytes("\r\n"));
+        return out;
+    }
+
+    /* satu putaran penuh dengan method/header/body bebas. */
+    static int requestInto(int addr, int port, int[] method, int[] host,
+                           int[] path, int[] headers, int[] body, int[] buf) {
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) return fd;
+        int[] head = reqEx(method, host, path, headers, body);
+        int r = Tcp.sendBuf(fd, head);
+        if (r == 0 && body.length > 0) r = Tcp.sendBuf(fd, body);
+        if (r < 0) {
+            Net.close(fd);
+            return r;
+        }
+        int n = Tcp.recvAll(fd, buf);
+        Net.close(fd);
+        return n;
+    }
+
+    /* GET dengan header tambahan */
+    static int getWith(int addr, int port, int[] host, int[] path,
+                       int[] headers, int[] buf) {
+        return requestInto(addr, port, Net.bytes("GET"), host, path,
+                           headers, new int[0], buf);
+    }
+
+    /* POST dengan header tambahan + body */
+    static int postWith(int addr, int port, int[] host, int[] path,
+                        int[] headers, int[] body, int[] buf) {
+        return requestInto(addr, port, Net.bytes("POST"), host, path,
+                           headers, body, buf);
+    }
+
+    /* ── pembacaan header respons ──────────────────────────────── */
+
+    /* indeks awal body (setelah CRLF CRLF), -1 bila tidak ada */
+    static int bodyStart(int[] resp) {
+        int p = Tcp.indexOf(resp, Net.bytes("\r\n\r\n"), 0);
+        if (p < 0) return -1;
+        return p + 4;
+    }
+
+    /* potongan header mentah (tanpa baris status & tanpa CRLF CRLF) */
+    static int[] headerBlock(int[] resp) {
+        int e = Tcp.indexOf(resp, Net.bytes("\r\n\r\n"), 0);
+        if (e < 0) return new int[0];
+        int s0 = Tcp.indexOf(resp, Net.bytes("\r\n"), 0);
+        if (s0 < 0 || s0 + 2 > e) return new int[0];
+        int len = e - (s0 + 2);
+        int[] out = new int[len];
+        for (int i = 0; i < len; i++) out[i] = resp[s0 + 2 + i];
+        return out;
+    }
+
+    static int lowerc(int c) {
+        if (c >= 65 && c <= 90) return c + 32;
+        return c;
+    }
+
+    static boolean nameEq(int[] line, int at, int[] name) {
+        if (at + name.length > line.length) return false;
+        for (int i = 0; i < name.length; i++) {
+            if (lowerc(line[at + i]) != lowerc(name[i])) return false;
+        }
+        return true;
+    }
+
+    /* nilai header (tanpa spasi tepi), array kosong bila tidak ada.
+     * perbandingan nama case-insensitive; baris pertama yang cocok dipakai. */
+    static int[] headerValue(int[] resp, int[] name) {
+        int[] block = headerBlock(resp);
+        int i = 0;
+        while (i < block.length) {
+            int ls = i;
+            while (i < block.length && block[i] != 13 && block[i] != 10) i++;
+            int le = i;
+            if (nameEq(block, ls, name) && ls + name.length < le &&
+                block[ls + name.length] == 58) {          /* ':' */
+                int vs = ls + name.length + 1;
+                while (vs < le && (block[vs] == 32 || block[vs] == 9)) vs++;
+                int ve = le;
+                while (ve > vs && (block[ve - 1] == 32 || block[ve - 1] == 9)) ve--;
+                int[] out = new int[ve - vs];
+                for (int k = 0; k < out.length; k++) out[k] = block[vs + k];
+                return out;
+            }
+            /* lewati CRLF */
+            while (i < block.length && (block[i] == 13 || block[i] == 10)) i++;
+        }
+        return new int[0];
+    }
+
+    static boolean hasHeader(int[] resp, int[] name) {
+        return headerValue(resp, name).length > 0;
+    }
 }

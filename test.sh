@@ -659,6 +659,121 @@ printf '3004\n1\n1\n32\n32\n1\n' > "$T/kopi/netbulk.ref"
 check netbulk "$T/kopi/netbulk.kop"
 kill $BULK_PID 2>/dev/null
 
+# ─── UDP: bind/sendto/recvfrom (loopback, tanpa server luar) ─────────────
+cat > "$T/kopi/udptest.kop" <<'EOF'
+import Udp;
+
+class Main {
+    public static void main(String[] args) {
+        int s = Udp.open();
+        if (s < 0) { System.out.println(s); return; }
+        System.out.println(Udp.bind(s, Udp.loopback(), 9918));
+
+        int c = Udp.open();
+        System.out.println(Udp.sendTo(c, Udp.loopback(), 9918, Net.bytes("HALO")));
+
+        int[] buf = new int[240];
+        int[] from = new int[2];
+        int n = Udp.recvFrom(s, buf, from);
+        System.out.println(n);
+        System.out.println(from[0] == Udp.loopback());
+        for (int i = 0; i < n; i++) System.out.println(buf[i]);
+
+        System.out.println(Udp.sendTo(s, from[0], from[1], Net.bytes("BALAS")));
+
+        int[] buf2 = new int[240];
+        int[] from2 = new int[2];
+        int n2 = Udp.recvFrom(c, buf2, from2);
+        System.out.println(n2);
+        for (int i = 0; i < n2; i++) System.out.println(buf2[i]);
+
+        Udp.close(s);
+        Udp.close(c);
+    }
+}
+EOF
+printf '0\n4\n4\n1\n72\n65\n76\n79\n5\n5\n66\n65\n76\n65\n83\n' > "$T/kopi/udptest.ref"
+check udptest "$T/kopi/udptest.kop"
+
+# ─── HTTP: header permintaan kustom + pembacaan header respons ───────────
+cat > "$T/kopi/httpsrv.py" <<'EOF'
+import socket
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", 9919)); s.listen(4)
+while True:
+    try:
+        c, _ = s.accept()
+    except OSError:
+        break
+    try:
+        req = b""
+        while b"\r\n\r\n" not in req:
+            d = c.recv(4096)
+            if not d: break
+            req += d
+        saw = b"X-Kopi: 123" in req and b"User-Agent: Kopi/1" in req
+        body = b"HALO\n"
+        resp = (b"HTTP/1.0 201 Created\r\n"
+                + (b"X-Saw: yes\r\n" if saw else b"X-Saw: no\r\n")
+                + b"X-Kopi: ok\r\nContent-Length: 5\r\n\r\n" + body)
+        c.sendall(resp)
+    except OSError:
+        pass
+    try: c.close()
+    except OSError: pass
+EOF
+python3 "$T/kopi/httpsrv.py" & HTTP_PID2=$!
+sleep 0.5
+
+cat > "$T/kopi/httphead.kop" <<'EOF'
+import Tcp;
+import Http;
+
+class Main {
+    static int[] slice(int[] a, int n) {
+        int[] o = new int[n];
+        for (int i = 0; i < n; i++) o[i] = a[i];
+        return o;
+    }
+
+    public static void main(String[] args) {
+        int[] h = Net.bytes("X-Kopi: 123\r\nUser-Agent: Kopi/1\r\n");
+        int[] buf = new int[2048];
+        int n = Http.getWith(2130706433, 9919, Net.bytes("127.0.0.1"),
+                             Net.bytes("/halo"), h, buf);
+        System.out.println(n > 0);
+        int m = 0;
+        if (n > 0) m = n;
+        int[] resp = slice(buf, m);
+        System.out.println(Http.statusOf(resp));
+        int[] saw = Http.headerValue(resp, Net.bytes("x-saw"));
+        System.out.println(saw.length);
+        System.out.println(saw[0]);
+        int[] body = Http.bodyOf(resp);
+        System.out.println(body.length);
+        for (int i = 0; i < body.length; i++) System.out.println(body[i]);
+        int[] v = Http.headerValue(resp, Net.bytes("X-Kopi"));
+        System.out.println(v.length);
+        for (int i = 0; i < v.length; i++) System.out.println(v[i]);
+        System.out.println(Http.hasHeader(resp, Net.bytes("content-length")));
+        int[] cl = Http.headerValue(resp, Net.bytes("Content-Length"));
+        System.out.println(cl.length);
+        System.out.println(cl[0]);
+    }
+}
+EOF
+printf '1\n201\n3\n121\n5\n72\n65\n76\n79\n10\n2\n111\n107\n1\n1\n53\n' > "$T/kopi/httphead.ref"
+check httphead "$T/kopi/httphead.kop"
+kill $HTTP_PID2 2>/dev/null
+
+# sintaks x64 untuk Net baru (UDP + HTTP header)
+for t in udptest httphead; do
+    ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" \
+        && cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || {
+        echo "FAIL  $t [x64]: sintaks assembly"; FAIL=$((FAIL+1)); pas64=0; }
+done
+
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"
 [ $FAIL -eq 0 ]
