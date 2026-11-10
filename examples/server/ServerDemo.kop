@@ -1,97 +1,20 @@
-// ServerDemo.kop — server HTTP minimal Kopi (v1.9.2).
-// Jalankan: ./ServerDemo.bin 8080
-//
-// v1.9.2: keep-alive per koneksi, HEAD, cookie, body chunked, MIME dari
-// library Mime. Setiap request memakai mark arena sendiri sehingga
-// koneksi panjang tidak menumbuhkan memori.
+// ServerDemo.kop — server HTTP blocking sederhana (v1.10.0).
+// Satu koneksi dilayani sampai selesai (keep-alive), lalu lanjut.
+// Untuk banyak klien sekaligus lihat ServerEvent.kop (poll).
 import Str;
-import Time;
 import Log;
 import HttpServer;
-import Static;
+import Routes;
 
 class Main {
-
-    static int[] empty() { return new int[0]; }
-
-    static int[] text(int code, int[] s, boolean keep) {
-        return HttpServer.responseKA(code, Net.bytes("text/plain; charset=utf-8"), s, b2i(keep));
-    }
-
-    static int b2i(boolean b) { if (b) return 1; return 0; }
-
-    /* bangun respons untuk satu request */
-    static int[] route(int[] req, boolean keep) {
-        int[] p = HttpServer.path(req);
-        int k = b2i(keep);
-
-        if (Str.eq(p, "/")) {
-            int[] b = Net.bytes("<h1>Kopi server</h1>\n");
-            return HttpServer.responseFor(req, 200, Net.bytes("text/html; charset=utf-8"), b, k);
-        }
-        if (Str.eq(p, "/health")) {
-            return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"),
-                                          Net.bytes("ok\n"), k);
-        }
-        if (Str.eq(p, "/json")) {
-            int[] b = Net.bytes("{\"status\":\"ok\",\"lang\":\"kopi\"}\n");
-            return HttpServer.responseFor(req, 200, Net.bytes("application/json"), b, k);
-        }
-        if (Str.eq(p, "/time")) {
-            return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"),
-                                          Str.cat(Time.format(Time.epoch()), Net.bytes("\n")), k);
-        }
-        if (Str.eq(p, "/echo")) {
-            return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"),
-                                          HttpServer.bodyAny(req), k);
-        }
-        if (Str.eq(p, "/sum")) {
-            int a = Str.toInt(HttpServer.queryValue(req, Net.bytes("a")));
-            int b = Str.toInt(HttpServer.queryValue(req, Net.bytes("b")));
-            return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"),
-                                          Str.cat(Str.fromInt(a + b), Net.bytes("\n")), k);
-        }
-        if (Str.eq(p, "/header")) {
-            int[] name = HttpServer.queryValue(req, Net.bytes("name"));
-            int[] v = HttpServer.headerValue(req, name);
-            return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"),
-                                          Str.cat(v, Net.bytes("\n")), k);
-        }
-        if (Str.eq(p, "/setcookie")) {
-            int[] extra = HttpServer.setCookie(Net.bytes("sesi"), Net.bytes("abc123"),
-                                               Net.bytes("/"), 60);
-            return HttpServer.respond(200, Net.bytes("text/plain; charset=utf-8"),
-                                      Net.bytes("cookie dipasang\n"), extra, k);
-        }
-        if (Str.eq(p, "/cookie")) {
-            int[] v = HttpServer.cookie(req, Net.bytes("sesi"));
-            int[] b = Net.bytes("sesi=");
-            b = Str.cat(b, v);
-            b = Str.cat(b, Net.bytes("\n"));
-            return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"), b, k);
-        }
-        if (Str.startsWith(p, Net.bytes("/static/"))) {
-            int[] rel = Str.slice(p, 8, p.length - 8);
-            return Static.serveKA(rel, k);
-        }
-        if (HttpServer.methodIs(req, Net.bytes("HEAD"))) {
-            return HttpServer.responseFor(req, 404, Net.bytes("text/plain; charset=utf-8"),
-                                          Net.bytes("not found\n"), k);
-        }
-        return HttpServer.responseFor(req, 404, Net.bytes("text/plain; charset=utf-8"),
-                                      Net.bytes("not found\n"), k);
-    }
-
     public static void main(String[] args) {
         int port = 8080;
         if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
 
-        int fd = Net.socket(2, 1);                 /* AF_INET, SOCK_STREAM */
+        int fd = Net.socket(2, 1);
         if (fd < 0) { Log.error(Net.bytes("boot"), Net.bytes("socket gagal")); return; }
-        Net.setsockopt(fd, 1, 2, 1);               /* SOL_SOCKET, SO_REUSEADDR */
-        int rb = Net.bind(fd, 0, port);            /* 0.0.0.0 */
-        int rl = Net.listen(fd, 16);
-        if (rb < 0 || rl < 0) {
+        Net.setsockopt(fd, 1, 2, 1);
+        if (Net.bind(fd, 0, port) < 0 || Net.listen(fd, 16) < 0) {
             Log.error(Net.bytes("boot"), Net.bytes("bind/listen gagal"));
             return;
         }
@@ -100,19 +23,16 @@ class Main {
         while (true) {
             int c = Net.accept(fd);
             if (c < 0) { Net.sleep(5); continue; }
-
-            /* keep-alive: layani beberapa request pada koneksi yang sama */
             while (true) {
                 int mark = Net.memMark();
                 int[] req = HttpServer.readRequest(c, 16384);
                 if (req.length == 0) { Net.memReset(mark); break; }
-
-                boolean keep = HttpServer.keepAlive(req);
-                int[] resp = route(req, keep);
+                int keep = 0;
+                if (HttpServer.keepAlive(req)) keep = 1;
+                int[] resp = Routes.handle(req, keep);
                 HttpServer.send(c, resp);
-                Log.info(Net.bytes("req"), HttpServer.path(req));
                 Net.memReset(mark);
-                if (!keep) break;
+                if (keep == 0) break;
             }
             Net.close(c);
         }

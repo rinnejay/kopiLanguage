@@ -1400,6 +1400,7 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "ttyRaw") || !strcmp(fn, "ttyraw")) { bi = 36; want = 1; }
             else if (!strcmp(fn, "localport")) { bi = 37; want = 1; }
             else if (!strcmp(fn, "settimeout")) { bi = 38; want = 2; }
+            else if (!strcmp(fn, "pollfd"))   { bi = 39; want = 3; }
             else die("baris %d: fungsi Net.%s tidak ada", e->line, fn);
 
             int narg = (int)e->ival;
@@ -1475,6 +1476,11 @@ static Ty type_expr_raw(Node *e) {
                         die("baris %d: Net.recv1 argumen fd harus int", e->line);
                     if (i == 1 && t != T_ARI && t != T_STR)
                         die("baris %d: Net.recv1 argumen buffer harus int[]/String", e->line);
+                } else if (bi == 39) {
+                    if ((i == 0 || i == 1) && t != T_ARI && t != T_STR)
+                        die("baris %d: Net.pollfd argumen %d harus int[]", e->line, i + 1);
+                    if (i == 2 && t != T_INT)
+                        die("baris %d: Net.pollfd timeout harus int", e->line);
                 } else if (bi == 34 || bi == 36 || bi == 37 || bi == 38) {
                     if (t != T_INT)
                         die("baris %d: argumen Net.%s harus int", e->line, fn);

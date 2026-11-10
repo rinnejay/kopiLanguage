@@ -1,0 +1,64 @@
+// Routes.kop — kumpulan route contoh untuk server demo (v1.10.0).
+// Dipakai ServerDemo (blocking) dan ServerEvent (event-loop poll).
+
+import Str;
+import Time;
+import HttpServer;
+import Static;
+
+class Routes {
+
+    static int[] okText(int[] req, int[] body, int keep) {
+        return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"), body, keep);
+    }
+
+    static int[] handle(int[] req, int keep) {
+        int[] p = HttpServer.path(req);
+
+        if (Str.eq(p, "/")) {
+            return HttpServer.responseFor(req, 200, Net.bytes("text/html; charset=utf-8"),
+                                          Net.bytes("<h1>Kopi server</h1>\n"), keep);
+        }
+        if (Str.eq(p, "/health")) {
+            return HttpServer.responseFor(req, 200, Net.bytes("text/plain; charset=utf-8"),
+                                          Net.bytes("ok\n"), keep);
+        }
+        if (Str.eq(p, "/json")) {
+            return HttpServer.responseFor(req, 200, Net.bytes("application/json"),
+                                          Net.bytes("{\"status\":\"ok\",\"lang\":\"kopi\"}\n"), keep);
+        }
+        if (Str.eq(p, "/time")) {
+            return okText(req, Str.cat(Time.format(Time.epoch()), Net.bytes("\n")), keep);
+        }
+        if (Str.eq(p, "/echo")) {
+            return okText(req, HttpServer.bodyAny(req), keep);
+        }
+        if (Str.eq(p, "/sum")) {
+            int a = Str.toInt(HttpServer.queryValue(req, Net.bytes("a")));
+            int b = Str.toInt(HttpServer.queryValue(req, Net.bytes("b")));
+            return okText(req, Str.cat(Str.fromInt(a + b), Net.bytes("\n")), keep);
+        }
+        if (Str.eq(p, "/header")) {
+            int[] name = HttpServer.queryValue(req, Net.bytes("name"));
+            return okText(req, Str.cat(HttpServer.headerValue(req, name), Net.bytes("\n")), keep);
+        }
+        if (Str.eq(p, "/setcookie")) {
+            int[] extra = HttpServer.setCookie(Net.bytes("sesi"), Net.bytes("abc123"),
+                                               Net.bytes("/"), 60);
+            return HttpServer.respond(200, Net.bytes("text/plain; charset=utf-8"),
+                                      Net.bytes("cookie dipasang\n"), extra, keep);
+        }
+        if (Str.eq(p, "/cookie")) {
+            int[] b = Net.bytes("sesi=");
+            b = Str.cat(b, HttpServer.cookie(req, Net.bytes("sesi")));
+            b = Str.cat(b, Net.bytes("\n"));
+            return okText(req, b, keep);
+        }
+        if (Str.startsWith(p, Net.bytes("/static/"))) {
+            int[] rel = Str.slice(p, 8, p.length - 8);
+            return Static.serveKA(rel, keep);
+        }
+        return HttpServer.responseFor(req, 404, Net.bytes("text/plain; charset=utf-8"),
+                                      Net.bytes("not found\n"), keep);
+    }
+}

@@ -1,0 +1,200 @@
+// ServerEvent.kop — server HTTP event-loop (poll) multi-klien (v1.10.0).
+//
+// Berbeda dari ServerDemo (satu koneksi sampai selesai), server ini
+// memakai `Net.pollfd`: semua socket non-blocking, satu proses melayani
+// banyak koneksi sekaligus. Klien yang mengirim request separuh tidak
+// memblokir klien lain.
+//
+// Pakai: ./ServerEvent.bin [port]
+//
+// Batas: tetap single-thread (CPU-bound request tetap memblokir), buffer
+// per koneksi 8 KiB, tanpa pipelining lebih dari satu request sekaligus
+// (sisa byte digeser, bukan diproses berantai).
+
+import Str;
+import Log;
+import HttpServer;
+import Routes;
+
+class Main {
+
+    static int MAXC() { return 32; }
+    static int BUFSZ() { return 8192; }
+    static int IDLE() { return 20; }              /* detik */
+
+    static int lower(int c) { if (c >= 65 && c <= 90) return c + 32; return c; }
+
+    static boolean isCrlf(int[] b, int i) {
+        return i + 1 < b.length && b[i] == 13 && b[i + 1] == 10;
+    }
+
+    /* panjang total request yang sudah lengkap, atau -1 bila belum */
+    static int complete(int[] b, int off, int len) {
+        int he = -1;
+        int i = off;
+        while (i + 3 < off + len) {
+            if (b[i] == 13 && b[i + 1] == 10 && b[i + 2] == 13 && b[i + 3] == 10) {
+                he = i + 4;
+                break;
+            }
+            i++;
+        }
+        if (he < 0) return -1;
+
+        int cl = 0;
+        int p = off;
+        /* lewati baris request */
+        while (p + 1 < he && !isCrlf(b, p)) p++;
+        p = p + 2;
+        while (p + 1 < he) {
+            int ls = p;
+            while (p + 1 < he && !isCrlf(b, p)) p++;
+            int le = p;
+            int[] nm = Net.bytes("content-length:");
+            if (le - ls > nm.length) {
+                boolean ok = true;
+                for (int j = 0; j < nm.length; j++) {
+                    if (lower(b[ls + j]) != nm[j]) { ok = false; break; }
+                }
+                if (ok) {
+                    int k = ls + nm.length;
+                    int v = 0;
+                    while (k < le && (b[k] == 32 || b[k] == 9)) k++;
+                    while (k < le && b[k] >= 48 && b[k] <= 57) {
+                        v = v * 10 + (b[k] - 48);
+                        k++;
+                    }
+                    cl = v;
+                }
+            }
+            p = p + 2;
+        }
+        int need = (he - off) + cl;
+        if (len < need) return -1;
+        return need;
+    }
+
+    static void closeSlot(int[] cfd, int[] clen, int i) {
+        if (cfd[i] >= 0) Net.close(cfd[i]);
+        cfd[i] = -1;
+        clen[i] = 0;
+    }
+
+    public static void main(String[] args) {
+        int port = 8080;
+        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+
+        int lfd = Net.socket(2, 1);
+        if (lfd < 0) { Log.error(Net.bytes("boot"), Net.bytes("socket gagal")); return; }
+        Net.setsockopt(lfd, 1, 2, 1);
+        if (Net.bind(lfd, 0, port) < 0 || Net.listen(lfd, 64) < 0) {
+            Log.error(Net.bytes("boot"), Net.bytes("bind/listen gagal"));
+            return;
+        }
+        Net.setnonblock(lfd);
+
+        int MC = MAXC();
+        int BZ = BUFSZ();
+        int[] cfd = new int[MC];
+        int[] clen = new int[MC];
+        int[] clast = new int[MC];
+        for (int i = 0; i < MC; i++) { cfd[i] = -1; clen[i] = 0; clast[i] = 0; }
+        int[] cbuf = new int[MC * BZ];
+        int[] pfds = new int[MC + 1];
+        int[] prev = new int[MC + 1];
+        int[] pslot = new int[MC + 1];
+        int[] tmp = new int[4096];
+
+        Log.info(Net.bytes("boot"), Net.bytes("event-loop siap"));
+        int[] hello = Net.bytes("Kopi ServerEvent (poll) port=");
+        hello = Str.cat(hello, Str.fromInt(port));
+        System.out.println(hello);
+
+        while (true) {
+            pfds[0] = lfd;
+            pslot[0] = -1;
+            int np = 1;
+            for (int i = 0; i < MC; i++) {
+                if (cfd[i] >= 0) {
+                    pfds[np] = cfd[i];
+                    pslot[np] = i;
+                    np++;
+                }
+            }
+            int nready = Net.pollfd(pfds, prev, 500);
+            if (nready < 0) { Net.sleep(10); continue; }
+            int now = Net.time();
+
+            /* terima koneksi baru */
+            if (nready > 0 && (prev[0] & 1) != 0) {
+                int acc = 0;
+                while (acc < 32) {
+                    int c = Net.accept(lfd);
+                    if (c < 0) break;
+                    Net.setnonblock(c);
+                    int slot = -1;
+                    for (int i = 0; i < MC; i++) {
+                        if (cfd[i] < 0) { slot = i; break; }
+                    }
+                    if (slot < 0) { Net.close(c); }
+                    else {
+                        cfd[slot] = c;
+                        clen[slot] = 0;
+                        clast[slot] = now;
+                    }
+                    acc++;
+                }
+            }
+
+            /* layani koneksi yang siap */
+            for (int k = 1; k < np; k++) {
+                if ((prev[k] & 3) == 0) continue;
+                int slot = pslot[k];
+                if (slot < 0 || cfd[slot] < 0) continue;
+                int c = cfd[slot];
+                int off = slot * BZ;
+
+                if ((prev[k] & 2) != 0 && clen[slot] == 0) {
+                    closeSlot(cfd, clen, slot);
+                    continue;
+                }
+
+                int rn = Net.recv1(c, tmp);
+                if (rn <= 0) { closeSlot(cfd, clen, slot); continue; }
+
+                int keepN = clen[slot];
+                if (keepN + rn > BZ) rn = BZ - keepN;
+                for (int i = 0; i < rn; i++) cbuf[off + keepN + i] = tmp[i];
+                clen[slot] = keepN + rn;
+                clast[slot] = now;
+
+                int guard = 0;
+                while (guard < 4) {
+                    int need = complete(cbuf, off, clen[slot]);
+                    if (need < 0) break;
+                    int mark = Net.memMark();
+                    int[] req = Str.slice(cbuf, off, need);
+                    int keep = 0;
+                    if (HttpServer.keepAlive(req)) keep = 1;
+                    int[] resp = Routes.handle(req, keep);
+                    HttpServer.send(c, resp);
+                    Net.memReset(mark);
+
+                    int rem = clen[slot] - need;
+                    if (rem > 0) {
+                        for (int i = 0; i < rem; i++) cbuf[off + i] = cbuf[off + need + i];
+                    }
+                    clen[slot] = rem;
+                    guard++;
+                    if (keep == 0) { closeSlot(cfd, clen, slot); break; }
+                    if (rem == 0) break;
+                }
+            }
+
+            /* buang koneksi menganggur */
+            for (int i = 0; i < MC; i++) {
+                if (cfd[i] >= 0 && now - clast[i] > IDLE()) closeSlot(cfd, clen, i);
+            }
+        }
+    }
+}

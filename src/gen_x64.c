@@ -24,6 +24,7 @@ static void spop(const char *r) { emit("\tpopq %%%s", r); par ^= 1; }
 static int gen_expr(Method *m, Node *e);
 static void gen_stmts(Method *m, Node *lst);
 static int netlbl;      /* label EX_NET unik per kemunculan */
+static int arrlbl;      /* label zero-init array unik */
 static int cur_ret_label;
 
 /* 32-bit int/bool vs 64-bit (pointer / numerik baru / float bits) */
@@ -626,7 +627,20 @@ static int gen_expr(Method *m, Node *e) {
         emit("\taddq $8, %%r10");       /* + header len */
         emit("\tmovq %%r10, %%rdi");
         emit("\tcall kopalloc");
-        emit("\tmovq %%r10, (%rax)");   /* len */
+        emit("\tmovq %%r10, (%%rax)");  /* len */
+        {
+            int L = arrlbl++;
+            emit("\tmovq %%r10, %%rcx");
+            emit("\tshrq $3, %%rcx");      /* n */
+            emit("\txorl %%edx, %%edx");
+            emit(".LNZX%d:", L);
+            emit("\tcmpq %%rcx, %%rdx");
+            emit("\tjge .LNZX%de", L);
+            emit("\tmovq $0, 8(%%rax,%%rdx,8)");
+            emit("\tincq %%rdx");
+            emit("\tjmp .LNZX%d", L);
+            emit(".LNZX%de:", L);
+        }
         return 1;
     }
     case EX_IDX: {
@@ -1306,6 +1320,74 @@ static int gen_expr(Method *m, Node *e) {
             emit("\taddq $16, %%rsp");
             return 0;
         }
+        if (e->ival == 39) {                       /* pollfd(fds, revents, ms) */
+            gen_expr(m, e->a); spush();
+            gen_expr(m, e->a->next); spush();
+            gen_expr(m, e->a->next->next); spush();
+            int pad = par;
+            if (pad) emit("\tsubq $8, %%rsp");
+            emit("\tsubq $512, %%rsp");
+            int A = 512 + pad;
+            emit("\tmovq %d(%%rsp), %%r10", A + 16);   /* fds */
+            emit("\tmovl (%%r10), %%r9d");
+            emit("\tcmpl $64, %%r9d");
+            emit("\tjle .LPFX%dc", ln);
+            emit("\tmovl $64, %%r9d");
+            emit(".LPFX%dc:", ln);
+            emit("\tmovl %%r9d, %d(%%rsp)", A - 8);    /* simpan n */
+            emit("\txorl %%ecx, %%ecx");
+            emit(".LPFX%dl:", ln);
+            emit("\tcmpl %%r9d, %%ecx");
+            emit("\tjge .LPFX%dd", ln);
+            emit("\tmovslq %%ecx, %%rax");
+            emit("\tmovl 8(%%r10,%%rax,8), %%edx");
+            emit("\tmovq %%rax, %%r11");
+            emit("\tshlq $3, %%r11");
+            emit("\tmovl %%edx, (%%rsp,%%r11)");
+            emit("\tmovw $1, 4(%%rsp,%%r11)");
+            emit("\tmovw $0, 6(%%rsp,%%r11)");
+            emit("\tincl %%ecx");
+            emit("\tjmp .LPFX%dl", ln);
+            emit(".LPFX%dd:", ln);
+            emit("\tmovq %%rsp, %%rdi");
+            emit("\tmovl %d(%%rsp), %%esi", A - 8);
+            emit("\tmovl %d(%%rsp), %%edx", A);
+            emit("\tcall poll@PLT");
+            emit("\tmovl %d(%%rsp), %%r9d", A - 8);
+            emit("\tmovq %d(%%rsp), %%r10", A + 8);    /* revents */
+            emit("\txorl %%ecx, %%ecx");
+            emit("\txorl %%eax, %%eax");
+            emit(".LPFX%dk:", ln);
+            emit("\tcmpl %%r9d, %%ecx");
+            emit("\tjge .LPFX%df", ln);
+            emit("\tmovslq %%ecx, %%r11");
+            emit("\tshlq $3, %%r11");
+            emit("\tmovzwl 6(%%rsp,%%r11), %%esi");
+            emit("\txorl %%edi, %%edi");
+            emit("\ttestw %%si, %%si");
+            emit("\tje .LPFX%dn2", ln);
+            emit("\ttestw $1, %%si");
+            emit("\tje .LPFX%dn1", ln);
+            emit("\tmovl $1, %%edi");
+            emit(".LPFX%dn1:", ln);
+            emit("\ttestw $56, %%si");
+            emit("\tje .LPFX%dn2", ln);
+            emit("\torl $2, %%edi");
+            emit(".LPFX%dn2:", ln);
+            emit("\tmovq %%rdi, 8(%%r10,%%r11)");
+            emit("\ttestl %%edi, %%edi");
+            emit("\tje .LPFX%dn", ln);
+            emit("\tincl %%eax");
+            emit(".LPFX%dn:", ln);
+            emit("\tincl %%ecx");
+            emit("\tjmp .LPFX%dk", ln);
+            emit(".LPFX%df:", ln);
+            emit("\taddq $512, %%rsp");
+            if (pad) emit("\taddq $8, %%rsp");
+            emit("\taddq $24, %%rsp");
+            par ^= 1;
+            return 0;
+        }
         if (e->ival == 38) {                       /* settimeout(fd, ms) */
             gen_expr(m, e->a); spush();
             gen_expr(m, e->a->next); spush();
@@ -1659,7 +1741,7 @@ void gen_x64(const char *outpath) {
             emit("\tpushq %%rbp");
             emit("\tmovq %%rsp, %%rbp");
             emit("\tandq $-16, %%rsp");
-            emit("\tmovl $8388608, %%edi");     /* 1<<23 bytes arena */
+            emit("\tmovl $33554432, %%edi");    /* 1<<25 bytes arena (32 MB) */
             emit("\tcall malloc@PLT");
             emit("\tmovq %%rax, kop_arena_base(%%rip)");
             emit("\tmovl $0, %%eax");           /* arg main diabaikan */
@@ -1696,7 +1778,7 @@ void gen_x64(const char *outpath) {
     emit("kopalloc:");
     emit("\tmovq kop_arena_used(%%rip), %%rax");
     emit("\taddq %%rdi, %%rax");
-    emit("\tcmpq $8388608, %%rax");
+    emit("\tcmpq $33554432, %%rax");
     emit("\tjge .Koom");
     emit("\tmovq %%rax, kop_arena_used(%%rip)");
     emit("\tsubq %%rdi, %%rax");

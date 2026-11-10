@@ -1,0 +1,99 @@
+// Resolv.kop — resolver DNS UDP + /etc/resolv.conf (v1.10.0).
+//
+// Melengkapi Dns.kop (yang memakai DNS-over-TCP dengan server eksplisit):
+// di sini kita membaca server dari resolv.conf lalu bertanya lewat UDP:53
+// dengan timeout, seperti resolver sistem sederhana.
+//
+// Batas: hanya record A (IPv4), satu server dicoba berurutan, tanpa
+// caching dan tanpa pencarian domain (`search`/`ndots`).
+
+import File;
+import Str;
+import Dns;
+import Udp;
+import Tcp;
+
+class Resolv {
+
+    static int defaultServer() { return 134744072; }    /* 8.8.8.8 */
+
+    /* telaah teks resolv.conf → daftar ip (flat) */
+    static int[] parse(int[] text) {
+        int[] out = new int[16];
+        int n = 0;
+        int lines = Str.splitCount(text, 10);
+        for (int li = 0; li < lines; li++) {
+            int[] ln = Str.trim(Str.splitAt(text, 10, li));
+            if (ln.length < 12) continue;
+            if (!Str.startsWith(ln, Net.bytes("nameserver"))) continue;
+            int i = 10;
+            while (i < ln.length && (ln[i] == 32 || ln[i] == 9)) i++;
+            int[] ip = Str.trim(Str.slice(ln, i, ln.length - i));
+            int a = Str.toInt(Str.splitAt(ip, 46, 0));
+            int b = Str.toInt(Str.splitAt(ip, 46, 1));
+            int c = Str.toInt(Str.splitAt(ip, 46, 2));
+            int d = Str.toInt(Str.splitAt(ip, 46, 3));
+            if (a < 0 || b < 0 || c < 0 || d < 0) continue;
+            if (Str.splitCount(ip, 46) != 4) continue;
+            if (n < out.length) { out[n] = Tcp.ip(a, b, c, d); n++; }
+        }
+        int[] r = new int[n];
+        for (int i = 0; i < n; i++) r[i] = out[i];
+        return r;
+    }
+
+    static int[] servers() {
+        int fd = File.openRead("/etc/resolv.conf");
+        if (fd < 0) {
+            int[] d = new int[1];
+            d[0] = defaultServer();
+            return d;
+        }
+        int[] buf = new int[4096];
+        int n = File.readInto(fd, buf);
+        File.close(fd);
+        if (n <= 0) {
+            int[] d = new int[1];
+            d[0] = defaultServer();
+            return d;
+        }
+        int[] s = parse(Str.slice(buf, 0, n));
+        if (s.length == 0) {
+            int[] d = new int[1];
+            d[0] = defaultServer();
+            return d;
+        }
+        return s;
+    }
+
+    /* satu kueri A lewat UDP; hasil[0]=RCODE, hasil[1..4]=oktet */
+    static int lookupUdp(int serverIp, int port, int[] name, int timeoutMs, int[] hasil, int cap) {
+        int fd = Udp.open();
+        if (fd < 0) return fd;
+        Net.settimeout(fd, timeoutMs);
+        Udp.bind(fd, 0, 0);
+        int[] q = Dns.query(name, 1);
+        int r = Udp.sendTo(fd, serverIp, port, q);
+        if (r < 0) { Net.close(fd); return r; }
+        int[] buf = new int[cap];
+        int[] from = new int[4];
+        int n = Net.recvfrom(fd, buf, from);
+        Net.close(fd);
+        if (n < 0) return n;
+        int[] msg = new int[n];
+        for (int i = 0; i < n; i++) msg[i] = buf[i];
+        return Dns.parseA(msg, hasil);
+    }
+
+    /* coba semua server dari resolv.conf */
+    static int lookup(int[] name, int timeoutMs, int[] hasil, int cap) {
+        int[] srv = servers();
+        int last = -1;
+        for (int i = 0; i < srv.length; i++) {
+            last = lookupUdp(srv[i], 53, name, timeoutMs, hasil, cap);
+            if (last == 0 && hasil[0] == 0 && hasil[1] >= 0) return 0;
+        }
+        if (last < 0) return last;
+        return 0;
+    }
+}

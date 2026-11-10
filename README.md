@@ -37,8 +37,8 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 | Lokasi | Kelompok | Isi |
 |--------|----------|-----|
 | `lib/core/` | logika dasar & sistem | `Math`, `Digits`, `Stats`, `Matrix`, `Arrays`, **`Json`**, **`Str`** (teks), **`Map`/`Set`/`Deque`**, **`File`/`Path`**, **`Time`** |
-| `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256 + HMAC + **SHA-1**), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
-| `lib/net/` | jaringan | `Tcp`, `Udp`, `Dns`, `Rfc`, `Http` (klien HTTP/1.1 + chunked/redirect/auth), **`Url`** (RFC 3986), **`Tls`** (klien TLS 1.3), **`HttpServer`** (server HTTP/1.1 + keep-alive), **`Static`**, **`Mime`**, **`WebSocket`** |
+| `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256 + HMAC + **SHA-1**), **`Pbkdf2`** (PBKDF2-HMAC-SHA256), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
+| `lib/net/` | jaringan | `Tcp`, `Udp`, `Dns`, **`Resolv`** (DNS UDP + resolv.conf), `Rfc`, `Http` (klien HTTP/1.1 + chunked/redirect/auth), **`Url`** (RFC 3986), **`Tls`** (klien TLS 1.3), **`HttpServer`** (server HTTP/1.1 + keep-alive), **`Static`**, **`Mime`**, **`WebSocket`**, **`Jwt`**, **`Session`**, **`Auth`** |
 | `examples/game/`, `examples/ws/` | contoh | game realtime UDP (server+klien+bot), server WebSocket gema |
 
 ATURAN unik: file test TIDAK boleh bernama sama (kasus tak peduli) dengan
@@ -48,7 +48,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.9.3 hari ini  ████████████████ 103/103 test hijau — game realtime + HTTP/1.1 + WebSocket (a64 + VM)
+v1.10.0 hari ini ████████████████ 112/112 test hijau — event-loop poll, auth/session, resolver DNS (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -74,6 +74,7 @@ v1.9.3 hari ini  ████████████████ 103/103 test h
 | **v1.8.0** | **tipe `String` native**: literal `"..."` **dan** `'...'` bertipe `String`, concat `+`, perbandingan isi `==`/`!=`, `.length`, indeks `s[i]` (byte), parameter/return `String`, serta **interop dua arah dengan `int[]`** (perpustakaan `Str`/`File`/`Path`/`Json` tetap bekerja). `System.out.println/print` menerima `String`; template `{s}` mendukung `String`; builtin `Net.cat`, `Net.sequal`, `Net.sne`. Escape `\0` ditolak (tak ada pemotongan cpool diam-diam). Uji `strnative` VM+a64 + sintaks x64; suite 85/85 |
 | **v1.8.1** | **`Net.bytes` tidak lagi wajib**: literal `"..."`/`'...'` sudah `String` dan bisa langsung dipakai sebagai path/buffer/parameter `int[]` (interop implisit). Pemeriksaan argumen builtin `Net.*` (openb/mkdirb/unlinkb/renameb/sendto/recvfrom/recvb/sendb) kini menerima `String` maupun `int[]`. `Net.bytes` dipertahankan hanya untuk kompatibilitas dan sebagai cara eksplisit membuat byte-array dari literal (tetap literal-only). Uji `strnative` diperluas: `int[] a = "abc"`, `Json.parse("...")`, `File.create("...")`, dan `Net.openb("...")` langsung. Suite 85/85 |
 | **v1.9.0** | **server minimal**: builtin `Net.listen`, `Net.accept` (accept4 — `accept` diblokir seccomp Android), `Net.setsockopt`, `Net.memMark/memReset` (arena per-request), `Net.argc/argv/getenv`, `Net.recv1` (satu `read`, bukan blocking-until-full). Library **`.kop`**: `MapStr` (peta String→int), `HttpServer` (parser request HTTP/1.1, method/path/query/header/body/urlDecode, response builder, kirim), `Static` (MIME + file statis + tolak `..`), `Log` (stderr + timestamp UTC). Contoh `examples/server/ServerDemo.kop`: listen → accept → parse → route → response → `memReset`, dengan endpoint `/`, `/health`, `/json`, `/time`, `/echo`, `/sum`, `/header`, `/static/*`, 404/403. Diuji 200 request beruntun tanpa OOM di a64 & VM, plus x64 sintaks; suite 87/87 |
+| **v1.10.0** | **event-loop & auth**: builtin **`Net.pollfd(fds, revents, ms)`** (poll(2) via libc; revents 1=siap baca, 2=error/hup) → contoh **`ServerEvent`** melayani banyak koneksi HTTP dalam satu proses (klien yang mengirim header separuh tidak memblokir klien lain; diuji 6 koneksi separuh + 1 normal < 0,01 dtk). **Perbaikan penting**: `new int[n]` kini **selalu men-zero-kan elemen** di ketiga backend — sebelumnya mengandalkan arena baru; setelah `memReset` array berisi sampah dan SHA-256/HMAC menghasilkan hash salah (ditemukan lewat PBKDF2). Arena x64 disamakan 32 MB. Auth: **`Pbkdf2`** (RFC 8018; buffer sementara di-reset tiap iterasi supaya 4096+ iterasi tidak OOM), **`Jwt`** HS256, **`Session`** ber-expiry, **`Auth`** Basic/Bearer — semua diuji lawan `hashlib`/`hmac`. **`Resolv`**: parser `/etc/resolv.conf` + kueri DNS UDP ber-timeout (diuji server DNS Python). Suite 112/112; teks RFC 7539 kini dibundel di `test/data/` sehingga uji Poly1305 tidak lagi di-skip |
 | **v1.9.1** | **game realtime `Kopi Arena`**: contoh `examples/game/` — server UDP otoritatif 20 tick/detik, klien terminal (WASD/panah, ANSI, raw mode), bot penguji. Modul contoh (bukan `lib/`): `Arena`, `ArenaServer`, `Wire`, `Render`. Builtin baru `Net.setnonblock`, `Net.key` (stdin non-blocking), `Net.ttyRaw`, `Net.localport`. Arena memakai `memMark/memReset` per iterasi, jadi server jalan lama tanpa OOM. Uji: unit aturan arena, bot (join/gerak/snapshot/quit), klien 40 frame, 2 backend + sintaks x64 |
 | **v1.9.2** | **HTTP/1.1 + URL + MIME**: `lib/net/Url.kop` (encode/decode, form, `pair`, `resolve` RFC 3986, `normalize`, `ip4`) diuji lawan `urllib.parse`; `Http` diperluas `getFull`, `exchange`, `follow` (redirect 301/302/303/307/308), `payload`/`dechunk`, `basic`, `formPost`, `jsonPost`, timeout 5 dtk; `HttpServer` dapat `keepAlive`, `responseKA`/`respond`/`responseFor` (HEAD), `cookie`/`setCookie`, `bodyAny`/`dechunk`; `Mime.kop` + `Static.serveKA`. Builtin `Net.settimeout(fd, ms)` (SO_RCVTIMEO/SO_SNDTIMEO). Eksperimen: `ServerDemo` kini keep-alive per koneksi, `/setcookie`, `/cookie`, HEAD, body chunked; diuji Python di a64 & VM |
 | **v1.9.3** | **WebSocket + SHA-1**: `Hash.sha1` (vektor FIPS 180-4) dan `lib/net/WebSocket.kop` (handshake RFC 6455, frame teks/biner/ping/pong/close, decode frame klien bermask). Contoh `examples/ws/WsEcho.kop`; probe Python memverifikasi `Sec-WebSocket-Accept` contoh RFC, gema, ping→pong, frame 200 byte, close. Juga memperbaiki **kebocoran stack `Net.recvfrom` a64** (sp +96 → +80) yang membuat loop server merusak variabel lokal; datagram dinaikkan 240 → **1200 byte** |
@@ -526,15 +527,18 @@ Semua alokasi dinamis (elemen array, closure) masuk satu **arena bump
 allocator** — sederhana, cepat, tanpa free-per-objek:
 
 ```
-kopalloc(n):  used += n; if (used > 8MB) die("arena memori habis");
+kopalloc(n):  used += n; if (used > 32MB) die("arena memori habis");
               return base + (used - n);
 ```
 
-- **Native a64/x64**: `base` = satu blok `malloc(1<<23)` di entry `main` (stub
-  `main` punya **frame sendiri** — tanpa itu, `bl malloc` menimpa `x30` dan
-  `ret` di class-main mengeksekusi ulang `main` = loop; bug ABI yang
-  menarik!). Limit 8 MB, lalu pesan rapi + exit 1, bukan SIGSEGV.
-- **VM**: arena 4 MB di heap `kopivm`, semantik penuh.
+- **Native a64/x64**: `base` = satu blok `malloc(1<<25)` (32 MB) di entry
+  `main` (stub `main` punya **frame sendiri** — tanpa itu, `bl malloc`
+  menimpa `x30` dan `ret` di class-main mengeksekusi ulang `main` = loop;
+  bug ABI yang menarik!). Limit 32 MB, lalu pesan rapi + exit 1, bukan
+  SIGSEGV.
+- **VM**: arena 32 MB (4M elemen `int64`) di heap `kopivm`, semantik penuh.
+- **`new int[n]` selalu men-zero-kan n elemen** (v1.10) — penting setelah
+  `Net.memReset`, karena memori arena dipakai ulang.
 - layout array identik di semua backend: `[0]=length, [8+8*i]=elemen` —
   elemen integer 32-bit disimpan sign-extended 8 byte penuh, jadi layout
   pointer array portable antar backend.
@@ -823,6 +827,63 @@ tanpa kompresi `permessage-deflate`.
 
 
 
+## Event loop: banyak klien, satu proses (v1.10.0)
+
+`Net.pollfd` membungkus `poll(2)`: isi `fds`, tunggu, lalu baca `revents`
+(1 = siap baca, 2 = error/hup). Contoh **`examples/server/ServerEvent.kop`**
+memakai socket non-blocking + buffer per koneksi + `Net.memReset` per
+request, sehingga klien yang mengirim header separuh tidak memblokir
+klien lain:
+
+```java
+int[] fds = new int[MAXC + 1];
+int[] rev = new int[MAXC + 1];
+fds[0] = lfd; int np = 1;
+for (int i = 0; i < MAXC; i++) if (cfd[i] >= 0) { fds[np] = cfd[i]; np++; }
+int n = Net.pollfd(fds, rev, 500);      // -1 = tunggu selamanya
+if ((rev[0] & 1) != 0) { /* accept sampai -EAGAIN */ }
+```
+
+Diuji: 6 koneksi mengirim request separuh, lalu koneksi ke-7 mendapat
+`200 ok` dalam **< 0,01 dtk** (a64 & VM); keep-alive dan POST tetap jalan.
+Batas: tetap single-thread — request yang CPU-bound memblokir loop.
+
+## Auth, session, dan JWT (v1.10.0)
+
+| Library | Isi |
+|---|---|
+| `Pbkdf2` | `sha256(pass, salt, iter, dkLen)` — buffer sementara di-reset tiap iterasi, aman untuk 100k iterasi |
+| `Jwt` | `sign(payload, secret)`, `verify(token, secret, out)`, `payloadOf` (HS256) |
+| `Session` | `newId/create/put/get/drop/sweep` di atas dua `MapStr` (id→uid, id→expiry) |
+| `Auth` | `scheme/token/basicRaw/checkBasic/bearer/challenge` |
+
+```java
+int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);
+int[] tok  = Jwt.sign(Net.bytes("{\"sub\":\"budi\"}"), secret);
+if (Jwt.verify(tok, secret, new int[128]) == 1) { /* sah */ }
+
+int[] ids  = MapStr.make(256, 8192);
+int[] exps = MapStr.make(256, 8192);
+int[] sid  = Session.create(ids, exps, 7, 3600);
+```
+
+Diuji lawan `hashlib.pbkdf2_hmac` dan `hmac` (token HS256 byte-identik),
+termasuk deteksi token yang diubah dan sesi kedaluwarsa.
+
+## Resolver DNS (v1.10.0)
+
+`lib/net/Resolv.kop` membaca `/etc/resolv.conf` lalu bertanya lewat **UDP:53**
+dengan timeout (melengkapi `Dns` yang DNS-over-TCP):
+
+```java
+int[] hasil = new int[5];
+int[] srv = Resolv.servers();                 // fallback 8.8.8.8
+int r = Resolv.lookupUdp(srv[0], 53, Net.bytes("example.com"), 2000, hasil, 512);
+// hasil[0]=RCODE, hasil[1..4]=oktet IPv4
+```
+
+Batas: hanya record A, tanpa cache, tanpa `search`/`ndots`, belum AAAA.
+
 ## Jaringan: TCP, UDP, HTTP (v1.6.2)
 
 Builtin `Net` adalah syscall Linux langsung tanpa libc. Set lengkapnya:
@@ -840,6 +901,7 @@ Builtin `Net` adalah syscall Linux langsung tanpa libc. Set lengkapnya:
 | `Net.listen(fd, backlog)` / `Net.accept(fd)` | server TCP (`accept4`) |
 | `Net.setsockopt(fd, lvl, opt, val)` | opsi socket (SO_REUSEADDR, TCP_NODELAY, …) |
 | `Net.settimeout(fd, ms)` | SO_RCVTIMEO + SO_SNDTIMEO (**v1.9.2**) |
+| `Net.pollfd(fds[], revents[], ms)` | tunggu banyak fd; `revents[i]`=1 siap baca, 2 error/hup (**v1.10**) |
 | `Net.setnonblock(fd)` / `Net.localport(fd)` | non-blocking; port lokal |
 | `Net.memMark()` / `Net.memReset(m)` | arena per-request (pengganti GC) |
 | `Net.recv1(fd, buf)` | satu `read` (untuk HTTP/WebSocket) |
@@ -1054,21 +1116,23 @@ kopi/
 
 ## Roadmap (fondasinya sudah rapi)
 
-- `char`, **array bertipe** (`String[]`, `long[]`, `double[]`, ...); metode instance String dan Unicode/UTF-8 penuh; lambda dengan tipe numerik/String baru
-- file/direktori lanjutan (`readdir`, `stat`, `rmdir`, permission), timezone/kalender, Map dengan kunci string/byte
-- operator bitwise `& ^ | << >>` (Crypto bisa diubah jadi native shift) +
-  ternary `? :`
-- instance class (field, `new`, virtual dispatch / vtable)
-- static fields & inisialisasi
-- GC proper: saat ini arena = bump allocator yang tidak pernah dibebaskan
-  (cukup untuk program batch); mark-sweep sederhana di jadwal
-- `switch`, `do/while`, `try/catch` terbatas
-- optimasi `-O1`: register allocation (jangan semua lewat stack),
-  const-folding
-- **Server lanjutan**: keep-alive/chunked/multipart, WebSocket, HTTP/2, TLS server,
-  thread/event-loop, routing framework
-- **TLS lanjutan** (klien 1.3 sudah ada): verifikasi tanda **ECDSA P-256**
-  untuk CertificateVerify, validasi rantai/PKI + hostname + masa berlaku,
-  session resumption/PSK, dan dukungan `u64` asli supaya X25519 tidak lagi
-  memakai limb 32-bit
+- `char`, **array bertipe** (`String[]`, `long[]`, `double[]`, ...); metode
+  instance String dan Unicode/UTF-8 penuh; lambda dengan tipe numerik baru
+- instance class (field, `new`, virtual dispatch/vtable), static fields,
+  serta `switch`, `do/while`, ternary `? :`
+- GC proper: arena masih bump allocator tanpa free; `memMark/memReset`
+  manual sudah cukup untuk server, mark-sweep menyusul
+- file/direktori lanjutan (`readdir`, `stat`, `rmdir`, permission),
+  timezone/kalender, Map dengan kunci string yang bisa tumbuh
+- **Server lanjutan**: multipart, range/ETag, chunked response streaming,
+  HTTP/2, TLS server, graceful shutdown, graceful worker/thread
+- **WebSocket lanjutan**: fragmentasi/continuation, frame >64 KiB,
+  permessage-deflate, versi klien, TLS
+- **Auth lanjutan**: Argon2/bcrypt, session persisten (file/DB), refresh
+  token, rate limit, CSRF
+- **DB**: klien SQLite/Postgres/Redis (butuh protokol atau FFI)
+- **Resolver**: cache, AAAA/IPv6, `search`/`ndots`, DNS-over-TLS/HTTPS
+- **TLS lanjutan**: verifikasi ECDSA P-256 untuk CertificateVerify,
+  validasi rantai/PKI + hostname + masa berlaku, session resumption
+- optimasi `-O1`: register allocation, const-folding
 - linker kecil sendiri (tanpa `cc`) → output `.so`/`.elf` langsung

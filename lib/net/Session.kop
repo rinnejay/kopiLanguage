@@ -1,0 +1,67 @@
+// Session.kop — sesi in-memory ber-expiry di atas MapStr (v1.10.0).
+//
+// Satu sesi = dua peta String→int yang dipakai bersama:
+//   ids  : id → uid
+//   exps : id → epoch-kedaluwarsa (detik; Net.time())
+// Id dibuat acak 128-bit (hex 32 karakter).
+//
+// Contoh:
+//   int[] ids  = MapStr.make(256, 8192);
+//   int[] exps = MapStr.make(256, 8192);
+//   int[] id = Session.create(ids, exps, 7, 3600);
+//   int uid = Session.get(ids, exps, id, Net.time());
+
+import Str;
+import MapStr;
+import Rand;
+import Cipher;
+
+class Session {
+
+    static int[] newId() { return Cipher.hexenc(Rand.bytes(16)); }
+
+    static boolean put(int[] ids, int[] exps, int[] id, int uid, int ttl, int now) {
+        boolean a = MapStr.put(ids, id, uid);
+        boolean b = MapStr.put(exps, id, now + ttl);
+        return a && b;
+    }
+
+    static int[] create(int[] ids, int[] exps, int uid, int ttl) {
+        int[] id = newId();
+        put(ids, exps, id, uid, ttl, Net.time());
+        return id;
+    }
+
+    /* -1 bila tidak ada / kedaluwarsa (entri dibersihkan sekalian) */
+    static int get(int[] ids, int[] exps, int[] id, int now) {
+        int e = MapStr.getOr(exps, id, -1);
+        if (e < 0) return -1;
+        if (now > e) {
+            MapStr.remove(ids, id);
+            MapStr.remove(exps, id);
+            return -1;
+        }
+        return MapStr.getOr(ids, id, -1);
+    }
+
+    static boolean drop(int[] ids, int[] exps, int[] id) {
+        MapStr.remove(ids, id);
+        return MapStr.remove(exps, id);
+    }
+
+    /* buang semua sesi kedaluwarsa; hasil = jumlah yang dibuang */
+    static int sweep(int[] ids, int[] exps, int now) {
+        int c = MapStr.cap(exps);
+        int n = 0;
+        for (int i = 0; i < c; i++) {
+            if (!MapStr.used(exps, i)) continue;
+            if (MapStr.valAtSlot(exps, i) < now) {
+                int[] k = MapStr.keyAtSlot(exps, i);
+                MapStr.remove(exps, k);
+                MapStr.remove(ids, k);
+                n++;
+            }
+        }
+        return n;
+    }
+}

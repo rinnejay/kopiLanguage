@@ -74,6 +74,32 @@ class Dns {
         return resp[3] % 16;
     }
 
+    /* telaah pesan DNS mentah (tanpa awalan panjang TCP) menjadi A.
+     * hasil[0]=RCODE, hasil[1..4]=oktet IPv4 (atau -1). */
+    static int parseA(int[] buf, int[] hasil) {
+        hasil[0] = -1; hasil[1] = -1; hasil[2] = -1; hasil[3] = -1; hasil[4] = -1;
+        if (buf.length < 12) return -9;
+        if (rcodeOf(buf) != 0) { hasil[0] = rcodeOf(buf); return 0; }
+        int an = buf[6] * 256 + buf[7];
+        int i = skipName(buf, 12);
+        i += 4;
+        for (int k = 0; k < an && i + 10 <= buf.length; k++) {
+            i = skipName(buf, i);
+            int tipe = buf[i] * 256 + buf[i + 1];
+            int rdl = buf[i + 8] * 256 + buf[i + 9];
+            if (rdl < 0 || rdl > 512) { hasil[0] = -9; return 0; }
+            if (tipe == 1 && rdl == 4 && hasil[1] < 0 && i + 12 <= buf.length) {
+                hasil[1] = buf[i + 10];
+                hasil[2] = buf[i + 11];
+                hasil[3] = buf[i + 12];
+                hasil[4] = buf[i + 13];
+            }
+            i += 10 + rdl;
+        }
+        hasil[0] = 0;
+        return 0;
+    }
+
     /* ── tanya resolver ─────────────────────────────────────────── */
 
     /* kirim kueri A (qtype=1) ke addr:port (TCP, awalan panjang 2 byte)
@@ -104,25 +130,6 @@ class Dns {
         Net.close(fd);
         if (n != tlen) return -9;         /* balas terpotong */
 
-        if (rcodeOf(buf) != 0) { hasil[0] = rcodeOf(buf); return 0; }
-
-        int an = buf[6] * 256 + buf[7];
-        int i = skipName(buf, 12);         /* lompat QNAME pertanyaan */
-        i += 4;                            /* QTYPE + QCLASS */
-        for (int k = 0; k < an && i + 10 <= buf.length; k++) {
-            i = skipName(buf, i);
-            int tipe = buf[i] * 256 + buf[i + 1];
-            int rdl = buf[i + 8] * 256 + buf[i + 9];
-            if (rdl < 0 || rdl > 512) { hasil[0] = -9; return 0; }
-            if (tipe == 1 && rdl == 4 && hasil[1] < 0 && i + 12 <= buf.length) {
-                hasil[1] = buf[i + 10];
-                hasil[2] = buf[i + 11];
-                hasil[3] = buf[i + 12];
-                hasil[4] = buf[i + 13];
-            }
-            i += 10 + rdl;
-        }
-        hasil[0] = 0;
-        return 0;
+        return parseA(buf, hasil);
     }
 }

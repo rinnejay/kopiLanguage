@@ -1,0 +1,66 @@
+// Auth.kop — util header Authorization (v1.10.0).
+// Menerima NILAI header (bukan seluruh request), mis.
+//   int[] v = HttpServer.headerValue(req, Net.bytes("Authorization"));
+//   if (Auth.checkBasic(v, Net.bytes("budi"), Net.bytes("rahasia"))) { ... }
+
+import Str;
+import Cipher;
+
+class Auth {
+
+    static int spaceAt(int[] v) {
+        for (int i = 0; i < v.length; i++) if (v[i] == 32) return i;
+        return -1;
+    }
+
+    static int[] scheme(int[] v) {
+        int s = spaceAt(v);
+        if (s < 0) return v;
+        return Str.slice(v, 0, s);
+    }
+
+    static int[] token(int[] v) {
+        int s = spaceAt(v);
+        if (s < 0) return new int[0];
+        int b = s;
+        while (b < v.length && v[b] == 32) b++;
+        return Str.slice(v, b, v.length - b);
+    }
+
+    static boolean same(int[] a, int[] b) {
+        if (a.length != b.length) return false;
+        int d = 0;
+        for (int i = 0; i < a.length; i++) d = d | (a[i] ^ b[i]);
+        return d == 0;
+    }
+
+    /* hasil "user:pass" dari Basic, kosong bila bukan Basic */
+    static int[] basicRaw(int[] v) {
+        if (!Str.equalsIgnoreCase(scheme(v), Net.bytes("Basic"))) return new int[0];
+        return Cipher.b64dec(token(v));
+    }
+
+    static boolean checkBasic(int[] v, int[] user, int[] pass) {
+        int[] raw = basicRaw(v);
+        if (raw.length == 0) return false;
+        int c = -1;
+        for (int i = 0; i < raw.length; i++) if (raw[i] == 58) { c = i; break; }
+        if (c < 0) return false;
+        int[] u = Str.slice(raw, 0, c);
+        int[] p = Str.slice(raw, c + 1, raw.length - c - 1);
+        return same(u, user) && same(p, pass);
+    }
+
+    static int[] bearer(int[] v) {
+        if (!Str.equalsIgnoreCase(scheme(v), Net.bytes("Bearer"))) return new int[0];
+        return token(v);
+    }
+
+    /* baris header tantangan untuk 401 */
+    static int[] challenge(int[] realm) {
+        int[] s = Net.bytes("WWW-Authenticate: Basic realm=\"");
+        s = Str.cat(s, realm);
+        s = Str.cat(s, Net.bytes("\"\r\n"));
+        return s;
+    }
+}

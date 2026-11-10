@@ -21,6 +21,7 @@ static void emit(const char *fmt, ...) {
 static int gen_expr(Method *m, Node *e);
 static void gen_stmts(Method *m, Node *lst);
 static int netlbl;      /* label EX_NET unik per kemunculan */
+static int arrlbl;      /* label zero-init array unik */
 
 static int cur_ret_label;
 
@@ -610,6 +611,18 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tadd\tx0, x0, #8");      /* + header len */
         emit("\tbl\tkopalloc");
         emit("\tstr\tx9, [x0]");        /* len */
+        {
+            int L = arrlbl++;
+            emit("\tmov\tx10, #0");
+            emit(".LNZ%d:", L);
+            emit("\tcmp\tx10, x9");
+            emit("\tb.hs\t.LNZ%de", L);
+            emit("\tadd\tx11, x0, #8");
+            emit("\tstr\txzr, [x11, x10, lsl #3]");
+            emit("\tadd\tx10, x10, #1");
+            emit("\tb\t.LNZ%d", L);
+            emit(".LNZ%de:", L);
+        }
         return 1;
     }
     case EX_IDX: {                       /* hasil: w0 = elemen (32-bit) */
@@ -1315,6 +1328,77 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmov\tw0, w12");
             emit(".LR1%dd:", ln);
             emit("\tadd\tsp, sp, #32");
+            return 0;
+        }
+        if (e->ival == 39) {                /* pollfd(fds, revents, ms) */
+            gen_expr(m, e->a);
+            push_val(1);
+            gen_expr(m, e->a->next);
+            push_val(1);
+            gen_expr(m, e->a->next->next);
+            push_val(0);
+            emit("\tsub\tsp, sp, #512");
+            emit("\tldr\tx10, [sp, #544]");       /* fds */
+            emit("\tldr\tw9, [x10]");             /* n */
+            emit("\tcmp\tw9, #64");
+            emit("\tb.le\t.LPF%dc", ln);
+            emit("\tmov\tw9, #64");
+            emit(".LPF%dc:", ln);
+            emit("\tmov\tx13, #0");
+            emit(".LPF%dl:", ln);
+            emit("\tcmp\tx13, x9");
+            emit("\tb.hs\t.LPF%dd", ln);
+            emit("\tsxtw\tx4, w13");
+            emit("\tlsl\tx4, x4, #3");
+            emit("\tadd\tx6, x10, x4");
+            emit("\tldr\tw14, [x6, #8]");
+            emit("\tadd\tx6, sp, x4");
+            emit("\tstr\tw14, [x6]");
+            emit("\tmov\tw14, #1");               /* POLLIN */
+            emit("\tstrh\tw14, [x6, #4]");
+            emit("\tmov\tw14, #0");
+            emit("\tstrh\tw14, [x6, #6]");
+            emit("\tadd\tx13, x13, #1");
+            emit("\tb\t.LPF%dl", ln);
+            emit(".LPF%dd:", ln);
+            emit("\tstr\tw9, [sp, #504]");        /* simpan n (caller-saved) */
+            emit("\tmov\tx0, sp");
+            emit("\tmov\tw1, w9");
+            emit("\tldr\tw2, [sp, #512]");
+            emit("\tbl\tpoll");
+            emit("\tldr\tw9, [sp, #504]");
+            emit("\tldr\tx15, [sp, #528]");       /* revents */
+            emit("\tmov\tx13, #0");
+            emit("\tmov\tw0, #0");                /* jumlah siap */
+            emit(".LPF%dk:", ln);
+            emit("\tcmp\tx13, x9");
+            emit("\tb.hs\t.LPF%df", ln);
+            emit("\tsxtw\tx4, w13");
+            emit("\tlsl\tx4, x4, #3");
+            emit("\tadd\tx6, sp, x4");
+            emit("\tldrh\tw16, [x6, #6]");
+            emit("\tmov\tw3, #0");
+            emit("\tcbz\tw16, .LPF%dw", ln);
+            emit("\ttst\tw16, #1");
+            emit("\tb.eq\t.LPF%dni", ln);
+            emit("\tmov\tw3, #1");
+            emit(".LPF%dni:", ln);
+            emit("\ttst\tw16, #56");              /* ERR|HUP|NVAL */
+            emit("\tb.eq\t.LPF%dne", ln);
+            emit("\torr\tw3, w3, #2");
+            emit(".LPF%dne:", ln);
+            emit(".LPF%dw:", ln);
+            emit("\tadd\tx6, x15, x4");
+            emit("\tsxtw\tx5, w3");
+            emit("\tstr\tx5, [x6, #8]");
+            emit("\tcbz\tw3, .LPF%dn", ln);
+            emit("\tadd\tw0, w0, #1");
+            emit(".LPF%dn:", ln);
+            emit("\tadd\tx13, x13, #1");
+            emit("\tb\t.LPF%dk", ln);
+            emit(".LPF%df:", ln);
+            emit("\tadd\tsp, sp, #512");
+            emit("\tadd\tsp, sp, #48");
             return 0;
         }
         if (e->ival == 38) {                /* settimeout(fd, ms) */

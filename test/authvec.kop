@@ -1,0 +1,44 @@
+// authvec.kop — PBKDF2 / JWT / Session / Auth (v1.10.0).
+import Str;
+import Cipher;
+import Pbkdf2;
+import Jwt;
+import MapStr;
+import Session;
+import Auth;
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(Cipher.hexenc(Pbkdf2.sha256(Net.bytes("password"), Net.bytes("salt"), 1, 32)));
+        System.out.println(Cipher.hexenc(Pbkdf2.sha256(Net.bytes("password"), Net.bytes("salt"), 2, 32)));
+        System.out.println(Cipher.hexenc(Pbkdf2.sha256(Net.bytes("password"), Net.bytes("salt"), 4096, 32)));
+        System.out.println(Cipher.hexenc(Pbkdf2.sha256(
+            Net.bytes("passwordPASSWORDpassword"),
+            Net.bytes("saltSALTsaltSALTsaltSALTsaltSALTsalt"), 4096, 40)));
+
+        int[] secret = Net.bytes("rahasia");
+        int[] token = Jwt.sign(Net.bytes("{\"sub\":\"budi\",\"n\":1}"), secret);
+        System.out.println(token);
+        int[] out = new int[64];
+        System.out.println(Jwt.verify(token, secret, out));
+        System.out.println(Jwt.verify(token, Net.bytes("salah"), out));
+        System.out.println(Jwt.verify(Net.bytes("abc"), secret, out));
+        System.out.println(Jwt.payloadOf(token));
+
+        int[] ids = MapStr.make(16, 256);
+        int[] exps = MapStr.make(16, 256);
+        System.out.println(Session.put(ids, exps, Net.bytes("id1"), 42, 10, 100));
+        System.out.println(Session.get(ids, exps, Net.bytes("id1"), 105));
+        System.out.println(Session.get(ids, exps, Net.bytes("id1"), 111));
+        Session.put(ids, exps, Net.bytes("id2"), 43, 10, 100);
+        System.out.println(Session.sweep(ids, exps, 200));
+        System.out.println(Session.get(ids, exps, Net.bytes("id2"), 200));
+
+        int[] hdr = Str.cat(Net.bytes("Basic "), Cipher.b64enc(Net.bytes("budi:rahasia")));
+        System.out.println(Auth.checkBasic(hdr, Net.bytes("budi"), Net.bytes("rahasia")));
+        System.out.println(Auth.checkBasic(hdr, Net.bytes("budi"), Net.bytes("salah")));
+        System.out.println(Auth.bearer(Net.bytes("Bearer tok.abc")));
+        System.out.println(Auth.scheme(Net.bytes("Bearer tok.abc")));
+        System.out.println(Auth.challenge(Net.bytes("admin")));
+    }
+}

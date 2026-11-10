@@ -6,7 +6,10 @@ pkill -f "python3 .*kopi/[r]fc192.py" 2>/dev/null
 pkill -f "python3 .*kopi/[d]nstest.py" 2>/dev/null
 pkill -f "python3 .*kopi/[p]osttest.py" 2>/dev/null
 pkill -f "python3 -m http.server [9]911" 2>/dev/null
-pkill -f "python3 .*opencode/[e]chosrv.py" 2>/dev/null
+pkill -f "python3 .*kopi/[e]chosrv.py" 2>/dev/null
+pkill -f "python3 .*kopi/[b]ulksrv.py" 2>/dev/null
+pkill -f "python3 tools/[h]ttp_test_server.py" 2>/dev/null
+pkill -f "python3 tools/[d]ns_test_server.py" 2>/dev/null
 sleep 0.3
 T=${TMPDIR:-/data/data/com.termux/files/usr/tmp/opencode}
 mkdir -p "$T/kopi"
@@ -64,12 +67,15 @@ printf '1\n1\n' > "$T/kopi/stream.ref"
 check stream test/stream.kop
 
 # ─── Poly1305: RFC 7539 §2.5.2 + Appendix A.3 (8 vektor, oracle python) ──
+if [ -f test/data/rfc7539.txt ]; then
+    cp test/data/rfc7539.txt "$T/kopi/rfc7539.txt"
+fi
 if [ -f "$T/kopi/rfc7539.txt" ]; then
     N=$(python3 tools/gen_poly1305.py "$T/kopi/polyvec.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
     python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/polyvec.ref"
     check polyvec "$T/kopi/polyvec.kop"
 else
-    echo "SKIP  polyvec (teks RFC 7539 tidak ada di $T/kopi)"
+    echo "SKIP  polyvec (teks RFC 7539 tidak ada)"
 fi
 
 # ─── Math/Digits/Stats/Matrix: oracle python (puluhan fungsi) ─────────────
@@ -660,7 +666,11 @@ s.bind(("127.0.0.1", 9912)); s.listen(8)
 while True:
     c, _ = s.accept()
     try:
-        d = c.recv(4096)
+        d = b""
+        while len(d) < 4:
+            chunk = c.recv(4096)
+            if not chunk: break
+            d += chunk
         c.sendall(b"ACK:" + d)
         c.shutdown(socket.SHUT_WR)
     except OSError:
@@ -1421,6 +1431,46 @@ for tgt in a64 vm; do
     kill $WPID 2>/dev/null
     wait $WPID 2>/dev/null
 done
+
+# ─── event loop (Net.pollfd): ServerEvent multi-klien ───
+./kopicc examples/server/ServerEvent.kop -t a64 -o "$T/kopi/sev.s" \
+  && cc "$T/kopi/sev.s" -o "$T/kopi/sev.bin" || true
+./kopicc examples/server/ServerEvent.kop -t vm -o "$T/kopi/sev.kbc" || true
+./kopicc examples/server/ServerEvent.kop -t x64 -o "$T/kopi/sev64.s" \
+  && cc -target x86_64-linux-gnu -c "$T/kopi/sev64.s" -o /dev/null \
+  && echo "PASS  event [x64]" && PASS=$((PASS+1)) \
+  || { echo "FAIL  event [x64]"; FAIL=$((FAIL+1)); }
+for tgt in a64 vm; do
+    port=10080
+    [ "$tgt" = vm ] && port=10081
+    if [ "$tgt" = a64 ]; then
+        "$T/kopi/sev.bin" $port > "$T/kopi/sev.$tgt.log" 2>&1 &
+    else
+        "$KOPIVM_ABS" "$T/kopi/sev.kbc" $port > "$T/kopi/sev.$tgt.log" 2>&1 &
+    fi
+    EPID=$!
+    sleep 0.5
+    if python3 tools/event_probe.py $port > "$T/kopi/sev.$tgt.out" 2>&1; then
+        echo "PASS  event [$tgt]"; PASS=$((PASS+1))
+    else
+        echo "FAIL  event [$tgt]"; FAIL=$((FAIL+1)); tail -4 "$T/kopi/sev.$tgt.out"
+    fi
+    kill $EPID 2>/dev/null
+    wait $EPID 2>/dev/null
+done
+
+# ─── PBKDF2 / JWT / Session / Auth (oracle Python hashlib+hmac) ───
+python3 tools/gen_authvec.py > "$T/kopi/authvec.ref"
+check authvec test/authvec.kop
+
+# ─── resolver DNS UDP + parser resolv.conf ───
+printf '2\n16909060\n167772213\n0\n0\n10\n1\n2\n3\n0\n3\n' > "$T/kopi/dnsresolv.ref"
+python3 tools/dns_test_server.py 10055 > "$T/kopi/dns.log" 2>&1 &
+DPID=$!
+sleep 0.4
+check dnsresolv test/dnsresolv.kop
+kill $DPID 2>/dev/null
+wait $DPID 2>/dev/null
 
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"

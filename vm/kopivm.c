@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <poll.h>
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -417,6 +418,7 @@ static void run(void) {
             long *blk = heap + heap_used;
             heap_used += n + 1;
             blk[0] = (long)n;
+            if (n > 0) memset(blk + 1, 0, (size_t)n * sizeof(long));
             if (sp >= MAXSTACK) dievm("operand stack penuh");
             stackv[sp++] = (int64_t)blk;
             break;
@@ -692,6 +694,28 @@ static void run(void) {
                 ssize_t n = read((int)fdi, tmp, (size_t)(len > 0 ? len : 1));
                 if (n > 0) for (long i = 0; i < n; i++) buf[1 + i] = (long)tmp[i];
                 stackv[sp++] = (n < 0) ? -errno : (int64_t)n;
+            } else if (bi == 39) {                /* pollfd(fds, revents, ms) */
+                int64_t ms = stackv[--sp];
+                long *rev = (long *)stackv[--sp];
+                long *fds = (long *)stackv[--sp];
+                long n = fds[0];
+                if (n > 64) n = 64;
+                struct pollfd pf[64];
+                for (long i = 0; i < n; i++) {
+                    pf[i].fd = (int)fds[1 + i];
+                    pf[i].events = POLLIN;
+                    pf[i].revents = 0;
+                }
+                int r = poll(pf, (nfds_t)n, (int)ms);
+                int cnt = 0;
+                for (long i = 0; i < n; i++) {
+                    int v = 0;
+                    if (pf[i].revents & POLLIN) v |= 1;
+                    if (pf[i].revents & (POLLERR | POLLHUP | POLLNVAL)) v |= 2;
+                    rev[1 + i] = v;
+                    if (pf[i].revents) cnt++;
+                }
+                stackv[sp++] = (r < 0) ? -errno : cnt;
             } else if (bi == 38) {                /* settimeout(fd, ms) */
                 int64_t ms = stackv[--sp], fdi = stackv[--sp];
                 struct timeval tv;
