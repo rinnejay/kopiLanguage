@@ -28,6 +28,21 @@
 sendiri, type checker sendiri, generator assembly sendiri, dan mesin virtual
 sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 
+## Struktur pustaka
+
+Pustaka standar (`lib/`) dikelompokkan per fungsi; `import Nama;` tetap
+satu nama — kompiler menyapu subfolder dengan sendirinya (urutan:
+folder pengimpor → `lib/` rata → `lib/<kategori>/`):
+
+| Lokasi | Kelompok | Isi |
+|--------|----------|-----|
+| `lib/core/` | logika dasar bahasa | `Matematika`, `Angka`, `Arrays` |
+| `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (MAC), `Aead` (ChaCha20-Poly1305) |
+| `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard) |
+
+ATURAN unik: file test TIDAK boleh bernama sama (kasus tak peduli) dengan
+modul yang diimpor — file lokal selalu menang atas `lib/`.
+
 ## Status & changelog
 
 ```

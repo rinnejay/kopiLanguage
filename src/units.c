@@ -7,13 +7,16 @@
  *
  * Pencarian modul `import NamaClass;`:
  *   1) folder file pengimpor (Nama.kop lalu nama.kop) — lokal menang
- *   2) lib standar: <folder kopicc>/lib (atau $KOPPATH jika diset)
+ *   2) lib standar rata: <folder kopicc>/lib (atau $KOPPATH jika diset)
+ *   3) subfolder lib standar: lib/<kategori>/Nama.kop — pustaka
+ *      dikelompokkan per fungsi (core/, crypto/, net/)
  */
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 #include "lex.h"
 #include "ast.h"
 
@@ -84,7 +87,9 @@ static const char *libdir(void) {
 
 /* cari file .kop untuk import Nama; urutan:
  * 1) folder file pengimpor (kasus asli & lowercase) — lokal menang
- * 2) folder lib standar (kasus asli & lowercase) */
+ * 2) folder lib standar (kasus asli & lowercase) — file rata
+ * 3) subfolder lib standar (lib/<kategori>/Nama.kop, tak peduli huruf) —
+ *    pustaka dikumpulkan per fungsi: core/, crypto/, net/ */
 static char *find_module(const char *dir, const char *name, int line) {
     char low[512];
     name_lower(name, low, sizeof low);
@@ -106,9 +111,28 @@ static char *find_module(const char *dir, const char *name, int line) {
         FILE *f = fopen(cand[i], "rb");
         if (f) { fclose(f); return strdup(cand[i]); }
     }
+    /* 3) sapu subfolder lib/<kategori>/ — Nama.kop atau nama.kop berisi
+     *    nama entri yang cocok kasus tak peduli */
+    const char *root = ld[0] ? ld : "./lib";
+    DIR *d = opendir(root);
+    if (d) {
+        struct dirent *en;
+        while ((en = readdir(d))) {
+            const char *sub = en->d_name;
+            if (sub[0] == '.') continue;
+            char pA[PATH_MAX], pB[PATH_MAX];
+            (void)snprintf(pA, sizeof pA, "%s/%s/%s.kop", root, sub, name);
+            FILE *fa = fopen(pA, "rb");
+            if (fa) { fclose(fa); closedir(d); return strdup(pA); }
+            (void)snprintf(pB, sizeof pB, "%s/%s/%s.kop", root, sub, low);
+            FILE *fb = fopen(pB, "rb");
+            if (fb) { fclose(fb); closedir(d); return strdup(pB); }
+        }
+        closedir(d);
+    }
     die("baris %d: tidak menemukan modul untuk import '%s' "
-        "(dicoba: %s, %s, %s, %s)",
-        line, name, cand[0], cand[1], cand[2], cand[3]);
+        "(dicoba: %s, %s, %s, %s — dan subfolder %s/*/)",
+        line, name, cand[0], cand[1], cand[2], cand[3], root);
     return 0;
 }
 
