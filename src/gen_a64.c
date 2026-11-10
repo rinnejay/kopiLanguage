@@ -29,7 +29,7 @@ static int cur_ret_label;
 static int is64ty(Ty t) {
     return t == T_FN || t == T_ARI || t == T_LONG || t == T_UINT64 ||
            t == T_UINT8 || t == T_UINT16 || t == T_UINT32 ||
-           t == T_BYTE || t == T_SHORT ||
+           t == T_BYTE || t == T_SHORT || t == T_STR ||
            t == T_FLOAT || t == T_DOUBLE;
 }
 
@@ -260,7 +260,7 @@ static void gen_stmt(Method *m, Node *s) {
             emit("\tadrp\tx1, :got:cpool%d", (int)s->cp);
             emit("\tldr\tx1, [x1, :got_lo12:cpool%d]", (int)s->cp);
             emit("\tbl\tprintf");
-        } else if ((Ty)s->a->dty == T_ARI) {
+        } else if ((Ty)s->a->dty == T_ARI || (Ty)s->a->dty == T_STR) {
             int lloop = nlab++, lend = nlab++;
             gen_expr(m, s->a);
             emit("\tsub\tsp, sp, #32");
@@ -488,6 +488,15 @@ static int gen_expr(Method *m, Node *e) {
         if (e->ival) emit("\tmov\tw0, #1");
         else emit("\tmov\tw0, wzr");
         return 0;
+    case EX_STRLIT: {
+        Node f;
+        memset(&f, 0, sizeof f);
+        f.kind = EX_NET;
+        f.ival = 5;
+        f.cp = e->cp;
+        f.dty = (int)T_ARI;
+        return gen_expr(m, &f);
+    }
     case EX_VAR:
         if (is64ty((Ty)e->dty)) {
             loc_load((e->ival + 1) * 8, "x0");
@@ -1071,6 +1080,94 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tsvc\t#0");
                 return 0;
             }
+        }
+        if (e->ival >= 22 && e->ival <= 24) {
+            int idx = 0;
+            for (Node *aa = e->a; aa; aa = aa->next, idx++) {
+                gen_expr(m, aa);
+                push_val(1);                    /* pointer array/String */
+            }
+            if (e->ival == 22) {                /* cat(a,b) */
+                char la[40], lb[40], ld[40];
+                snprintf(la, sizeof la, ".LCA%dA", ln);
+                snprintf(lb, sizeof lb, ".LCA%dB", ln);
+                snprintf(ld, sizeof ld, ".LCA%dD", ln);
+                emit("\tldr\tx10, [sp]");           /* b */
+                emit("\tldr\tx11, [sp, #16]");       /* a */
+                emit("\tldr\tw12, [x10]");
+                emit("\tldr\tw13, [x11]");
+                emit("\tadd\tw14, w12, w13");
+                emit("\tsxtw\tx0, w14");
+                emit("\tlsl\tx0, x0, #3");
+                emit("\tadd\tx0, x0, #8");
+                emit("\tbl\tkopalloc");
+                emit("\tldr\tx10, [sp]");
+                emit("\tldr\tx11, [sp, #16]");
+                emit("\tldr\tw12, [x10]");
+                emit("\tldr\tw13, [x11]");
+                emit("\tadd\tw14, w12, w13");
+                emit("\tsxtw\tx14, w14");
+                emit("\tstr\tx14, [x0]");
+                emit("\tmov\tw9, #0");
+                emit("%s:", la);
+                emit("\tcmp\tw9, w13");
+                emit("\tb.hs\t%s", ld);
+                emit("\tsxtw\tx15, w9");
+                emit("\tlsl\tx15, x15, #3");
+                emit("\tadd\tx15, x15, #8");
+                emit("\tldr\tx16, [x11, x15]");
+                emit("\tstr\tx16, [x0, x15]");
+                emit("\tadd\tw9, w9, #1");
+                emit("\tb\t%s", la);
+                emit("%s:", ld);
+                emit("\tmov\tw9, #0");
+                emit("%s:", lb);
+                emit("\tcmp\tw9, w12");
+                emit("\tb.hs\t.LCA%dE", ln);
+                emit("\tsxtw\tx15, w9");
+                emit("\tlsl\tx15, x15, #3");
+                emit("\tadd\tx15, x15, #8");
+                emit("\tldr\tx16, [x10, x15]");
+                emit("\tadd\tw17, w13, w9");
+                emit("\tsxtw\tx17, w17");
+                emit("\tlsl\tx17, x17, #3");
+                emit("\tadd\tx17, x17, #8");
+                emit("\tstr\tx16, [x0, x17]");
+                emit("\tadd\tw9, w9, #1");
+                emit("\tb\t%s", lb);
+                emit(".LCA%dE:", ln);
+                emit("\tadd\tsp, sp, #32");
+                return 1;
+            }
+            /* sequal / sne */
+            emit("\tldr\tx10, [sp]");
+            emit("\tldr\tx11, [sp, #16]");
+            emit("\tldr\tw12, [x10]");
+            emit("\tldr\tw13, [x11]");
+            emit("\tcmp\tw12, w13");
+            emit("\tb.ne\t.LSE%dN", ln);
+            emit("\tmov\tw9, #0");
+            emit(".LSE%dL:", ln);
+            emit("\tcmp\tw9, w12");
+            emit("\tb.hs\t.LSE%dY", ln);
+            emit("\tsxtw\tx15, w9");
+            emit("\tlsl\tx15, x15, #3");
+            emit("\tadd\tx15, x15, #8");
+            emit("\tldr\tx16, [x11, x15]");
+            emit("\tldr\tx17, [x10, x15]");
+            emit("\tcmp\tx16, x17");
+            emit("\tb.ne\t.LSE%dN", ln);
+            emit("\tadd\tw9, w9, #1");
+            emit("\tb\t.LSE%dL", ln);
+            emit(".LSE%dY:", ln);
+            emit("\tmov\tw0, #1");
+            emit("\tb\t.LSE%dD", ln);
+            emit(".LSE%dN:", ln);
+            emit("\tmov\tw0, wzr");
+            emit(".LSE%dD:", ln);
+            emit("\tadd\tsp, sp, #32");
+            if (e->ival == 24) emit("\teor\tw0, w0, #1");
+            return 0;
         }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {

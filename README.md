@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.7.1 hari ini  ████████████████  83/83 test hijau — template `...{expr}...` + single-quote string (a64 + VM)
+v1.8.0 hari ini  ████████████████  85/85 test hijau — String native (literal, +, ==, length, interop) (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -70,6 +70,7 @@ v1.7.1 hari ini  ████████████████  83/83 test hi
 | **v1.6.5** | **uji ketangguhan proyek besar** `examples/proyekbesar/`: **54 file `.kop`** (53 modul + main) saling `import`, memakai pustaka (`Math`, `Arrays`, `Stats`, `Matrix`, `Json`, `Cipher`, `Hash`) dan modul lokal (struktur data, algoritma, CSV/JSON, inventory/order/billing, lexer/compiler/evaluator/VM mini). Harness `bench.py`: kompilasi a64/VM/x64 **paralel**, eksekusi a64 & VM **paralel** dengan timeout 120 s, sampling `VmHWM` untuk puncak RSS, banding output byte-per-byte, lalu **4 proses a64 paralel**. Hasil acuan: kompilasi ~0,13 s; a64 ~0,14 s, VM ~0,94 s; puncak RSS ~24 MB; 102 baris output identik; tanpa hang/OOM (fase memori ≈21,6 MB payload pada arena/heap 32 MB). Juga ditambahkan `Json.write` (publik) dan `proyekbesar` masuk `test.sh` (a64/VM/x64) |
 | **v1.7.0** | **fondasi OS + teks + collections**: builtin baru `Net.openb` (path dinamis), `mkdirb`, `unlinkb`, `renameb`, `seek`, `time`, `mono` (long ms), `sleep`, `exit` di a64/x64/VM. Library baru: **`Str`** (potong/gabung/cari/ganti/trim/case/pad/angka/hex/UTF-8 count), **`Map`** (int→int open addressing, grow/forEach), **`Set`**, **`Deque`**, **`File`** (create/append/baca/tulis/seek/size/rename/unlink/mkdir), **`Path`**, **`Time`** (epoch/mono/sleep, kalender UTC + format). Bug yang ikut diperbaiki: capture **array** dalam lambda (EX_ENVLOAD hanya 32-bit), path syscall belum NUL-terminated, pointer rename tertukar, seek membaca 64-bit dari slot 32-bit. Uji `ostest` (file I/O) & `textmap` (Str/Map/Set/Deque/Path/Time) di VM & a64 + sintaks x64; suite 81/81 |
 | **v1.7.1** | **template string** dengan backtick: `` `Halo {nama}, umur {umur}` ``. Interpolasi `{ekspresi}` mendukung `int/uint*/long/uint64/bool/float/double/int[]` (teks), escape `\n \t \r \0 \\ \` \{ \}`, literal `{{`/`}}`, **template bersarang**, dan dapat disimpan di variabel/dikembalikan fungsi. `'...'` dan `"..."` tetap string biasa (tanpa interpolasi). `System.out.println/print` kini menerima hasil template (byte array) lewat `fwrite/fputc` agar urutan output tetap. Ditambahkan `Str.boolText/fromUInt/fromLong/fromULong/fromDouble`; cache tipe (`Node.typed`) memperbaiki resolusi ganda pada template. Uji `tstrtest` di VM & a64 + sintaks x64; suite 83/83 |
+| **v1.8.0** | **tipe `String` native**: literal `"..."` **dan** `'...'` bertipe `String`, concat `+`, perbandingan isi `==`/`!=`, `.length`, indeks `s[i]` (byte), parameter/return `String`, serta **interop dua arah dengan `int[]`** (perpustakaan `Str`/`File`/`Path`/`Json` tetap bekerja). `System.out.println/print` menerima `String`; template `{s}` mendukung `String`; builtin `Net.cat`, `Net.sequal`, `Net.sne`. Escape `\0` ditolak (tak ada pemotongan cpool diam-diam). Uji `strnative` VM+a64 + sintaks x64; suite 85/85 |
 
 ## Bangun
 
@@ -133,6 +134,7 @@ Fitur v1.0 (semua sudah diuji di backend a64 maupun vm):
 |-----------------------------------|---------------------------------------------------|
 | `class`, metode `static`          | multi-class, panggilan lintas-class `Cls.nama()`  |
 | tipe numerik                      | `int` (32-bit), `long` (64), `float`/`double`, `uint8/16/32/64`; literal `L/U/UL/f/d`, hex `0x`, biner `0b`, cast `(tipe)x` |
+| **`String` native**               | literal `"..."`/`'...'`, `+` (concat), `==`/`!=` (isi), `.length`, `s[i]`, parameter/return, interop `int[]` |
 | tipe `boolean`, `void`            | checker tipe sederhana (deteksi salah tipe)       |
 | array `int[]`                     | `new int[n]`, `a[i]`, `a[i] = v`, `a.length` — heap arena `kopalloc` + bounds check runtime |
 | aritmetika                        | `+ - * / %` (semantik Java: trunc ke 0)           |
@@ -201,6 +203,39 @@ float  f     = 1.5f + 2.25f;           // 3.75
 - Backend **x64** menerima tipe baru (assembly lolos `cc -target`, diuji
   sintaks); eksekusi runtime baru diverifikasi di **aarch64** dan **VM**.
 
+## String native (v1.8.0)
+
+Teks kini punya tipe `String` (bukan hanya `int[]`):
+
+```java
+String s = "Halo";
+String t = 'Dunia';                  // kutip tunggal juga String
+String u = s + " " + t;              // concat
+System.out.println(u);               // Halo Dunia
+System.out.println(s == "Halo");     // 1 (banding isi)
+System.out.println(s != "X");        // 1
+System.out.println(s.length);        // 4
+System.out.println(s[0]);            // 72 ('H' sebagai byte)
+
+String pair(String a, String b) { return a + b; }
+String v = Net.bytes("bytes");       // int[] → String implisit
+int[] w = u;                         // String → int[] implisit
+System.out.println(Str.upper(s));    // String → int[] untuk pustaka
+```
+
+- `+` hanya untuk `String + String` (atau `int[]` yang diperlakukan
+  sebagai teks). Untuk mencampur angka pakai template:
+  `` `umur={n}` `` atau `"n=" + Str.fromInt(n)`.
+- `==`/`!=` membandingkan **isi**, bukan pointer.
+- Tidak ada operator `<`/`>` untuk String (pakai `Str.cmp`).
+- `String` dan `int[]` saling diberikan secara implisit karena
+  representasinya sama (array byte 8-byte-per-elemen); ini menjaga
+  kompatibilitas pustaka lama.
+- Belum ada `String[]` (array bertipe) dan metode instance (`s.upper()`
+  tetap `Str.upper(s)`); Unicode/UTF-8 penuh belum ada.
+- Literal string tidak mendukung `\0` (ditolak agar tidak memotong
+  konstanta C).
+
 ## Template string (v1.7.1)
 
 Hanya **backtick** yang menjadi formatter; `'...'` dan `"..."` tetap string
@@ -226,8 +261,8 @@ Aturan:
 
 - `{ekspresi}` = satu ekspresi Kopi; boleh panggil metode (`{dua()}`,
   `{Str.upper(nama)}`), aritmetika (`{umur + 2}`), atau template bersarang.
-- Tipe yang bisa diinterpolasi: `int`, `byte/short`, `uint8/16/32/64`,
-  `long`, `boolean`, `float`, `double`, dan `int[]` (dianggap teks).
+- Tipe yang bisa diinterpolasi: `String`, `int[]` (teks), `int`,
+  `byte/short`, `uint8/16/32/64`, `long`, `boolean`, `float`, `double`.
   Konversi memakai `Str.fromInt/fromUInt/fromLong/fromULong/fromDouble/
   boolText`, jadi **butuh `import Str;`** bila ada interpolasi angka/bool
   atau penggabungan >1 bagian.
@@ -243,7 +278,7 @@ Batas jujur:
 - `double`/`float` dicetak maksimal **6 digit pecahan** dengan nol ekor
   dibuang (`1.0` → `1`), bukan algoritma Java `Double.toString`.
 - `{...}` harus berisi ekspresi; blok pernyataan tidak bisa.
-- Teks tetap `int[]`; belum ada tipe `String` native.
+- `String` native sudah ada (v1.8.0), tetapi bukan class dengan metode; operasi teks lewat `Str.*`.
 
 ## OS, teks, collections, waktu (v1.7.0)
 
@@ -274,7 +309,7 @@ Path boleh **dinamis** (`int[]`); builtin memaket byte ke penyangga syscall
 (maks ±4000 byte, dipotong). Yang belum ada: `readdir`, `stat`, `rmdir`,
 metadata/permission, mmap.
 
-### Teks (`Str`) — masih byte-array
+### Teks (`Str`) — bekerja pada String/byte-array
 
 ```java
 int[] s = Net.bytes("  Kopi Language  ");
@@ -285,8 +320,8 @@ Str.replaceSeq(Net.bytes("a-b"), Net.bytes("a"), Net.bytes("xy"));
 Str.padLeft(Net.bytes("7"), 3, 48);         // "007"
 Str.fromInt(-42); Str.toInt(Net.bytes("-42"));
 ```
-Teks belum menjadi tipe `String` native; versi ini ASCII + `utf8Count`
-sederhana. Operasi Unicode penuh (case/normalisasi) belum ada.
+`Str` tetap operasi byte/ASCII (dipakai juga oleh `String`); `utf8Count`
+sederhana tersedia. Operasi Unicode penuh (case/normalisasi) belum ada.
 
 ### Collections
 
@@ -833,7 +868,7 @@ kopi/
 
 ## Roadmap (fondasinya sudah rapi)
 
-- `char`, **`String` native** (agar `Str` tidak lagi byte-array); **array bertipe** (`long[]`, `double[]`, ...); lambda dengan tipe numerik baru
+- `char`, **array bertipe** (`String[]`, `long[]`, `double[]`, ...); metode instance String dan Unicode/UTF-8 penuh; lambda dengan tipe numerik/String baru
 - file/direktori lanjutan (`readdir`, `stat`, `rmdir`, permission), timezone/kalender, Map dengan kunci string/byte
 - operator bitwise `& ^ | << >>` (Crypto bisa diubah jadi native shift) +
   ternary `? :`

@@ -135,7 +135,7 @@ static void gen_stmt(Node *s) {
             Ty pt = (Ty)s->a->dty;
             if (pt == T_INT || pt == T_BOOL) {
                 em8(s->ival ? OP_PRINTILN : OP_PRINTI);
-            } else if (pt == T_ARI) {
+            } else if (pt == T_ARI || pt == T_STR) {
                 em8(OP_PRINTBUF); em8(s->ival ? 1 : 0);
             } else {
                 em8(OP_PRINTNUM); em8((int)pt); em8(s->ival ? 1 : 0);
@@ -261,6 +261,9 @@ static void gen_expr(Node *e) {
         break;
     }
     case EX_BOOL: em8(OP_ICONST); em32(e->ival); break;
+    case EX_STRLIT:
+        em8(OP_NET); em16(5); em16((int)e->cp);
+        break;
     case EX_CAST:
         gen_expr(e->a);
         emit_conv((Ty)e->a->dty, (Ty)e->dty);

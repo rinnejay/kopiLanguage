@@ -407,6 +407,64 @@ check tstrtest "$T/kopi/tstrtest.kop"
     && cc -target x86_64-linux-gnu -c "$T/kopi/tstrtest64.s" -o /dev/null \
     && echo "PASS  tstrtest [x64]" || { echo "FAIL  tstrtest [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── String native: literal, concat, ==, length, indexing, interop ──────
+rm -f strnative_tmp.txt
+cat > "$T/kopi/strnative.kop" <<'EOF'
+import Str;
+import File;
+
+class Main {
+    static String pair(String a, String b) { return a + b; }
+
+    static String lab(int n) {
+        return "n=" + Str.fromInt(n);
+    }
+
+    public static void main(String[] args) {
+        String s = "Halo";
+        String t = 'Dunia';
+        System.out.println(s);
+        System.out.println(t);
+        System.out.println(s + " " + t);
+        System.out.println(s == "Halo");
+        System.out.println(s != "X");
+        System.out.println(s.length);
+        System.out.println(s[0]);
+
+        String u = s + t;
+        System.out.println(u.length);
+        String v = Net.bytes("bytes");
+        System.out.println(v);
+        int[] w = u;
+        System.out.println(w.length);
+        System.out.println(Str.upper(s));
+        System.out.println(pair("a", "b"));
+        System.out.println(lab(7));
+        System.out.println(`template {s} {u.length}`);
+
+        String e = "";
+        System.out.println(e.length);
+        System.out.println(s == t);
+        System.out.println("literal" + "" == "literal");
+
+        String path = "strnative_tmp.txt";
+        int fd = File.create(path);
+        File.writeAll(fd, "isi file");
+        File.close(fd);
+        fd = File.openRead(path);
+        System.out.println(File.size(fd));
+        File.close(fd);
+        File.remove(path);
+    }
+}
+EOF
+printf '%s\n' 'Halo' 'Dunia' 'Halo Dunia' '1' '1' '4' '72' '9' 'bytes' '9' 'HALO' 'ab' 'n=7' 'template Halo 9' '0' '0' '1' '8' > "$T/kopi/strnative.ref"
+check strnative "$T/kopi/strnative.kop"
+rm -f strnative_tmp.txt
+./kopicc "$T/kopi/strnative.kop" -t x64 -o "$T/kopi/strnative64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/strnative64.s" -o /dev/null \
+    && echo "PASS  strnative [x64]" || { echo "FAIL  strnative [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
 printf '1\n1\n1\n0\n' > "$T/kopi/aeadvec.ref"

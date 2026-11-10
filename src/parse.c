@@ -217,7 +217,8 @@ static Node *stmt_single(void) {
     switch (t->type) {
     case KW_INT: case KW_BOOL: case KW_FN: case KW_LONG: case KW_DOUBLE:
     case KW_FLOAT: case KW_UINT8: case KW_UINT16: case KW_UINT32: case KW_UINT64:
-    case KW_BYTE: case KW_SHORT: case KW_INT8: case KW_INT16: {
+    case KW_BYTE: case KW_SHORT: case KW_INT8: case KW_INT16:
+    case KW_STRING: {
         Ty ty = type_opt();
         /* multi-deklarasi: int a = 0, b = 1; → rantai ST_VAR via ->next */
         Node *head = 0, *tailst = 0;
@@ -324,8 +325,12 @@ static Node *stmt_single(void) {
         expect('(', "'('");
         Node *n = newnode(ST_PRINT, line);
         n->ival = isln;   /* flag newline */
-        if (at(TK_STR)) { n->str = xs(peek()->text); advance(); }
-        else n->a = expr();
+        if (at(TK_STR) && peek2()->type == ')') {
+            n->str = xs(peek()->text);
+            advance();
+        } else {
+            n->a = expr();
+        }
         expect(')', "')' setelah pernyataan print");
         expect(';', "';'");
         return n;
@@ -384,8 +389,6 @@ static void parse_class(void) {
         skip_mods();
         Tok *rt = peek();
         Ty ret = type_opt();
-        if (ret == T_STR)
-            die("baris %d: tipe kembalian String belum didukung", rt->line);
         if (ret == T_FN)
             die("baris %d: metode dengan return lambda belum didukung — simpan lambda di variabel", rt->line);
         Tok *mn = peek();
@@ -633,6 +636,20 @@ static void tstr_append(Node **head, Node **tail, Node *n) {
     *tail = n;
 }
 
+static Ty desugar_net2(Node *e, int bi, Node *a, Node *b, Ty ret) {
+    Node *nn = newnode(EX_NET, e->line);
+    nn->ival = bi;
+    nn->dty = (int)ret;
+    a->next = b;
+    b->next = 0;
+    nn->a = a;
+    Node *savenext = e->next;
+    *e = *nn;
+    e->next = savenext;
+    e->dty = (int)ret;
+    return ret;
+}
+
 static Node *parse_tstr(const char *raw, int line) {
     int n = (int)strlen(raw);
     char *lit = xmalloc((size_t)n + 1);
@@ -646,7 +663,7 @@ static Node *parse_tstr(const char *raw, int line) {
             if (e == 'n') lit[ln] = 10;
             else if (e == 't') lit[ln] = 9;
             else if (e == 'r') lit[ln] = 13;
-            else if (e == '0') lit[ln] = 0;
+            else if (e == '0') die("baris %d: template: escape \\0 tidak didukung", line);
             else lit[ln] = e;
             ln++;
             i += 2;
@@ -1183,12 +1200,19 @@ static Ty type_expr_raw(Node *e) {
     switch (e->kind) {
     case EX_INT:  return (Ty)e->dty;      /* tipe literal ditentukan lexer */
     case EX_BOOL: return T_BOOL;
+    case EX_STRLIT:
+        if (e->cp == 0 && e->str) e->cp = cp_push(e->str);
+        return T_STR;
     case EX_NET: {
         if ((e->ival == 5 || e->ival == 6) && e->str) {
             e->cp = cp_push(e->str);
             e->str = 0;
         }
         if (e->ival == 5 || e->ival == 6) return (Ty)e->dty;
+        if (e->ival == 22 || e->ival == 23 || e->ival == 24) {
+            for (Node *aa = e->a; aa; aa = aa->next) type_expr(aa);
+            return (Ty)e->dty;
+        }
         for (Node *aa = e->a; aa; aa = aa->next) type_expr(aa);
         return T_INT;
     }
@@ -1200,7 +1224,7 @@ static Ty type_expr_raw(Node *e) {
             part->next = 0;
             Ty pt = type_expr(part);
             Node *as = part;
-            if (pt != T_ARI) {
+            if (pt != T_ARI && pt != T_STR) {
                 const char *fn = 0;
                 if (pt == T_BOOL) fn = "boolText";
                 else if (pt == T_INT || pt == T_BYTE || pt == T_SHORT) fn = "fromInt";
@@ -1268,6 +1292,17 @@ static Ty type_expr_raw(Node *e) {
         Ty lt = type_expr(e->a), rt = type_expr(e->b);
         char op = e->str[0];
         int two = e->str[1] != 0;
+        if (lt == T_STR || rt == T_STR) {
+            int ls = (lt == T_STR || lt == T_ARI);
+            int rs = (rt == T_STR || rt == T_ARI);
+            if (!ls || !rs)
+                die("baris %d: operasi String hanya dengan String/teks", e->line);
+            if (op == '+' && !two)
+                return desugar_net2(e, 22, e->a, e->b, T_STR);
+            if ((op == '=' || op == '!') && two)
+                return desugar_net2(e, op == '=' ? 23 : 24, e->a, e->b, T_BOOL);
+            die("baris %d: operator '%s' tidak didukung untuk String", e->line, e->str);
+        }
         if ((op == '&' || op == '|') && two) {      /* "&&" / "||" saja */
             if (lt != T_BOOL || rt != T_BOOL)
                 die("baris %d: '&&' / '||' butuh operand boolean", e->line);
@@ -1348,7 +1383,10 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "mono"))    { bi = 19; want = 0; }
             else if (!strcmp(fn, "sleep"))   { bi = 20; want = 1; }
             else if (!strcmp(fn, "exit"))    { bi = 21; want = 1; }
-            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes openr recvb sendb bind sendto recvfrom shutdown openb mkdirb unlinkb renameb seek time mono sleep exit)", e->line, fn);
+            else if (!strcmp(fn, "cat"))     { bi = 22; want = 2; }
+            else if (!strcmp(fn, "sequal"))  { bi = 23; want = 2; }
+            else if (!strcmp(fn, "sne"))     { bi = 24; want = 2; }
+            else die("baris %d: fungsi Net.%s tidak ada", e->line, fn);
 
             int narg = (int)e->ival;
             if (bi == 5) {
@@ -1412,12 +1450,17 @@ static Ty type_expr_raw(Node *e) {
                 } else if (bi == 17 || bi == 20 || bi == 21) {
                     if (t != T_INT)
                         die("baris %d: argumen Net.%s harus int", e->line, fn);
+                } else if (bi == 22 || bi == 23 || bi == 24) {
+                    if (t != T_STR && t != T_ARI)
+                        die("baris %d: Net.%s membutuhkan String/teks", e->line, fn);
                 } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
             }
             e->kind = EX_NET;
             e->ival = bi;
             if (bi == 19) { e->dty = (int)T_LONG; return T_LONG; }
+            if (bi == 22) { e->dty = (int)T_STR; return T_STR; }
+            if (bi == 23 || bi == 24) { e->dty = (int)T_BOOL; return T_BOOL; }
             e->dty = (int)T_INT;
             return T_INT;
         }
@@ -1500,16 +1543,20 @@ static Ty type_expr_raw(Node *e) {
             die("baris %d: ukuran 'new int[n]' harus int", e->line);
         if ((long)e->ival < 0) e->ival = 0;
         return T_ARI;
-    case EX_IDX:
-        if (type_expr(e->a) != T_ARI)
-            die("baris %d: indeks [..] hanya untuk array int[]", e->line);
+    case EX_IDX: {
+        Ty bt = type_expr(e->a);
+        if (bt != T_ARI && bt != T_STR)
+            die("baris %d: indeks [..] hanya untuk array/String", e->line);
         if (type_expr(e->b) != T_INT)
             die("baris %d: indeks array harus int", e->line);
         return T_INT;
-    case EX_LEN:
-        if (type_expr(e->a) != T_ARI)
-            die("baris %d: .length hanya untuk array int[]", e->line);
+    }
+    case EX_LEN: {
+        Ty bt = type_expr(e->a);
+        if (bt != T_ARI && bt != T_STR)
+            die("baris %d: .length hanya untuk array/String", e->line);
         return T_INT;
+    }
     }
     die("type_expr: node tidak dikenal kind=%d", e->kind);
     return T_INT;
@@ -1618,7 +1665,7 @@ static void resolve_stmt(Node *s) {
     case ST_PRINT: {
         if (s->str) return;
         Ty et = type_expr(s->a);
-        if (!ty_is_num(et) && et != T_BOOL && et != T_ARI)
+        if (!ty_is_num(et) && et != T_BOOL && et != T_ARI && et != T_STR)
             die("baris %d: println/print hanya menerima numerik, boolean, atau teks/string literal", s->line);
         break;
     }

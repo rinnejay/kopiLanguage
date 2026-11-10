@@ -47,7 +47,7 @@ static char *unescape(const char *s, size_t n, char endq) {
             case 'n': out[j++] = '\n'; break;
             case 't': out[j++] = '\t'; break;
             case 'r': out[j++] = '\r'; break;
-            case '0': out[j++] = '\0'; break;
+            case '0': die("literal string: escape \\0 tidak didukung"); break;
             default: out[j++] = c; break;   /* \" \\ dll */
             }
         } else {

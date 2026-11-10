@@ -30,7 +30,7 @@ static int cur_ret_label;
 static int is64ty(Ty t) {
     return t == T_FN || t == T_ARI || t == T_LONG || t == T_UINT64 ||
            t == T_UINT8 || t == T_UINT16 || t == T_UINT32 ||
-           t == T_BYTE || t == T_SHORT ||
+           t == T_BYTE || t == T_SHORT || t == T_STR ||
            t == T_FLOAT || t == T_DOUBLE;
 }
 
@@ -241,7 +241,7 @@ static void gen_stmt(Method *m, Node *s) {
         if (s->str) {
             emit("\tleaq cpool%d(%%rip), %%rsi", (int)s->cp);
             emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "sn" : "s");
-        } else if ((Ty)s->a->dty == T_ARI) {
+        } else if ((Ty)s->a->dty == T_ARI || (Ty)s->a->dty == T_STR) {
             int lloop = nlab++, lend = nlab++;
             gen_expr(m, s->a);
             emit("\tsubq $16, %%rsp");
@@ -530,6 +530,15 @@ static int gen_expr(Method *m, Node *e) {
     case EX_BOOL:
         emit("\tmovl $%d, %%eax", (int)e->ival);
         break;
+    case EX_STRLIT: {
+        Node f;
+        memset(&f, 0, sizeof f);
+        f.kind = EX_NET;
+        f.ival = 5;
+        f.cp = e->cp;
+        f.dty = (int)T_ARI;
+        return gen_expr(m, &f);
+    }
     case EX_VAR:
         if (is64ty((Ty)e->dty)) {
             emit("\tmovq -%ld(%%rbp), %%rax", (e->ival + 1) * 8);
@@ -1074,6 +1083,91 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tsyscall");
                 return 0;
             }
+        }
+        if (e->ival >= 22 && e->ival <= 24) {
+            int idx = 0;
+            for (Node *aa = e->a; aa; aa = aa->next, idx++) {
+                gen_expr(m, aa);
+                spush();
+            }
+            if (e->ival == 22) {                     /* cat(a,b) */
+                int l1 = nlab++, l2 = nlab++, l3 = nlab++;
+                emit("\tmovq (%%rsp), %%r10");
+                emit("\tmovq 16(%%rsp), %%r11");
+                emit("\tmovl (%%r10), %%r12d");
+                emit("\tmovl (%%r11), %%r13d");
+                emit("\tmovl %%r12d, %%r14d");
+                emit("\taddl %%r13d, %%r14d");
+                emit("\tmovslq %%r14d, %%rdi");
+                emit("\tshlq $3, %%rdi");
+                emit("\taddq $8, %%rdi");
+                emit("\tcall kopalloc");
+                emit("\tmovq %%rax, %%r15");
+                emit("\tmovq (%%rsp), %%r10");
+                emit("\tmovq 16(%%rsp), %%r11");
+                emit("\tmovl (%%r10), %%r12d");
+                emit("\tmovl (%%r11), %%r13d");
+                emit("\tmovl %%r12d, %%r14d");
+                emit("\taddl %%r13d, %%r14d");
+                emit("\tmovslq %%r14d, %%rax");
+                emit("\tmovq %%rax, (%%r15)");
+                emit("\txorl %%ecx, %%ecx");
+                emit(".LCAX%dA:", l1);
+                emit("\tcmpl %%r13d, %%ecx");
+                emit("\tjge .LCAX%dB", l2);
+                emit("\tmovslq %%ecx, %%rax");
+                emit("\tshlq $3, %%rax");
+                emit("\tmovq 8(%%r11,%%rax), %%rdx");
+                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
+                emit("\tincl %%ecx");
+                emit("\tjmp .LCAX%dA", l1);
+                emit(".LCAX%dB:", l2);
+                emit("\txorl %%ecx, %%ecx");
+                emit(".LCAX%dC:", l3);
+                emit("\tcmpl %%r12d, %%ecx");
+                emit("\tjge .LCAX%dD", l1);
+                emit("\tmovslq %%ecx, %%rax");
+                emit("\tshlq $3, %%rax");
+                emit("\tmovq 8(%%r10,%%rax), %%rdx");
+                emit("\tmovl %%r13d, %%eax");
+                emit("\taddl %%ecx, %%eax");
+                emit("\tmovslq %%eax, %%rax");
+                emit("\tshlq $3, %%rax");
+                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
+                emit("\tincl %%ecx");
+                emit("\tjmp .LCAX%dC", l3);
+                emit(".LCAX%dD:", l1);
+                emit("\taddq $16, %%rsp");
+                emit("\tmovq %%r15, %%rax");
+                return 1;
+            }
+            emit("\tmovq (%%rsp), %%r10");
+            emit("\tmovq 16(%%rsp), %%r11");
+            emit("\tmovl (%%r10), %%r12d");
+            emit("\tmovl (%%r11), %%r13d");
+            emit("\tcmpl %%r13d, %%r12d");
+            emit("\tjne .LSEX%dN", ln);
+            emit("\txorl %%ecx, %%ecx");
+            emit(".LSEX%dL:", ln);
+            emit("\tcmpl %%r12d, %%ecx");
+            emit("\tjge .LSEX%dY", ln);
+            emit("\tmovslq %%ecx, %%rax");
+            emit("\tshlq $3, %%rax");
+            emit("\tmovq 8(%%r11,%%rax), %%rdx");
+            emit("\tmovq 8(%%r10,%%rax), %%rsi");
+            emit("\tcmpq %%rsi, %%rdx");
+            emit("\tjne .LSEX%dN", ln);
+            emit("\tincl %%ecx");
+            emit("\tjmp .LSEX%dL", ln);
+            emit(".LSEX%dY:", ln);
+            emit("\tmovl $1, %%eax");
+            emit("\tjmp .LSEX%dD", ln);
+            emit(".LSEX%dN:", ln);
+            emit("\txorl %%eax, %%eax");
+            emit(".LSEX%dD:", ln);
+            emit("\taddq $16, %%rsp");
+            if (e->ival == 24) emit("\txorl $1, %%eax");
+            return 0;
         }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {

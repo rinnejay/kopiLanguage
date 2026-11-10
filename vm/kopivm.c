@@ -613,6 +613,26 @@ static void run(void) {
             } else if (bi == 21) {                /* exit(code) */
                 int64_t code = stackv[--sp];
                 exit((int)code);
+            } else if (bi == 22) {                /* cat(a,b) */
+                long *b = (long *)stackv[--sp];
+                long *a = (long *)stackv[--sp];
+                long la = a[0], lb = b[0];
+                long total = la + lb;
+                if (heap_used + total + 1 > HEAPLEN) dievm("arena penuh (cat)");
+                long *blk = heap + heap_used;
+                heap_used += total + 1;
+                blk[0] = total;
+                for (long i = 0; i < la; i++) blk[1 + i] = a[1 + i];
+                for (long j = 0; j < lb; j++) blk[1 + la + j] = b[1 + j];
+                stackv[sp++] = (int64_t)blk;
+            } else if (bi == 23 || bi == 24) {    /* sequal / sne */
+                long *b = (long *)stackv[--sp];
+                long *a = (long *)stackv[--sp];
+                int eq = (a[0] == b[0]);
+                for (long i = 0; eq && i < a[0]; i++)
+                    if (a[1 + i] != b[1 + i]) eq = 0;
+                if (bi == 24) eq = eq ? 0 : 1;
+                stackv[sp++] = eq;
             } else {
                 dievm("Net builtin tidak dikenal");
             }
