@@ -1169,6 +1169,153 @@ static int gen_expr(Method *m, Node *e) {
             if (e->ival == 24) emit("\teor\tw0, w0, #1");
             return 0;
         }
+        if (e->ival >= 25 && e->ival <= 32) {
+            int idx = 0;
+            for (Node *aa = e->a; aa; aa = aa->next, idx++) {
+                gen_expr(m, aa);
+                push_val(e->ival == 32 && idx == 0);
+            }
+            if (e->ival == 25) {             /* listen(fd, backlog) */
+                emit("\tldr\tw0, [sp, #16]");
+                emit("\tldr\tw1, [sp, #0]");
+                emit("\tmov\tx8, #201");
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #32");
+                return 0;
+            }
+            if (e->ival == 26) {             /* accept(fd) */
+                emit("\tldr\tw0, [sp, #0]");
+                emit("\tmov\tx1, #0");
+                emit("\tmov\tx2, #0");
+                emit("\tmov\tx3, #0");
+                emit("\tmov\tx8, #242");            /* __NR_accept4 */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #16");
+                return 0;
+            }
+            if (e->ival == 27) {             /* setsockopt(fd,lvl,opt,val) */
+                emit("\tldr\tw0, [sp, #48]");
+                emit("\tldr\tw1, [sp, #32]");
+                emit("\tldr\tw2, [sp, #16]");
+                emit("\tldr\tw3, [sp, #0]");
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tstr\tw3, [sp]");
+                emit("\tmov\tx3, sp");
+                emit("\tmov\tx8, #208");
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #16");
+                emit("\tadd\tsp, sp, #64");
+                return 0;
+            }
+            if (e->ival == 28) {             /* memmark() */
+                emit("\tadrp\tx9, kop_arena_used");
+                emit("\tadd\tx9, x9, :lo12:kop_arena_used");
+                emit("\tldr\tw0, [x9]");
+                return 0;
+            }
+            if (e->ival == 29) {             /* memreset(mark) */
+                emit("\tldr\tw0, [sp, #0]");
+                emit("\tadrp\tx9, kop_arena_used");
+                emit("\tadd\tx9, x9, :lo12:kop_arena_used");
+                emit("\tcmp\tw0, #0");
+                emit("\tb.ge\t.LMR%dP", ln);
+                emit("\tmov\tw0, wzr");
+                emit(".LMR%dP:", ln);
+                emit("\tldr\tw10, [x9]");
+                emit("\tcmp\tw0, w10");
+                emit("\tb.le\t.LMR%dS", ln);
+                emit("\tmov\tw0, w10");
+                emit(".LMR%dS:", ln);
+                emit("\tstr\tw0, [x9]");
+                emit("\tadd\tsp, sp, #16");
+                return 0;
+            }
+            if (e->ival == 30) {             /* argc() */
+                emit("\tadrp\tx9, kop_argc");
+                emit("\tadd\tx9, x9, :lo12:kop_argc");
+                emit("\tldr\tw0, [x9]");
+                return 0;
+            }
+            if (e->ival == 31) {             /* argv(i) → String */
+                emit("\tldr\tw0, [sp, #0]");
+                emit("\tadrp\tx9, kop_argc");
+                emit("\tadd\tx9, x9, :lo12:kop_argc");
+                emit("\tldr\tw9, [x9]");
+                emit("\tcmp\tw0, #0");
+                emit("\tb.lt\t.LAV%dE", ln);
+                emit("\tcmp\tw0, w9");
+                emit("\tb.hs\t.LAV%dE", ln);
+                emit("\tadrp\tx10, kop_argv");
+                emit("\tadd\tx10, x10, :lo12:kop_argv");
+                emit("\tldr\tx10, [x10]");
+                emit("\tsxtw\tx11, w0");
+                emit("\tldr\tx0, [x10, x11, lsl #3]");
+                emit("\tbl\tkop_str_from_cstr");
+                emit("\tb\t.LAV%dD", ln);
+                emit(".LAV%dE:", ln);
+                emit("\tadrp\tx0, .Lempty_str");
+                emit("\tadd\tx0, x0, :lo12:.Lempty_str");
+                emit("\tbl\tkop_str_from_cstr");
+                emit(".LAV%dD:", ln);
+                emit("\tadd\tsp, sp, #16");
+                return 1;
+            }
+            if (e->ival == 32) {             /* getenv(name) → String */
+                emit("\tldr\tx10, [sp, #0]");
+                pack_path_bytes(ln, 'g', 0);
+                emit("\tadrp\tx0, kop_iobuf");
+                emit("\tadd\tx0, x0, :lo12:kop_iobuf");
+                emit("\tbl\tgetenv");
+                emit("\tcbz\tx0, .LGE%dE", ln);
+                emit("\tbl\tkop_str_from_cstr");
+                emit("\tb\t.LGE%dD", ln);
+                emit(".LGE%dE:", ln);
+                emit("\tadrp\tx0, .Lempty_str");
+                emit("\tadd\tx0, x0, :lo12:.Lempty_str");
+                emit("\tbl\tkop_str_from_cstr");
+                emit(".LGE%dD:", ln);
+                emit("\tadd\tsp, sp, #16");
+                return 1;
+            }
+        }
+        if (e->ival == 33) {                /* recv1(fd, buf) → n (satu read) */
+            gen_expr(m, e->a);
+            push_val(0);
+            gen_expr(m, e->a->next);
+            push_val(1);
+            emit("\tldr\tx10, [sp]");
+            emit("\tldr\tw0, [sp, #16]");
+            emit("\tldr\tw11, [x10]");
+            emit("\tcmp\tw11, #4000");
+            emit("\tb.ls\t.LR1%dc", ln);
+            emit("\tmov\tw11, #4000");
+            emit(".LR1%dc:", ln);
+            emit("\tadrp\tx17, kop_iobuf");
+            emit("\tadd\tx17, x17, :lo12:kop_iobuf");
+            emit("\tmov\tx1, x17");
+            emit("\tmov\tw2, w11");
+            emit("\tmov\tx8, #63");
+            emit("\tsvc\t#0");
+            emit("\tcmp\tx0, #0");
+            emit("\tb.le\t.LR1%dd", ln);
+            emit("\tmov\tw12, w0");
+            emit("\tmov\tw13, #0");
+            emit(".LR1%dk:", ln);
+            emit("\tcmp\tw13, w12");
+            emit("\tb.hs\t.LR1%df", ln);
+            emit("\tldrb\tw16, [x17, x13]");
+            emit("\tsxtw\tx15, w13");
+            emit("\tlsl\tx15, x15, #3");
+            emit("\tadd\tx15, x15, #8");
+            emit("\tstr\tx16, [x10, x15]");
+            emit("\tadd\tw13, w13, #1");
+            emit("\tb\t.LR1%dk", ln);
+            emit(".LR1%df:", ln);
+            emit("\tmov\tw0, w12");
+            emit(".LR1%dd:", ln);
+            emit("\tadd\tsp, sp, #32");
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -1393,6 +1540,18 @@ void gen_a64(const char *outpath) {
        kalau tidak epilogue class akan ret kembali ke tengah main (loop) */
     emit("\tstp\tx29, x30, [sp, #-16]!");
     emit("\tmov\tx29, sp");
+    emit("\tsub\tw10, w0, #1");            /* buang nama program */
+    emit("\tcmp\tw10, #0");
+    emit("\tb.ge\t.LARGok");
+    emit("\tmov\tw10, wzr");
+    emit(".LARGok:");
+    emit("\tadrp\tx9, kop_argc");
+    emit("\tadd\tx9, x9, :lo12:kop_argc");
+    emit("\tstr\tw10, [x9]");
+    emit("\tadrp\tx9, kop_argv");
+    emit("\tadd\tx9, x9, :lo12:kop_argv");
+    emit("\tadd\tx11, x1, #8");
+    emit("\tstr\tx11, [x9]");
     /* init arena: blok 32 MB sekali via malloc (X25519 ladder mengalokasi
      * ~2,5 MB per panggilan; 6 vektor RFC butuh ~15 MB) */
     emit("\tmovz\tx0, #0x200, lsl #16");    /* 1<<25 bytes */
@@ -1453,10 +1612,50 @@ void gen_a64(const char *outpath) {
     emit("\tadd\tx0, x3, x2");
     emit("\tret");
 
+    /* x0 = char* C → x0 = int[] byte-array (arena) */
+    emit(".text");
+    emit("\t.globl kop_str_from_cstr");
+    emit("kop_str_from_cstr:");
+    emit("\tstp\tx29, x30, [sp, #-16]!");
+    emit("\tmov\tx29, sp");
+    emit("\tmov\tx9, x0");
+    emit("\tmov\tw2, #0");
+    emit(".LSCa:");
+    emit("\tldrb\tw1, [x9, x2]");
+    emit("\tcbz\tw1, .LSCb");
+    emit("\tadd\tw2, w2, #1");
+    emit("\tb\t.LSCa");
+    emit(".LSCb:");
+    emit("\tstp\tx9, x2, [sp, #-16]!");
+    emit("\tsxtw\tx10, w2");
+    emit("\tlsl\tx0, x10, #3");
+    emit("\tadd\tx0, x0, #8");
+    emit("\tbl\tkopalloc");
+    emit("\tldp\tx9, x2, [sp], #16");
+    emit("\tsxtw\tx10, w2");
+    emit("\tstr\tx10, [x0]");
+    emit("\tmov\tx11, x0");
+    emit("\tmov\tx12, #0");
+    emit(".LSCc:");
+    emit("\tcmp\tx12, x10");
+    emit("\tb.hs\t.LSCd");
+    emit("\tldrb\tw1, [x9, x12]");
+    emit("\tlsl\tx13, x12, #3");
+    emit("\tadd\tx13, x13, #8");
+    emit("\tstr\tx1, [x11, x13]");
+    emit("\tadd\tx12, x12, #1");
+    emit("\tb\t.LSCc");
+    emit(".LSCd:");
+    emit("\tmov\tx0, x11");
+    emit("\tldp\tx29, x30, [sp], #16");
+    emit("\tret");
+
     emit("\t.section .data");
     emit("\t.align 3");
     emit("kop_arena_base: .quad 0");
     emit("kop_arena_used: .quad 0");
+    emit("kop_argc: .quad 0");
+    emit("kop_argv: .quad 0");
     emit(".comm kop_iobuf, 4096, 32");      /* penyangga syscall rekursi builtin */
 
     emit("\t.section .rodata");
@@ -1466,6 +1665,7 @@ void gen_a64(const char *outpath) {
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");
+    emit(".Lempty_str: .asciz \"%s\"", "");
     emit(".Lfmt_sn: .asciz \"%s\"", "%s\\n");
     emit(".Lfmt_ld: .asciz \"%s\"", "%ld");
     emit(".Lfmt_ldn: .asciz \"%s\"", "%ld\\n");

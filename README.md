@@ -38,7 +38,7 @@ folder pengimpor → `lib/` rata → `lib/<kategori>/`):
 |--------|----------|-----|
 | `lib/core/` | logika dasar & sistem | `Math`, `Digits`, `Stats`, `Matrix`, `Arrays`, **`Json`**, **`Str`** (teks), **`Map`/`Set`/`Deque`**, **`File`/`Path`**, **`Time`** |
 | `lib/crypto/` | kriptografi | `Crypto`, `Cipher` (klasik: RC4/Vigenère/base64/CRC), `Hash` (SHA-256+HMAC), `Kdf` (HKDF+ExpandLabel), `Big` (medan 2²⁵⁵−19), `X25519`, `ChaCha` (stream), `Poly` (Poly1305), `Aead` (ChaCha20-Poly1305), `Rand` (entropi `/dev/urandom`), `Der` (parser DER minimal + pin SPKI SHA-256) |
-| `lib/net/` | jaringan | `Tcp` (transport di atas syscall `Net`), `Dns` (DNS-over-TCP), `Http` (HTTP/1.0), `Rfc` (klien protokol era awal: daytime/echo/quote/whois/finger/discard), **`Udp`** (datagram: bind/sendTo/recvFrom/shutdown), **`Tls`** (klien TLS 1.3 — lihat bagian khusus di bawah) |
+| `lib/net/` | jaringan | `Tcp`, `Udp`, `Dns`, `Http` (klien HTTP/1.0), `Rfc`, **`Tls`** (klien TLS 1.3), **`HttpServer`** (server HTTP/1.1 minimal), **`Static`** (file statis) |
 
 ATURAN unik: file test TIDAK boleh bernama sama (kasus tak peduli) dengan
 modul yang diimpor — file lokal selalu menang atas `lib/`.
@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.8.1 hari ini  ████████████████  85/85 test hijau — String native tanpa Net.bytes (literal langsung) (a64 + VM)
+v1.9.0 hari ini  ████████████████  87/87 test hijau — HTTP server minimal .kop (listen/accept, arena reset) (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -72,6 +72,7 @@ v1.8.1 hari ini  ████████████████  85/85 test hi
 | **v1.7.1** | **template string** dengan backtick: `` `Halo {nama}, umur {umur}` ``. Interpolasi `{ekspresi}` mendukung `int/uint*/long/uint64/bool/float/double/int[]` (teks), escape `\n \t \r \0 \\ \` \{ \}`, literal `{{`/`}}`, **template bersarang**, dan dapat disimpan di variabel/dikembalikan fungsi. `'...'` dan `"..."` tetap string biasa (tanpa interpolasi). `System.out.println/print` kini menerima hasil template (byte array) lewat `fwrite/fputc` agar urutan output tetap. Ditambahkan `Str.boolText/fromUInt/fromLong/fromULong/fromDouble`; cache tipe (`Node.typed`) memperbaiki resolusi ganda pada template. Uji `tstrtest` di VM & a64 + sintaks x64; suite 83/83 |
 | **v1.8.0** | **tipe `String` native**: literal `"..."` **dan** `'...'` bertipe `String`, concat `+`, perbandingan isi `==`/`!=`, `.length`, indeks `s[i]` (byte), parameter/return `String`, serta **interop dua arah dengan `int[]`** (perpustakaan `Str`/`File`/`Path`/`Json` tetap bekerja). `System.out.println/print` menerima `String`; template `{s}` mendukung `String`; builtin `Net.cat`, `Net.sequal`, `Net.sne`. Escape `\0` ditolak (tak ada pemotongan cpool diam-diam). Uji `strnative` VM+a64 + sintaks x64; suite 85/85 |
 | **v1.8.1** | **`Net.bytes` tidak lagi wajib**: literal `"..."`/`'...'` sudah `String` dan bisa langsung dipakai sebagai path/buffer/parameter `int[]` (interop implisit). Pemeriksaan argumen builtin `Net.*` (openb/mkdirb/unlinkb/renameb/sendto/recvfrom/recvb/sendb) kini menerima `String` maupun `int[]`. `Net.bytes` dipertahankan hanya untuk kompatibilitas dan sebagai cara eksplisit membuat byte-array dari literal (tetap literal-only). Uji `strnative` diperluas: `int[] a = "abc"`, `Json.parse("...")`, `File.create("...")`, dan `Net.openb("...")` langsung. Suite 85/85 |
+| **v1.9.0** | **server minimal**: builtin `Net.listen`, `Net.accept` (accept4 — `accept` diblokir seccomp Android), `Net.setsockopt`, `Net.memMark/memReset` (arena per-request), `Net.argc/argv/getenv`, `Net.recv1` (satu `read`, bukan blocking-until-full). Library **`.kop`**: `MapStr` (peta String→int), `HttpServer` (parser request HTTP/1.1, method/path/query/header/body/urlDecode, response builder, kirim), `Static` (MIME + file statis + tolak `..`), `Log` (stderr + timestamp UTC). Contoh `examples/server/ServerDemo.kop`: listen → accept → parse → route → response → `memReset`, dengan endpoint `/`, `/health`, `/json`, `/time`, `/echo`, `/sum`, `/header`, `/static/*`, 404/403. Diuji 200 request beruntun tanpa OOM di a64 & VM, plus x64 sintaks; suite 87/87 |
 
 ## Bangun
 
@@ -610,6 +611,8 @@ Kopi, bukan kode built-in compiler:
 | `lib/core/Matrix.kop`  | `zero identity add sub scale transpose mul trace det1 det2 det3 det det isIdentity` (matriks persegi, `int[]` datar) |
 | `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge copy reverse sort` (merge sort O(n log n)) + `binSearch`; **fungsional**: `forEach forEachIndexed map filter reduce any all countWhere findIndex sumBy` |
 | `lib/core/Json.kop`       | `parse write print line typeOf isNull isBool isNumber isString isArray isObject asInt asDouble asBool asText count at get has put del add nullV boolV num str arrN objN` |
+| `lib/core/MapStr.kop`     | `make cap size poolUsed put get getOr has remove clear used keyAtSlot valAtSlot` (String→int) |
+| `lib/core/Log.kop`        | `info warn error emit` (stderr, timestamp UTC) |
 | `lib/core/Str.kop`        | `len eq cmp copy cat slice at indexOf lastIndexOf contains startsWith endsWith trim upper lower repeat reverse replaceByte replaceSeq countByte splitCount splitAt padLeft padRight fromInt fromUInt fromLong fromULong fromDouble boolText toInt isDigits equalsIgnoreCase utf8Count hex print line` |
 | `lib/core/Map.kop`        | `make cap size put get getOr has remove clear grow forEach` (int→int, open addressing) |
 | `lib/core/Set.kop`        | `make add has remove size clear grow forEach` |
@@ -661,6 +664,49 @@ Urutan pencarian `import Nama`:
 
 Contoh siap pakai: `examples/pakai_lib.kop` (→ diuji di semua backend oleh
 `test.sh`).
+
+## HTTP server minimal (v1.9.0)
+
+Server HTTP bisa ditulis **100% di `.kop`**; hanya socket dasar yang
+merupakan builtin.
+
+```java
+int fd = Net.socket(2, 1);                 // TCP
+Net.setsockopt(fd, 1, 2, 1);               // SO_REUSEADDR
+Net.bind(fd, 0, 8080);                     // 0.0.0.0
+Net.listen(fd, 16);
+while (true) {
+    int c = Net.accept(fd);                // accept4
+    int mark = Net.memMark();              // arena per-request
+    int[] req = HttpServer.readRequest(c, 16384);
+    int[] resp = HttpServer.text(200, "ok\n");
+    HttpServer.send(c, resp);
+    Net.close(c);
+    Net.memReset(mark);                    // wajib (tanpa GC)
+}
+```
+
+Builtin baru: `listen`, `accept` (memakai syscall `accept4` karena `accept`
+diblokir seccomp di Android), `setsockopt`, `memMark`/`memReset`,
+`argc`/`argv`/`getenv`, `recv1` (satu `read`; `recvb` tetap “baca sampai
+penuh”).
+
+Library `.kop`:
+
+| Library | Isi |
+|---|---|
+| `HttpServer` | `readRequest method path pathOnly target version headerValue contentLength body queryValue urlDecode response text html jsonResponse notFound forbidden send` |
+| `Static` | `mime serve` (menolak path `..`) |
+| `Log` | `info warn error emit` (stderr, timestamp UTC) |
+| `MapStr` | peta String→int (header/session/route), kapasitas+pool tetap |
+
+Contoh lengkap: `examples/server/ServerDemo.kop` (endpoint `/`, `/health`,
+`/json`, `/time`, `/echo`, `/sum`, `/header`, `/static/*`, 404/403).
+
+Batas jujur: **single-threaded blocking**, `Connection: close` per respons,
+tanpa keep-alive/chunked/multipart/WebSocket/HTTP2, tanpa TLS server,
+routing manual `if/else`, dan ukuran request dibatasi buffer. Untuk produksi
+jalankan di belakang reverse proxy dan tambahkan worker/process.
 
 ## Jaringan: TCP, UDP, HTTP (v1.6.2)
 
@@ -896,8 +942,8 @@ kopi/
 - `switch`, `do/while`, `try/catch` terbatas
 - optimasi `-O1`: register allocation (jangan semua lewat stack),
   const-folding
-- **TCP server** (`listen`/`accept`), datagram UDP > 240 byte, dan
-  HTTP/1.1 (keep-alive, chunked, header respons berulang)
+- **Server lanjutan**: keep-alive/chunked/multipart, WebSocket, HTTP/2, TLS server,
+  thread/event-loop, datagram UDP > 240 byte, routing framework
 - **TLS lanjutan** (klien 1.3 sudah ada): verifikasi tanda **ECDSA P-256**
   untuk CertificateVerify, validasi rantai/PKI + hostname + masa berlaku,
   session resumption/PSK, dan dukungan `u64` asli supaya X25519 tidak lagi

@@ -1171,6 +1171,74 @@ for t in udptest httphead; do
         echo "FAIL  $t [x64]: sintaks assembly"; FAIL=$((FAIL+1)); pas64=0; }
 done
 
+# ─── HTTP server minimal (.kop): listen/accept + HttpServer + arena reset ─
+mkdir -p "$T/kopi/srvdir"
+printf 'HALO STATIC\n' > "$T/kopi/srvdir/hello.txt"
+cat > "$T/kopi/srvtest.py" <<'EOF'
+import http.client, sys, time
+port = int(sys.argv[1])
+def req(method, path, body=None, headers=None):
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=8)
+    c.request(method, path, body=body, headers=headers or {})
+    r = c.getresponse(); d = r.read(); c.close()
+    return r.status, r.getheader("Content-Type"), d
+def wait_up():
+    for _ in range(50):
+        try:
+            req("GET", "/health"); return
+        except OSError:
+            time.sleep(0.1)
+    raise SystemExit("server tidak siap")
+wait_up()
+st, ct, d = req("GET", "/"); assert st == 200 and b"Kopi server" in d
+st, ct, d = req("GET", "/health"); assert st == 200 and d == b"ok\n"
+st, ct, d = req("GET", "/json"); assert st == 200 and ct == "application/json" and b'"ok"' in d
+st, ct, d = req("GET", "/time"); assert st == 200 and len(d) >= 19
+st, ct, d = req("GET", "/static/hello.txt"); assert st == 200 and d == b"HALO STATIC\n" and "text/plain" in ct
+st, ct, d = req("GET", "/nope"); assert st == 404
+st, ct, d = req("POST", "/echo", b"abc"); assert st == 200 and d == b"abc"
+st, ct, d = req("GET", "/sum?a=2&b=3"); assert st == 200 and d == b"5\n"
+st, ct, d = req("GET", "/header?name=X-Test", headers={"X-Test": "yes"}); assert st == 200 and d == b"yes\n"
+st, ct, d = req("GET", "/static/../x"); assert st == 403
+ok = 0
+for i in range(200):
+    st, _, d = req("GET", "/health")
+    if st == 200 and d == b"ok\n": ok += 1
+assert ok == 200
+print("OK")
+EOF
+
+# build server a64 + VM (+ x64 sintaks)
+KOPIVM_ABS="$(pwd)/kopivm"
+if ./kopicc examples/server/ServerDemo.kop -t a64 -o "$T/kopi/srvdemo.s" \
+   && cc "$T/kopi/srvdemo.s" -o "$T/kopi/srvdemo.bin" \
+   && ./kopicc examples/server/ServerDemo.kop -t vm -o "$T/kopi/srvdemo.kbc"; then
+    for tgt in a64 vm; do
+        port=9930
+        if [ "$tgt" = vm ]; then port=9931; fi
+        if [ "$tgt" = a64 ]; then
+            ( cd "$T/kopi/srvdir" && exec "$T/kopi/srvdemo.bin" $port > "$T/kopi/srv.$port.log" 2>&1 ) &
+        else
+            ( cd "$T/kopi/srvdir" && exec "$KOPIVM_ABS" "$T/kopi/srvdemo.kbc" $port > "$T/kopi/srv.$port.log" 2>&1 ) &
+        fi
+        SPID=$!
+        sleep 0.4
+        if python3 "$T/kopi/srvtest.py" $port > "$T/kopi/srvtest.$tgt.out" 2>&1; then
+            echo "PASS  server [${tgt}]"; PASS=$((PASS+1))
+        else
+            echo "FAIL  server [${tgt}]"; FAIL=$((FAIL+1))
+            tail -3 "$T/kopi/srvtest.$tgt.out"
+        fi
+        kill $SPID 2>/dev/null
+        wait $SPID 2>/dev/null
+    done
+    ./kopicc examples/server/ServerDemo.kop -t x64 -o "$T/kopi/srvdemo64.s" \
+        && cc -target x86_64-linux-gnu -c "$T/kopi/srvdemo64.s" -o /dev/null \
+        && echo "PASS  server [x64]" || { echo "FAIL  server [x64]"; FAIL=$((FAIL+1)); }
+else
+    echo "FAIL  server: build"; FAIL=$((FAIL+1))
+fi
+
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"
 [ $FAIL -eq 0 ]

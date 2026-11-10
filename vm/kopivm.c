@@ -194,6 +194,19 @@ static char *pack_cpath(long *a, size_t maxlen) {
     return b;
 }
 
+static int vargc;
+static char **vargv;
+
+static int64_t mk_str_arr(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (heap_used + (long)n + 1 > HEAPLEN) dievm("arena penuh (string)");
+    long *blk = heap + heap_used;
+    heap_used += (long)n + 1;
+    blk[0] = (long)n;
+    for (size_t i = 0; i < n; i++) blk[1 + i] = (long)(unsigned char)s[i];
+    return (int64_t)blk;
+}
+
 static void run(void) {
     int mid = -1;
     for (int i = 0; i < nmeths; i++)
@@ -633,6 +646,51 @@ static void run(void) {
                     if (a[1 + i] != b[1 + i]) eq = 0;
                 if (bi == 24) eq = eq ? 0 : 1;
                 stackv[sp++] = eq;
+            } else if (bi == 25) {                /* listen(fd, backlog) */
+                int64_t backlog = stackv[--sp], fdi = stackv[--sp];
+                int r = listen((int)fdi, (int)backlog);
+                stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 26) {                /* accept(fd) */
+                int64_t fdi = stackv[--sp];
+                int fd2 = accept((int)fdi, 0, 0);
+                stackv[sp++] = (fd2 < 0) ? -errno : fd2;
+            } else if (bi == 27) {                /* setsockopt(fd,lvl,opt,val) */
+                int64_t val = stackv[--sp], opt = stackv[--sp];
+                int64_t lvl = stackv[--sp], fdi = stackv[--sp];
+                int v = (int)val;
+                int r = setsockopt((int)fdi, (int)lvl, (int)opt, &v, sizeof v);
+                stackv[sp++] = (r < 0) ? -errno : r;
+            } else if (bi == 28) {                /* memmark() */
+                stackv[sp++] = (int64_t)heap_used;
+            } else if (bi == 29) {                /* memreset(mark) */
+                int64_t mark = stackv[--sp];
+                if (mark < 0) mark = 0;
+                if (mark > heap_used) mark = heap_used;
+                heap_used = (long)mark;
+                stackv[sp++] = 0;
+            } else if (bi == 30) {                /* argc() */
+                stackv[sp++] = vargc;
+            } else if (bi == 31) {                /* argv(i) */
+                int64_t i = stackv[--sp];
+                if (i >= 0 && i < vargc)
+                    stackv[sp++] = mk_str_arr(vargv[i]);
+                else
+                    stackv[sp++] = mk_str_arr(0);
+            } else if (bi == 32) {                /* getenv(name) */
+                long *pa = (long *)stackv[--sp];
+                char *name = pack_cpath(pa, 4000);
+                char *v = getenv(name);
+                free(name);
+                stackv[sp++] = mk_str_arr(v);
+            } else if (bi == 33) {                /* recv1(fd, buf): satu read */
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                long len = buf[0];
+                if (len > 4000) len = 4000;
+                unsigned char tmp[4000];
+                ssize_t n = read((int)fdi, tmp, (size_t)(len > 0 ? len : 1));
+                if (n > 0) for (long i = 0; i < n; i++) buf[1 + i] = (long)tmp[i];
+                stackv[sp++] = (n < 0) ? -errno : (int64_t)n;
             } else {
                 dievm("Net builtin tidak dikenal");
             }
@@ -804,6 +862,8 @@ static void run(void) {
 }
 
 int main(int argc, char **argv) {
+    if (argc > 2) { vargc = argc - 2; vargv = argv + 2; }
+    else { vargc = 0; vargv = argv; }
     if (argc < 2) {
         fprintf(stderr, "usage: kopivm <file.kbc>\n");
         return 2;

@@ -1,0 +1,66 @@
+// ServerDemo.kop — server HTTP minimal Kopi (v1.9).
+// Jalankan: ./ServerDemo.bin 8080
+import Str;
+import Time;
+import Log;
+import HttpServer;
+import Static;
+
+class Main {
+    public static void main(String[] args) {
+        int port = 8080;
+        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+
+        int fd = Net.socket(2, 1);                 /* AF_INET, SOCK_STREAM */
+        if (fd < 0) { Log.error(Net.bytes("boot"), Net.bytes("socket gagal")); return; }
+        Net.setsockopt(fd, 1, 2, 1);               /* SOL_SOCKET, SO_REUSEADDR */
+        int rb = Net.bind(fd, 0, port);            /* 0.0.0.0 */
+        int rl = Net.listen(fd, 16);
+        if (rb < 0 || rl < 0) {
+            Log.error(Net.bytes("boot"), Net.bytes("bind/listen gagal"));
+            return;
+        }
+        Log.info(Net.bytes("boot"), Net.bytes("Kopi server siap"));
+
+        while (true) {
+            int c = Net.accept(fd);
+            if (c < 0) { Net.sleep(5); continue; }
+            int mark = Net.memMark();
+            int[] req = HttpServer.readRequest(c, 16384);
+            int[] resp = HttpServer.text(400, Net.bytes("bad request\n"));
+
+            if (req.length > 0) {
+                int[] p = HttpServer.path(req);
+                if (Str.eq(p, "/")) {
+                    resp = HttpServer.html(200, Net.bytes("<h1>Kopi server</h1>\n"));
+                } else if (Str.eq(p, "/health")) {
+                    resp = HttpServer.text(200, Net.bytes("ok\n"));
+                } else if (Str.eq(p, "/json")) {
+                    resp = HttpServer.jsonResponse(Net.bytes("{\"status\":\"ok\",\"lang\":\"kopi\"}\n"));
+                } else if (Str.eq(p, "/time")) {
+                    resp = HttpServer.text(200, Str.cat(Time.format(Time.epoch()), Net.bytes("\n")));
+                } else if (Str.eq(p, "/echo")) {
+                    resp = HttpServer.text(200, HttpServer.body(req));
+                } else if (Str.eq(p, "/sum")) {
+                    int a = Str.toInt(HttpServer.queryValue(req, Net.bytes("a")));
+                    int b = Str.toInt(HttpServer.queryValue(req, Net.bytes("b")));
+                    resp = HttpServer.text(200, Str.cat(Str.fromInt(a + b), Net.bytes("\n")));
+                } else if (Str.eq(p, "/header")) {
+                    int[] name = HttpServer.queryValue(req, Net.bytes("name"));
+                    int[] v = HttpServer.headerValue(req, name);
+                    resp = HttpServer.text(200, Str.cat(v, Net.bytes("\n")));
+                } else if (Str.startsWith(p, Net.bytes("/static/"))) {
+                    int[] rel = Str.slice(p, 8, p.length - 8);
+                    resp = Static.serve(rel);
+                } else {
+                    resp = HttpServer.notFound();
+                }
+                Log.info(Net.bytes("req"), p);
+            }
+
+            HttpServer.send(c, resp);
+            Net.close(c);
+            Net.memReset(mark);
+        }
+    }
+}

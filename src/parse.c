@@ -1386,6 +1386,15 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "cat"))     { bi = 22; want = 2; }
             else if (!strcmp(fn, "sequal"))  { bi = 23; want = 2; }
             else if (!strcmp(fn, "sne"))     { bi = 24; want = 2; }
+            else if (!strcmp(fn, "listen"))  { bi = 25; want = 2; }
+            else if (!strcmp(fn, "accept"))  { bi = 26; want = 1; }
+            else if (!strcmp(fn, "setsockopt")) { bi = 27; want = 4; }
+            else if (!strcmp(fn, "memmark") || !strcmp(fn, "memMark")) { bi = 28; want = 0; }
+            else if (!strcmp(fn, "memreset") || !strcmp(fn, "memReset")){ bi = 29; want = 1; }
+            else if (!strcmp(fn, "argc"))    { bi = 30; want = 0; }
+            else if (!strcmp(fn, "argv"))    { bi = 31; want = 1; }
+            else if (!strcmp(fn, "getenv"))  { bi = 32; want = 1; }
+            else if (!strcmp(fn, "recv1"))   { bi = 33; want = 2; }
             else die("baris %d: fungsi Net.%s tidak ada", e->line, fn);
 
             int narg = (int)e->ival;
@@ -1453,13 +1462,24 @@ static Ty type_expr_raw(Node *e) {
                 } else if (bi == 22 || bi == 23 || bi == 24) {
                     if (t != T_STR && t != T_ARI)
                         die("baris %d: Net.%s membutuhkan String/teks", e->line, fn);
+                } else if (bi == 32) {
+                    if (t != T_STR && t != T_ARI)
+                        die("baris %d: Net.getenv membutuhkan String/teks nama", e->line);
+                } else if (bi == 33) {
+                    if (i == 0 && t != T_INT)
+                        die("baris %d: Net.recv1 argumen fd harus int", e->line);
+                    if (i == 1 && t != T_ARI && t != T_STR)
+                        die("baris %d: Net.recv1 argumen buffer harus int[]/String", e->line);
+                } else if (bi == 25 || bi == 26 || bi == 27 || bi == 29 || bi == 31) {
+                    if (t != T_INT)
+                        die("baris %d: argumen Net.%s harus int", e->line, fn);
                 } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
             }
             e->kind = EX_NET;
             e->ival = bi;
             if (bi == 19) { e->dty = (int)T_LONG; return T_LONG; }
-            if (bi == 22) { e->dty = (int)T_STR; return T_STR; }
+            if (bi == 22 || bi == 31 || bi == 32) { e->dty = (int)T_STR; return T_STR; }
             if (bi == 23 || bi == 24) { e->dty = (int)T_BOOL; return T_BOOL; }
             e->dty = (int)T_INT;
             return T_INT;

@@ -1,0 +1,146 @@
+// MapStr.kop — peta String→int (open addressing + kolam kunci) v1.9.
+// Satu int[] mandiri:
+//   [0]=cap [1]=size [2]=poolUsed [3]=poolCap
+//   hash[cap] @4, off[cap], len[cap], val[cap],
+//   pool byte-as-int @4+4*cap
+// Kapasitas/pool tetap (tanpa grow) — cocok untuk header/session kecil.
+// Kunci disalin ke pool; remove memakai tombstone (pool tidak diklaim ulang).
+
+class MapStr {
+
+    static int TOMB() { return 2147483647; }
+
+    static int[] make(int cap, int poolCap) {
+        int c = 2;
+        while (c < cap) c = c * 2;
+        int[] m = new int[4 + 4 * c + poolCap];
+        m[0] = c;
+        m[3] = poolCap;
+        return m;
+    }
+
+    static int cap(int[] m) { return m[0]; }
+    static int size(int[] m) { return m[1]; }
+    static int poolUsed(int[] m) { return m[2]; }
+
+    static int hash(int[] k) {
+        int h = (int)2166136261L;
+        for (int i = 0; i < k.length; i++) {
+            h = h ^ (k[i] & 255);
+            h = h * 16777619;
+        }
+        if (h == 0) h = 1;
+        if (h == TOMB()) h = TOMB() - 1;
+        return h;
+    }
+
+    static boolean same(int[] m, int slot, int[] key, int h) {
+        int c = m[0];
+        if (m[4 + slot] != h) return false;
+        int len = m[4 + 2 * c + slot];
+        if (len != key.length) return false;
+        int off = m[4 + c + slot];
+        int base = 4 + 4 * c;
+        for (int i = 0; i < len; i++)
+            if (m[base + off + i] != key[i]) return false;
+        return true;
+    }
+
+    static int find(int[] m, int[] key) {
+        int c = m[0];
+        int h = hash(key);
+        int i = h & (c - 1);
+        for (int n = 0; n < c; n++) {
+            int hh = m[4 + i];
+            if (hh == 0) return -1;
+            if (hh != TOMB() && same(m, i, key, h)) return i;
+            i = (i + 1) & (c - 1);
+        }
+        return -1;
+    }
+
+    static boolean has(int[] m, int[] key) { return find(m, key) >= 0; }
+
+    static int get(int[] m, int[] key) {
+        int i = find(m, key);
+        if (i < 0) return 0;
+        return m[4 + 3 * m[0] + i];
+    }
+
+    static int getOr(int[] m, int[] key, int def) {
+        int i = find(m, key);
+        if (i < 0) return def;
+        return m[4 + 3 * m[0] + i];
+    }
+
+    static boolean place(int[] m, int at, int[] key, int h, int v) {
+        int c = m[0];
+        int used = m[2];
+        if (used + key.length > m[3]) return false;
+        int base = 4 + 4 * c;
+        for (int i = 0; i < key.length; i++) m[base + used + i] = key[i];
+        m[4 + at] = h;
+        m[4 + c + at] = used;
+        m[4 + 2 * c + at] = key.length;
+        m[4 + 3 * c + at] = v;
+        m[2] = used + key.length;
+        m[1] = m[1] + 1;
+        return true;
+    }
+
+    static boolean put(int[] m, int[] key, int v) {
+        int c = m[0];
+        int h = hash(key);
+        int i = h & (c - 1);
+        int tomb = -1;
+        for (int n = 0; n < c; n++) {
+            int hh = m[4 + i];
+            if (hh == 0) {
+                int at = i;
+                if (tomb >= 0) at = tomb;
+                return place(m, at, key, h, v);
+            }
+            if (hh == TOMB()) {
+                if (tomb < 0) tomb = i;
+            } else if (same(m, i, key, h)) {
+                m[4 + 3 * c + i] = v;
+                return true;
+            }
+            i = (i + 1) & (c - 1);
+        }
+        if (tomb >= 0) return place(m, tomb, key, h, v);
+        return false;
+    }
+
+    static boolean remove(int[] m, int[] key) {
+        int i = find(m, key);
+        if (i < 0) return false;
+        m[4 + i] = TOMB();
+        m[1] = m[1] - 1;
+        return true;
+    }
+
+    static void clear(int[] m) {
+        int c = m[0];
+        for (int i = 0; i < c; i++) m[4 + i] = 0;
+        m[1] = 0;
+        m[2] = 0;
+    }
+
+    static boolean used(int[] m, int i) {
+        int h = m[4 + i];
+        return h != 0 && h != TOMB();
+    }
+
+    static int valAtSlot(int[] m, int i) { return m[4 + 3 * m[0] + i]; }
+
+    static int[] keyAtSlot(int[] m, int i) {
+        int c = m[0];
+        int off = m[4 + c + i];
+        int len = m[4 + 2 * c + i];
+        int base = 4 + 4 * c;
+        int[] out = new int[len];
+        for (int j = 0; j < len; j++) out[j] = m[base + off + j];
+        return out;
+    }
+}
