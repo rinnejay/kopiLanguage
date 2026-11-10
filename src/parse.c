@@ -1416,37 +1416,37 @@ static Ty type_expr_raw(Node *e) {
                 if (bi == 7 || bi == 8) {
                     if (i == 0 && t != T_INT)
                         die("baris %d: Net.%s argumen %d harus int", e->line, i, fn);
-                    if (i == 1 && t != T_ARI)
-                        die("baris %d: Net.%s argumen %d harus int[] buffer", e->line, i, fn);
+                    if (i == 1 && t != T_ARI && t != T_STR)
+                        die("baris %d: Net.%s argumen %d harus int[]/String buffer", e->line, i, fn);
                 } else if (bi == 9) {
                     if (t != T_INT)
                         die("baris %d: Net.bind membutuhkan (fd int, ip int, port int)", e->line);
                 } else if (bi == 10) {
                     if (i < 3 && t != T_INT)
                         die("baris %d: Net.sendto argumen %d harus int", e->line, i);
-                    if (i == 3 && t != T_ARI)
-                        die("baris %d: Net.sendto argumen buffer harus int[]", e->line);
+                    if (i == 3 && t != T_ARI && t != T_STR)
+                        die("baris %d: Net.sendto argumen buffer harus int[]/String", e->line);
                 } else if (bi == 11) {
                     if (i == 0 && t != T_INT)
                         die("baris %d: Net.recvfrom argumen fd harus int", e->line);
-                    if (i == 1 && t != T_ARI)
-                        die("baris %d: Net.recvfrom argumen buffer harus int[]", e->line);
-                    if (i == 2 && t != T_ARI)
+                    if (i == 1 && t != T_ARI && t != T_STR)
+                        die("baris %d: Net.recvfrom argumen buffer harus int[]/String", e->line);
+                    if (i == 2 && t != T_ARI && t != T_STR)
                         die("baris %d: Net.recvfrom argumen from harus int[2]", e->line);
                 } else if (bi == 12) {
                     if (t != T_INT)
                         die("baris %d: Net.shutdown membutuhkan (fd int, how int)", e->line);
                 } else if (bi == 13) {
-                    if (i == 0 && t != T_ARI)
-                        die("baris %d: Net.openb argumen path harus int[]", e->line);
+                    if (i == 0 && t != T_ARI && t != T_STR)
+                        die("baris %d: Net.openb argumen path harus int[]/String", e->line);
                     if (i > 0 && t != T_INT)
                         die("baris %d: Net.openb argumen flags/mode harus int", e->line);
                 } else if (bi == 14 || bi == 15) {
-                    if (t != T_ARI)
-                        die("baris %d: Net.%s argumen path harus int[]", e->line, fn);
+                    if (t != T_ARI && t != T_STR)
+                        die("baris %d: Net.%s argumen path harus int[]/String", e->line, fn);
                 } else if (bi == 16) {
-                    if (t != T_ARI)
-                        die("baris %d: Net.renameb kedua argumen harus int[] path", e->line);
+                    if (t != T_ARI && t != T_STR)
+                        die("baris %d: Net.renameb kedua argumen harus int[]/String path", e->line);
                 } else if (bi == 17 || bi == 20 || bi == 21) {
                     if (t != T_INT)
                         die("baris %d: argumen Net.%s harus int", e->line, fn);

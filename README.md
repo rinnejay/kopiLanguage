@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.8.0 hari ini  ████████████████  85/85 test hijau — String native (literal, +, ==, length, interop) (a64 + VM)
+v1.8.1 hari ini  ████████████████  85/85 test hijau — String native tanpa Net.bytes (literal langsung) (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -71,6 +71,7 @@ v1.8.0 hari ini  ████████████████  85/85 test hi
 | **v1.7.0** | **fondasi OS + teks + collections**: builtin baru `Net.openb` (path dinamis), `mkdirb`, `unlinkb`, `renameb`, `seek`, `time`, `mono` (long ms), `sleep`, `exit` di a64/x64/VM. Library baru: **`Str`** (potong/gabung/cari/ganti/trim/case/pad/angka/hex/UTF-8 count), **`Map`** (int→int open addressing, grow/forEach), **`Set`**, **`Deque`**, **`File`** (create/append/baca/tulis/seek/size/rename/unlink/mkdir), **`Path`**, **`Time`** (epoch/mono/sleep, kalender UTC + format). Bug yang ikut diperbaiki: capture **array** dalam lambda (EX_ENVLOAD hanya 32-bit), path syscall belum NUL-terminated, pointer rename tertukar, seek membaca 64-bit dari slot 32-bit. Uji `ostest` (file I/O) & `textmap` (Str/Map/Set/Deque/Path/Time) di VM & a64 + sintaks x64; suite 81/81 |
 | **v1.7.1** | **template string** dengan backtick: `` `Halo {nama}, umur {umur}` ``. Interpolasi `{ekspresi}` mendukung `int/uint*/long/uint64/bool/float/double/int[]` (teks), escape `\n \t \r \0 \\ \` \{ \}`, literal `{{`/`}}`, **template bersarang**, dan dapat disimpan di variabel/dikembalikan fungsi. `'...'` dan `"..."` tetap string biasa (tanpa interpolasi). `System.out.println/print` kini menerima hasil template (byte array) lewat `fwrite/fputc` agar urutan output tetap. Ditambahkan `Str.boolText/fromUInt/fromLong/fromULong/fromDouble`; cache tipe (`Node.typed`) memperbaiki resolusi ganda pada template. Uji `tstrtest` di VM & a64 + sintaks x64; suite 83/83 |
 | **v1.8.0** | **tipe `String` native**: literal `"..."` **dan** `'...'` bertipe `String`, concat `+`, perbandingan isi `==`/`!=`, `.length`, indeks `s[i]` (byte), parameter/return `String`, serta **interop dua arah dengan `int[]`** (perpustakaan `Str`/`File`/`Path`/`Json` tetap bekerja). `System.out.println/print` menerima `String`; template `{s}` mendukung `String`; builtin `Net.cat`, `Net.sequal`, `Net.sne`. Escape `\0` ditolak (tak ada pemotongan cpool diam-diam). Uji `strnative` VM+a64 + sintaks x64; suite 85/85 |
+| **v1.8.1** | **`Net.bytes` tidak lagi wajib**: literal `"..."`/`'...'` sudah `String` dan bisa langsung dipakai sebagai path/buffer/parameter `int[]` (interop implisit). Pemeriksaan argumen builtin `Net.*` (openb/mkdirb/unlinkb/renameb/sendto/recvfrom/recvb/sendb) kini menerima `String` maupun `int[]`. `Net.bytes` dipertahankan hanya untuk kompatibilitas dan sebagai cara eksplisit membuat byte-array dari literal (tetap literal-only). Uji `strnative` diperluas: `int[] a = "abc"`, `Json.parse("...")`, `File.create("...")`, dan `Net.openb("...")` langsung. Suite 85/85 |
 
 ## Bangun
 
@@ -235,6 +236,22 @@ System.out.println(Str.upper(s));    // String → int[] untuk pustaka
   tetap `Str.upper(s)`); Unicode/UTF-8 penuh belum ada.
 - Literal string tidak mendukung `\0` (ditolak agar tidak memotong
   konstanta C).
+
+**`Net.bytes` tidak diperlukan lagi** untuk pemakaian normal:
+
+```java
+int[] a = "teks";                 // String → int[]
+String s = "halo";                // String native
+Str.upper("abc");                 // literal langsung
+Json.parse("{\"a\":1}");         // literal langsung
+File.create("data.txt");          // literal langsung
+int fd = Net.openb("data.txt", 577, 420);  // builtin pun menerima String
+```
+
+`Net.bytes("...")` tetap ada demi kompatibilitas kode lama dan untuk
+menegaskan bahwa nilainya `int[]` byte-array; ia hanya menerima **literal**,
+bukan variabel String. Untuk variabel String, pakai langsung (konversi ke
+`int[]` implisit).
 
 ## Template string (v1.7.1)
 

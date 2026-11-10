@@ -408,9 +408,10 @@ check tstrtest "$T/kopi/tstrtest.kop"
     && echo "PASS  tstrtest [x64]" || { echo "FAIL  tstrtest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── String native: literal, concat, ==, length, indexing, interop ──────
-rm -f strnative_tmp.txt
+rm -f strnative_tmp.txt strnative_net.txt
 cat > "$T/kopi/strnative.kop" <<'EOF'
 import Str;
+import Json;
 import File;
 
 class Main {
@@ -447,6 +448,14 @@ class Main {
         System.out.println(s == t);
         System.out.println("literal" + "" == "literal");
 
+        int[] lit = "abc";
+        System.out.println(lit.length);
+        System.out.println(Json.parse("{\"a\":1}").length > 0);
+        int fd2 = Net.openb("strnative_net.txt", 577, 420);
+        System.out.println(fd2 > 0);
+        File.close(fd2);
+        File.remove("strnative_net.txt");
+
         String path = "strnative_tmp.txt";
         int fd = File.create(path);
         File.writeAll(fd, "isi file");
@@ -458,9 +467,9 @@ class Main {
     }
 }
 EOF
-printf '%s\n' 'Halo' 'Dunia' 'Halo Dunia' '1' '1' '4' '72' '9' 'bytes' '9' 'HALO' 'ab' 'n=7' 'template Halo 9' '0' '0' '1' '8' > "$T/kopi/strnative.ref"
+printf '%s\n' 'Halo' 'Dunia' 'Halo Dunia' '1' '1' '4' '72' '9' 'bytes' '9' 'HALO' 'ab' 'n=7' 'template Halo 9' '0' '0' '1' '3' '1' '1' '8' > "$T/kopi/strnative.ref"
 check strnative "$T/kopi/strnative.kop"
-rm -f strnative_tmp.txt
+rm -f strnative_tmp.txt strnative_net.txt
 ./kopicc "$T/kopi/strnative.kop" -t x64 -o "$T/kopi/strnative64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/strnative64.s" -o /dev/null \
     && echo "PASS  strnative [x64]" || { echo "FAIL  strnative [x64]"; FAIL=$((FAIL+1)); }
