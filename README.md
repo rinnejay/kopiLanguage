@@ -366,6 +366,11 @@ kopi/
   dan syscall `shutdown` (half-close) — klien TCP v1.4 berjalan penuh
   tanpa keduanya; server-side `bind/listen/accept` tinggal tiga syscall
   di atas kerangka `Net` yang sama
-- **TLS**: bahasa belum punya aritmetika unsigned 64-bit untuk
-  pertukaran kunci modern — road: `u64` + bilangan besar
+- **TLS 1.3 client** — SUDAH ADA (`lib/net/Tls.kop`, murni Kopi):
+  ChaCha20-Poly1305, X25519, HKDF-SHA256, transcript, server Finished
+  di-verifikasi, app data dua arah (`writeApp`/`readApp`). Batas jujur:
+  autentikasi = pin SPKI TOFU (SHA-256 DER SPKI leaf), **bukan** validasi
+  chain/PKI; CertificateVerify baru masuk transcript (verifikasi tanda
+  ECDSA P-256 menyusul); satu suite cipher; tanpa session resumption/0-RTT;
+  tanpa `u64` (X25519 memakai limb 32-bit).
 - linker kecil sendiri (tanpa `cc`) → output `.so`/`.elf` langsung

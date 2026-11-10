@@ -64,18 +64,18 @@ class Kdf {
     }
 
     /* HKDF-Expand-Label(Secret, Label, Context, Length):
-     * HkdfLabel = uint16(Length) | "tls13 " | uint8(label.len) | label
-     *           | uint8(context.len) | context   (byte panjang dulu!)
-     * (context kosong boleh: hantarkan array panjang 0) */
+     * HkdfLabel = uint16(Length)
+     *           | uint8(len("tls13 " + Label)) | "tls13 " | Label
+     *           | uint8(Context.len) | Context         (RFC 8446 §7.1) */
     static int[] expandLabel(int[] secret, int[] label, int[] context, int len) {
-        int[] hx = new int[label.length + 1];
-        hx[0] = label.length;                     /* uint8 len: MAJU dari label */
-        for (int i = 0; i < label.length; i++) hx[1 + i] = label[i];
+        int[] lab = concat(tls13(), label);
+        int[] hx = new int[lab.length + 1];
+        hx[0] = lab.length;                       /* uint8 len: "tls13 " | label */
+        for (int i = 0; i < lab.length; i++) hx[1 + i] = lab[i];
         int[] cx = new int[context.length + 1];
         cx[0] = context.length;                   /* uint8 len: MAJU dari context */
         for (int i = 0; i < context.length; i++) cx[1 + i] = context[i];
-        int[] left = concat(u16(len), tls13());
-        int[] hklabel = concat(left, concat(hx, cx));
+        int[] hklabel = concat(u16(len), concat(hx, cx));
         return expand(secret, hklabel, len);
     }
 

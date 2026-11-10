@@ -90,6 +90,16 @@ def main():
     if not any(k[0].startswith("a3v") for k in kasus):
         sys.exit("tidak ada vektor A.3 yang cocok — cek parser")
 
+    # Vektor panjang deterministik (bulatkan bug carry/slot-9 pada Poly);
+    # tag dihitung oracle python murni, bukan mesin Kopi.
+    import random
+    rnd = random.Random(20261110)
+    for k, ln in enumerate((701, 809, 900)):
+        data = bytes(rnd.randrange(256) for _ in range(ln))
+        kb = bytes(rnd.randrange(256) for _ in range(32))
+        r, sb = kb[:16], kb[16:]
+        kasus.append(("big%d" % k, r, sb, data, poly1305_ref(r, sb, data)))
+
     # tulis generator Kopi
     def hlp(name, b):
         body = "    static int[] %s() {\n        int[] v = new int[%d];\n" % (name, len(b))

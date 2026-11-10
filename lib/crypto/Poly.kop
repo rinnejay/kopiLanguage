@@ -50,6 +50,21 @@ class Poly {
         v[9] = v[9] + c;
     }
 
+    /* kuras slot 9 (koefisien 2^135): 2^135 ≡ 160 (mod p), jadi lipat
+     * v[9]·160 ke slot 0/1 lalu angkut ulang. Sisa carry bisa balik ke
+     * slot 9, ulangi sampai benar-benar nol (pasti cepat, ≤ beberapa). */
+    static void fold9(int[] v) {
+        int g = 0;
+        while (v[9] != 0 && g < 16) {
+            int f = 160 * v[9];
+            v[9] = 0;
+            v[0] = v[0] + (f & 32767);
+            v[1] = v[1] + (f >> 15);
+            carPass(v);
+            g = g + 1;
+        }
+    }
+
     /* lipat slot 9..len-1: 2^(15k) → 160·2^(15(k-9)); k dari besar ke kecil
      * agar k contributions hi dari slot besar ikut terserap di pass ini */
     static void foldAll(int[] v) {
@@ -86,6 +101,7 @@ class Poly {
         carPass(pr);
         foldAll(pr);
         carPass(pr);
+        fold9(pr);
         for (int j = 0; j < 10; j++) acc[j] = pr[j];
     }
 
@@ -133,6 +149,7 @@ class Poly {
             for (int j = 0; j < take; j++) addByte(acc, j, msg[i + j]);
             addByte(acc, take, 1);          /* byte 0x01 sesuai RFC */
             carPass(acc);
+            fold9(acc);
             mulFold(acc, rsl);
         }
 
@@ -142,6 +159,7 @@ class Poly {
         carPass(acc);
         foldAll(acc);
         carPass(acc);
+        fold9(acc);
         for (int t2 = 0; t2 < 40; t2++) {
             int c2 = cmpP(acc);
             if (c2 < 0) t2 = 40;
@@ -151,6 +169,7 @@ class Poly {
         /* tag = (acc + s) mod 2^128 → ambil 16 byte rendah */
         for (int j2 = 0; j2 < 16; j2++) addByte(acc, j2, s[j2]);
         carPass(acc);
+        fold9(acc);
         int[] tag = new int[16];
         for (int b2 = 0; b2 < 16; b2++) {
             int sh2 = b2 * 8;

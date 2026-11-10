@@ -1,0 +1,100 @@
+/* Der.kop — parser ASN.1 DER minimal (v1).
+ *
+ * Tujuan: mengekstrak SubjectPublicKeyInfo dari sertifikat X.509
+ * umum (leaf) untuk pin TLS 1.3 jujur (TOFU ala SSH): pin = SHA-256(DER SPKI).
+ *
+ * Struktur TBSCertificate yang diasumsikan (RFC 5280):
+ *   Certificate ::= SEQUENCE
+ *     tbsCertificate SEQUENCE
+ *       [0] version (opsional)
+ *       serialNumber   INTEGER
+ *       signature      SEQUENCE   ← AlgorithmIdentifier (wajib dihitung!)
+ *       issuer         SEQUENCE
+ *       validity       SEQUENCE
+ *       subject        SEQUENCE
+ *       subjectPublicKeyInfo SEQUENCE  ← yang lima
+ *       extensions [3] ...
+ */
+
+import Hash;
+
+class Der {
+
+    /* baca satu TLV dari pos. tulis hasil ke out (4 slot):
+     * out[0] = tag (atau -1 jika rusak), out[1] = panjang isi,
+     * out[2] = posisi isi, out[3] = posisi berikutnya. */
+    static void tlv(int[] x, int pos, int[] out) {
+        out[0] = -1;
+        out[1] = 0;
+        out[2] = 0;
+        out[3] = 0;
+        if (pos < 0 || pos + 2 > x.length) return;
+        int tag = x[pos];
+        int p = pos + 1;
+        int first = x[p];
+        p = p + 1;
+        int len = 0;
+        if (first < 128) {
+            len = first;
+        } else {
+            int nb = first & 127;
+            if (nb > 3 || p + nb > x.length) return;
+            len = 0;
+            for (int i = 0; i < nb; i++) {
+                len = (len << 8) | x[p + i];
+            }
+            p = p + nb;
+        }
+        if (p + len > x.length) return;
+        out[0] = tag;
+        out[1] = len;
+        out[2] = p;
+        out[3] = p + len;
+    }
+
+    static int[] sliceOf(int[] x, int from, int len) {
+        int[] out = new int[len];
+        for (int i = 0; i < len; i++) out[i] = x[from + i];
+        return out;
+    }
+
+    /* SPKI (DER utuh) dari sertifikat leaf.
+     * kosong (panjang 0) bila gagal. */
+    static int[] spkiOf(int[] x) {
+        int[] o = new int[4];
+        tlv(x, 0, o);
+        if (o[0] != 48) return new int[0];          /* bukan SEQUENCE */
+        tlv(x, o[2], o);                             /* tbsCertificate */
+        if (o[0] != 48) return new int[0];
+        int tbsEnd = o[3];
+        int p = o[2];
+        int nSaw = 0;                                /* SEQUENCE 0x30 top-level lewat */
+        while (p < tbsEnd) {
+            tlv(x, p, o);
+            if (o[0] < 0) return new int[0];
+            if (o[0] >= 160) {                       /* [0]/[3] kontekstual = versi */
+                p = o[3];
+            } else if (o[0] == 2) {                  /* INTEGER = serial */
+                p = o[3];
+            } else if (o[0] == 48) {                 /* SEQUENCE */
+                nSaw = nSaw + 1;
+                if (nSaw == 5) {
+                    /* ini SPKI: tag 30 ‖ isi */
+                    int full = (o[3] - p);
+                    return sliceOf(x, p, full);
+                }
+                p = o[3];
+            } else {
+                return new int[0];
+            }
+        }
+        return new int[0];
+    }
+
+    /* fingerprint pin: SHA-256 dari DER SPKI */
+    static int[] spkiPin(int[] cert) {
+        int[] spki = spkiOf(cert);
+        if (spki.length == 0) return new int[0];
+        return Hash.sha256(spki);
+    }
+}

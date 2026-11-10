@@ -64,8 +64,8 @@ printf '1\n1\n' > "$T/kopi/stream.ref"
 check stream test/stream.kop
 
 # ─── Poly1305: RFC 7539 §2.5.2 + Appendix A.3 (8 vektor, oracle python) ──
-python3 tools/gen_poly1305.py "$T/kopi/polyvec.kop" >/dev/null
-printf '1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/polyvec.ref"
+N=$(python3 tools/gen_poly1305.py "$T/kopi/polyvec.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
+python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/polyvec.ref"
 check polyvec "$T/kopi/polyvec.kop"
 
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───

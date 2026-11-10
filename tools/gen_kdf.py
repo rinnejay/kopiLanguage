@@ -17,8 +17,8 @@ def hexp(prk, info, L):
 
 okm42 = hexp(prk, info, 42)
 okm80 = hexp(prk, info, 80)
-# HkdfLabel = uint16(32) | "tls13 " | uint8(2) | "cd" | uint8(0)
-lab = b'\x00\x20tls13 \x02cd\x00'
+# HkdfLabel = uint16(32) | uint8(8) | "tls13 cd" | uint8(0)   (RFC 8446 §7.1)
+lab = b'\x00\x20' + bytes([8]) + b'tls13 cd' + bytes([0])
 xl32 = hexp(prk, lab, 32)
 
 def hlp(name, b):

@@ -1,0 +1,501 @@
+/* Tls.kop — klien TLS 1.3 (RFC 8446) murni Kopi.
+ *
+ * Layer:
+ *   1. record layer AEAD ChaCha20-Poly1305 (§5.2):
+ *      nonce = write_iv XOR seq BE 64-bit (kiri-nol 12 byte),
+ *      plaintext = isi ‖ inner_type, aad = header 5 byte outer,
+ *      tag Poly1305 via Aead.tagOf; record luar = header ‖ ks ‖ tag.
+ *   2. key schedule penuh (§7.1, di atas Kdf.kop):
+ *      early  = Extract(0^32, 0^32);
+ *      hs     = Extract(DS(early,"derived",""), ECDHE X25519);
+ *      c/s_hs = DS(hs, "c/s hs traffic", CH‖SH);
+ *      master = Extract(DS(hs, "derived", H("")), 0^32);
+ *      c_ap   = DS(master, "c ap traffic", CH..serverFinished);
+ *      s_ap   = DS(master, "s ap traffic", CH..serverFinished);
+ *   3. handshake: ClientHello (x25519, supported_versions, sig algs),
+ *      ServerHello (key_share + supported_versions),
+ *      EncryptedExtensions, Certificate (pin SPKI), CertificateVerify
+ *      (masuk transcript saja — verifikasi tanda belum, jujur di README),
+ *      server Finished (DI-VERIFY: HMAC finished_key ‖ transcript-hash),
+ *      kirim client Finished.
+ *
+ * Autentikasi jujur: pin SPKI ala SSH/TOFU — pin = SHA-256(DER SPKI
+ * leaf). MITM tertutup tanpa kunci privat yang cocok. Chain validation
+ * + ECDSA P-256 CertificateVerify menyusul (lihat README roadmap).
+ *
+ * API:
+ *   Tls.gate(ip, port, pin32) → ctx     (int[]; lihat konstanta offset)
+ *   Tls.writeApp(ctx, data)   → 0/-1    (data app dipail 1 record AEAD)
+ *   Tls.readApp(ctx)          → data    (lewat NST/alert; kosong = close)
+ *
+ * Offset ctx: 0 fd; 1 bersambung-hasil (1 pas penuh); 2 pin cocok;
+ * 3 server-Finished cocok; 4 seq keluar; 5 seq masuk;
+ * 8..39 client app key; 40..51 client app iv;
+ * 56..87 server app key; 88..99 server app iv.
+ */
+
+import Hash;
+import Kdf;
+import ChaCha;
+import Aead;
+import X25519;
+import Tcp;
+import Der;
+import Rand;
+
+class Tls {
+
+    /* ── utili byte ─────────────────────────────────────────────── */
+
+    static int[] cat(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) out[i] = a[i];
+        for (int i = 0; i < b.length; i++) out[a.length + i] = b[i];
+        return out;
+    }
+
+    static int[] cat3(int[] a, int[] b, int[] c) {
+        return cat(cat(a, b), c);
+    }
+
+    static int[] arr1(int a) {
+        int[] b = new int[1];
+        b[0] = a;
+        return b;
+    }
+
+    static int[] arr2(int a, int b) {
+        int[] c = new int[2];
+        c[0] = a;
+        c[1] = b;
+        return c;
+    }
+
+    static int[] arr3(int a, int b, int cc) {
+        int[] c = new int[3];
+        c[0] = a;
+        c[1] = b;
+        c[2] = cc;
+        return c;
+    }
+
+    static int[] sliceOf(int[] x, int from, int len) {
+        int[] out = new int[len];
+        for (int i = 0; i < len; i++) out[i] = x[from + i];
+        return out;
+    }
+
+    static int[] u16(int v) {
+        int[] b = new int[2];
+        b[0] = (v >>> 8) & 255;
+        b[1] = v & 255;
+        return b;
+    }
+
+    static int[] u24(int v) {
+        int[] b = new int[3];
+        b[0] = (v >>> 16) & 255;
+        b[1] = (v >>> 8) & 255;
+        b[2] = v & 255;
+        return b;
+    }
+
+    static int get16(int[] x, int p) {
+        return (x[p] << 8) | x[p + 1];
+    }
+
+    static int get24(int[] x, int p) {
+        return (x[p] << 16) | (x[p + 1] << 8) | x[p + 2];
+    }
+
+    /* ── kunci + iv dari secret (RFC 8446 §7.3) ─────────────────── */
+
+    static int[] tkey(int[] secret) {
+        return Kdf.expandLabel(secret, Net.bytes("key"), new int[0], 32);
+    }
+
+    static int[] tiv(int[] secret) {
+        return Kdf.expandLabel(secret, Net.bytes("iv"), new int[0], 12);
+    }
+
+    /* ── layer record (RFC 8446 §5.2) ───────────────────────────── */
+
+    /* nonce = iv ^ (seq 64-bit big-endian di byte 4..11) (RFC 8446 §5.2).
+     * seq 32-bit: s[0..3] nol, sehingga hanya n[8..11] yang ter-XOR.
+     * Hindari shift >= 32 (UB di C). */
+    static int[] nonceOf(int[] iv, int seq) {
+        int[] n = new int[12];
+        for (int i = 0; i < 12; i++) n[i] = iv[i];
+        n[8] = n[8] ^ ((seq >>> 24) & 255);
+        n[9] = n[9] ^ ((seq >>> 16) & 255);
+        n[10] = n[10] ^ ((seq >>> 8) & 255);
+        n[11] = n[11] ^ (seq & 255);
+        return n;
+    }
+
+    /* seal: payload + ctype → record luar penuh */
+    static int[] seal(int[] key, int[] iv, int seq, int ctype, int[] payload) {
+        int[] nce = nonceOf(iv, seq);
+        int[] plain = new int[payload.length + 1];
+        for (int i = 0; i < payload.length; i++) plain[i] = payload[i];
+        plain[payload.length] = ctype;
+        int[] ctr = ChaCha.xctr(key, nce, 1, plain);
+        /* record = ciphertext + tag 16 byte (RFC 8446 §5.2) */
+        int clen = ctr.length;
+        int rlen = clen + 16;
+        int[] hdrFull = cat(arr3(23, 3, 3), u16(rlen));
+        int[] ctag = Aead.tagOf(key, nce, hdrFull, ctr);
+        int[] out = new int[5 + rlen];
+        for (int i = 0; i < 5; i++) out[i] = hdrFull[i];
+        for (int i = 0; i < clen; i++) out[5 + i] = ctr[i];
+        for (int i = 0; i < 16; i++) out[5 + clen + i] = ctag[i];
+        return out;
+    }
+
+    /* open: verifikasi tag dulu, lalu unplug keystream.
+     * okOut[0] = -1 galat, selain itu inner type (1..255).
+     * balikan = isi plaintext (tanpa inner type). */
+    static int[] openRec(int[] key, int[] iv, int seq, int[] rec, int[] okOut) {
+        okOut[0] = -1;
+        int[] kosong = new int[0];
+        if (rec.length < 22) return kosong;
+        int pl = rec.length - 5;
+        int[] hdr = sliceOf(rec, 0, 5);
+        int[] data = sliceOf(rec, 5, pl - 16);
+        int[] tag = sliceOf(rec, 5 + pl - 16, 16);
+        int[] nce = nonceOf(iv, seq);
+        int[] ctag = Aead.tagOf(key, nce, hdr, data);
+        if (Hash.eq(tag, ctag) == 0) { okOut[0] = -1; return kosong; }
+        int[] plain = ChaCha.xctr(key, nce, 1, data);
+        int idx = -1;
+        for (int q = plain.length - 1; q >= 0; q--) {
+            if (plain[q] != 0) {
+                idx = q;
+                break;
+            }
+        }
+        if (idx < 0) return kosong;
+        okOut[0] = plain[idx];
+        return sliceOf(plain, 0, idx);
+    }
+
+    /* ── pembaca record dari fd ─────────────────────────────────── */
+
+    static int[] recvExact(int fd, int n) {
+        int[] kosong = new int[0];
+        if (n <= 0) return kosong;
+        int[] out = new int[n];
+        int got = 0;
+        while (got < n) {
+            /* minta tepat sisa byte: tidak ada kelebihan yang terbuang */
+            int[] sisa = new int[n - got];
+            int r = Net.recvb(fd, sisa);
+            if (r <= 0) return kosong;
+            for (int i = 0; i < r; i++) out[got + i] = sisa[i];
+            got = got + r;
+        }
+        return out;
+    }
+
+    static int[] recvRecord(int fd) {
+        int[] h = recvExact(fd, 5);
+        if (h.length != 5) return new int[0];
+        int len = get16(h, 3);
+        if (len <= 0) return new int[0];
+        int[] isi = recvExact(fd, len);
+        if (isi.length != len) return new int[0];
+        return cat(h, isi);
+    }
+
+    /* ── ClientHello ────────────────────────────────────────────── */
+
+    static int[] extOf(int id, int[] body) {
+        return cat3(u16(id), u16(body.length), body);
+    }
+
+    /* handshake message ClientHello (tanpa header record) */
+    static int[] chMsg(int[] sk, int[] rnd) {
+        int[] pub = X25519.pub(sk);
+        /* key_share (51): ClientKeyShare = u16(entry_len=36) ‖ entry,
+         *                 entry = grp(0x001d) ‖ klen(u16(32)) ‖ pub — RFC 8446 §4.2.8 */
+        int[] ksBody = cat(u16(36), cat3(u16(29), u16(32), pub));
+        /* supported_versions (43): vektor ProtocolVersion versions<2..254>
+         * — prefix panjang 1 BYTE (maks 254), bukan u16: `02` ‖ `0304` */
+        int[] svBody = arr3(2, 3, 4);
+        int[] grBody = new int[4];
+        grBody[0] = 0;
+        grBody[1] = 2;
+        grBody[2] = 0;
+        grBody[3] = 29;
+        int[] saBody = new int[8];
+        saBody[0] = 0;
+        saBody[1] = 6;
+        saBody[2] = 4;
+        saBody[3] = 3;
+        saBody[4] = 4;
+        saBody[5] = 1;
+        saBody[6] = 8;
+        saBody[7] = 4;
+        int[] exts =
+            cat(extOf(10, grBody),
+                cat(extOf(13, saBody),
+                    cat(extOf(43, svBody), extOf(51, ksBody))));
+        int[] b1 = arr2(3, 3);                          /* legacy 0x0303 */
+        int[] b2 = arr1(0);                             /* sid len 0 */
+        int[] b3 = u16(2);
+        int[] cisa = arr2(19, 3);                        /* 0x1303 */
+        int[] b4 = arr2(1, 0);                           /* compression 1: null */
+        int[] bodyA = cat3(b1, rnd, b2);
+        int[] bodyB = cat3(b3, cisa, b4);
+        int[] body = cat(bodyA, bodyB);
+        body = cat(body, cat(u16(exts.length), exts));
+        int[] msg = cat3(arr1(1), u24(body.length), body);
+        return msg;
+    }
+
+    /* ── ServerHello: ambil key_share & supported_versions ──────── */
+
+    /* isi fragment SH (dari record header). balikan = key_share pub
+     * server (32 byte) atau kosong bila gagal. */
+    static int[] parseSH(int[] isi) {
+        int[] kosong = new int[0];
+        if (isi.length < 40) return kosong;
+        if (isi[0] != 2) return kosong;
+        int mlen = get24(isi, 1);
+        if (mlen + 4 != isi.length) return kosong;
+        int p = 4 + 2 + 32;                              /* legacy + random */
+        int sid = isi[p];
+        p = p + 1 + sid;
+        int ci = get16(isi, p);
+        p = p + 2;
+        int cmpz = isi[p];
+        p = p + 1;
+        int enl = get16(isi, p);
+        p = p + 2;
+        if (ci != 4867) return kosong;                   /* 0x1303 chacha */
+        if (cmpz != 0) return kosong;
+        int shareOfs = -1;
+        int ver = -1;
+        int e = p;
+        while (e + 4 <= isi.length) {
+            int id = get16(isi, e);
+            int el = get16(isi, e + 2);
+            int bs = e + 4;
+            if (id == 51 && el >= 36) {
+                /* ServerHello: isi = KeyShareEntry langsung (tanpa vector):
+                 * grp(2) ‖ klen(2) ‖ key — RFC 8446 §4.1.2 */
+                int grp = get16(isi, bs);
+                int klen = get16(isi, bs + 2);
+                if (grp == 29 && klen == 32) shareOfs = bs + 4;
+            }
+            if (id == 43 && el == 2) {
+                ver = get16(isi, bs);
+            }
+            e = bs + el;
+        }
+        if (shareOfs < 0) return kosong;
+        if (ver != 772) return kosong;                   /* 0x0304 = TLS 1.3 */
+        return sliceOf(isi, shareOfs, 32);
+    }
+
+    /* ── gate: handshake penuh + pin ────────────────────────────── */
+
+    /* Untuk uji: gate() pakai Rand; gateFixed dipatok kunci ephemeral.
+     * Inti bersama di handshake(). */
+    static int[] gate(int ip, int port, int[] pin) {
+        return handshake(ip, port, pin, Rand.bytes(64));
+    }
+
+    static int[] gateFixed(int ip, int port, int[] pin, int[] fsk, int[] frnd) {
+        return handshake(ip, port, pin, cat(fsk, frnd));
+    }
+
+    static int[] handshake(int ip, int port, int[] pin, int[] randSes) {
+        int[] ctx = new int[256];
+        int fd = Tcp.open(ip, port);
+        if (fd < 0) return ctx;
+        ctx[0] = fd;
+        ctx[6] = 1;                                      /* tcp ok */
+
+        /* ── ClientHello ── */
+        int[] sk = sliceOf(randSes, 0, 32);
+        int[] rnd = sliceOf(randSes, 32, 32);
+        int[] msg = chMsg(sk, rnd);
+        int[] rec = cat3(arr3(22, 3, 3), u16(msg.length), msg);
+        int t1 = Tcp.sendBuf(fd, rec);
+        if (t1 < 0) return ctx;
+        ctx[6] = 2;                                      /* CH terkirim */
+        int[] tx = msg;
+
+        /* ── ServerHello ── */
+        int[] sho = recvRecord(fd);
+        if (sho.length == 0) {
+            ctx[6] = 3;
+            return ctx;
+        }
+        if (sho[0] != 22) {
+            ctx[6] = 4;
+            return ctx;
+        }
+        ctx[6] = 5;
+        ctx[7] = sho.length;
+        int[] shFrag = sliceOf(sho, 5, sho.length - 5);
+        ctx[8] = shFrag.length;
+        if (shFrag.length < 36) {
+            ctx[6] = 6;
+            return ctx;
+        }
+        int[] spub = parseSH(shFrag);
+        ctx[9] = spub.length;
+        if (spub.length != 32) {
+            ctx[6] = 7;
+            return ctx;
+        }
+        ctx[6] = 8;
+        tx = cat(tx, shFrag);
+
+        /* ── key schedule handshake ── */
+        int[] ecd = X25519.x25519(sk, spub);
+        int[] early = Kdf.extract(new int[32], new int[32]);
+        int[] hsDerived = Kdf.deriveSecret(early, Net.bytes("derived"), new int[0]);
+        int[] hsSec = Kdf.extract(hsDerived, ecd);
+        int[] cHsSecret = Kdf.deriveSecret(hsSec, Net.bytes("c hs traffic"), tx);
+        int[] sHsSecret = Kdf.deriveSecret(hsSec, Net.bytes("s hs traffic"), tx);
+        int[] sHsKey = tkey(sHsSecret);
+        int[] sHsIv = tiv(sHsSecret);
+
+        /* ── record handshake server (EE/Cert/CV/Finished) ── */
+        int rseq = 0;
+        int sfDone = 0;
+        int pinOk = -1;
+        int sfOk = -1;
+        while (sfDone == 0) {
+            int[] rrec = recvRecord(fd);
+            if (rrec.length == 0) {
+                ctx[6] = 9;
+                return ctx;
+            }
+            if (rrec[0] == 20) continue;                 /* compat CCS */
+            if (rrec[0] != 23) {
+                ctx[6] = 88 + rrec[0];
+                return ctx;
+            }
+            int[] okOut = new int[1];
+            int[] plain = openRec(sHsKey, sHsIv, rseq, rrec, okOut);
+            if (okOut[0] < 0) {
+                ctx[6] = 10;
+                return ctx;
+            }
+            if (okOut[0] != 22) {
+                ctx[6] = 11;
+                return ctx;
+            }
+            ctx[6] = 12;
+            rseq = rseq + 1;
+            if (plain.length < 4) {
+                ctx[6] = 13;
+                return ctx;
+            }
+            int mtype = plain[0];
+            int mlen = get24(plain, 1);
+            if (mlen + 4 != plain.length) {
+                ctx[6] = 14 + 100 * mtype;
+                return ctx;
+            }
+            if (mtype == 8 || mtype == 11 || mtype == 15) {
+                tx = cat(tx, plain);
+            }
+            if (mtype == 11) {
+                int c0 = 4;                              /* mulai body */
+                c0 = c0 + 1;                             /* request context */
+                c0 = c0 + 3;                             /* chain length */
+                int cLen = get24(plain, c0);
+                c0 = c0 + 3;
+                if (cLen > 0 && c0 + cLen <= plain.length) {
+                    int[] leaf = sliceOf(plain, c0, cLen);
+                    int[] fp = Der.spkiPin(leaf);
+                    if (fp.length == 32) {
+                        pinOk = Hash.eq(fp, pin);
+                    }
+                }
+            }
+            if (mtype == 20) {
+                int[] fk = Kdf.expandLabel(sHsSecret, Net.bytes("finished"), new int[0], 32);
+                int[] expec = Hash.hmac(fk, Hash.sha256(tx));
+                int[] vdata = sliceOf(plain, 4, plain.length - 4);
+                sfOk = Hash.eq(expec, vdata);
+                tx = cat(tx, plain);
+                sfDone = 1;
+            }
+        }
+
+        /* ── master + kunci app ── */
+        int[] d2 = Kdf.deriveSecret(hsSec, Net.bytes("derived"), new int[0]);
+        int[] master = Kdf.extract(d2, new int[32]);
+        int[] sApSecret = Kdf.deriveSecret(master, Net.bytes("s ap traffic"), tx);
+        int[] sApKey = tkey(sApSecret);
+        int[] sApIv = tiv(sApSecret);
+
+        /* ── client Finished + kunci app client ── */
+        int[] fkC = Kdf.expandLabel(cHsSecret, Net.bytes("finished"), new int[0], 32);
+        int[] vd = Hash.hmac(fkC, Hash.sha256(tx));
+        int[] finMsg = cat3(arr1(20), u24(32), vd);
+        int[] frec = seal(tkey(cHsSecret), tiv(cHsSecret), 0, 22, finMsg);
+        int t2 = Tcp.sendBuf(fd, frec);
+        if (t2 < 0) return ctx;
+        int[] cApSecret = Kdf.deriveSecret(master, Net.bytes("c ap traffic"), tx);
+        int[] cApKey = tkey(cApSecret);
+        int[] cApIv = tiv(cApSecret);
+
+        /* ── isi ctx ── */
+        ctx[2] = pinOk;
+        ctx[3] = sfOk;
+        for (int w = 0; w < 32; w++) {
+            ctx[8 + w] = cApKey[w];
+            ctx[56 + w] = sApKey[w];
+        }
+        for (int v = 0; v < 12; v++) {
+            ctx[40 + v] = cApIv[v];
+            ctx[88 + v] = sApIv[v];
+        }
+        if (pinOk == 1 && sfOk == 1) ctx[1] = 1;
+        return ctx;
+    }
+
+    /* ── app: kirim data ────────────────────────────────────────── */
+
+    static int writeApp(int[] ctx, int[] data) {
+        int[] ckey = sliceOf(ctx, 8, 32);
+        int[] civ = sliceOf(ctx, 40, 12);
+        int[] frec = seal(ckey, civ, ctx[4], 23, data);
+        int k = Tcp.sendBuf(ctx[0], frec);
+        if (k < 0) return k;
+        ctx[4] = ctx[4] + 1;
+        return 0;
+    }
+
+    /* ── app: baca data (lewat NST/alert) ───────────────────────── */
+
+    static int[] readApp(int[] ctx) {
+        int[] sorng = new int[0];
+        int loops = 0;
+        while (loops < 999) {
+            int[] rrec = recvRecord(ctx[0]);
+            if (rrec.length == 0) return sorng;
+            if (rrec[0] != 23) {
+                loops = loops + 1;
+                continue;
+            }
+            int[] ckey = sliceOf(ctx, 56, 32);
+            int[] civ = sliceOf(ctx, 88, 12);
+            int[] okOut = new int[1];
+            int[] plain = openRec(ckey, civ, ctx[5], rrec, okOut);
+            if (okOut[0] < 0) return sorng;
+            ctx[5] = ctx[5] + 1;
+            if (okOut[0] == 21) return sorng;            /* alert/close */
+            if (okOut[0] == 23) return plain;
+            loops = loops + 1;                            /* NST dsb → lewati */
+        }
+        return sorng;
+    }
+}
