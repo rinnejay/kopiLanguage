@@ -5,7 +5,8 @@ typedef enum {
     T_INT, T_BOOL, T_VOID, T_STR, T_FN, T_ARI,
     /* tipe numerik tambahan (v1.6) */
     T_LONG, T_DOUBLE, T_FLOAT,
-    T_UINT8, T_UINT16, T_UINT32, T_UINT64
+    T_UINT8, T_UINT16, T_UINT32, T_UINT64,
+    T_BYTE, T_SHORT          /* 8/16-bit bertanda (akhir = nilai byte stabil) */
 } Ty;
 
 /* ── sifat tipe numerik ─────────────────────────────────────────── */
@@ -20,7 +21,7 @@ static inline int ty_is_uint(Ty t) {
 
 /* semua integer bertanda/unsigned (bukan bool) */
 static inline int ty_is_int(Ty t) {
-    return t == T_INT || t == T_LONG || ty_is_uint(t);
+    return t == T_INT || t == T_LONG || t == T_BYTE || t == T_SHORT || ty_is_uint(t);
 }
 
 static inline int ty_is_num(Ty t) {
@@ -32,8 +33,8 @@ static inline int ty_width(Ty t) {
     switch (t) {
     case T_INT: case T_UINT32: return 32;
     case T_LONG: case T_UINT64: return 64;
-    case T_UINT8: return 8;
-    case T_UINT16: return 16;
+    case T_UINT8: case T_BYTE: return 8;
+    case T_UINT16: case T_SHORT: return 16;
     case T_FLOAT: return 32;
     case T_DOUBLE: return 64;
     default: return 0;
@@ -46,8 +47,8 @@ static inline int ty_width(Ty t) {
  * didefinisikan eksplisit dan diuji. */
 static inline int ty_rank(Ty t) {
     switch (t) {
-    case T_UINT8:  return 1;
-    case T_UINT16: return 2;
+    case T_UINT8: case T_BYTE: return 1;
+    case T_UINT16: case T_SHORT: return 2;
     case T_UINT32: return 3;
     case T_INT:    return 4;
     case T_UINT64: return 5;

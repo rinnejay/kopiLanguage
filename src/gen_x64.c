@@ -30,6 +30,7 @@ static int cur_ret_label;
 static int is64ty(Ty t) {
     return t == T_FN || t == T_ARI || t == T_LONG || t == T_UINT64 ||
            t == T_UINT8 || t == T_UINT16 || t == T_UINT32 ||
+           t == T_BYTE || t == T_SHORT ||
            t == T_FLOAT || t == T_DOUBLE;
 }
 
@@ -45,6 +46,8 @@ static void norm_ty(Ty t) {
     case T_UINT32: emit("\tmovl %%eax, %%eax"); break;
     case T_UINT16: emit("\tmovzwl %%ax, %%eax"); break;
     case T_UINT8:  emit("\tmovzbl %%al, %%eax"); break;
+    case T_BYTE:   emit("\tmovsbq %%al, %%rax"); break;
+    case T_SHORT:  emit("\tmovswq %%ax, %%rax"); break;
     case T_BOOL:   emit("\tandl $1, %%eax"); break;
     default: break;
     }
@@ -118,6 +121,8 @@ static void conv_ty(Ty from, Ty to) {
     case T_UINT32: emit("\tmovl %%eax, %%eax"); break;
     case T_UINT16: emit("\tmovzwl %%ax, %%eax"); break;
     case T_UINT8:  emit("\tmovzbl %%al, %%eax"); break;
+    case T_BYTE:   emit("\tmovsbq %%al, %%rax"); break;
+    case T_SHORT:  emit("\tmovswq %%ax, %%rax"); break;
     case T_LONG: case T_UINT64: break;
     default: break;
     }
@@ -217,7 +222,7 @@ static void gen_stmt(Method *m, Node *s) {
         } else {
             gen_expr(m, s->a);
             Ty pt = (Ty)s->a->dty;
-            if (pt == T_INT || pt == T_BOOL) {
+            if (pt == T_INT || pt == T_BOOL || pt == T_BYTE || pt == T_SHORT) {
                 emit("\tmovl %%eax, %%esi");
                 emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "in" : "i");
                 emit("\txorl %%eax, %%eax");
@@ -457,7 +462,7 @@ static int gen_expr(Method *m, Node *e) {
             union { double d; uint64_t u; } cv;
             cv.d = e->fval;
             emit("\tmovabsq $%llu, %%rax", (unsigned long long)cv.u);
-        } else if (t == T_UINT32 || t == T_UINT8 || t == T_UINT16) {
+        } else if (t == T_UINT32 || t == T_UINT8 || t == T_UINT16 || t == T_BYTE || t == T_SHORT) {
             emit("\tmovl $%lu, %%eax", (unsigned long)e->ival);
         } else {
             emit("\tmovabsq $%ld, %%rax", e->ival);

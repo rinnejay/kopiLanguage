@@ -46,6 +46,16 @@ def f32(x):
     return struct.unpack("<f", struct.pack("<f", x))[0]
 
 
+def b8(x):
+    x &= 0xFF
+    return x - 0x100 if x >= 0x80 else x
+
+
+def b16(x):
+    x &= 0xFFFF
+    return x - 0x10000 if x >= 0x8000 else x
+
+
 def fmt_f(x):
     return "%.9g" % f32(x)
 
@@ -95,6 +105,21 @@ case("1.0 / 3.0", fmt_d(1.0 / 3.0))
 case("1.5f", fmt_f(1.5))
 case("0.1f", fmt_f(0.1))
 case("1.0f / 3.0f", fmt_f(1.0 / 3.0))
+
+# ── byte & short (bertanda 8/16-bit) ────────────────────────────────────
+case("(byte)200", b8(200))
+case("(short)70000", b16(70000))
+case("(byte)-129", b8(-129))
+case("(short)-32769", b16(-32769))
+case("(int)(byte)200", b8(200))
+case("(long)(short)-2", b16(-2))
+bln("(byte)-5 < (short)300", True)
+case("kaliByte(16, 16)", b8(16 * 16))
+case("tambahShort(30000, 30000)", b16(30000 + 30000))
+case("kurangByte(100, 100)", b8(100 - 100))
+case("(int8)-5", -5)
+case("(int16)-300", -300)
+case("jumlahSampaiByte(5)", 15)
 
 # ── aritmetika long ──────────────────────────────────────────────────────
 case("5000000000L + 1234567890123L", 5000000000 + 1234567890123)
@@ -197,6 +222,15 @@ def main():
         return a;
     }
     static uint8 kaliU8(uint8 a, uint8 b) { return (uint8)(a * b); }
+    static byte kaliByte(byte a, byte b) { return (byte)(a * b); }
+    static short tambahShort(short a, short b) { return (short)(a + b); }
+    static byte kurangByte(byte a, byte b) { return (byte)(a - b); }
+    static int jumlahSampaiByte(byte n) {
+        byte i = 1;
+        int s = 0;
+        while (i <= n) { s = s + i; i++; }
+        return s;
+    }
     static long jumlahSampai(long n) {
         long s = 0L;
         long i = 1L;

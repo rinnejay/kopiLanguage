@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.6 hari ini    ████████████████  65/65 test hijau — long/float/double/uint8..64 (a64 + VM)
+v1.6.1 hari ini  ████████████████  65/65 test hijau — numerik lengkap termasuk byte/short (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -63,6 +63,7 @@ v1.6 hari ini    ████████████████  65/65 test hi
 | **v1.5d-E3** | **penamaan pustaka inti jadi Inggris**: `Matematika`→**`Math`** (`pangkat`→`pow`, `akar`→`sqrt`, `prima`→`isPrime`, `faktorial`→`factorial`, `genap`→`isEven`), `Angka`→**`Digits`** (`balik`→`reverse`, `jumlahDigit`→`digitSum`, `panjang`→`digitCount`, `deka`→`pow10`, `cetakBasis`→`printBase`); `examples/pakai_lib.kop` + `test.sh` + README diselaraskan |
 | **v1.5d-E4** | **pustaka matematika diperluas besar-besaran** (`int` 32-bit, murni Kopi): `Math` kini mencakup 80+ fungsi — aritmetika modular aman-overflow (`mulMod` doubling, `powMod`, `modInverse` via Bezout), teori bilangan (sieve `primesUpTo`, `primeCount`, `nthPrime`, `factorize`, σ/φ/radikal/Möbius, prima/abundant/deficient), kombinatorika (`binomial`, `permutation`, `catalan`, `derangement`, `stirling2`, `bell`, Lucas/Tribonacci), bit (`popcount`, `highestBit`, `reverseBits`, `nextPow2`), akar/log bulat (`sqrt`, `cbrt`, `log2`, `log10`), geometri integer (`heron16`, `isRightTriangle`, jarak). Modul baru `Digits` (palindrom/Armstrong/akar digital), `Stats` (median/modus/varians/simpangan baku), `Matrix` (aljabar matriks persegi). Uji oracle python: **154 kasus** di `tools/gen_mathvec.py`, lulus di VM & a64, sintaks x64 diperiksa; total suite 63/63 |
 | **v1.6** | **tipe numerik lengkap** (scalar): `long` (64-bit bertanda), `float`/`double` (IEEE-754), `uint8`/`uint16`/`uint32`/`uint64` (unsigned dengan wrap sesuai lebar), literal `L/U/UL/f/d`, hex `0x`, biner `0b`, cast `(tipe)expr`, promosi campuran (int+uint32→long, uint32+uint32→uint32, dst), perbandingan signed/unsigned, `%` float, `println` format per tipe, parameter/return semua tipe, compound assignment (narrowing implisit ala Java). Backend a64 + VM menghasilkan output identik; x64 diperiksa sintaksnya. Uji oracle python `tools/gen_numvec.py` (66 kasus), suite 65/65. Batas jujur: array masih `int[]` (belum `long[]`/`double[]`), lambda masih `int`, dan backend x64 belum dijalankan di mesin x86-64 |
+| **v1.6.1** | **`byte`/`int8` (8-bit bertanda) dan `short`/`int16` (16-bit bertanda)** — melengkapi `long`/`float`/`double`/`uint8..64`. Aritmetika wrap sesuai lebar + sign-extend kanonik, cast, literal `-128`/`-32768`, parameter/return/cetak signed. Sekaligus memperbaiki **tabrakan nilai token**: seluruh keyword & token multi-karakter dipindah ke ≥256 agar tidak bertabrakan dengan kode ASCII operator 1-karakter (`%`, `&`, `!`, …), dan dependensi header ditambahkan ke Makefile. Uji numvec diperluas (byte/short) + suite 65/65 |
 
 ## Bangun
 
@@ -150,6 +151,8 @@ Kopi kini punya tipe angka lengkap (masih **scalar**; array tetap `int[]`):
 | `long` | 64 | bertanda, wrap | `42L`, `0x1F4L` |
 | `float` | 32 | IEEE-754 binary32 | `1.5f` |
 | `double` | 64 | IEEE-754 binary64 | `1.5`, `1.5d`, `1e-3` |
+| `byte` / `int8` | 8 | bertanda, wrap | `-128`, `(byte)200` |
+| `short` / `int16` | 16 | bertanda, wrap | `-32768`, `(short)70000` |
 | `uint8` | 8 | unsigned, wrap | `255`, `(uint8)300` |
 | `uint16` | 16 | unsigned, wrap | `65535` |
 | `uint32` | 32 | unsigned, wrap | `4294967295U`, `0xFFFFFFFFU` |
@@ -157,6 +160,8 @@ Kopi kini punya tipe angka lengkap (masih **scalar**; array tetap `int[]`):
 
 ```java
 long   total = 5000000000L;
+byte   b     = (byte)200;              // 200 → -56 (wrap 8-bit bertanda)
+short  s16   = (short)70000;           // → 4464 (wrap 16-bit)
 uint8  kecil = (uint8)(250 + 10);      // 260 → 4 (wrap 8-bit)
 uint32 besar = 4294967290U + 10U;      // → 4
 double rasio = (double)7 / 2.0;        // 3.5

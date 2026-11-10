@@ -27,6 +27,8 @@ static struct { const char *kw; int type; } kws[] = {
     {"long", KW_LONG}, {"double", KW_DOUBLE}, {"float", KW_FLOAT},
     {"uint8", KW_UINT8}, {"uint16", KW_UINT16},
     {"uint32", KW_UINT32}, {"uint64", KW_UINT64},
+    {"byte", KW_BYTE}, {"short", KW_SHORT},
+    {"int8", KW_INT8}, {"int16", KW_INT16},
     {"if", KW_IF}, {"else", KW_ELSE}, {"while", KW_WHILE}, {"for", KW_FOR},
     {"return", KW_RETURN}, {"true", KW_TRUE}, {"false", KW_FALSE},
     {"break", KW_BREAK}, {"continue", KW_CONTINUE}, {"import", KW_IMPORT},

@@ -48,7 +48,8 @@ static Method *cur_method;
 static int is_type_tok(int t) {
     return t == KW_INT || t == KW_BOOL || t == KW_VOID || t == KW_FN ||
            t == KW_STRING || t == KW_LONG || t == KW_DOUBLE || t == KW_FLOAT ||
-           t == KW_UINT8 || t == KW_UINT16 || t == KW_UINT32 || t == KW_UINT64;
+           t == KW_UINT8 || t == KW_UINT16 || t == KW_UINT32 || t == KW_UINT64 ||
+           t == KW_BYTE || t == KW_SHORT || t == KW_INT8 || t == KW_INT16;
 }
 
 static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) | numerik baru */
@@ -64,6 +65,8 @@ static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) |
     if (at(KW_UINT16)) { advance(); return T_UINT16; }
     if (at(KW_UINT32)) { advance(); return T_UINT32; }
     if (at(KW_UINT64)) { advance(); return T_UINT64; }
+    if (at(KW_BYTE) || at(KW_INT8))   { advance(); return T_BYTE; }
+    if (at(KW_SHORT) || at(KW_INT16)) { advance(); return T_SHORT; }
     if (at(KW_BOOL)) { advance(); return T_BOOL; }
     if (at(KW_VOID)) { advance(); return T_VOID; }
     if (at(KW_FN)) { advance(); return T_FN; }
@@ -213,7 +216,8 @@ static Node *stmt_single(void) {
 
     switch (t->type) {
     case KW_INT: case KW_BOOL: case KW_FN: case KW_LONG: case KW_DOUBLE:
-    case KW_FLOAT: case KW_UINT8: case KW_UINT16: case KW_UINT32: case KW_UINT64: {
+    case KW_FLOAT: case KW_UINT8: case KW_UINT16: case KW_UINT32: case KW_UINT64:
+    case KW_BYTE: case KW_SHORT: case KW_INT8: case KW_INT16: {
         Ty ty = type_opt();
         /* multi-deklarasi: int a = 0, b = 1; → rantai ST_VAR via ->next */
         Node *head = 0, *tailst = 0;
@@ -1098,8 +1102,16 @@ static void resolve_stmts(Node *lst);
 
 /* literal int yang muat ke tipe tujuan (Java: constant narrowing) */
 static int fits_literal(Ty dst, Node *e) {
-    if (e->kind != EX_INT || !ty_is_int(dst)) return 0;
-    long v = e->ival;
+    if (!ty_is_int(dst)) return 0;
+    long v;
+    if (e->kind == EX_INT) {
+        v = e->ival;
+    } else if (e->kind == EX_UN && e->str && e->str[0] == '-' &&
+               e->a && e->a->kind == EX_INT) {
+        v = -e->a->ival;
+    } else {
+        return 0;
+    }
     switch (dst) {
     case T_INT:    return v >= -2147483648L && v <= 2147483647L;
     case T_LONG:   return 1;
@@ -1107,6 +1119,8 @@ static int fits_literal(Ty dst, Node *e) {
     case T_UINT16: return v >= 0 && v <= 65535;
     case T_UINT32: return v >= 0 && v <= 4294967295L;
     case T_UINT64: return 1;
+    case T_BYTE:   return v >= -128 && v <= 127;
+    case T_SHORT:  return v >= -32768 && v <= 32767;
     default: return 0;
     }
 }

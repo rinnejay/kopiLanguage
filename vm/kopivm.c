@@ -141,6 +141,8 @@ static int64_t norm_val(int64_t v, int t) {
     case T_LONG:   return v;
     case T_UINT8:  return (uint8_t)v;
     case T_UINT16: return (uint16_t)v;
+    case T_BYTE:   return (int8_t)v;
+    case T_SHORT:  return (int16_t)v;
     case T_UINT32: return (uint32_t)v;
     case T_UINT64: return v;
     default:       return v;
@@ -644,6 +646,8 @@ static void run(void) {
             else if (t == T_UINT64) printf("%" PRIu64 "%s", (uint64_t)v, ln ? "\n" : "");
             else if (t == T_UINT8 || t == T_UINT16 || t == T_UINT32)
                 printf("%" PRIu32 "%s", (uint32_t)v, ln ? "\n" : "");
+            else if (t == T_BYTE || t == T_SHORT)
+                printf("%" PRId64 "%s", v, ln ? "\n" : "");
             else if (t == T_FLOAT) printf("%.9g%s", (double)bits_f(v), ln ? "\n" : "");
             else printf("%.15g%s", bits_d(v), ln ? "\n" : "");
             break;

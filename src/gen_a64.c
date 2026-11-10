@@ -29,6 +29,7 @@ static int cur_ret_label;
 static int is64ty(Ty t) {
     return t == T_FN || t == T_ARI || t == T_LONG || t == T_UINT64 ||
            t == T_UINT8 || t == T_UINT16 || t == T_UINT32 ||
+           t == T_BYTE || t == T_SHORT ||
            t == T_FLOAT || t == T_DOUBLE;
 }
 
@@ -56,6 +57,8 @@ static void norm_ty(Ty t) {
     case T_UINT32: emit("\tmov\tw0, w0"); break;
     case T_UINT16: emit("\tuxth\tw0, w0"); break;
     case T_UINT8:  emit("\tuxtb\tw0, w0"); break;
+    case T_BYTE:   emit("\tsxtb\tx0, w0"); break;
+    case T_SHORT:  emit("\tsxth\tx0, w0"); break;
     case T_BOOL:   emit("\tand\tw0, w0, #1"); break;
     default: break;                      /* long/uint64/float/double */
     }
@@ -104,6 +107,8 @@ static void conv_ty(Ty from, Ty to) {
     case T_UINT32: emit("\tmov\tw0, w0"); break;
     case T_UINT16: emit("\tuxth\tw0, w0"); break;
     case T_UINT8:  emit("\tuxtb\tw0, w0"); break;
+    case T_SHORT:  emit("\tsxth\tx0, w0"); break;
+    case T_BYTE:   emit("\tsxtb\tx0, w0"); break;
     case T_LONG:   /* int/bool/uint* kanonik sudah benar */
     case T_UINT64: break;
     default: break;
@@ -229,7 +234,7 @@ static void gen_stmt(Method *m, Node *s) {
         } else {
             gen_expr(m, s->a);
             Ty pt = (Ty)s->a->dty;
-            if (pt == T_INT || pt == T_BOOL) {
+            if (pt == T_INT || pt == T_BOOL || pt == T_BYTE || pt == T_SHORT) {
                 const char *fmt = s->ival ? ".Lfmt_in" : ".Lfmt_i";
                 emit("\tsxtw\tx1, w0");
                 emit("\tadrp\tx0, :got:%s", fmt);
@@ -407,7 +412,7 @@ static int gen_expr(Method *m, Node *e) {
             mov64_imm(cv.u);
             return 1;
         }
-        if (t == T_UINT32) {
+        if (t == T_UINT32 || t == T_UINT8 || t == T_UINT16 || t == T_BYTE || t == T_SHORT) {
             uint32_t u = (uint32_t)e->ival;
             emit("\tmovz\tw0, #0x%lx", (long)(u & 0xffff));
             if (u >> 16) emit("\tmovk\tw0, #0x%lx, lsl #16", (long)(u >> 16));
