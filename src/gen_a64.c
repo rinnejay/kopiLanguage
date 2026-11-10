@@ -328,6 +328,146 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmov\tx0, x11");
             return 1;                       /* hasil pointer array 64-bit */
         }
+        if (e->ival == 6) {              /* Net.openr("literal") → fd          */
+            int c = (int)e->cp;
+            emit("\tadrp\tx9, :got:cpool%d", c);
+            emit("\tldr\tx9, [x9, :got_lo12:cpool%d]", c);
+            emit("\tmov\tx10, #0");
+            emit(".LNO%da:", ln);
+            emit("\tldrb\tw1, [x9, x10]");
+            emit("\tadd\tx10, x10, #1");
+            emit("\tcbnz\tw1, .LNO%da", ln);
+            /* openat(AT_FDCWD=-100, path, O_RDONLY) */
+            emit("\tmovn\tw0, #99");                   /* -100 */
+            emit("\tmov\tx1, x9");                     /* path */
+            emit("\tmov\tx2, #0");                     /* flags = O_RDONLY */
+            emit("\tmov\tx8, #56");                    /* __NR_openat */
+            emit("\tsvc\t#0");
+            return 0;                                  /* fd | -errno */
+        }
+        if (e->ival == 7 || e->ival == 8) {
+            /* recvb(fd, buf) / sendb(fd, buf): buf adalah pointer 64-bit */
+            for (Node *aa = e->a; aa; aa = aa->next) {
+                gen_expr(m, aa);
+                push_val(aa == e->a ? 0 : 1);          /* fd int, buf array */
+            }
+        }
+        if (e->ival == 7) {              /* recvb(fd, buf) → n | -1            */
+            /* stack: [0..15]=buf (64-bit), [16..31]=fd; tmp via .comm */
+            emit("\tldr\tx10, [sp]");                  /* buf */
+            emit("\tldr\tw11, [x10]");                 /* len */
+            emit("\tcmp\tw11, #0");
+            emit("\tb.le\t.LRV%dz", ln);
+            emit("\tmov\tw9, #0");                     /* got */
+            emit("\tadrp\tx17, kop_iobuf");
+            emit("\tadd\tx17, x17, :lo12:kop_iobuf");
+            emit(".LRV%dl:", ln);
+            emit("\tcmp\tw9, w11");
+            emit("\tb.hs\t.LRV%df", ln);
+            emit("\tsub\tw12, w11, w9");               /* sisa */
+            emit("\tcmp\tw12, #240");
+            emit("\tb.ls\t.LRV%dc", ln);
+            emit("\tmov\tw12, #240");
+            emit(".LRV%dc:", ln);
+            /* salin ke tmp: tmp[k] = buf[1 + got + k] */
+            emit("\tmov\tw13, #0");
+            emit(".LRV%dcs:", ln);
+            emit("\tcmp\tw13, w12");
+            emit("\tb.hs\t.LRV%dcf", ln);
+            emit("\tadd\tw15, w13, w9");
+            emit("\tlsl\tx15, x15, #3");
+            emit("\tadd\tx15, x15, #8");
+            emit("\tldr\tx16, [x10, x15]");
+            emit("\tstrb\tw16, [x17, x13]");
+            emit("\tadd\tw13, w13, #1");
+            emit("\tb\t.LRV%dcs", ln);
+            emit(".LRV%dcf:", ln);
+            emit("\tmov\tw2, w12");                    /* want */
+            emit("\tmov\tx1, x17");                    /* tmp */
+            emit("\tldr\tw0, [sp, #16]");              /* fd */
+            emit("\tmov\tx8, #63");                    /* __NR_read */
+            emit("\tsvc\t#0");
+            emit("\tcmp\tx0, #0");
+            emit("\tb.lt\t.LRV%dry", ln);              /* galat keras */
+            emit("\tb.eq\t.LRV%de", ln);               /* EOF */
+            /* salin kembali: buf[1 + got + k] = tmp[k], k < x0 */
+            emit("\tmov\tx13, #0");
+            emit(".LRV%drs:", ln);
+            emit("\tcmp\tx13, x0");
+            emit("\tb.hs\t.LRV%drf", ln);
+            emit("\tldrb\tw16, [x17, x13]");
+            emit("\tadd\tw15, w13, w9");
+            emit("\tlsl\tx15, x15, #3");
+            emit("\tadd\tx15, x15, #8");
+            emit("\tstr\tx16, [x10, x15]");
+            emit("\tadd\tx13, x13, #1");
+            emit("\tb\t.LRV%drs", ln);
+            emit(".LRV%drf:", ln);
+            emit("\tadd\tw9, w9, w0");                 /* got += nread */
+            emit("\tb\t.LRV%dl", ln);
+            emit(".LRV%dry:", ln);                     /* galat → -1 */
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tneg\tw0, wzr");
+            emit("\tb\t.LRV%dh", ln);
+            emit(".LRV%de:", ln);                      /* EOF → got */
+            emit(".LRV%df:", ln);                      /* penuh → got */
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tmov\tw0, w9");
+            emit("\tb\t.LRV%dh", ln);
+            emit(".LRV%dz:", ln);                      /* len<=0 → 0 */
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tmov\tw0, wzr");
+            emit(".LRV%dh:", ln);
+            return 0;
+        }
+        if (e->ival == 8) {              /* sendb(fd, buf) → 0 | -1            */
+            emit("\tldr\tx10, [sp]");                  /* buf */
+            emit("\tldr\tw11, [x10]");                 /* len */
+            emit("\tcmp\tw11, #0");
+            emit("\tb.le\t.LRS%df", ln);
+            emit("\tmov\tw9, #0");                     /* terkirim */
+            emit(".LRS%dl:", ln);
+            emit("\tcmp\tw9, w11");
+            emit("\tb.hs\t.LRS%df", ln);
+            emit("\tsub\tw12, w11, w9");
+            emit("\tcmp\tw12, #240");
+            emit("\tb.ls\t.LRS%dc", ln);
+            emit("\tmov\tw12, #240");
+            emit(".LRS%dc:", ln);
+            emit("\tadrp\tx17, kop_iobuf");
+            emit("\tadd\tx17, x17, :lo12:kop_iobuf");
+            /* salin ke tmp: tmp[k] = buf[1 + terkirim + k] */
+            emit("\tmov\tw13, #0");
+            emit(".LRS%dcs:", ln);
+            emit("\tcmp\tw13, w12");
+            emit("\tb.hs\t.LRS%dcf", ln);
+            emit("\tadd\tw15, w13, w9");
+            emit("\tlsl\tx15, x15, #3");
+            emit("\tadd\tx15, x15, #8");
+            emit("\tldr\tx16, [x10, x15]");
+            emit("\tstrb\tw16, [x17, x13]");
+            emit("\tadd\tw13, w13, #1");
+            emit("\tb\t.LRS%dcs", ln);
+            emit(".LRS%dcf:", ln);
+            emit("\tmov\tw2, w12");
+            emit("\tmov\tx1, x17");
+            emit("\tldr\tw0, [sp, #16]");
+            emit("\tmov\tx8, #64");                    /* __NR_write */
+            emit("\tsvc\t#0");
+            emit("\tcmp\tw0, #0");
+            emit("\tb.lt\t.LRS%de", ln);
+            emit("\tadd\tw9, w9, w0");                 /* penuh/parsial */
+            emit("\tb\t.LRS%dl", ln);
+            emit(".LRS%de:", ln);                      /* galat → -1 */
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tneg\tw0, wzr");
+            emit("\tb\t.LRS%dh", ln);
+            emit(".LRS%df:", ln);                      /* selesai/len 0 → 0 */
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tmov\tw0, wzr");
+            emit(".LRS%dh:", ln);
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -601,6 +741,7 @@ void gen_a64(const char *outpath) {
     emit("\t.align 3");
     emit("kop_arena_base: .quad 0");
     emit("kop_arena_used: .quad 0");
+    emit(".comm kop_iobuf, 256, 32");      /* penyangga syscall rekursi builtin */
 
     emit("\t.section .rodata");
     emit(".Lfmt_i: .asciz \"%s\"", "%d");

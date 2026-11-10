@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -399,6 +400,42 @@ static void run(void) {
                 for (long i = 0; i < n; i++)
                     blk[1 + i] = (long)(unsigned char)s[i];
                 stackv[sp++] = (int64_t)blk;
+            } else if (bi == 6) {                 /* Net.openr("literal") → fd */
+                uint16_t cp16 = (uint16_t)m->code[f->pc] | ((uint16_t)m->code[f->pc + 1] << 8);
+                f->pc += 2;
+                int fd = (int)open(cpool[cp16], O_RDONLY);
+                stackv[sp++] = (fd < 0) ? (int64_t)-1 : (int64_t)fd;
+            } else if (bi == 7) {                 /* recvb(fd, buf) → n | -1 */
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                long len = buf[0];
+                long nrd = 0;
+                if (len > 0) {
+                    unsigned char *tmp = (unsigned char *)malloc((size_t)len);
+                    if (!tmp) dievm("Net.recvb: memori habis");
+                    nrd = read((int)fdi, tmp, (size_t)len);
+                    if (nrd < 0) nrd = -1;
+                    for (long i = 0; i < nrd; i++)
+                        buf[1 + i] = (long)tmp[i];
+                    free(tmp);
+                }
+                stackv[sp++] = (int64_t)nrd;
+            } else if (bi == 8) {                 /* sendb(fd, buf) → 0 | -1 */
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                long len = buf[0];
+                long terkirim = 0;
+                while (terkirim < len) {
+                    unsigned char tmp[4096];
+                    long want = len - terkirim;
+                    if (want > 4096) want = 4096;
+                    for (long i = 0; i < want; i++)
+                        tmp[i] = (unsigned char)(buf[1 + terkirim + i] & 0xff);
+                    long nwr = write((int)fdi, tmp, (size_t)want);
+                    if (nwr <= 0) { terkirim = -1; break; }
+                    terkirim += nwr;
+                }
+                stackv[sp++] = (terkirim >= 0) ? (int64_t)0 : (int64_t)-1;
             } else {
                 dievm("Net builtin tidak dikenal");
             }

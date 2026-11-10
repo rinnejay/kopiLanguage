@@ -170,11 +170,11 @@ static void gen_expr(Node *e) {
         break;
     }
     case EX_NET:
-        if (e->ival != 5)                /* Net.bytes: literal dicerna compile-time */
+        if (e->ival != 5 && e->ival != 6)     /* bytes/openr: literal dicerna compile-time */
             for (Node *aa = e->a; aa; aa = aa->next) gen_expr(aa);
         em8(OP_NET);
         em16((int)e->ival);
-        if (e->ival == 5) em16((int)e->cp);       /* Net.bytes: index cpool */
+        if (e->ival == 5 || e->ival == 6) em16((int)e->cp);   /* bytes/openr: cpool */
         break;
     case EX_ENVLOAD:
         em8(OP_ENVLOAD);

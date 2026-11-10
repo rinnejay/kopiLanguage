@@ -1,0 +1,28 @@
+public class Main {
+    public static void main(String[] args) {
+        int[] msg = new int[3000];
+        for (int i = 0; i < 3000; i++) msg[i] = i % 251;
+        int fd = Net.socket(2, 1);
+        int c = Net.connect(fd, 2130706433, 9917);
+        int s = Net.sendb(fd, msg);
+        int[] balasan = new int[100];
+        int total = 0;
+        while (total < 3004) {
+            int nr = Net.recvb(fd, balasan);
+            if (nr <= 0) break;
+            total = total + nr;
+        }
+        System.out.println(total);
+        Net.close(fd);
+        int f1 = Net.openr("/dev/null");
+        int o1 = 0;
+        if (f1 > 0) o1 = 1;
+        System.out.println(o1);
+        Net.close(f1);
+        int f2 = Net.openr("/tidak/ada/inilah.txt");
+        int o2 = 0;
+        if (f2 < 0) o2 = 1;
+        System.out.println(o2);
+        Net.close(f2);
+    }
+}

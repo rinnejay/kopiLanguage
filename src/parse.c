@@ -898,7 +898,10 @@ static Ty type_expr(Node *e) {
             else if (!strcmp(fn, "wrb"))     { bi = 3; want = 2; }
             else if (!strcmp(fn, "close"))   { bi = 4; want = 1; }
             else if (!strcmp(fn, "bytes"))   { bi = 5; want = 1; }
-            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes)", e->line, fn);
+            else if (!strcmp(fn, "openr"))   { bi = 6; want = 1; }
+            else if (!strcmp(fn, "recvb"))   { bi = 7; want = 2; }
+            else if (!strcmp(fn, "sendb"))   { bi = 8; want = 2; }
+            else die("baris %d: fungsi Net.%s tidak ada (pilihan: socket connect rdb wrb close bytes openr recvb sendb)", e->line, fn);
 
             int narg = (int)e->ival;
             if (bi == 5) {
@@ -910,11 +913,27 @@ static Ty type_expr(Node *e) {
                 e->dty = (int)T_ARI;
                 return T_ARI;
             }
+            if (bi == 6) {
+                if (narg != 1 || e->a == 0 || e->a->kind != EX_STRLIT)
+                    die("baris %d: Net.openr membutuhkan tepat satu string literal", e->line);
+                e->kind = EX_NET;
+                e->ival = bi;
+                e->cp = cp_push(e->a->str);
+                e->dty = (int)T_INT;
+                return T_INT;
+            }
             if (narg != want)
                 die("baris %d: Net.%s membutuhkan %d argumen, dapat %d", e->line, fn, want, narg);
             Node *aa = e->a;
             for (int i = 0; i < narg; i++, aa = aa->next) {
-                if (type_expr(aa) != T_INT)
+                Ty t = type_expr(aa);
+                /* recvb/sendb: (fd int, buf int[]) */
+                if (bi == 7 || bi == 8) {
+                    if (i == 0 && t != T_INT)
+                        die("baris %d: Net.%s argumen %d harus int", e->line, i, fn);
+                    if (i == 1 && t != T_ARI)
+                        die("baris %d: Net.%s argumen %d harus int[] buffer", e->line, i, fn);
+                } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
             }
             e->kind = EX_NET;

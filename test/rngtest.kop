@@ -1,0 +1,16 @@
+import Rand;
+
+public class Main {
+    public static void main(String[] args) {
+        int[] a = Rand.bytes(32);
+        int[] b = Rand.bytes(32);
+        System.out.println(a.length);
+        int diff = 0;
+        for (int i = 0; i < 32; i++) {
+            if (a[i] != b[i]) diff++;
+        }
+        System.out.println(diff);
+        int[] satu = Rand.bytes(1);
+        System.out.println(satu.length);
+    }
+}

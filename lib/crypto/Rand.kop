@@ -1,0 +1,23 @@
+/* Rand.kop — sumber acak kriptografis untuk Kopi.
+ *
+ * Baca /dev/urandom lewat Net.openr + Net.recvb. Ini sumber acak
+ * sungguhan kernel — bukan LCG. Dipakai TLS untuk client_random dan
+ * kunci sesi ECDHE.
+ */
+
+class Rand {
+
+    static int[] bytes(int n) {
+        int[] out = new int[n];
+        int fd = Net.openr("/dev/urandom");
+        if (fd < 0) return out;
+        int got = 0;
+        while (got < n) {
+            int nr = Net.recvb(fd, out);
+            if (nr <= 0) break;
+            got = got + nr;
+        }
+        Net.close(fd);
+        return out;
+    }
+}

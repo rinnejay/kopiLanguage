@@ -322,6 +322,148 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmovq %%rbx, %%rax");
             return 1;
         }
+        if (e->ival == 6) {              /* Net.openr("literal") → fd          */
+            int c = (int)e->cp;
+            emit("\tleaq cpool%d(%%rip), %%rsi", c);
+            emit("\tmovq %%rsi, %%rdx");                 /* strlen */
+            emit("\txorl %%eax, %%eax");
+            emit(".LNO%da:", ln);
+            emit("\tcmpb $0, (%%rdx)");
+            emit("\tje .LNO%db", ln);
+            emit("\taddq $1, %%rdx");
+            emit("\tjmp .LNO%da", ln);
+            emit(".LNO%db:", ln);
+            /* openat(AT_FDCWD=-100, path, O_RDONLY) */
+            emit("\tmovl $-100, %%edi");
+            emit("\txorl %%edx, %%edx");                 /* flags = O_RDONLY */
+            emit("\tmovl $257, %%eax");                  /* __NR_openat */
+            emit("\tsyscall");
+            return 0;                                    /* fd | -errno */
+        }
+        if (e->ival == 7 || e->ival == 8) {
+            for (Node *aa = e->a; aa; aa = aa->next) {
+                gen_expr(m, aa);
+                spush();
+            }
+        }
+        if (e->ival == 7) {              /* recvb(fd, buf) → n | -1            */
+            /* stack: [0]=buf (64-bit), [8]=fd; tmp via .comm kop_iobuf */
+            emit("\tmovq (%%rsp), %%r10");               /* buf */
+            emit("\tmovl (%%r10), %%r8d");               /* len */
+            emit("\ttestl %%r8d, %%r8d");
+            emit("\tjle .LRX%dz", ln);
+            emit("\txorl %%r9d, %%r9d");                 /* got */
+            emit("\tleaq kop_iobuf(%%rip), %%r11");      /* tmp base */
+            emit(".LRX%dl:", ln);
+            emit("\tcmpl %%r8d, %%r9d");
+            emit("\tjge .LRX%df", ln);
+            emit("\tmovl %%r8d, %%eax");
+            emit("\tsubl %%r9d, %%eax");                 /* sisa */
+            emit("\tcmpl $240, %%eax");
+            emit("\tjle .LRX%dc", ln);
+            emit("\tmovl $240, %%eax");
+            emit(".LRX%dc:", ln);                        /* want = eax */
+            emit("\tmovl %%eax, %%edx");                 /* want untuk syscall */
+            /* salin ke tmp: tmp[k] = buf[1 + got + k] */
+            emit("\txorl %%ecx, %%ecx");
+            emit(".LRX%dcs:", ln);
+            emit("\tcmpl %%eax, %%ecx");
+            emit("\tjge .LRX%dcf", ln);
+            emit("\tmovl %%r9d, %%eax");
+            emit("\taddl %%ecx, %%eax");
+            emit("\tshlq $3, %%rax");
+            emit("\tmovq 8(%%r10,%%rax), %%rax");
+            emit("\tmovb %%al, (%%r11,%%rcx)");
+            emit("\tincl %%ecx");
+            emit("\tjmp .LRX%dcs", ln);
+            emit(".LRX%dcf:", ln);
+            emit("\tmovl 8(%%rsp), %%edi");              /* fd */
+            emit("\tmovq %%r11, %%rsi");                 /* tmp */
+            emit("\txorl %%eax, %%eax");                 /* __NR_read = 0 */
+            emit("\tsyscall");
+            emit("\ttestq %%rax, %%rax");
+            emit("\tjs .LRX%dry", ln);                   /* galat keras */
+            emit("\tje .LRX%de", ln);                    /* EOF */
+            /* salin kembali: buf[1 + got + k] = tmp[k], k < rax */
+            emit("\txorl %%ecx, %%ecx");
+            emit(".LRX%drs:", ln);
+            emit("\tcmpq %%rax, %%rcx");
+            emit("\tjge .LRX%drf", ln);
+            emit("\tmovzbq (%%r11,%%rcx), %%rdx");
+            emit("\tmovl %%r9d, %%eax");
+            emit("\taddl %%ecx, %%eax");
+            emit("\tshlq $3, %%rax");
+            emit("\tmovq %%rdx, 8(%%r10,%%rax)");
+            emit("\tincl %%ecx");
+            emit("\tjmp .LRX%drs", ln);
+            emit(".LRX%drf:", ln);
+            emit("\taddl %%eax, %%r9d");                 /* got += nread */
+            emit("\tjmp .LRX%dl", ln);
+            emit(".LRX%dry:", ln);                       /* galat → -1 */
+            emit("\taddq $16, %%rsp");
+            emit("\tmovl $-1, %%eax");
+            emit("\tjmp .LRX%dh", ln);
+            emit(".LRX%de:", ln);                        /* EOF → got */
+            emit("\tjmp .LRX%df", ln);
+            emit(".LRX%df:", ln);                        /* penuh → got */
+            emit("\tmovl %%r9d, %%eax");
+            emit("\taddq $16, %%rsp");
+            emit("\tjmp .LRX%dh", ln);
+            emit(".LRX%dz:", ln);                        /* len<=0 → 0 */
+            emit("\txorl %%eax, %%eax");
+            emit("\taddq $16, %%rsp");
+            emit(".LRX%dh:", ln);
+            return 0;
+        }
+        if (e->ival == 8) {              /* sendb(fd, buf) → 0 | -1            */
+            emit("\tmovq (%%rsp), %%r10");               /* buf */
+            emit("\tmovl (%%r10), %%r8d");               /* len */
+            emit("\ttestl %%r8d, %%r8d");
+            emit("\tjle .LSX%df", ln);
+            emit("\txorl %%r9d, %%r9d");                 /* terkirim */
+            emit("\tleaq kop_iobuf(%%rip), %%r11");      /* tmp base */
+            emit(".LSX%dl:", ln);
+            emit("\tcmpl %%r8d, %%r9d");
+            emit("\tjge .LSX%df", ln);
+            emit("\tmovl %%r8d, %%eax");
+            emit("\tsubl %%r9d, %%eax");
+            emit("\tcmpl $240, %%eax");
+            emit("\tjle .LSX%dc", ln);
+            emit("\tmovl $240, %%eax");
+            emit(".LSX%dc:", ln);                        /* want = eax */
+            /* salin ke tmp: tmp[k] = buf[1 + terkirim + k] */
+            emit("\tmovl %%eax, %%edx");                 /* want untuk syscall */
+            emit("\txorl %%ecx, %%ecx");
+            emit(".LSX%dcs:", ln);
+            emit("\tcmpl %%edx, %%ecx");
+            emit("\tjge .LSX%dcf", ln);
+            emit("\tmovl %%r9d, %%eax");
+            emit("\taddl %%ecx, %%eax");
+            emit("\tshlq $3, %%rax");
+            emit("\tmovq 8(%%r10,%%rax), %%rax");
+            emit("\tmovb %%al, (%%r11,%%rcx)");
+            emit("\tincl %%ecx");
+            emit("\tjmp .LSX%dcs", ln);
+            emit(".LSX%dcf:", ln);
+            emit("\tmovl 8(%%rsp), %%edi");              /* fd */
+            emit("\tmovq %%r11, %%rsi");
+            emit("\tmovl %%edx, %%edx");                 /* want */
+            emit("\tmovl $1, %%eax");                    /* __NR_write */
+            emit("\tsyscall");
+            emit("\ttestq %%rax, %%rax");
+            emit("\tjs .LSX%de", ln);
+            emit("\taddl %%eax, %%r9d");                 /* penuh/parsial */
+            emit("\tjmp .LSX%dl", ln);
+            emit(".LSX%de:", ln);                        /* galat → -1 */
+            emit("\taddq $16, %%rsp");
+            emit("\tmovl $-1, %%eax");
+            emit("\tjmp .LSX%dh", ln);
+            emit(".LSX%df:", ln);                        /* selesai → 0 */
+            emit("\txorl %%eax, %%eax");
+            emit("\taddq $16, %%rsp");
+            emit(".LSX%dh:", ln);
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -570,6 +712,7 @@ void gen_x64(const char *outpath) {
     emit("\t.align 8");
     emit("kop_arena_base: .quad 0");
     emit("kop_arena_used: .quad 0");
+    emit("\t.comm kop_iobuf, 256, 32");    /* penyangga syscall rekursi builtin */
     emit("\tpushq %%rbp");
     emit("\tmovq %%rsp, %%rbp");
     emit("\tandq $-16, %%rsp");

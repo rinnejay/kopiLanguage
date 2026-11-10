@@ -230,7 +230,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done
@@ -580,6 +580,75 @@ EOF
 printf '201\n15\n66\n' > "$T/kopi/netpost.ref"
 check netpost "$T/kopi/netpost.kop"
 kill $POST_PID 2>/dev/null
+
+# ─── Net.bulk: recvb/sendb + openr entropy Rand (pukal, server khusus) ───
+cat > "$T/kopi/bulksrv.py" <<'EOF'
+import socket
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("127.0.0.1", 9913)); s.listen(4); s.settimeout(60)
+while True:
+    c, _ = s.accept()
+    d = b""
+    while len(d) < 3000:
+        chunk = c.recv(3000 - len(d))
+        if not chunk: break
+        d += chunk
+    c.sendall(b"ACK:" + d)
+    try: c.close()
+    except OSError: pass
+EOF
+python3 "$T/kopi/bulksrv.py" & BULK_PID=$!
+sleep 0.5
+
+cat > "$T/kopi/netbulk.kop" <<'EOF'
+import Rand;
+
+class Main {
+    public static void main(String[] args) {
+        /* recvb + sendb: pukal 3000 byte via echo 9913 */
+        int[] msg = new int[3000];
+        for (int i = 0; i < 3000; i++) msg[i] = i % 251;
+        int fd = Net.socket(2, 1);
+        int c = Net.connect(fd, 2130706433, 9913);
+        Net.sendb(fd, msg);
+        int[] bal = new int[100];
+        int total = 0;
+        while (total < 3004) {
+            int nr = Net.recvb(fd, bal);
+            if (nr <= 0) break;
+            total = total + nr;
+        }
+        System.out.println(total);       /* 3004 = "ACK:" + 3000 */
+        Net.close(fd);
+        /* openr: file ada → fd > 0; file kosong? /dev/null tak berisi tetap fd */
+        int f1 = Net.openr("/dev/null");
+        int o1 = 0;
+        if (f1 > 0) o1 = 1;
+        System.out.println(o1);
+        Net.close(f1);
+        int f2 = Net.openr("/tidak/ada/inilah.txt");
+        int o2 = 0;
+        if (f2 < 0) o2 = 1;
+        System.out.println(o2);
+        Net.close(f2);
+        /* Rand: /dev/urandom — panjang + dua undian berbeda */
+        int[] a = Rand.bytes(32);
+        int[] b = Rand.bytes(32);
+        System.out.println(a.length);
+        int diff = 0;
+        for (int i = 0; i < 32; i++) {
+            if (a[i] != b[i]) diff++;
+        }
+        System.out.println(diff);
+        int[] satu = Rand.bytes(1);
+        System.out.println(satu.length);
+    }
+}
+EOF
+printf '3004\n1\n1\n32\n32\n1\n' > "$T/kopi/netbulk.ref"
+check netbulk "$T/kopi/netbulk.kop"
+kill $BULK_PID 2>/dev/null
 
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"

@@ -1,0 +1,19 @@
+public class Main {
+    public static void main(String[] args) {
+        int[] msg = new int[100];
+        for (int i = 0; i < 100; i++) msg[i] = 65 + i % 26;
+        int fd = Net.socket(2, 1);
+        int c = Net.connect(fd, 2130706433, 9917);
+        System.out.println(fd);
+        System.out.println(c);
+        int s = Net.sendb(fd, msg);
+        System.out.println(s);
+        int nr = Net.recvb(fd, msg2());
+        System.out.println(nr);
+        if (nr > 0) System.out.println(msg2()[0]);
+        Net.close(fd);
+    }
+    static int[] msg2() {
+        return new int[104];
+    }
+}
