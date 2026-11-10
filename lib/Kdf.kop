@@ -1,0 +1,86 @@
+/* Kdf.kop — HKDF-SHA256 (RFC 5869) + ExpandLabel (RFC 8446 §7.1) murni Kopi.
+ *
+ * Bergantung Hash.kop (sha256/hmac). Semua data int[] byte-as-int.
+ * Cukup untuk key schedule TLS 1.3 nanti (ingat HKDF-Expand-Label).
+ */
+
+import Hash;
+
+class Kdf {
+
+    /* HKDF-Extract: PRK = HMAC(salt, IKM) */
+    static int[] extract(int[] salt, int[] ikm) {
+        return Hash.hmac(salt, ikm);
+    }
+
+    /* HKDF-Expand: OKM = T(1) | T(2) | ... (L byte)
+     * T(i) = HMAC(PRK, T(i-1) | info | i)   dengan i byte tunggal */
+    static int[] expand(int[] prk, int[] info, int len) {
+        int nblk = (len + 31) / 32;
+        int[] previous = new int[0];
+        int[] out = new int[nblk * 32];
+        int wk = 0;                       /* penulis OKM */
+        for (int i = 1; i <= nblk; i++) {
+            /* bangun pesan: previous | info | i */
+            int[] msg = new int[previous.length + info.length + 1];
+            for (int k = 0; k < previous.length; k++) msg[k] = previous[k];
+            for (int k = 0; k < info.length; k++) msg[previous.length + k] = info[k];
+            msg[previous.length + info.length] = i;
+            previous = Hash.hmac(prk, msg);
+            for (int k = 0; k < 32; k++) out[wk + k] = previous[k];
+            wk = wk + 32;
+        }
+        /* potong len byte (jika len bukan kelipatan 32) */
+        if (len == out.length) return out;
+        int[] cut = new int[len];
+        for (int k = 0; k < len; k++) cut[k] = out[k];
+        return cut;
+    }
+
+    static int[] concat(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) out[i] = a[i];
+        for (int i = 0; i < b.length; i++) out[a.length + i] = b[i];
+        return out;
+    }
+
+    static int[] concat3(int[] a, int[] b, int[] c) {
+        return concat(concat(a, b), c);
+    }
+
+    /* uint16 big-endian dua byte */
+    static int[] u16(int v) {
+        int[] b = new int[2];
+        b[0] = (v >>> 8) & 255;
+        b[1] = v & 255;
+        return b;
+    }
+
+    /* "tls13 " — ukuran 6 byte tetap */
+    static int[] tls13() {
+        int[] l = new int[6];
+        l[0] = 116; l[1] = 108; l[2] = 115; l[3] = 49; l[4] = 51; l[5] = 32;
+        return l;
+    }
+
+    /* HKDF-Expand-Label(Secret, Label, Context, Length):
+     * HkdfLabel = uint16(Length) | "tls13 " | uint8(label.len) | label
+     *           | uint8(context.len) | context   (byte panjang dulu!)
+     * (context kosong boleh: hantarkan array panjang 0) */
+    static int[] expandLabel(int[] secret, int[] label, int[] context, int len) {
+        int[] hx = new int[label.length + 1];
+        hx[0] = label.length;                     /* uint8 len: MAJU dari label */
+        for (int i = 0; i < label.length; i++) hx[1 + i] = label[i];
+        int[] cx = new int[context.length + 1];
+        cx[0] = context.length;                   /* uint8 len: MAJU dari context */
+        for (int i = 0; i < context.length; i++) cx[1 + i] = context[i];
+        int[] left = concat(u16(len), tls13());
+        int[] hklabel = concat(left, concat(hx, cx));
+        return expand(secret, hklabel, len);
+    }
+
+    /* Derive-Secret(Secret, Label, Messages) = ExpandLabel(Secret, Label, SHA256(messages), 32) */
+    static int[] deriveSecret(int[] secret, int[] label, int[] msgs) {
+        return expandLabel(secret, label, Hash.sha256(msgs), 32);
+    }
+}

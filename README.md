@@ -32,7 +32,7 @@ sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 
 ```
 Pengembangan  ██████████░░░░░░  ~62%  menuju bahasa serius (v2)
-v1.5c hari ini ████████████████  51/51 test hijau — X25519 RFC 7748 lulus penuh di 3 backend
+v1.5d-A hari ini ████████████████  53/53 test hijau — HKDF/ExpandLabel RFC 5869+8446 lulus di 3 backend
 ```
 
 | Versi | Isi |
@@ -42,7 +42,7 @@ v1.5c hari ini ████████████████  51/51 test hija
 | **v1.2** | **array `int[]` + arena memori `kopalloc`** (bump allocator, 1 batas 8 MB): `new int[n]`, `a[i]`, `a[i] = v`, `a.length`, bounds check runtime (`kopi: array tidak valid`, OOM rapi); fix ABI entry `main` (frame x30 sendiri); pustaka `lib/Arrays.kop` (sort/binSearch/find/count/...) dan `lib/Crypto.kop` (bitxor + FNV-1a + PRNG Lehmer + XOR-stream/Caesar) — **100% ditulis dalam bahasa Kopi** di atas aritmetika murni |
 | **v1.2.1** | scoping per-blok (`if/else`, `while`, `for`, blok `{}` telanjang — deklarasi direset di akhir blok, shadow antar cabang diperbolehkan ala sibling) + multi-deklarasi `int a = 0, b = 1;` — library kini bisa memakai nama loop yang sama di metode yang sama |
 | **v1.3** | **jaringan**: builtin `Net.*` = syscall Linux langsung tanpa libc — `socket`, `connect`, `rdb` (baca 1 byte), `wrb` (tulis 1 byte), `close`, dan `Net.bytes("literal")` (byte-as-int, dikonversi compile-time). Codegen native a64 (`svc #0`) & x64 (`syscall`) membangun `sockaddr_in` di stack sendiri; VM KOP1 jalur op `OP_NET`. Pustaka `lib/Tcp.kop` (open/send/recvAll/cat/indexOf — 100% Kopi) dan `lib/Http.kop` (klien HTTP/1.0 minimal: statusOf/bodyOf/getInto) + `examples/httpget.kop`; uji loopback (echo + `python -m http.server`) masuk test.sh (33 tes) |
-| **v1.5c** | **Bignum + X25519 murni Kopi** (`lib/Big.kop`, `lib/X25519.kop`): medan p=2^255−19 dengan 17 limb radiks-15-bit (bit 255-nya diperlakukan eksplisit di fold), fold `2^255 ≡ 19` di `femul`/`fesub`; ladder Montgomery RFC 7748 dengan cswap constant-time, inverse via Fermat x^(p−2); **lulus 6 vektor resmi RFC 7748** (2× X25519 §5.2 + 4× DH §6.1 Alice/Bob/shared-K) di VM dan native a64 (VM 8,7 s, native 0,5 s per 6 panggilan); field penuh diuji-variabel terhadap ground-truth python (20 kasus fesub/feadd/femul/mix/inv) dan 60 pasangan acak via oracle; beres 2 jebakan: limb-0 p salah tulis (8172 vs 32749) dan fold fesub tak memperhitungkan pinjaman ke satuan 2^255 — ditangkap oracle, bukan kebetulan; situ: batas immediate ldr/str aarch64 (>255 byte → sub x27) dan arena naik ke 16 MB (VM) / 32 MB (a64) untuk ladder
+| **v1.5d-A** | **HKDF-SHA256 + ExpandLabel murni Kopi** (`lib/Kdf.kop`): `extract` (`HMAC(salt, IKM)`) dan `expand` (T(i)=HMAC(PRK, T(i−1)|info|i)) lulus kasus 1 RFC 5869 (PRK + OKM 42 byte + OKM 80 byte jalur potong); `expandLabel` (uint16 len | "tls13 " | uint8 len·label | uint8 len·context) sudah sesuai RFC 8446 §7.1 — fondasi key schedule TLS 1.3; jebakan yang ditulis telanjang: byte-panjang harus MENDAHULUI datanya (逆变器 tinted salah taruh sesudah) — tertangkap ref python hmac
 
 `test.sh` memverifikasi **konsistensi output antar-backend**: program yang sama
 harus menghasilkan output byte-per-byte identik di VM, native aarch64, dan

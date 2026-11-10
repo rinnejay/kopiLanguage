@@ -54,6 +54,11 @@ python3 tools/gen_x25519.py "$T/kopi/curve25519.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n' > "$T/kopi/curve25519.ref"
 check curve25519 "$T/kopi/curve25519.kop"
 
+# ─── KDF: HKDF RFC 5869 + ExpandLabel RFC 8446 (vektor python hmac) ──────
+python3 tools/gen_kdf.py "$T/kopi/hkdf.kop" >/dev/null
+printf '1\n1\n1\n1\n' > "$T/kopi/hkdf.ref"
+check hkdf "$T/kopi/hkdf.kop"
+
 printf '42 == 42\n' > "$T/kopi/first.ref"
 check first examples/first.kop
 
@@ -211,7 +216,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec bigsmoke febig curve25519; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec bigsmoke febig curve25519 hkdf; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done
