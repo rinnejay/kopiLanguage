@@ -1,0 +1,217 @@
+/* Hash.kop — SHA-256 + HMAC-SHA256 murni di bahasa Kopi (v1.5b).
+ *
+ * Bergantung operator bitwise native v1.5a (& | ^ ~ << >> >>>).
+ * Penjumlahan modulo-2^32 dibangun lewat uadd (belah 16-bit rendah/tinggi)
+ * sebab + Kopi adalah penjumlahan bertanda 32-bit yang meluap.
+ *
+ * v1: satu-shot; bitlen < 2^31 (pesan < 256 MB). Konstanta dari FIPS 180-4.
+ */
+
+class Hash {
+
+
+    private static int[] KK() {
+        int[] k = new int[64];
+        /* akar kubik 64 prima pertama, pecahan 32-bit (FIPS 180-4 §4.2.2) */
+        k[0] = 1116352408;
+        k[1] = 1899447441;
+        k[2] = -1245643825;
+        k[3] = -373957723;
+        k[4] = 961987163;
+        k[5] = 1508970993;
+        k[6] = -1841331548;
+        k[7] = -1424204075;
+        k[8] = -670586216;
+        k[9] = 310598401;
+        k[10] = 607225278;
+        k[11] = 1426881987;
+        k[12] = 1925078388;
+        k[13] = -2132889090;
+        k[14] = -1680079193;
+        k[15] = -1046744716;
+        k[16] = -459576895;
+        k[17] = -272742522;
+        k[18] = 264347078;
+        k[19] = 604807628;
+        k[20] = 770255983;
+        k[21] = 1249150122;
+        k[22] = 1555081692;
+        k[23] = 1996064986;
+        k[24] = -1740746414;
+        k[25] = -1473132947;
+        k[26] = -1341970488;
+        k[27] = -1084653625;
+        k[28] = -958395405;
+        k[29] = -710438585;
+        k[30] = 113926993;
+        k[31] = 338241895;
+        k[32] = 666307205;
+        k[33] = 773529912;
+        k[34] = 1294757372;
+        k[35] = 1396182291;
+        k[36] = 1695183700;
+        k[37] = 1986661051;
+        k[38] = -2117940946;
+        k[39] = -1838011259;
+        k[40] = -1564481375;
+        k[41] = -1474664885;
+        k[42] = -1035236496;
+        k[43] = -949202525;
+        k[44] = -778901479;
+        k[45] = -694614492;
+        k[46] = -200395387;
+        k[47] = 275423344;
+        k[48] = 430227734;
+        k[49] = 506948616;
+        k[50] = 659060556;
+        k[51] = 883997877;
+        k[52] = 958139571;
+        k[53] = 1322822218;
+        k[54] = 1537002063;
+        k[55] = 1747873779;
+        k[56] = 1955562222;
+        k[57] = 2024104815;
+        k[58] = -2067236844;
+        k[59] = -1933114872;
+        k[60] = -1866530822;
+        k[61] = -1538233109;
+        k[62] = -1090935817;
+        k[63] = -965641998;
+        return k;
+    }
+    private static int[] HH0() {
+        int[] k = new int[8];
+        /* akar kuadrat 8 prima pertama, pecahan 32-bit (§5.3.3) */
+        k[0] = 1779033703;
+        k[1] = -1150833019;
+        k[2] = 1013904242;
+        k[3] = -1521486534;
+        k[4] = 1359893119;
+        k[5] = -1694144372;
+        k[6] = 528734635;
+        k[7] = 1541459225;
+        return k;
+    }
+
+    /* penjumlahan modulo 2^32 */
+    static int uadd(int x, int y) {
+        int lo = (x & 65535) + (y & 65535);
+        int hi = ((x >>> 16) + (y >>> 16)) + (lo >>> 16);
+        return ((hi & 65535) << 16) | (lo & 65535);
+    }
+
+    /* rotasi kanan 32-bit; count 0 aman */
+    static int rotr(int x, int n) {
+        if (n == 0) return x;
+        return (x >>> n) | (x << (32 - n));
+    }
+
+    private static int m0(int x) { return rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3); }
+    private static int m1(int x) { return rotr(x, 17) ^ rotr(x, 19) ^ (x >>> 10); }
+    private static int s0(int x) { return rotr(x, 2) ^ rotr(x, 13) ^ rotr(x, 22); }
+    private static int s1(int x) { return rotr(x, 6) ^ rotr(x, 11) ^ rotr(x, 25); }
+    private static int ch(int x, int y, int z) { return (x & y) ^ (~x & z); }
+    private static int maj(int x, int y, int z) { return (x & y) ^ (x & z) ^ (y & z); }
+
+    /* satu-shot: pesan byte-as-int (0..255) → digest 32 byte-as-int */
+    static int[] sha256(int[] msg) {
+        int L = msg.length;
+        int total = L + 9;
+        int nblk = (total + 63) / 64;
+        int nsz = nblk * 64;
+        int[] m = new int[nsz];
+        int i = 0;
+        while (i < L) { m[i] = msg[i]; i++; }
+        m[L] = 128;                          /* 0x80 */
+        int bitlen = L * 8;
+        m[nsz - 4] = (bitlen >>> 24) & 255;  /* len 64-bit BE; v1: < 2^31 bit */
+        m[nsz - 3] = (bitlen >>> 16) & 255;
+        m[nsz - 2] = (bitlen >>> 8) & 255;
+        m[nsz - 1] = bitlen & 255;
+
+        int[] H = HH0();
+        int[] K = KK();
+        int[] st = new int[8];
+        for (i = 0; i < 8; i++) st[i] = H[i];
+
+        int[] w = new int[64];
+        int[] tmp = new int[8];              /* a..h untuk penambahan akhir */
+        for (int blk = 0; blk < nblk; blk++) {
+            int base = blk * 64;
+            for (i = 0; i < 16; i++) {
+                int t = base + i * 4;
+                w[i] = (m[t] << 24) | (m[t + 1] << 16) | (m[t + 2] << 8) | m[t + 3];
+            }
+            for (i = 16; i < 64; i++) {
+                w[i] = uadd(uadd(m1(w[i - 2]), w[i - 7]),
+                            uadd(m0(w[i - 15]), w[i - 16]));
+            }
+            int a = st[0], b = st[1], c = st[2], d = st[3];
+            int e = st[4], f = st[5], g = st[6], h = st[7];
+            for (i = 0; i < 64; i++) {
+                int T1 = uadd(h, uadd(s1(e), uadd(ch(e, f, g), uadd(K[i], w[i]))));
+                int T2 = uadd(s0(a), maj(a, b, c));
+                h = g; g = f; f = e;
+                e = uadd(d, T1);
+                d = c; c = b; b = a;
+                a = uadd(T1, T2);
+            }
+            tmp[0] = a; tmp[1] = b; tmp[2] = c; tmp[3] = d;
+            tmp[4] = e; tmp[5] = f; tmp[6] = g; tmp[7] = h;
+            for (i = 0; i < 8; i++) st[i] = uadd(st[i], tmp[i]);
+        }
+
+        int[] out = new int[32];
+        for (i = 0; i < 8; i++) {
+            for (int j = 0; j < 4; j++) out[i * 4 + j] = (st[i] >>> (24 - j * 8)) & 255;
+        }
+        return out;
+    }
+
+    /* HMAC-SHA256 (RFC 2104); key > 64 byte di-hash dulu */
+    static int[] hmac(int[] key, int[] msg) {
+        int[] k = key;
+        if (key.length > 64) k = sha256(key);
+        int[] ki = new int[64];
+        int[] ko = new int[64];
+        for (int i = 0; i < 64; i++) {
+            int v = 0;
+            if (i < k.length) v = k[i];
+            ki[i] = v ^ 54;                  /* 0x36 */
+            ko[i] = v ^ 92;                  /* 0x5C */
+        }
+        int[] imsg = new int[64 + msg.length];
+        for (int i = 0; i < 64; i++) imsg[i] = ki[i];
+        for (int i = 0; i < msg.length; i++) imsg[64 + i] = msg[i];
+        int[] ih = sha256(imsg);
+        int[] omsg = new int[96];
+        for (int i = 0; i < 64; i++) omsg[i] = ko[i];
+        for (int i = 0; i < 32; i++) omsg[64 + i] = ih[i];
+        return sha256(omsg);
+    }
+
+    static int[] toHex(int[] dig) {
+        int[] out = new int[dig.length * 2];
+        int o = 0;
+        for (int i = 0; i < dig.length; i++) {
+            int v = dig[i] & 255;
+            if (v < 16) {
+                out[o] = 48; o++;
+                if (v < 10) out[o] = 48 + v; else out[o] = 87 + v;
+                o++;
+            } else {
+                int hi = v / 16;
+                int lo = v % 16;
+                if (hi < 10) out[o] = 48 + hi; else out[o] = 87 + hi; o++;
+                if (lo < 10) out[o] = 48 + lo; else out[o] = 87 + lo; o++;
+            }
+        }
+        return out;
+    }
+
+    static int eq(int[] a, int[] b) {
+        if (a.length != b.length) return 0;
+        for (int i = 0; i < a.length; i++) if (a[i] != b[i]) return 0;
+        return 1;
+    }
+}

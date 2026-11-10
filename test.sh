@@ -38,6 +38,11 @@ check demo examples/demo.kop
 printf '34\n119\n85\n-103\n48\n6\n-4\n15\n15\n3\n1024\n11\n10\n186\n48\n60\n195\n780\n48\n15\n1\n1\n42\n7\n5\n' > "$T/kopi/bitops.ref"
 check bitops test/bitops.kop
 
+# ─── hash: SHA-256 + HMAC (vektor FIPS 180-4 / RFC 4231 via vektor python) ─
+python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
+printf '1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"
+check hashvec "$T/kopi/hashvec.kop"
+
 printf '42 == 42\n' > "$T/kopi/first.ref"
 check first examples/first.kop
 
@@ -195,7 +200,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done

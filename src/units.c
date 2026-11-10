@@ -37,10 +37,12 @@ typedef struct {
 } Visited;
 
 static int visited_add(Visited *v, const char *path) {
+    /* hasil: 0 = baru tercatat (sambung file ini), 1 = realpath gagal,
+     * 2 = sudah pernah dimuat (lewati — mencegah duplikat) */
     char buf[PATH_MAX];
     if (!realpath(path, buf)) return 1;   /* file tak ada; dibiarkan error di lex */
     for (int i = 0; i < v->n; i++)
-        if (!strcmp(v->paths[i], buf)) return 0;   /* sudah pernah dimuat */
+        if (!strcmp(v->paths[i], buf)) return 2;   /* sudah pernah dimuat */
     if (v->n >= 256) die("terlalu banyak file yang diimpor (maks 256)");
     v->paths[v->n++] = strdup(buf);
     return 0;

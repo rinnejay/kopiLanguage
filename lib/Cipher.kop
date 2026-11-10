@@ -5,8 +5,10 @@
  * RC4-kuat (schema lama) — jadwal yang TIDAK dienkripsi; catat di README.
  *
  * Isi: RC4, Vigenère, base64 (enc/dec), hex (enc/dec),
- *      CRC-16-CCITT (0x1021), Adler-32.
+ *      CRC-16-CCITT (0x1021), Adler-32. Bergantung Crypto (import).
  */
+
+import Crypto;
 
 class Cipher {
 
