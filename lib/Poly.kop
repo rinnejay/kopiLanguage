@@ -1,0 +1,165 @@
+/* Poly1305.kop — MAC one-time Poly1305 (RFC 7539 §2.5) murni Kopi.
+ *
+ * Reprensentasi: 9 limb radiks 15-bit (135 bit) + slot 9 untuk sisa.
+ * p = 2^130 - 5. Fold: 2^(15k) ≡ 160·2^(15(k-9)) untul k ≥ 9 —
+ * karena 2^135 = 2^5·2^130 ≡ 5·2^5 = 160 (mod p).
+ *
+ * API: mac(r16, s16, msg) → tag 16 byte.
+ *   - r di-clamp per byte sesuai mask RFC (LE): ff ff ff 0f fc ff ff 0f ...
+ *   - per blok 16 byte: acc = ((acc + n) · r) mod p, n = blok ‖ 0x01
+ *   - tag = (acc + s) mod 2^128 (low 16 byte)
+ *
+ * Semua nilai slot < 2^31 — aman int32 signed.
+ */
+
+class Poly {
+
+    static int[] plimbs() {
+        int[] v = new int[9];
+        v[0] = 32763;
+        for (int i = 1; i < 8; i++) v[i] = 32767;
+        v[8] = 1023;
+        return v;
+    }
+
+    static int[] maskLE() {
+        int[] m = new int[16];
+        m[0] = 255; m[1] = 255; m[2] = 255; m[3] = 15;
+        m[4] = 252; m[5] = 255; m[6] = 255; m[7] = 15;
+        m[8] = 252; m[9] = 255; m[10] = 255; m[11] = 15;
+        m[12] = 252; m[13] = 255; m[14] = 255; m[15] = 15;
+        return m;
+    }
+
+    /* tambah byte val pada posisi bit 8·pos (pos = indeks byte blok) */
+    static void addByte(int[] v, int pos, int val) {
+        int sh = pos * 8;
+        int slot = sh / 15;
+        int off = sh % 15;
+        v[slot] = v[slot] + (val << off);
+    }
+
+    /* cari-angkut 9 slot; sisa ke slot 9 (kecil, tetap dipantau) */
+    static void carPass(int[] v) {
+        int c = 0;
+        for (int i = 0; i < 9; i++) {
+            int s = v[i] + c;
+            v[i] = s & 32767;
+            c = s >> 15;
+        }
+        v[9] = v[9] + c;
+    }
+
+    /* lipat slot 9..len-1: 2^(15k) → 160·2^(15(k-9)); k dari besar ke kecil
+     * agar k contributions hi dari slot besar ikut terserap di pass ini */
+    static void foldAll(int[] v) {
+        for (int k = v.length - 1; k >= 9; k--) {
+            int f = 160 * v[k];
+            v[k] = 0;
+            v[k - 9] = v[k - 9] + (f & 32767);
+            v[k - 8] = v[k - 8] + (f >> 15);
+        }
+    }
+
+    /* (acc + blok)·r: schoolbook 9×9 → 18 slot, lalu fold + carPass 3 kali.
+     * acc[0..8] masuk ternormalisasi (< 2^15); keluar < 2^135, slot 9 ~0 */
+    static void mulFold(int[] acc, int[] rsl) {
+        int[] pr = new int[18];
+        for (int i = 0; i < 9; i++) {
+            int xi = acc[i];
+            int c = 0;
+            for (int j = 0; j < 9; j++) {
+                int t = pr[i + j] + xi * rsl[j] + c;
+                pr[i + j] = t & 32767;
+                c = t >> 15;
+            }
+            pr[i + 9] = pr[i + 9] + c;
+        }
+        for (int k = 17; k >= 9; k--) {
+            int f = 160 * pr[k];
+            pr[k] = 0;
+            pr[k - 9] = pr[k - 9] + (f & 32767);
+            pr[k - 8] = pr[k - 8] + (f >> 15);
+        }
+        carPass(pr);
+        foldAll(pr);
+        carPass(pr);
+        foldAll(pr);
+        carPass(pr);
+        for (int j = 0; j < 10; j++) acc[j] = pr[j];
+    }
+
+    /* v ternormalisasi (slot < 2^15, slot 9 ≈ 0): bandingkan dengan p */
+    static int cmpP(int[] v) {
+        int[] pl = plimbs();
+        for (int i = 8; i >= 0; i--) {
+            if (v[i] > pl[i]) return 1;
+            if (v[i] < pl[i]) return -1;
+        }
+        return 0;
+    }
+
+    static void subP(int[] v) {
+        int[] pl = plimbs();
+        int b = 0;
+        for (int i = 0; i < 9; i++) {
+            int t = v[i] - pl[i] - b;
+            if (t < 0) {
+                t = t + 32768;
+                b = 1;
+            } else {
+                b = 0;
+            }
+            v[i] = t;
+        }
+    }
+
+    /* MAC: r 16 byte, s 16 byte, msg → tag 16 byte */
+    static int[] mac(int[] r, int[] s, int[] msg) {
+        int[] mk = maskLE();
+        int[] rc = new int[16];
+        for (int i = 0; i < 16; i++) rc[i] = r[i] & mk[i];
+
+        /* r → slot: byte b menempati bit 8b..8b+7 */
+        int[] rsl = new int[10];
+        for (int b = 0; b < 16; b++) addByte(rsl, b, rc[b]);
+        carPass(rsl);
+
+        int[] acc = new int[10];
+        int n = msg.length;
+        for (int i = 0; i < n; i += 16) {
+            int take = n - i;
+            if (take > 16) take = 16;
+            for (int j = 0; j < take; j++) addByte(acc, j, msg[i + j]);
+            addByte(acc, take, 1);          /* byte 0x01 sesuai RFC */
+            carPass(acc);
+            mulFold(acc, rsl);
+        }
+
+        /* kurangi p sampai < p (deterministik: cap 40 pasti cukup:
+         * nilai setelah fold < 2^136 < 36·p) */
+        foldAll(acc);
+        carPass(acc);
+        foldAll(acc);
+        carPass(acc);
+        for (int t2 = 0; t2 < 40; t2++) {
+            int c2 = cmpP(acc);
+            if (c2 < 0) t2 = 40;
+            if (c2 >= 0) subP(acc);
+        }
+
+        /* tag = (acc + s) mod 2^128 → ambil 16 byte rendah */
+        for (int j2 = 0; j2 < 16; j2++) addByte(acc, j2, s[j2]);
+        carPass(acc);
+        int[] tag = new int[16];
+        for (int b2 = 0; b2 < 16; b2++) {
+            int sh2 = b2 * 8;
+            int slot2 = sh2 / 15;
+            int off2 = sh2 % 15;
+            int raw = acc[slot2] >>> off2;
+            if (slot2 + 1 < 9) raw = raw | (acc[slot2 + 1] << (15 - off2));
+            tag[b2] = raw & 255;
+        }
+        return tag;
+    }
+}
