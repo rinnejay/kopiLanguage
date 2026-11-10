@@ -260,6 +260,40 @@ static void gen_stmt(Method *m, Node *s) {
             emit("\tadrp\tx1, :got:cpool%d", (int)s->cp);
             emit("\tldr\tx1, [x1, :got_lo12:cpool%d]", (int)s->cp);
             emit("\tbl\tprintf");
+        } else if ((Ty)s->a->dty == T_ARI) {
+            int lloop = nlab++, lend = nlab++;
+            gen_expr(m, s->a);
+            emit("\tsub\tsp, sp, #32");
+            emit("\tstr\tx0, [sp]");
+            emit("\tstr\twzr, [sp, #8]");
+            emit(".L%d:", lloop);
+            emit("\tldr\tx14, [sp]");
+            emit("\tldr\tw16, [sp, #8]");
+            emit("\tldr\tw15, [x14]");
+            emit("\tcmp\tw16, w15");
+            emit("\tb.hs\t.L%d", lend);
+            emit("\tsxtw\tx9, w16");
+            emit("\tlsl\tx9, x9, #3");
+            emit("\tadd\tx9, x9, #8");
+            emit("\tldr\tw0, [x14, x9]");
+            emit("\tadrp\tx1, :got:stdout");
+            emit("\tldr\tx1, [x1, :got_lo12:stdout]");
+            emit("\tldr\tx1, [x1]");
+            emit("\tbl\tfputc");
+            emit("\tldr\tw16, [sp, #8]");
+            emit("\tadd\tw16, w16, #1");
+            emit("\tstr\tw16, [sp, #8]");
+            emit("\tb\t.L%d", lloop);
+            emit(".L%d:", lend);
+            if (s->ival) {
+                emit("\tmov\tw0, #10");
+                emit("\tadrp\tx1, :got:stdout");
+                emit("\tldr\tx1, [x1, :got_lo12:stdout]");
+                emit("\tldr\tx1, [x1]");
+                emit("\tbl\tfputc");
+            }
+            emit("\tadd\tsp, sp, #32");
+            emit("\tmov\tw0, wzr");
         } else {
             gen_expr(m, s->a);
             Ty pt = (Ty)s->a->dty;

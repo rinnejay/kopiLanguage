@@ -37,6 +37,7 @@ enum {
     OP_CONV,        /* 2 byte: from,to */
     OP_NORM,        /* 1 byte: tipe */
     OP_PRINTNUM,    /* 2 byte: tipe, newline */
+    OP_PRINTBUF,    /* 1 byte: newline; tulis array byte ke fd 1 */
 };
 
 #define MAXM 4096
@@ -759,6 +760,18 @@ static void run(void) {
                 printf("%" PRId64 "%s", v, ln ? "\n" : "");
             else if (t == T_FLOAT) printf("%.9g%s", (double)bits_f(v), ln ? "\n" : "");
             else printf("%.15g%s", bits_d(v), ln ? "\n" : "");
+            break;
+        }
+        case OP_PRINTBUF: {
+            int ln = m->code[f->pc++];
+            long *buf = (long *)stackv[--sp];
+            long len = buf[0];
+            unsigned char *tmp = (unsigned char *)malloc((size_t)(len > 0 ? len : 1));
+            if (!tmp) dievm("print: memori habis");
+            for (long i = 0; i < len; i++) tmp[i] = (unsigned char)(buf[1 + i] & 0xff);
+            fwrite(tmp, 1, (size_t)len, stdout);
+            free(tmp);
+            if (ln) fputc(10, stdout);
             break;
         }
         case OP_HALT:

@@ -5,7 +5,7 @@
  * sehingga SEMUA token lain (keyword & multi-char) harus >= 256 agar tidak
  * bertabrakan dengan operator ASCII. */
 enum {
-    T_EOF = 0, T_NUM, TK_STR, T_ID,          /* < 256 */
+    T_EOF = 0, T_NUM, TK_STR, TK_TSTR, T_ID, /* < 256 */
 
     KW_CLASS = 256, KW_PUBLIC, KW_PRIVATE, KW_STATIC, KW_FINAL,
     KW_INT, KW_BOOL, KW_VOID, KW_STRING,
@@ -34,5 +34,6 @@ typedef struct {
 } Tok;
 
 Tok *lex_file(const char *path, int *ntoks);
+Tok *lex_text(const char *src, const char *fname, int startline, int *ntoks);
 
 #endif

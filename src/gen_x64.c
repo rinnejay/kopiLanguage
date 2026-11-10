@@ -241,6 +241,35 @@ static void gen_stmt(Method *m, Node *s) {
         if (s->str) {
             emit("\tleaq cpool%d(%%rip), %%rsi", (int)s->cp);
             emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "sn" : "s");
+        } else if ((Ty)s->a->dty == T_ARI) {
+            int lloop = nlab++, lend = nlab++;
+            gen_expr(m, s->a);
+            emit("\tsubq $16, %%rsp");
+            emit("\tmovq %%rax, (%%rsp)");
+            emit("\tmovq $0, 8(%%rsp)");
+            emit(".L%d:", lloop);
+            emit("\tmovq (%%rsp), %%r10");
+            emit("\tmovq 8(%%rsp), %%r11");
+            emit("\tmovq (%%r10), %%rax");
+            emit("\tcmpq %%rax, %%r11");
+            emit("\tjge .L%d", lend);
+            emit("\tmovq %%r11, %%rax");
+            emit("\tshlq $3, %%rax");
+            emit("\tmovq 8(%%r10,%%rax), %%rdi");
+            emit("\tmovq stdout@GOTPCREL(%%rip), %%rsi");
+            emit("\tmovq (%%rsi), %%rsi");
+            emit("\tcall fputc@PLT");
+            emit("\tincq 8(%%rsp)");
+            emit("\tjmp .L%d", lloop);
+            emit(".L%d:", lend);
+            if (s->ival) {
+                emit("\tmovl $10, %%edi");
+                emit("\tmovq stdout@GOTPCREL(%%rip), %%rsi");
+                emit("\tmovq (%%rsi), %%rsi");
+                emit("\tcall fputc@PLT");
+            }
+            emit("\taddq $16, %%rsp");
+            emit("\txorl %%eax, %%eax");
         } else {
             gen_expr(m, s->a);
             Ty pt = (Ty)s->a->dty;

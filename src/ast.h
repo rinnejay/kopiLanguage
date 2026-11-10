@@ -108,6 +108,7 @@ enum {
     EX_NET,        /* builtin Net.* : ival=idx builtin, a=args            */
     EX_STRLIT,     /* string literal dalam ekspresi (khusus Net.bytes)    */
     EX_CAST,       /* (tipe) expr : a=operand, dty=tipe tujuan            */
+    EX_TSTR,       /* template `...{expr}...` : a=daftar bagian (byte/ekspresi) */
     /* statements */
     ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
@@ -122,6 +123,7 @@ typedef struct Node {
     double fval;       /* literal float/double atau nilai cast compile-time */
     long cp;           /* index cpool (ST_PRINT string atau grep codegen) */
     int dty;           /* tipe deklarasi / tipe hasil ekspresi */
+    int typed;         /* sudah melalui type_expr (cache resolusi) */
     int line;
     const char *file;  /* file sumber AST — untuk laporan error */
     struct Method *meth; /* EX_CALL: metode target (untuk konversi argumen) */

@@ -57,19 +57,44 @@ static char *unescape(const char *s, size_t n, char endq) {
     return out;
 }
 
-Tok *lex_file(const char *path, int *ntoks) {
-    g_srcfile = path;
-    FILE *f = fopen(path, "rb");
-    if (!f) die("tidak bisa membuka file: %s", path);
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char *src = xmalloc((size_t)size + 1);
-    if (fread(src, 1, (size_t)size, f) != (size_t)size) die("gagal membaca file: %s", path);
-    fclose(f);
-    src[size] = 0;
+/* lewati satu template `...{...}...` (mendukung nested template di dalam
+ * interpolasi). *pp masuk di posisi backtick, keluar setelah backtick tutup. */
+static void scan_tpl(const char **pp, int *line) {
+    const char *p = *pp;
+    p++;                                   /* lewati ` pembuka */
+    int depth = 0;
+    while (*p) {
+        if (*p == '\\' && p[1]) {
+            if (p[1] == '\n') (*line)++;
+            p += 2;
+            continue;
+        }
+        if (*p == '`') {
+            if (depth == 0) { p++; *pp = p; return; }
+            scan_tpl(&p, line);            /* template bersarang */
+            continue;
+        }
+        if (depth > 0 && (*p == '"' || *p == '\'')) {
+            char q = *p;
+            p++;
+            while (*p && *p != q) {
+                if (*p == '\\' && p[1]) p++;
+                p++;
+            }
+            if (*p) p++;
+            continue;
+        }
+        if (*p == '{') depth++;
+        else if (*p == '}') { if (depth > 0) depth--; }
+        if (*p == '\n') (*line)++;
+        p++;
+    }
+    die("template ` tidak ditutup");
+}
 
-    int cap = 256, n = 0, line = 1;
+static Tok *lex_scan(char *src, const char *fname, int startline, int *ntoks) {
+    g_srcfile = fname;
+    int cap = 256, n = 0, line = startline;
     Tok *toks = xmalloc(sizeof(Tok) * (size_t)cap);
     char *p = src;
 
@@ -191,16 +216,24 @@ Tok *lex_file(const char *path, int *ntoks) {
             PUSH(type, type == T_ID ? xstrndup(start, len) : 0, 0);
             continue;
         }
-        if (*p == '"') {
+        if (*p == '`') {
+            char *start = p + 1;
+            scan_tpl(&p, &line);
+            char *end = p - 1;                 /* sebelum backtick tutup */
+            PUSH(TK_TSTR, xstrndup(start, (size_t)(end - start)), 0);
+            continue;
+        }
+        if (*p == '"' || *p == '\'') {
+            char q = *p;
             p++;
             char *start = p;
-            while (*p && *p != '"') {
+            while (*p && *p != q) {
                 if (*p == '\n') die("baris %d: string tidak ditutup", line);
                 if (*p == '\\') p++;
                 p++;
             }
             if (!*p) die("baris %d: string tidak ditutup", line);
-            PUSH(TK_STR, unescape(start, (size_t)(p - start), '"'), 0);
+            PUSH(TK_STR, unescape(start, (size_t)(p - start), q), 0);
             p++;
             continue;
         }
@@ -241,4 +274,23 @@ Tok *lex_file(const char *path, int *ntoks) {
     (void)src;
     *ntoks = n;
     return toks;
+}
+
+Tok *lex_file(const char *path, int *ntoks) {
+    g_srcfile = path;
+    FILE *f = fopen(path, "rb");
+    if (!f) die("tidak bisa membuka file: %s", path);
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *src = xmalloc((size_t)size + 1);
+    if (fread(src, 1, (size_t)size, f) != (size_t)size) die("gagal membaca file: %s", path);
+    fclose(f);
+    src[size] = 0;
+
+    return lex_scan(src, path, 1, ntoks);
+}
+
+Tok *lex_text(const char *src, const char *fname, int startline, int *ntoks) {
+    return lex_scan((char *)src, fname, startline, ntoks);
 }

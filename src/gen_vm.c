@@ -25,7 +25,7 @@ enum {
     OP_EQ64, OP_NE64,
     OP_FADD, OP_FSUB, OP_FMUL, OP_FDIV, OP_FMOD, OP_FNEG,
     OP_FLT, OP_FGT, OP_FLE, OP_FGE, OP_FEQ, OP_FNE,
-    OP_CONV, OP_NORM, OP_PRINTNUM,
+    OP_CONV, OP_NORM, OP_PRINTNUM, OP_PRINTBUF,
 };
 
 typedef struct {
@@ -135,6 +135,8 @@ static void gen_stmt(Node *s) {
             Ty pt = (Ty)s->a->dty;
             if (pt == T_INT || pt == T_BOOL) {
                 em8(s->ival ? OP_PRINTILN : OP_PRINTI);
+            } else if (pt == T_ARI) {
+                em8(OP_PRINTBUF); em8(s->ival ? 1 : 0);
             } else {
                 em8(OP_PRINTNUM); em8((int)pt); em8(s->ival ? 1 : 0);
             }

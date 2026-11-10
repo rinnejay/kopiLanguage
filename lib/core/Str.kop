@@ -276,6 +276,102 @@ class Str {
         return o;
     }
 
+    /* ── konversi untuk template & umum (v1.7.1) ─────────────── */
+
+    static int[] boolText(boolean b) {
+        if (b) return Net.bytes("true");
+        return Net.bytes("false");
+    }
+
+    /* uint32 (nilai kanonik zero-extended di int) */
+    static int[] fromUInt(int v) {
+        if (v >= 0) return fromInt(v);
+        long u = ((long)v) & 4294967295L;
+        return fromLong(u);
+    }
+
+    static int[] fromLong(long v) {
+        boolean neg = v < 0;
+        long n = v;
+        int[] tmp = new int[24];
+        int k = 0;
+        if (n == 0) { tmp[0] = 48; k = 1; }
+        while (n != 0) {
+            long d = n % 10;
+            if (d < 0) d = -d;
+            tmp[k] = 48 + (int)d;
+            k++;
+            n = n / 10;
+        }
+        int off = 0;
+        if (neg) off = 1;
+        int[] o = new int[k + off];
+        if (neg) o[0] = 45;
+        for (int i = 0; i < k; i++) o[off + i] = tmp[k - 1 - i];
+        return o;
+    }
+
+    /* uint64: divisi unsigned bit-per-bit */
+    static int[] fromULong(long v) {
+        if (v >= 0) return fromLong(v);
+        int[] tmp = new int[24];
+        int k = 0;
+        long x = v;
+        while (x != 0) {
+            long q = 0;
+            int rem = 0;
+            for (int b = 63; b >= 0; b--) {
+                rem = rem * 2 + (int)((x >>> b) & 1);
+                q = q << 1;
+                if (rem >= 10) { rem = rem - 10; q = q | 1; }
+            }
+            tmp[k] = 48 + rem;
+            k++;
+            x = q;
+        }
+        if (k == 0) { tmp[0] = 48; k = 1; }
+        int[] o = new int[k];
+        for (int i = 0; i < k; i++) o[i] = tmp[k - 1 - i];
+        return o;
+    }
+
+    /* double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang).
+     * Batas jujur: bukan algoritma pembulatan Java/printf. */
+    static int[] fromDouble(double d) {
+        boolean neg = d < 0.0;
+        boolean isnan = d != d;
+        double x = d;
+        if (neg) x = -x;
+        if (isnan) return Net.bytes("nan");
+        if (x > 9000000000000000000.0) {
+            if (neg) return Net.bytes("-inf");
+            return Net.bytes("inf");
+        }
+        long ip = (long)x;
+        int[] o = fromLong(ip);
+        double frac = x - (double)ip;
+        if (frac > 0.0000005) {
+            int[] fd = new int[6];
+            int k = 0;
+            for (int i = 0; i < 6; i++) {
+                frac = frac * 10.0;
+                int dig = (int)frac;
+                fd[k] = 48 + dig;
+                k++;
+                frac = frac - (double)dig;
+            }
+            while (k > 0 && fd[k - 1] == 48) k--;
+            if (k > 0) {
+                o = cat(o, Net.bytes("."));
+                int[] fr = new int[k];
+                for (int i = 0; i < k; i++) fr[i] = fd[i];
+                o = cat(o, fr);
+            }
+        }
+        if (neg) o = cat(Net.bytes("-"), o);
+        return o;
+    }
+
     static void print(int[] s) {
         for (int i = 0; i < s.length; i++) Net.wrb(1, s[i]);
     }

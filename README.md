@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.7.0 hari ini  ████████████████  81/81 test hijau — file I/O, waktu, Str, Map/Set/Deque (a64 + VM)
+v1.7.1 hari ini  ████████████████  83/83 test hijau — template `...{expr}...` + single-quote string (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -69,6 +69,7 @@ v1.7.0 hari ini  ████████████████  81/81 test hi
 | **v1.6.4** | **JSON native**: literal `json {...}` / `json [...]` (sampai 8 entri; lebih dari 4 pasangan objek dirangkai via `Json.put`), nilai berupa tape `int[]` sehingga bisa disimpan di variabel, dipassing, dan dikembalikan fungsi. Pustaka `lib/core/Json.kop`: `parse`, `write`, `print`/`line`, `typeOf`/`isNull`/`isBool`/`isNumber`/`isString`/`isArray`/`isObject`, `asInt`/`asDouble`/`asBool`/`asText`, `count`/`at`/`get`/`has`, `put`/`del`/`add` (immutable), konstruktor `nullV`/`boolV`/`num`/`str`/`arrN`/`objN`. Angka disimpan sebagai teks sumber (format dipertahankan), string di-escape saat ditulis, `\uXXXX` didekode ke UTF-8 (tanpa pasangan surrogate). Parser mengenal token `:`; uji `jsontest` di VM & a64 + sintaks x64; suite 75/75 |
 | **v1.6.5** | **uji ketangguhan proyek besar** `examples/proyekbesar/`: **54 file `.kop`** (53 modul + main) saling `import`, memakai pustaka (`Math`, `Arrays`, `Stats`, `Matrix`, `Json`, `Cipher`, `Hash`) dan modul lokal (struktur data, algoritma, CSV/JSON, inventory/order/billing, lexer/compiler/evaluator/VM mini). Harness `bench.py`: kompilasi a64/VM/x64 **paralel**, eksekusi a64 & VM **paralel** dengan timeout 120 s, sampling `VmHWM` untuk puncak RSS, banding output byte-per-byte, lalu **4 proses a64 paralel**. Hasil acuan: kompilasi ~0,13 s; a64 ~0,14 s, VM ~0,94 s; puncak RSS ~24 MB; 102 baris output identik; tanpa hang/OOM (fase memori ≈21,6 MB payload pada arena/heap 32 MB). Juga ditambahkan `Json.write` (publik) dan `proyekbesar` masuk `test.sh` (a64/VM/x64) |
 | **v1.7.0** | **fondasi OS + teks + collections**: builtin baru `Net.openb` (path dinamis), `mkdirb`, `unlinkb`, `renameb`, `seek`, `time`, `mono` (long ms), `sleep`, `exit` di a64/x64/VM. Library baru: **`Str`** (potong/gabung/cari/ganti/trim/case/pad/angka/hex/UTF-8 count), **`Map`** (int→int open addressing, grow/forEach), **`Set`**, **`Deque`**, **`File`** (create/append/baca/tulis/seek/size/rename/unlink/mkdir), **`Path`**, **`Time`** (epoch/mono/sleep, kalender UTC + format). Bug yang ikut diperbaiki: capture **array** dalam lambda (EX_ENVLOAD hanya 32-bit), path syscall belum NUL-terminated, pointer rename tertukar, seek membaca 64-bit dari slot 32-bit. Uji `ostest` (file I/O) & `textmap` (Str/Map/Set/Deque/Path/Time) di VM & a64 + sintaks x64; suite 81/81 |
+| **v1.7.1** | **template string** dengan backtick: `` `Halo {nama}, umur {umur}` ``. Interpolasi `{ekspresi}` mendukung `int/uint*/long/uint64/bool/float/double/int[]` (teks), escape `\n \t \r \0 \\ \` \{ \}`, literal `{{`/`}}`, **template bersarang**, dan dapat disimpan di variabel/dikembalikan fungsi. `'...'` dan `"..."` tetap string biasa (tanpa interpolasi). `System.out.println/print` kini menerima hasil template (byte array) lewat `fwrite/fputc` agar urutan output tetap. Ditambahkan `Str.boolText/fromUInt/fromLong/fromULong/fromDouble`; cache tipe (`Node.typed`) memperbaiki resolusi ganda pada template. Uji `tstrtest` di VM & a64 + sintaks x64; suite 83/83 |
 
 ## Bangun
 
@@ -199,6 +200,50 @@ float  f     = 1.5f + 2.25f;           // 3.75
   sebagai batas, bukan jaminan lintas-CPU).
 - Backend **x64** menerima tipe baru (assembly lolos `cc -target`, diuji
   sintaks); eksekusi runtime baru diverifikasi di **aarch64** dan **VM**.
+
+## Template string (v1.7.1)
+
+Hanya **backtick** yang menjadi formatter; `'...'` dan `"..."` tetap string
+biasa tanpa interpolasi.
+
+```java
+import Str;
+
+int umur = 20;
+int[] nama = Net.bytes("budi");
+boolean aktif = true;
+long besar = 5000000000L;
+
+System.out.println(`Halo {nama}, umur {umur} aktif={aktif}`);
+// Halo budi, umur 20 aktif=true
+System.out.println(`long={besar} kali={umur * 2}`);
+int[] s = `x{1}y`;                  // bisa disimpan di variabel
+System.out.println(`nested {`inner {umur}`}`);
+System.out.println(`literal {{x}} \{y\} dan \`bt\``);
+```
+
+Aturan:
+
+- `{ekspresi}` = satu ekspresi Kopi; boleh panggil metode (`{dua()}`,
+  `{Str.upper(nama)}`), aritmetika (`{umur + 2}`), atau template bersarang.
+- Tipe yang bisa diinterpolasi: `int`, `byte/short`, `uint8/16/32/64`,
+  `long`, `boolean`, `float`, `double`, dan `int[]` (dianggap teks).
+  Konversi memakai `Str.fromInt/fromUInt/fromLong/fromULong/fromDouble/
+  boolText`, jadi **butuh `import Str;`** bila ada interpolasi angka/bool
+  atau penggabungan >1 bagian.
+- Escape: `\n \t \r \0 \\ \` \{ \}`; `{{` dan `}}` = kurung literal.
+- `System.out.println(`...`)` / `print(`...`)` menerima byte array hasil
+  template. Implementasi memakai `fwrite/fputc` supaya urutan dengan
+  `println` lain tetap benar.
+
+Batas jujur:
+
+- Tidak ada format specifier (`%02d`, padding, locale). Padding manual:
+  `Str.padLeft(Str.fromInt(x), 3, 48)` — atau interpolasi hasilnya.
+- `double`/`float` dicetak maksimal **6 digit pecahan** dengan nol ekor
+  dibuang (`1.0` → `1`), bukan algoritma Java `Double.toString`.
+- `{...}` harus berisi ekspresi; blok pernyataan tidak bisa.
+- Teks tetap `int[]`; belum ada tipe `String` native.
 
 ## OS, teks, collections, waktu (v1.7.0)
 
@@ -513,7 +558,7 @@ Kopi, bukan kode built-in compiler:
 | `lib/core/Matrix.kop`  | `zero identity add sub scale transpose mul trace det1 det2 det3 det det isIdentity` (matriks persegi, `int[]` datar) |
 | `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge copy reverse sort` (merge sort O(n log n)) + `binSearch`; **fungsional**: `forEach forEachIndexed map filter reduce any all countWhere findIndex sumBy` |
 | `lib/core/Json.kop`       | `parse write print line typeOf isNull isBool isNumber isString isArray isObject asInt asDouble asBool asText count at get has put del add nullV boolV num str arrN objN` |
-| `lib/core/Str.kop`        | `len eq cmp copy cat slice at indexOf lastIndexOf contains startsWith endsWith trim upper lower repeat reverse replaceByte replaceSeq countByte splitCount splitAt padLeft padRight fromInt toInt isDigits equalsIgnoreCase utf8Count hex print line` |
+| `lib/core/Str.kop`        | `len eq cmp copy cat slice at indexOf lastIndexOf contains startsWith endsWith trim upper lower repeat reverse replaceByte replaceSeq countByte splitCount splitAt padLeft padRight fromInt fromUInt fromLong fromULong fromDouble boolText toInt isDigits equalsIgnoreCase utf8Count hex print line` |
 | `lib/core/Map.kop`        | `make cap size put get getOr has remove clear grow forEach` (int→int, open addressing) |
 | `lib/core/Set.kop`        | `make add has remove size clear grow forEach` |
 | `lib/core/Deque.kop`      | `make capacity size isEmpty isFull pushBack pushFront popFront popBack get clear` |

@@ -599,6 +599,108 @@ static Node *json_value(void) {
     return 0;
 }
 
+/* ── template string `...{ekspresi}...` (v1.7.1) ────────────────── */
+
+static int tstr_close(const char *s, int start) {
+    int depth = 1;
+    int i = start;
+    while (s[i]) {
+        char c = s[i];
+        if (c == '\\') { i += 2; continue; }
+        if (c == '\'' || c == '"' || c == '`') {
+            char q = c;
+            i++;
+            while (s[i] && s[i] != q) {
+                if (s[i] == '\\' && s[i + 1]) i++;
+                i++;
+            }
+            if (s[i]) i++;
+            continue;
+        }
+        if (c == '{') depth++;
+        else if (c == '}') {
+            depth--;
+            if (depth == 0) return i;
+        }
+        i++;
+    }
+    return -1;
+}
+
+static void tstr_append(Node **head, Node **tail, Node *n) {
+    n->next = 0;
+    if (*tail) (*tail)->next = n; else *head = n;
+    *tail = n;
+}
+
+static Node *parse_tstr(const char *raw, int line) {
+    int n = (int)strlen(raw);
+    char *lit = xmalloc((size_t)n + 1);
+    int ln = 0;
+    Node *head = 0, *tail = 0;
+    int i = 0;
+    while (i < n) {
+        char c = raw[i];
+        if (c == '\\' && i + 1 < n) {
+            char e = raw[i + 1];
+            if (e == 'n') lit[ln] = 10;
+            else if (e == 't') lit[ln] = 9;
+            else if (e == 'r') lit[ln] = 13;
+            else if (e == '0') lit[ln] = 0;
+            else lit[ln] = e;
+            ln++;
+            i += 2;
+            continue;
+        }
+        if (c == '{' && i + 1 < n && raw[i + 1] == '{') {
+            lit[ln] = '{'; ln++; i += 2; continue;
+        }
+        if (c == '}' && i + 1 < n && raw[i + 1] == '}') {
+            lit[ln] = '}'; ln++; i += 2; continue;
+        }
+        if (c == '{') {
+            if (ln > 0) {
+                lit[ln] = 0;
+                tstr_append(&head, &tail, mk_netbytes(lit, line));
+                ln = 0;
+            }
+            int close = tstr_close(raw, i + 1);
+            if (close < 0)
+                die("baris %d: template: '}' penutup ekspresi tidak ditemukan", line);
+            int sublen = close - i - 1;
+            char *sub = xmalloc((size_t)sublen + 1);
+            memcpy(sub, raw + i + 1, (size_t)sublen);
+            sub[sublen] = 0;
+            int nt = 0;
+            Tok *tt = lex_text(sub, "<template>", line, &nt);
+            Tok *savets = ts;
+            int saveti = ti;
+            ts = tt;
+            ti = 0;
+            Node *ex = expr();
+            if (!at(T_EOF))
+                die("baris %d: template: ekspresi '{...}' tidak valid", line);
+            ts = savets;
+            ti = saveti;
+            tstr_append(&head, &tail, ex);
+            i = close + 1;
+            continue;
+        }
+        lit[ln] = c;
+        ln++;
+        i++;
+    }
+    if (ln > 0) {
+        lit[ln] = 0;
+        tstr_append(&head, &tail, mk_netbytes(lit, line));
+    }
+    if (head == 0) return mk_netbytes("", line);
+    if (head->next == 0 && head->kind == EX_NET) return head;
+    Node *node = newnode(EX_TSTR, line);
+    node->a = head;
+    return node;
+}
+
 static Node *postfix(void);   /* deklarasi maju: operand cast */
 
 static Node *primary(void) {
@@ -611,6 +713,11 @@ static Node *primary(void) {
         n->dty = t->numty;
         advance();
         return n;
+    }
+    if (at(TK_TSTR)) {
+        const char *raw = xs(peek()->text);
+        advance();
+        return parse_tstr(raw, line);
     }
     if (at(KW_JSON)) {
         advance();
@@ -1064,8 +1171,10 @@ static Ty type_expr_raw(Node *e);
 static int fits_literal(Ty dst, Node *e);
 
 static Ty type_expr(Node *e) {
+    if (e->typed) return (Ty)e->dty;
     Ty t = type_expr_raw(e);
     e->dty = (int)t;          /* semua ekspresi menyimpan tipe hasilnya */
+    e->typed = 1;
     return t;
 }
 
@@ -1082,6 +1191,54 @@ static Ty type_expr_raw(Node *e) {
         if (e->ival == 5 || e->ival == 6) return (Ty)e->dty;
         for (Node *aa = e->a; aa; aa = aa->next) type_expr(aa);
         return T_INT;
+    }
+    case EX_TSTR: {
+        Node *acc = 0;
+        Node *part = e->a;
+        while (part) {
+            Node *next = part->next;
+            part->next = 0;
+            Ty pt = type_expr(part);
+            Node *as = part;
+            if (pt != T_ARI) {
+                const char *fn = 0;
+                if (pt == T_BOOL) fn = "boolText";
+                else if (pt == T_INT || pt == T_BYTE || pt == T_SHORT) fn = "fromInt";
+                else if (pt == T_UINT8 || pt == T_UINT16 || pt == T_UINT32) fn = "fromUInt";
+                else if (pt == T_LONG) fn = "fromLong";
+                else if (pt == T_UINT64) fn = "fromULong";
+                else if (pt == T_FLOAT || pt == T_DOUBLE) fn = "fromDouble";
+                if (!fn)
+                    die("baris %d: template tidak mendukung tipe ini", e->line);
+                if (!find_method("Str", fn))
+                    die("baris %d: template butuh 'import Str;' untuk format angka/boolean", e->line);
+                char fname[64];
+                snprintf(fname, sizeof fname, "Str.%s", fn);
+                as = mk_call1(fname, part, e->line);
+            }
+            if (acc == 0) {
+                acc = as;
+            } else {
+                if (!find_method("Str", "cat"))
+                    die("baris %d: template butuh 'import Str;' untuk penggabungan", e->line);
+                Node *pair[2];
+                pair[0] = acc;
+                pair[1] = as;
+                acc = mk_call("Str.cat", pair, 2, e->line);
+            }
+            part = next;
+        }
+        if (acc == 0) acc = mk_netbytes("", e->line);
+        Node *savenext = e->next;
+        int saveline = e->line;
+        const char *savefile = e->file;
+        Ty rt = type_expr(acc);
+        *e = *acc;
+        e->next = savenext;
+        e->line = saveline;
+        e->file = savefile;
+        e->dty = (int)rt;
+        return rt;
     }
     case EX_CAST: {
         Ty from = type_expr(e->a);
@@ -1461,8 +1618,8 @@ static void resolve_stmt(Node *s) {
     case ST_PRINT: {
         if (s->str) return;
         Ty et = type_expr(s->a);
-        if (!ty_is_num(et) && et != T_BOOL)
-            die("baris %d: println/print hanya menerima numerik, boolean, atau string literal", s->line);
+        if (!ty_is_num(et) && et != T_BOOL && et != T_ARI)
+            die("baris %d: println/print hanya menerima numerik, boolean, atau teks/string literal", s->line);
         break;
     }
     case ST_EXPR:

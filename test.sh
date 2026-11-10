@@ -343,6 +343,70 @@ for t in ostest textmap; do
         && echo "PASS  $t [x64]" || { echo "FAIL  $t [x64]"; FAIL=$((FAIL+1)); }
 done
 
+# ─── template string backtick `...{expr}...` (v1.7.1) ───────────────────
+cat > "$T/kopi/tstrtest.kop" <<'EOF'
+import Str;
+
+class Main {
+    static int dua() { return 2; }
+
+    static int[] sapa(int umur) {
+        return `umur={umur}`;
+    }
+
+    public static void main(String[] args) {
+        int umur = 20;
+        long besar = 5000000000L;
+        uint32 u = 4294967295U;
+        uint64 uq = 18446744073709551615UL;
+        boolean aktif = true;
+        double pi = 3.5;
+        float f = 1.25f;
+        int[] nama = Net.bytes("budi");
+
+        System.out.println(`Halo {nama}, umur {umur} aktif={aktif}`);
+        System.out.println(`long={besar} u32={u} u64={uq}`);
+        System.out.println(`pi={pi} f={f} neg={-7}`);
+        System.out.println(`longm={-5000000000L}`);
+        System.out.println(`d={0.1} t={1.0 / 3.0} f3={1.0f / 3.0f}`);
+        System.out.println(`b={false} not={!true}`);
+        System.out.println(`multi={1}{2}{3}`);
+        System.out.println(`literal {{x}} \{y\} dan \`bt\` dollar=$`);
+        System.out.println(sapa(umur));
+        System.out.println(`nested {`inner {umur}`}`);
+        System.out.println(`bytes={(nama)} expr={umur + dua()}`);
+        System.out.print(`tanpa newline`);
+        System.out.println("");
+        System.out.println('kutip tunggal {tetap literal}');
+        System.out.println("kutip ganda {tetap literal}");
+        System.out.println(Str.len(`a{1}b`));
+        int[] t = `x{2}y`;
+        System.out.println(t.length);
+        System.out.println(Str.eq(t, Net.bytes("x2y")));
+    }
+}
+EOF
+printf '%s\n' \
+ 'Halo budi, umur 20 aktif=true' \
+ 'long=5000000000 u32=4294967295 u64=18446744073709551615' \
+ 'pi=3.5 f=1.25 neg=-7' \
+ 'longm=-5000000000' \
+ 'd=0.1 t=0.333333 f3=0.333333' \
+ 'b=false not=false' \
+ 'multi=123' \
+ 'literal {x} {y} dan `bt` dollar=$' \
+ 'umur=20' \
+ 'nested inner 20' \
+ 'bytes=budi expr=22' \
+ 'tanpa newline' \
+ 'kutip tunggal {tetap literal}' \
+ 'kutip ganda {tetap literal}' \
+ '3' '3' '1' > "$T/kopi/tstrtest.ref"
+check tstrtest "$T/kopi/tstrtest.kop"
+./kopicc "$T/kopi/tstrtest.kop" -t x64 -o "$T/kopi/tstrtest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/tstrtest64.s" -o /dev/null \
+    && echo "PASS  tstrtest [x64]" || { echo "FAIL  tstrtest [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
 printf '1\n1\n1\n0\n' > "$T/kopi/aeadvec.ref"
