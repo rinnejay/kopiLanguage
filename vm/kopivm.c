@@ -46,7 +46,10 @@ static void dievm(const char *m) {
 }
 
 /* heap untuk closure & array (bump arena; GC belum ada) */
-#define HEAPLEN (1 << 19)   /* dalam long: 4 MB */
+/* heap untuk closure & array (bump arena; GC belum ada).
+ * 1 << 22 long = 32 MB: cukup untuk beberapa X25519 penuh (ladder meng-
+ * alokasi ~0,3 MB long per panggilan tanpa GC) */
+#define HEAPLEN (1 << 22)
 static long *heap;
 static long heap_used;
 

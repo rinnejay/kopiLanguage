@@ -43,6 +43,17 @@ python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"
 check hashvec "$T/kopi/hashvec.kop"
 
+# ─── Big: smoke + field penuh (ground truth python; gen_febig.py) ────────
+printf '56088\n0\n1\n0\n' > "$T/kopi/bigsmoke.ref"
+check bigsmoke test/bigsmoke.kop
+python3 tools/gen_febig.py >/dev/null
+check febig "$T/kopi/febig.kop"
+
+# ─── X25519: vektor RFC 7748 §5.2 (2 buah) + §6.1 DH (4 buah) ────────────
+python3 tools/gen_x25519.py "$T/kopi/curve25519.kop" >/dev/null
+printf '1\n1\n1\n1\n1\n1\n' > "$T/kopi/curve25519.ref"
+check curve25519 "$T/kopi/curve25519.kop"
+
 printf '42 == 42\n' > "$T/kopi/first.ref"
 check first examples/first.kop
 
@@ -200,7 +211,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec bigsmoke febig curve25519; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done

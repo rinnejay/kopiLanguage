@@ -1,0 +1,100 @@
+/* X25519.kop — fungsi X25519 (RFC 7748 §5) murni di bahasa Kopi.
+ *
+ * Tangga Montgomery hanya agar koordinat-x: cswap constant-time (mask &),
+ * field ops lewat Big (radiks 15-bit, fold 2^255≡19). v1: satu koridor;
+ * inv(ypse) lewat Fermat x^(p-2) (254 fsq + ~254 femul per titik).
+ *
+ * Input/output: byte-as-int 32 panjang, koding little-endian
+ * (lengan cantong bit 255 di byte 31 dibuang otomatis oleh Big.fromBytes).
+ *
+ * Vektor RFC 7748 §5.2 + DH §6.1 ada di test/x25519.kop.
+ */
+
+import Big;
+
+class X25519 {
+
+    /* X25519(k, u) — kedua arg byte-as-int 32 (scalar, u-coord) */
+    static int[] x25519(int[] k32, int[] u32) {
+        int[] k = Big.scalarFromBytes(k32);
+        int[] x1 = Big.fromBytes(u32);
+        int[] pp = new int[68];       /* x2,z2,x3,z3 berdampingan 17 limb */
+        pp[0] = 1;                    /* x2 = 1 */
+        pp[17] = 0;                   /* z2 = 0 */
+        for (int i = 0; i < 17; i++) pp[34 + i] = x1[i];   /* x3 = u */
+        pp[51] = 1;                   /* z3 = 1 */
+        int swap = 0;
+        for (int t = 254; t >= 0; t--) {
+            int kt = Big.bitOf(k, t);
+            swap = swap ^ kt;
+            Big.cswap17(pp, 0, 34, swap);    /* x2 <-> x3 */
+            Big.cswap17(pp, 17, 51, swap);   /* z2 <-> z3 */
+            swap = kt;
+            ladderStep(pp, x1);
+        }
+        Big.cswap17(pp, 0, 34, swap);
+        Big.cswap17(pp, 17, 51, swap);
+        /* hasil: x2 / z2 — zz = 17 limb z2 (offset 17) */
+        int[] zz = new int[17];
+        for (int i = 0; i < 17; i++) zz[i] = pp[17 + i];
+        int[] zi = Big.feInv(zz);
+        int[] xr = new int[17];
+        for (int i = 0; i < 17; i++) xr[i] = pp[i];
+        int[] out = Big.femul(xr, zi);
+        return Big.toBytes(out);
+    }
+
+    /* (dihapus: pengambil z2 kini dilakukan langsung di x25519) */
+
+    /* satu langkah tangga (RFC 7748, aturan [montgomery]):
+     *   A = x2+z2 ; AA = A^2 ; B = x2-z2 ; BB = B^2 ; E = AA-BB
+     *   C = x3+z3 ; D = x3-z3 ; DA = D*A ; CB = C*B
+     *   x3 = (DA+CB)^2 ; z3 = x1*(DA-CB)^2
+     *   x2 = AA*BB ; z2 = E*(AA + a24*E)         a24 = 121665 */
+    private static void ladderStep(int[] pp, int[] x1) {
+        int[] x2 = new int[17];
+        int[] z2 = new int[17];
+        int[] x3 = new int[17];
+        int[] z3 = new int[17];
+        for (int i = 0; i < 17; i++) {
+            x2[i] = pp[i]; z2[i] = pp[17 + i];
+            x3[i] = pp[34 + i]; z3[i] = pp[51 + i];
+        }
+        int[] A = Big.feadd(x2, z2);
+        int[] AA = Big.fsq(A);
+        int[] B = Big.fesub(x2, z2);
+        int[] BB = Big.fsq(B);
+        int[] E = Big.fesub(AA, BB);
+        int[] C = Big.feadd(x3, z3);
+        int[] D = Big.fesub(x3, z3);
+        int[] DA = Big.femul(D, A);
+        int[] CB = Big.femul(C, B);
+        int[] t1 = Big.feadd(DA, CB);
+        int[] nx3 = Big.fsq(t1);
+        int[] t2 = Big.fesub(DA, CB);
+        int[] t3 = Big.fsq(t2);
+        int[] nz3 = Big.femul(x1, t3);
+        int[] nx2 = Big.femul(AA, BB);
+        /* z2 = E * (AA + a24*E) ; a24 medan penuh biar femul tak meluap */
+        int[] a24 = new int[17];
+        a24[0] = 1;
+        a24[1] = 3;
+        /* 121665 = 3*32768 + 23361 ; radiks 15: limb0=23361, limb1=3 */
+        a24[0] = 23361;
+        a24[1] = 3;
+        int[] a24E = Big.femul(E, a24);
+        int[] t4 = Big.feadd(AA, a24E);
+        int[] nz2 = Big.femul(E, t4);
+        for (int i = 0; i < 17; i++) {
+            pp[i] = nx2[i]; pp[17 + i] = nz2[i];
+            pp[34 + i] = nx3[i]; pp[51 + i] = nz3[i];
+        }
+    }
+
+    /* kunci publik: u = 9 (little-endian: byte[0] = 9) */
+    static int[] pub(int[] sk) {
+        int[] u = new int[32];
+        u[0] = 9;
+        return x25519(sk, u);
+    }
+}

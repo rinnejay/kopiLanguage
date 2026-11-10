@@ -1,0 +1,249 @@
+/* Big.kop — aritmetika medan mod p = 2^255-19 murni di bahasa Kopi (v1.5c).
+ *
+ * Representasi: 17 limb radiks 15-bit, little-endian → 17*15 = 255 bit
+ * sehingga 2^255 duduk pas di batas radis: perkalian/penjumlahan yang
+ * "menginap" bit ke-255 dan seterusnya dilipat (fold) dengan
+ *   2^255 ≡ 19 (mod p)
+ * menyisakan linggal kecil yang beres di akhir lewat conditional-subtract.
+ *
+ * Perkalian schoolbook dengan carry langsung per slot:
+ *   t = out[i+j] + a[i]*b[j] + carry  ≤ 2^30 + 2^16  (tak meluap int32)
+ *   out[i+j] = t & 0x7FFF ; carry = t >> 15
+ *
+ * Simak: petunjuk produk f (limb*19) ≤ 2^19.1 → sesak slot ≤ 2^20;
+ * car (carry-propagate) dan cap menjaga semua limb < 2^15 sebelum csub.
+ */
+
+class Big {
+
+    /* konstanta p = 2^255 - 19, 17 limb radiks 15-bit
+     * (limb0 = (-19 mod 2^15) = 32749 — silang-vektor dari python) */
+    static int[] pans() {
+        int[] v = new int[17];
+        v[0] = 32749;
+        for (int i = 1; i < 17; i++) v[i] = 32767;   /* 0x7FFF */
+        return v;
+    }
+
+    static int[] zero() {
+        int[] v = new int[17];
+        v[0] = 1;
+        return v;
+    }
+
+    static int[] ten(int n) {
+        int[] v = new int[17];
+        v[0] = n;
+        return v;
+    }
+
+    /* kedua 17 limb; mengembalikan raw (limb bisa > 2^15 sedikit) */
+    static int[] bigadd(int[] x, int[] y) {
+        int[] v = new int[17];
+        int c = 0;
+        for (int i = 0; i < 17; i++) {
+            int s = x[i] + y[i] + c;
+            v[i] = s & 32767;
+            c = s >> 15;
+        }
+        /* residu bit >= 255: kumpulkan di v[16]; reduce() mengurusnya */
+        if (c != 0) v[16] = v[16] + (c << 15);
+        return v;
+    }
+
+    static int[] bigsubRaw(int[] x, int[] y) {
+        int[] v = new int[17];
+        int b = 0;
+        for (int i = 0; i < 17; i++) {
+            int t = x[i] - y[i] - b;
+            if (t < 0) { t = t + 32768; b = 1; } else b = 0;
+            v[i] = t;
+        }
+        return v;   /* pemanggil wajib menangani borrow terakhir */
+    }
+
+    /* bandingkan dua magnitudo (semua limb < 2^15): 1 x>y, -1 x<y, 0 sama */
+    static int cmp(int[] x, int[] y) {
+        int i = 16;
+        while (i >= 0 && x[i] == y[i]) i--;
+        if (i < 0) return 0;
+        if (x[i] > y[i]) return 1;
+        return -1;
+    }
+
+    /* gcd: belum dibutuhkan v1 — modular inverse lewat Fermat (p-2) */
+
+    /* ── inti medan ─────────────────────────────────────────────── */
+
+    /* car + cap limb (nilai invarian < 2^256), lalu csub 2x */
+    static void reduce(int[] v) {
+        int c = 0;
+        carPass(v);
+        c = v[16] >> 15;
+        if (c != 0) {
+            v[16] = v[16] & 32767;
+            v[0] = v[0] + c * 19;    /* 2^255 ≡ 19 */
+        }
+        carPass(v);
+        c = v[16] >> 15;
+        if (c != 0) {
+            v[16] = v[16] & 32767;
+            v[0] = v[0] + c * 19;
+            carPass(v);
+        }
+        csub2(v);
+    }
+
+    static void carPass(int[] v) {
+        int c = 0;
+        for (int i = 0; i < 16; i++) {
+            int s = v[i] + c;
+            v[i] = s & 32767;
+            c = s >> 15;
+        }
+        v[16] = v[16] + c;
+    }
+
+    static void csub2(int[] v) {
+        int[] pp = pans();
+        int[] t = bigsubRaw(v, pp);
+        if (cmp(v, pp) >= 0) copy(t, v);   /* v >= p: pakai hasil kurang */
+        t = bigsubRaw(v, pp);
+        if (cmp(v, pp) >= 0) copy(t, v);
+    }
+
+    static void copy(int[] s, int[] d) {
+        for (int i = 0; i < s.length && i < d.length; i++) d[i] = s[i];
+    }
+
+    /* perkalian medan penuh: 17x17 limbs → 34 → fold 2^255≡19 → reduce */
+    static int[] femul(int[] x, int[] y) {
+        int[] P = new int[34];
+        for (int i = 0; i < 17; i++) {
+            int c = 0;
+            int xi = x[i];
+            for (int j = 0; j < 17; j++) {
+                int t = P[i + j] + xi * y[j] + c;
+                P[i + j] = t & 32767;
+                c = t >> 15;
+            }
+            P[i + 17] = P[i + 17] + c;
+        }
+        /* lipat: limb ke-k (k ≥ 17) berbobot 19 * 2^(15*(k-17)) */
+        for (int k = 33; k >= 17; k--) {
+            if (P[k] != 0) {
+                int f = P[k] * 19;
+                P[k] = 0;
+                P[k - 17] = P[k - 17] + (f & 32767);
+                if (k - 16 < 34) P[k - 16] = P[k - 16] + (f >> 15);
+            }
+        }
+        reduce(P);
+        return P;
+    }
+
+    static int[] fsq(int[] x) {
+        return femul(x, x);
+    }
+
+    /* (x + y) mod p */
+    static int[] feadd(int[] x, int[] y) {
+        int[] v = bigadd(x, y);
+        reduce(v);
+        return v;
+    }
+
+    /* (x - y) mod p: jalan (x + 2p) - y (y < p) */
+    static int[] fesub(int[] x, int[] y) {
+        int[] pp = pans();
+        int[] w = new int[18];
+        int c = 0;
+        for (int i = 0; i < 17; i++) {
+            int s = x[i] + 2 * pp[i] + c;
+            w[i] = s & 32767;
+            c = s >> 15;
+        }
+        w[17] = c;
+        int b = 0;
+        for (int i = 0; i < 17; i++) {
+            int t = w[i] - y[i] - b;
+            if (t < 0) { t = t + 32768; b = 1; } else b = 0;
+            w[i] = t;
+        }
+        /* fold w[17] (bobot 2^255 ≡ 19); pinjaman b mengurangi satu unit */
+        int f = (w[17] - b) * 19;
+        w[17] = 0;
+        int lo = f & 32767;
+        int hi = f >> 15;
+        w[0] = w[0] + lo;
+        if (hi != 0) w[1] = w[1] + hi;
+        reduce(w);
+        return w;
+    }
+
+    /* kondisional swap constant-time: 17 limb pada dua basis eksplisit */
+    static void cswap17(int[] pair, int bx, int by, int swap) {
+        int mask = 0 - swap;
+        for (int i = 0; i < 17; i++) {
+            int d = mask & (pair[bx + i] ^ pair[by + i]);
+            pair[bx + i] = pair[bx + i] ^ d;
+            pair[by + i] = pair[by + i] ^ d;
+        }
+    }
+
+    /* inventory bit de eksponen 17-limb */
+    static int bitOf(int[] v, int t) {
+        return (v[t / 15] >> (t % 15)) & 1;
+    }
+
+    /* inverse via Fermat: x^(p-2) */
+    static int[] feInv(int[] x) {
+        int[] e = pans();
+        e[0] = e[0] - 2;                  /* p-2 = 2^255 - 21 */
+        int[] r = zero();
+        for (int t = 254; t >= 0; t--) {
+            r = fsq(r);
+            if (bitOf(e, t) != 0) r = femul(r, x);
+        }
+        return r;
+    }
+
+    /* ── pemampatan & pembongkaran (byte little-endian 32) ───────── */
+
+    /* byte-as-int little-endian 32 → elemen medan (bit 255 tergeser) */
+    static int[] fromBytes(int[] b) {
+        int[] v = new int[17];
+        for (int i = 0; i < 255; i++) {   /* bit 255 & seterusnya dibuang */
+            int bit = (b[i / 8] >> (i % 8)) & 1;
+            if (bit != 0) v[i / 15] = v[i / 15] + (1 << (i % 15));
+        }
+        reduce(v);
+        return v;
+    }
+
+    /* elemen medan (< p) → 32 byte little-endian */
+    static int[] toBytes(int[] x) {
+        int[] out = new int[32];
+        for (int i = 0; i < 32; i++) out[i] = 0;
+        for (int t = 0; t < 255; t++) {
+            int bit = bitOf(x, t);
+            if (bit != 0) out[t / 8] = out[t / 8] + (1 << (t % 8));
+        }
+        return out;
+    }
+
+    /* scalar dari 32 byte, clamped (RFC 7748 §5): k0&=248 k31&=127 |64 */
+    static int[] scalarFromBytes(int[] b) {
+        int[] k = new int[17];
+        int[] kb = new int[32];
+        for (int i = 0; i < 32; i++) kb[i] = b[i] & 255;
+        kb[0] = kb[0] & 248;
+        kb[31] = kb[31] & 127;
+        kb[31] = kb[31] | 64;
+        for (int t = 0; t < 255; t++) {
+            int bit = (kb[t / 8] >> (t % 8)) & 1;
+            if (bit != 0) k[t / 15] = k[t / 15] + (1 << (t % 15));
+        }
+        return k;   /* scalar TIDAK di-reduce (bobot penuh 255 bit) */
+    }
+}

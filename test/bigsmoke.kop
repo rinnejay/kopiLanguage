@@ -1,0 +1,22 @@
+import Big;
+
+class Main {
+    public static void main(String[] args) {
+        // 123 * 456 mod p — cek via toBytes bit pertama & terakhir? cukup
+        // reconstruct int kecil: pertimbangan melihat bit rendah
+        int[] a = Big.ten(123);
+        int[] b = Big.ten(456);
+        int[] r = Big.femul(a, b);
+        int v = 0;
+        for (int i = 16; i >= 0; i--) v = v * 32768 + r[i];
+        System.out.println(v);            // 56088
+        // (2^255-19) + 1 => 0? cek fesub(x,x) = 0
+        int[] z = Big.fesub(Big.ten(7), Big.ten(7));
+        System.out.println(z[0] + z[1]);  // 0 + 0
+        // feInv(3) * 3 = 1
+        int[] iv = Big.feInv(Big.ten(3));
+        int[] w = Big.femul(Big.ten(3), iv);
+        System.out.println(w[0]);         // 1
+        System.out.println(w[1]);         // 0
+    }
+}

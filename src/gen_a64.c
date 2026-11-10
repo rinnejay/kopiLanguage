@@ -28,6 +28,29 @@ static int cur_ret_label;
 /* 32-bit int/bool vs 64-bit (pointer lambda/array) */
 static int is64ty(Ty t) { return t == T_FN || t == T_ARI; }
 
+/* alamat lokal slot n: x27 = x29 - off (dipakai bila off > 255 —
+ * batas immediat unscaled ldr/str aarch64). x27 tidak dipakai backend lain */
+static void loc_addr(long off) {
+    if (off <= 4095) emit("\tsub\tx27, x29, #%ld", off);
+    else {
+        emit("\tmov\tx27, #%ld", off);
+        if (off > 65535) emit("\tmovk\tx27, #%ld, lsl #16", (off >> 16) & 0xffff);
+        emit("\tsub\tx27, x29, x27");
+    }
+}
+
+static void loc_store(long off, const char *reg) {
+    if (off <= 255) { emit("\tstr\t%s, [x29, #-%ld]", reg, off); return; }
+    loc_addr(off);
+    emit("\tstr\t%s, [x27]", reg);
+}
+
+static void loc_load(long off, const char *reg) {
+    if (off <= 255) { emit("\tldr\t%s, [x29, #-%ld]", reg, off); return; }
+    loc_addr(off);
+    emit("\tldr\t%s, [x27]", reg);
+}
+
 static void push_val(int is64) {
     if (is64) emit("\tstr\tx0, [sp, #-16]!");
     else emit("\tstr\tw0, [sp, #-16]!");
@@ -37,13 +60,11 @@ static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
         gen_expr(m, s->a);
-        if (is64ty((Ty)s->dty)) emit("\tstr\tx0, [x29, #-%ld]", (s->ival + 1) * 8);
-        else emit("\tstr\tw0, [x29, #-%ld]", (s->ival + 1) * 8);
+        loc_store((s->ival + 1) * 8, is64ty((Ty)s->dty) ? "x0" : "w0");
         break;
     case ST_ASSIGN:
         gen_expr(m, s->a);
-        if (is64ty((Ty)s->dty)) emit("\tstr\tx0, [x29, #-%ld]", (s->ival + 1) * 8);
-        else emit("\tstr\tw0, [x29, #-%ld]", (s->ival + 1) * 8);
+        loc_store((s->ival + 1) * 8, is64ty((Ty)s->dty) ? "x0" : "w0");
         break;
     case ST_IDXASG: {
         gen_expr(m, s->c);               /* nilai */
@@ -167,10 +188,10 @@ static int gen_expr(Method *m, Node *e) {
         return 0;
     case EX_VAR:
         if (is64ty((Ty)e->dty)) {
-            emit("\tldr\tx0, [x29, #-%ld]", (e->ival + 1) * 8);
+            loc_load((e->ival + 1) * 8, "x0");
             return 1;
         }
-        emit("\tldr\tw0, [x29, #-%ld]", (e->ival + 1) * 8);
+        loc_load((e->ival + 1) * 8, "w0");
         return 0;
     case EX_UN:
         gen_expr(m, e->a);
@@ -216,8 +237,7 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tmov\tw2, #%ld", hm->nparams - 1);         /* nuser */
         emit("\tstr\tw2, [x0, #16]");
         for (int j = 0; j < ncap; j++) {
-            emit("\tldr\t%s2, [x29, #-%ld]", is64ty(hm->captty[j]) ? "x" : "w",
-                 (hm->captslot[j] + 1) * 8);
+            loc_load((hm->captslot[j] + 1) * 8, is64ty(hm->captty[j]) ? "x2" : "w2");
             emit("\tstr\tx2, [x0, #%ld]", 24 + 8 * j);
         }
         return 1;
@@ -517,8 +537,9 @@ void gen_a64(const char *outpath) {
        kalau tidak epilogue class akan ret kembali ke tengah main (loop) */
     emit("\tstp\tx29, x30, [sp, #-16]!");
     emit("\tmov\tx29, sp");
-    /* init arena: blok HEAPBYTES sekali via malloc. */
-    emit("\tmovz\tx0, #0x80, lsl #16");     /* 1<<23 bytes */
+    /* init arena: blok 32 MB sekali via malloc (X25519 ladder mengalokasi
+     * ~2,5 MB per panggilan; 6 vektor RFC butuh ~15 MB) */
+    emit("\tmovz\tx0, #0x200, lsl #16");    /* 1<<25 bytes */
     emit("\tbl\tmalloc");
     emit("\tadrp\tx1, kop_arena_base");
     emit("\tstr\tx0, [x1, :lo12:kop_arena_base]");
@@ -565,7 +586,7 @@ void gen_a64(const char *outpath) {
     emit("\tadd\tx1, x1, :lo12:kop_arena_used");
     emit("\tldr\tx2, [x1]");
     emit("\tadd\tx2, x2, x0");
-    emit("\tmovz\tx3, #0x80, lsl #16");
+    emit("\tmovz\tx3, #0x200, lsl #16");
     emit("\tcmp\tx2, x3");
     emit("\tb.ge\t.Koom");
     emit("\tstr\tx2, [x1]");
