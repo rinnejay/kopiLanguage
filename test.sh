@@ -77,6 +77,83 @@ check mathvec "$T/kopi/mathvec.kop"
 python3 tools/gen_numvec.py "$T/kopi/numvec.kop" "$T/kopi/numvec.ref" >/dev/null
 check numvec "$T/kopi/numvec.kop"
 
+# ─── array fungsional: forEach/map/filter/reduce + gula metode ───────────
+cat > "$T/kopi/arrayfn.kop" <<'EOF'
+import Arrays;
+
+class Main {
+    public static void main(String[] args) {
+        int[] a = new int[5];
+        for (int i = 0; i < 5; i++) a[i] = i + 1;
+
+        Arrays.forEach(a, x => { System.out.println(x); });
+        a.forEach(x => { System.out.println(x * 10); });
+
+        int[] b = a.map(x => x + 1);
+        Arrays.forEach(b, x => { System.out.println(x); });
+
+        int[] ev = a.filter(x => x % 2 == 0);
+        System.out.println(ev.length);
+        Arrays.forEach(ev, x => { System.out.println(x); });
+
+        System.out.println(a.reduce(0, (acc, x) => acc + x));
+        System.out.println(a.any(x => x > 4));
+        System.out.println(a.any(x => x > 9));
+        System.out.println(a.all(x => x > 0));
+        System.out.println(a.all(x => x > 2));
+        System.out.println(a.countWhere(x => x % 2 == 1));
+        System.out.println(a.findIndex(x => x == 3));
+        System.out.println(a.sumBy(x => x * x));
+
+        int batas = 3;
+        System.out.println(a.countWhere(x => x > batas));
+
+        a.forEachIndexed((i, x) => { System.out.println(i * 100 + x); });
+
+        int[] r = Arrays.reverse(a);
+        Arrays.forEach(r, x => { System.out.println(x); });
+        int[] cp = Arrays.copy(a);
+        System.out.println(Arrays.arrEq(cp, a));
+    }
+}
+EOF
+printf '1\n2\n3\n4\n5\n10\n20\n30\n40\n50\n2\n3\n4\n5\n6\n2\n2\n4\n15\n1\n0\n1\n0\n3\n2\n55\n2\n1\n102\n203\n304\n405\n5\n4\n3\n2\n1\n1\n' > "$T/kopi/arrayfn.ref"
+check arrayfn "$T/kopi/arrayfn.kop"
+
+# ─── array: return lintas-fungsi (besar), new int[0], identitas ──────────
+cat > "$T/kopi/arrchk.kop" <<'EOF'
+class Main {
+    static int[] buat(int n) {
+        int[] a = new int[n];
+        for (int i = 0; i < n; i++) a[i] = i * 3;
+        return a;
+    }
+    static int[] identitas(int[] x) { return x; }
+    static int jumlah(int[] x) {
+        int s = 0;
+        for (int i = 0; i < x.length; i++) s = s + x[i];
+        return s;
+    }
+    public static void main(String[] args) {
+        int[] a = buat(300);
+        System.out.println(a.length);
+        System.out.println(a[0]);
+        System.out.println(a[299]);
+        System.out.println(a[150]);
+        int[] b = identitas(a);
+        System.out.println(b.length);
+        System.out.println(jumlah(a));
+        int[] z = new int[0];
+        System.out.println(z.length);
+        int[] one = buat(1);
+        System.out.println(one.length);
+        System.out.println(one[0]);
+    }
+}
+EOF
+printf '300\n0\n897\n450\n300\n134550\n0\n1\n0\n' > "$T/kopi/arrchk.ref"
+check arrchk "$T/kopi/arrchk.kop"
+
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
 printf '1\n1\n1\n0\n' > "$T/kopi/aeadvec.ref"
@@ -239,7 +316,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec arrayfn arrchk; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done

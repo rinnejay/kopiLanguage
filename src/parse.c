@@ -554,14 +554,44 @@ static Node *primary(void) {
 static Node *postfix(void) {
     Node *l = primary();
     for (;;) {
-        if (at('.')) {    /* hanya .length yang valid di sini */
-            if (peek2()->type != T_ID || strcmp(xs(peek2()->text), "length"))
-                die("baris %d: setelah '.' hanya '.length' yang didukung", l->line);
-            advance(); advance();
-            Node *n = newnode(EX_LEN, l->line);
-            n->a = l;
-            l = n;
-            break;
+        if (at('.')) {
+            if (peek2()->type != T_ID)
+                die("baris %d: setelah '.' butuh nama field/metode", l->line);
+            if (!strcmp(xs(peek2()->text), "length")) {
+                advance(); advance();
+                Node *n = newnode(EX_LEN, l->line);
+                n->a = l;
+                l = n;
+                break;
+            }
+            if (ts[ti + 2].type != '(')
+                die("baris %d: setelah '.' hanya '.length' atau metode array", l->line);
+            /* gula: a.forEach(f, ...) → Arrays.forEach(a, f, ...) */
+            advance();                              /* '.' */
+            const char *mname = xs(peek()->text);
+            advance();                              /* nama metode */
+            Node *call = newnode(EX_CALL, l->line);
+            char *full = xmalloc(strlen("Arrays.") + strlen(mname) + 1);
+            sprintf(full, "Arrays.%s", mname);
+            call->str = full;
+            expect('(', "'(' setelah nama metode array");
+            Node *args = l;
+            Node *tail = l;
+            int argc = 1;
+            if (!at(')')) {
+                do {
+                    Node *a = expr();
+                    tail->next = a;
+                    tail = a;
+                    argc++;
+                } while (at(',') && (advance(), 1));
+            }
+            expect(')', "')' setelah argumen metode array");
+            tail->next = 0;
+            call->a = args;
+            call->ival = argc;
+            l = call;
+            continue;
         }
         if (at('[')) {
             advance();
@@ -768,6 +798,22 @@ static SVar *resolve_name(const char *name, int line) {
     }
     die("baris %d: variabel '%s' tidak ada di scope", line, name);
     return 0;
+}
+
+/* cari variabel di scope tanpa membunuh proses (untuk gula array) */
+static SVar *lookup_name(const char *name) {
+    for (int i = nscope - 1; i >= 0; i--)
+        if (!strcmp(scope[i].name, name)) return &scope[i];
+    return 0;
+}
+
+static int is_array_method(const char *n) {
+    return !strcmp(n, "forEach") || !strcmp(n, "forEachIndexed") ||
+           !strcmp(n, "map") || !strcmp(n, "filter") ||
+           !strcmp(n, "reduce") || !strcmp(n, "any") ||
+           !strcmp(n, "all") || !strcmp(n, "countWhere") ||
+           !strcmp(n, "findIndex") || !strcmp(n, "sumBy") ||
+           !strcmp(n, "copy") || !strcmp(n, "reverse");
 }
 
 static Method *find_method(const char *cls, const char *name) {
@@ -1051,6 +1097,29 @@ static Ty type_expr_raw(Node *e) {
         }
         Method *m = find_method(buf, dot + 1);
         if (!m) {
+            /* gula array: a.forEach(f) → Arrays.forEach(a, f) */
+            if (is_array_method(dot + 1)) {
+                SVar *rv = lookup_name(buf);
+                Method *am = find_method("Arrays", dot + 1);
+                if (rv && rv->ty == T_ARI && am) {
+                    Node *recv = newnode(EX_VAR, e->line);
+                    recv->str = xs(buf);
+                    recv->next = e->a;
+                    Node *nn = newnode(EX_CALL, e->line);
+                    char *full2 = xmalloc(strlen("Arrays.") + strlen(dot + 1) + 1);
+                    sprintf(full2, "Arrays.%s", dot + 1);
+                    nn->str = full2;
+                    nn->a = recv;
+                    nn->ival = (long)((int)e->ival + 1);
+                    Ty gt = type_expr(nn);
+                    e->str = nn->str;
+                    e->a = nn->a;
+                    e->ival = nn->ival;
+                    e->meth = nn->meth;
+                    e->kind = EX_CALL;
+                    return gt;
+                }
+            }
             /* bukan metode: mungkin variabel lambda → pemanggilan dinamis */
             Node *vn = newnode(EX_VAR, e->line);
             vn->str = xs(dot + 1);

@@ -15,6 +15,7 @@ class Arrays {
     }
 
     static int max(int[] xs) {
+        if (xs.length == 0) return 0;
         int m = xs[0];
         for (int i = 1; i < xs.length; i++)
             if (xs[i] > m) m = xs[i];
@@ -22,6 +23,7 @@ class Arrays {
     }
 
     static int min(int[] xs) {
+        if (xs.length == 0) return 0;
         int m = xs[0];
         for (int i = 1; i < xs.length; i++)
             if (xs[i] < m) m = xs[i];
@@ -53,6 +55,7 @@ class Arrays {
 
     /* salin balik n elemen pertama ke array baru */
     static int[] take(int[] xs, int n) {
+        if (n < 0) n = 0;
         if (n > xs.length) n = xs.length;
         int[] out = new int[n];
         for (int i = 0; i < n; i++) out[i] = xs[i];
@@ -113,5 +116,100 @@ class Arrays {
             else            hi = m - 1;
         }
         return -1;
+    }
+
+    /* ── salinan & urutan (v1.6.3) ───────────────────────────────── */
+
+    static int[] copy(int[] xs) {
+        int[] out = new int[xs.length];
+        for (int i = 0; i < xs.length; i++) out[i] = xs[i];
+        return out;
+    }
+
+    static int[] reverse(int[] xs) {
+        int[] out = new int[xs.length];
+        for (int i = 0; i < xs.length; i++) out[i] = xs[xs.length - 1 - i];
+        return out;
+    }
+
+    /* ── gaya fungsional (lambda Kopi) ──────────────────────────── */
+
+    /* panggil f(x) untuk tiap elemen; hasil f diabaikan */
+    static void forEach(int[] xs, fn f) {
+        for (int i = 0; i < xs.length; i++) {
+            f(xs[i]);
+        }
+    }
+
+    /* panggil f(i, x) untuk tiap elemen (indeks, nilai) */
+    static void forEachIndexed(int[] xs, fn f) {
+        for (int i = 0; i < xs.length; i++) {
+            f(i, xs[i]);
+        }
+    }
+
+    /* array baru: out[i] = f(xs[i]) */
+    static int[] map(int[] xs, fn f) {
+        int[] out = new int[xs.length];
+        for (int i = 0; i < xs.length; i++) out[i] = f(xs[i]);
+        return out;
+    }
+
+    /* array baru berisi elemen yang pred(x) != 0 */
+    static int[] filter(int[] xs, fn pred) {
+        int n = 0;
+        for (int i = 0; i < xs.length; i++) {
+            if (pred(xs[i]) != 0) n++;
+        }
+        int[] out = new int[n];
+        int k = 0;
+        for (int i = 0; i < xs.length; i++) {
+            if (pred(xs[i]) != 0) { out[k] = xs[i]; k++; }
+        }
+        return out;
+    }
+
+    /* lipat kiri: acc = f(acc, x) mulai dari init */
+    static int reduce(int[] xs, int init, fn f) {
+        int acc = init;
+        for (int i = 0; i < xs.length; i++) {
+            acc = f(acc, xs[i]);
+        }
+        return acc;
+    }
+
+    static boolean any(int[] xs, fn pred) {
+        for (int i = 0; i < xs.length; i++) {
+            if (pred(xs[i]) != 0) return true;
+        }
+        return false;
+    }
+
+    static boolean all(int[] xs, fn pred) {
+        for (int i = 0; i < xs.length; i++) {
+            if (pred(xs[i]) == 0) return false;
+        }
+        return true;
+    }
+
+    static int countWhere(int[] xs, fn pred) {
+        int n = 0;
+        for (int i = 0; i < xs.length; i++) {
+            if (pred(xs[i]) != 0) n++;
+        }
+        return n;
+    }
+
+    static int findIndex(int[] xs, fn pred) {
+        for (int i = 0; i < xs.length; i++) {
+            if (pred(xs[i]) != 0) return i;
+        }
+        return -1;
+    }
+
+    static int sumBy(int[] xs, fn f) {
+        int s = 0;
+        for (int i = 0; i < xs.length; i++) s += f(xs[i]);
+        return s;
     }
 }

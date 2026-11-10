@@ -47,7 +47,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.6.2 hari ini  ████████████████  69/69 test hijau — UDP (bind/sendto/recvfrom) + HTTP header (a64 + VM)
+v1.6.3 hari ini  ████████████████  73/73 test hijau — array fungsional + `.forEach` (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -65,6 +65,7 @@ v1.6.2 hari ini  ████████████████  69/69 test hi
 | **v1.6** | **tipe numerik lengkap** (scalar): `long` (64-bit bertanda), `float`/`double` (IEEE-754), `uint8`/`uint16`/`uint32`/`uint64` (unsigned dengan wrap sesuai lebar), literal `L/U/UL/f/d`, hex `0x`, biner `0b`, cast `(tipe)expr`, promosi campuran (int+uint32→long, uint32+uint32→uint32, dst), perbandingan signed/unsigned, `%` float, `println` format per tipe, parameter/return semua tipe, compound assignment (narrowing implisit ala Java). Backend a64 + VM menghasilkan output identik; x64 diperiksa sintaksnya. Uji oracle python `tools/gen_numvec.py` (66 kasus), suite 65/65. Batas jujur: array masih `int[]` (belum `long[]`/`double[]`), lambda masih `int`, dan backend x64 belum dijalankan di mesin x86-64 |
 | **v1.6.1** | **`byte`/`int8` (8-bit bertanda) dan `short`/`int16` (16-bit bertanda)** — melengkapi `long`/`float`/`double`/`uint8..64`. Aritmetika wrap sesuai lebar + sign-extend kanonik, cast, literal `-128`/`-32768`, parameter/return/cetak signed. Sekaligus memperbaiki **tabrakan nilai token**: seluruh keyword & token multi-karakter dipindah ke ≥256 agar tidak bertabrakan dengan kode ASCII operator 1-karakter (`%`, `&`, `!`, …), dan dependensi header ditambahkan ke Makefile. Uji numvec diperluas (byte/short) + suite 65/65 |
 | **v1.6.2** | **UDP + HTTP header**: builtin baru `Net.bind`, `Net.sendto`, `Net.recvfrom`, `Net.shutdown` (syscall langsung di a64/x64, jalur host di VM) + modul `lib/net/Udp.kop` (`open/bind/sendTo/recvFrom/shutdown/close`), sumber datagram dicatat di `from[0]` (ip) / `from[1]` (port). `Tcp.shutdown` ditambahkan. `lib/net/Http.kop` diperluas: `reqEx`, `requestInto`, `getWith`, `postWith` (header permintaan kustom) serta `headerBlock`, `headerValue` (case-insensitive, nilai di-trim), `hasHeader` untuk membaca header respons. Backend x64 kini mendukung **8 argumen** (arg 7–8 lewat stack). Uji: UDP loopback bolak-balik (bind+sendto+recvfrom) dan server HTTP yang memeriksa header kustom + respons header, di VM & a64; sintaks x64 diperiksa. Batas jujur: datagram maks **240 byte** per kirim/terima (penyangga syscall v1) |
+| **v1.6.3** | **array fungsional + gula metode**: `Arrays.forEach`, `forEachIndexed`, `map`, `filter`, `reduce`, `any`, `all`, `countWhere`, `findIndex`, `sumBy`, `copy`, `reverse` (semuanya memakai lambda Kopi). Sintaks metode `a.forEach(f)`, `a.map(f)`, dst. didukung lewat desugaring ke `Arrays.*` (butuh `import Arrays;`). Perbaikan array: `Arrays.max/min` tidak lagi meledak pada array kosong, `take` meng-clamp `n < 0`. Uji baru `arrayfn` dan `arrchk` (return array besar 300 elemen, `new int[0]`, identitas) di VM & a64 + sintaks x64; suite 73/73 |
 
 ## Bangun
 
@@ -196,6 +197,57 @@ float  f     = 1.5f + 2.25f;           // 3.75
 - Backend **x64** menerima tipe baru (assembly lolos `cc -target`, diuji
   sintaks); eksekusi runtime baru diverifikasi di **aarch64** dan **VM**.
 
+## Array fungsional & `.forEach` (v1.6.3)
+
+`lib/core/Arrays.kop` kini punya gaya fungsional memakai lambda Kopi.
+Dua bentuk pemanggilan sama-sama sah:
+
+```java
+import Arrays;
+
+class Main {
+    public static void main(String[] args) {
+        int[] a = new int[5];
+        for (int i = 0; i < 5; i++) a[i] = i + 1;      // 1..5
+
+        Arrays.forEach(a, x => { System.out.println(x); });   // pustaka
+        a.forEach(x => { System.out.println(x * 10); });      // gula metode
+
+        int[] b  = a.map(x => x + 1);                  // 2..6
+        int[] ev = a.filter(x => x % 2 == 0);          // {2,4}
+        int s    = a.reduce(0, (acc, x) => acc + x);   // 15
+
+        System.out.println(a.any(x => x > 4));         // 1
+        System.out.println(a.all(x => x > 0));         // 1
+        System.out.println(a.countWhere(x => x % 2 == 1)); // 3
+        System.out.println(a.findIndex(x => x == 3));  // 2
+        System.out.println(a.sumBy(x => x * x));       // 55
+
+        int batas = 3;                                 // capture by-value
+        System.out.println(a.countWhere(x => x > batas)); // 2
+    }
+}
+```
+
+Aturan:
+
+- Callback menerima `int` (atau `(indeks, nilai)` untuk
+  `forEachIndexed`); nilai kembalian lambda dipakai oleh `map`/`reduce`/
+  `sumBy`, sedangkan `forEach` mengabaikannya.
+- Predikat dianggap **benar bila != 0** (lambda boleh mengembalikan
+  `boolean`; compiler memperlakukan hasil panggilan dinamis sebagai int).
+- Gula `a.map(...)` **didahulukan** bila `a` adalah variabel bertipe
+  `int[]`; jika tidak, `a.map` diperlakukan sebagai pemanggilan
+  `class.method` seperti biasa. `import Arrays;` tetap wajib agar metode
+  `Arrays.*` ada.
+- `Arrays` tidak mengubah array masukan; `map`/`filter`/`copy`/`reverse`
+  mengembalikan array baru. `sort` tetap mengembalikan array terurut baru.
+
+Perbaikan pada kesempatan ini: `Arrays.max/min` mengembalikan 0 untuk
+array kosong (sebelumnya membaca `xs[0]`), `take` meng-clamp `n < 0`, dan
+regresi `return` array (300 elemen), `new int[0]`, serta identitas array
+diuji di kedua backend (`arrchk`).
+
 ## Lambda (`fn` / arrow function)
 
 Kopi punya lambda sejati (closure) — bukan hanya callback tanpa memori:
@@ -324,7 +376,7 @@ Kopi, bukan kode built-in compiler:
 | `lib/core/Digits.kop`  | `reverse digitSum digitCount pow10 digitProduct isPalindrome isArmstrong digitalRoot sumSquareDigits sumCubeDigits printBase` |
 | `lib/core/Stats.kop`   | `sum product min max range mean sumSquares sumCubes median mode variance stddev countEven countOdd` |
 | `lib/core/Matrix.kop`  | `zero identity add sub scale transpose mul trace det1 det2 det3 det det isIdentity` (matriks persegi, `int[]` datar) |
-| `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge sort` (merge sort O(n log n)) + `binSearch` |
+| `lib/core/Arrays.kop`     | `sum max min find count arrEq take drop merge copy reverse sort` (merge sort O(n log n)) + `binSearch`; **fungsional**: `forEach forEachIndexed map filter reduce any all countWhere findIndex sumBy` |
 | `lib/crypto/Crypto.kop`   | `bitxor` (per-bit, tanpa operator bitwise), `fnv1a` (FNV-1a 32-bit), `nextRand`/`randRange` (Lehmer/Schrage), `xorStream` (XOR cipher nirl), `caesar`/`uncaesar` |
 
 ### Batas jujur pustaka matematika
