@@ -15,6 +15,7 @@ enum {
     OP_NEWCLO, OP_CALLIND, OP_ENVLOAD, OP_IDXR, OP_IDXW, OP_ALEN,
     OP_NEWARR,                      /* lambda/closure + array arena */
     OP_NET,                         /* builtin Net.* (syscall host) */
+    OP_BAND, OP_BOR, OP_BXOR, OP_SHL, OP_SHR, OP_USHR, OP_BNOT,   /* v1.5 bitwise */
 };
 
 typedef struct {
@@ -144,7 +145,7 @@ static void gen_expr(Node *e) {
     case EX_VAR: em8(OP_ILOAD); em16((int)e->ival); break;
     case EX_UN:
         gen_expr(e->a);
-        em8(e->str[0] == '-' ? OP_NEG : OP_NOT);
+        em8(e->str[0] == '-' ? OP_NEG : e->str[0] == '~' ? OP_BNOT : OP_NOT);
         break;
     case EX_CALL: {
         int i = 0;
@@ -194,7 +195,7 @@ static void gen_expr(Node *e) {
         break;
     case EX_BIN: {
         char op = e->str[0];
-        if (op == '&' || op == '|') {
+        if ((op == '&' || op == '|') && e->str[1] != 0) {
             /* short-circuit: hasil selalu 0/1 */
             int lres = newlab(), lend = newlab();
             int vfall = op == '&' ? 1 : 0;   /* nilai jika keduanya benar/salah */
@@ -215,6 +216,9 @@ static void gen_expr(Node *e) {
         /* operator 2-karakter dulu, supaya tidak tabrak case '<' / '>' */
         if (!strcmp(e->str, "<=")) em8(OP_LE);
         else if (!strcmp(e->str, ">=")) em8(OP_GE);
+        else if (!strcmp(e->str, "<<")) em8(OP_SHL);
+        else if (!strcmp(e->str, ">>")) em8(OP_SHR);
+        else if (!strcmp(e->str, ">>>")) em8(OP_USHR);
         else switch (op) {
         case '+': em8(OP_ADD); break;
         case '-': em8(OP_SUB); break;
@@ -225,6 +229,9 @@ static void gen_expr(Node *e) {
         case '>': em8(OP_GT); break;
         case '=': em8(OP_EQ); break;
         case '!': em8(OP_NE); break;
+        case '&': em8(OP_BAND); break;      /* bitwise (len 1) */
+        case '|': em8(OP_BOR); break;
+        case '^': em8(OP_BXOR); break;
         default: die("gen_vm: operator '%s'", e->str);
         }
         break;

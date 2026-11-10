@@ -34,6 +34,10 @@ check() { # nama file_kop
 printf '42\n1 ganjil; fakt= 1\n2 genap; fakt= 2\n3 ganjil; fakt= 6\n4 genap; fakt= 24\n5 ganjil; fakt= 120\n6 genap; fakt= 720\n7 ganjil; fakt= 5040\n8 genap; fakt= 40320\n9 ganjil; fakt= 362880\n10 terakhir; fakt= 3628800\nfib(20) = 6765\n303\n404\n505\n1 + 2 = 555\n' > "$T/kopi/demo.ref"
 check demo examples/demo.kop
 
+# ─── bitops: operator bitwise native & | ^ ~ << >> >>> + compound assign ─
+printf '34\n119\n85\n-103\n48\n6\n-4\n15\n15\n3\n1024\n11\n10\n186\n48\n60\n195\n780\n48\n15\n1\n1\n42\n7\n5\n' > "$T/kopi/bitops.ref"
+check bitops test/bitops.kop
+
 printf '42 == 42\n' > "$T/kopi/first.ref"
 check first examples/first.kop
 
@@ -189,8 +193,9 @@ check scope "$T/kopi/scope.kop"
 
 # sintaks x64 untuk fitur array + library (tidak dieksekusi di aarch64)
 cp examples/array.kop "$T/kopi/array.kop"
+cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done

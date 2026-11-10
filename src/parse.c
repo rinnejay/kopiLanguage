@@ -118,6 +118,24 @@ static Node *compound_assign(int line, int eat_semi) {
         bin->str = op == T_PP ? "+" : "-";
         bin->b = newnode(EX_INT, line);
         bin->b->ival = 1;
+    } else if (op == T_ANDEQ) {
+        bin->str = "&";
+        bin->b = expr();
+    } else if (op == T_OREQ) {
+        bin->str = "|";
+        bin->b = expr();
+    } else if (op == T_XOREQ) {
+        bin->str = "^";
+        bin->b = expr();
+    } else if (op == T_SHLEQ) {
+        bin->str = "<<";
+        bin->b = expr();
+    } else if (op == T_SHREQ) {
+        bin->str = ">>";
+        bin->b = expr();
+    } else if (op == T_USHREQ) {
+        bin->str = ">>>";
+        bin->b = expr();
     } else {
         char c = op == T_ADDEQ ? '+' : op == T_SUBEQ ? '-' :
                  op == T_MULEQ ? '*' : op == T_DIVEQ ? '/' : '%';
@@ -132,7 +150,9 @@ static Node *compound_assign(int line, int eat_semi) {
 
 static int is_incuptok(int t) {
     return t == T_PP || t == T_MM || t == T_ADDEQ || t == T_SUBEQ ||
-           t == T_MULEQ || t == T_DIVEQ || t == T_MODEQ;
+           t == T_MULEQ || t == T_DIVEQ || t == T_MODEQ ||
+           t == T_ANDEQ || t == T_OREQ || t == T_XOREQ ||
+           t == T_SHLEQ || t == T_SHREQ || t == T_USHREQ;
 }
 
 static Node *call_node(int line) {
@@ -453,6 +473,13 @@ static Node *primary(void) {
         n->a = primary();
         return n;
     }
+    if (at('~')) {                    /* bitwise complement (Java) */
+        Node *n = newnode(EX_UN, line);
+        n->str = "~";
+        advance();
+        n->a = primary();
+        return n;
+    }
     if (at(TK_STR)) {
         Node *n = newnode(EX_STRLIT, line);
         n->str = xs(t->text);
@@ -542,8 +569,21 @@ static Node *add_chain(void) {
     return l;
 }
 
-static Node *rel_chain(void) {
+static Node *shift_chain(void) {
     Node *l = add_chain();
+    while (at(T_SHL) || at(T_SHR) || at(T_USHR)) {
+        Node *n = newnode(EX_BIN, peek()->line);
+        n->str = at(T_SHL) ? "<<" : at(T_SHR) ? ">>" : ">>>";
+        n->a = l;
+        advance();
+        n->b = add_chain();
+        l = n;
+    }
+    return l;
+}
+
+static Node *rel_chain(void) {
+    Node *l = shift_chain();
     while (at('<') || at('>') || at(T_LE) || at(T_GE)) {
         Node *n = newnode(EX_BIN, peek()->line);
         const char *s = "?";
@@ -552,7 +592,7 @@ static Node *rel_chain(void) {
         n->str = s;
         n->a = l;
         advance();
-        n->b = add_chain();
+        n->b = shift_chain();
         l = n;
     }
     return l;
@@ -571,14 +611,56 @@ static Node *eq_chain(void) {
     return l;
 }
 
-static Node *and_chain(void) {
+/* bitwise & : presedensi antara ^ dan == (konvensi Java) */
+static Node *band_chain(void) {
     Node *l = eq_chain();
+    while (at('&')) {                              /* '&' 1-char ASCII 38 */
+        Node *n = newnode(EX_BIN, peek()->line);
+        n->str = "&";
+        n->a = l;
+        advance();
+        n->b = eq_chain();
+        l = n;
+    }
+    return l;
+}
+
+/* bitwise ^ */
+static Node *bxor_chain(void) {
+    Node *l = band_chain();
+    while (at('^')) {
+        Node *n = newnode(EX_BIN, peek()->line);
+        n->str = "^";
+        n->a = l;
+        advance();
+        n->b = band_chain();
+        l = n;
+    }
+    return l;
+}
+
+/* bitwise | */
+static Node *bor_chain(void) {
+    Node *l = bxor_chain();
+    while (at('|')) {                              /* '|' 1-char ASCII 124 */
+        Node *n = newnode(EX_BIN, peek()->line);
+        n->str = "|";
+        n->a = l;
+        advance();
+        n->b = bxor_chain();
+        l = n;
+    }
+    return l;
+}
+
+static Node *and_chain(void) {
+    Node *l = bor_chain();
     while (at(T_AND)) {
         Node *n = newnode(EX_BIN, peek()->line);
         n->str = "&&";
         n->a = l;
         advance();
-        n->b = eq_chain();
+        n->b = bor_chain();
         l = n;
     }
     return l;
@@ -768,12 +850,16 @@ static Ty type_expr(Node *e) {
             die("baris %d: '-' butuh operand int", e->line);
         if (e->str[0] == '!' && t != T_BOOL)
             die("baris %d: '!' butuh operand boolean", e->line);
+        if (e->str[0] == '~') {
+            if (t != T_INT) die("baris %d: '~' butuh operand int", e->line);
+            return T_INT;
+        }
         return e->str[0] == '-' ? T_INT : T_BOOL;
     }
     case EX_BIN: {
         Ty lt = type_expr(e->a), rt = type_expr(e->b);
         char op = e->str[0];
-        if (op == '&' || op == '|') {          /* && || */
+        if ((op == '&' || op == '|') && e->str[1] != 0) {   /* "&&" / "||" saja */
             if (lt != T_BOOL || rt != T_BOOL)
                 die("baris %d: '&&' / '||' butuh operand boolean", e->line);
             return T_BOOL;
@@ -782,7 +868,12 @@ static Ty type_expr(Node *e) {
             if (lt != rt) die("baris %d: tipe operand '==' / '!=' beda", e->line);
             return T_BOOL;
         }
-        if (op == '<' || op == '>') {
+        if ((op == '<' || op == '>') && e->str[1] == 0) {   /* relasional, bukan << / >> */
+            if (lt != T_INT || rt != T_INT)
+                die("baris %d: tanda pembanding butuh int", e->line);
+            return T_BOOL;
+        }
+        if (!strcmp(e->str, "<=") || !strcmp(e->str, ">=")) {
             if (lt != T_INT || rt != T_INT)
                 die("baris %d: tanda pembanding butuh int", e->line);
             return T_BOOL;

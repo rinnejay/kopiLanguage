@@ -209,6 +209,7 @@ static int gen_expr(Method *m, Node *e) {
     case EX_UN:
         gen_expr(m, e->a);
         if (e->str[0] == '-') emit("\tnegl %%eax");
+        else if (e->str[0] == '~') emit("\tnotl %%eax");
         else emit("\txorl $1, %%eax");
         break;
     case EX_CALL:
@@ -412,22 +413,28 @@ static int gen_expr(Method *m, Node *e) {
         break;
     case EX_BIN: {
         char op = e->str[0];
-        if (op == '&' || op == '|') { gen_bool_chain(m, e); break; }
+        if ((op == '&' || op == '|') && e->str[1] != 0) { gen_bool_chain(m, e); break; }
         gen_expr(m, e->a);
         spush();
         gen_expr(m, e->b);
-        spop("rcx");
-        switch (op) {
+        spop("rcx");                       /* konvensi: ecx=left, eax=right */
+        /* operator 2-karakter dulu supaya tidak tabrak case '<' / '>' */
+        if (!strcmp(e->str, "<<") || !strcmp(e->str, ">>") ||
+            !strcmp(e->str, ">>>") || op == '-' || op == '/' || op == '%') {
+            emit("\txchgl %%eax, %%ecx");  /* xchg: eax=left, ecx(count) untuk shift/idiv */
+        }
+        if (!strcmp(e->str, "<<")) emit("\tshll %%cl, %%eax");
+        else if (!strcmp(e->str, ">>")) emit("\tsarl %%cl, %%eax");
+        else if (!strcmp(e->str, ">>>")) emit("\tshrl %%cl, %%eax");
+        else switch (op) {
         case '+': emit("\taddl %%ecx, %%eax"); break;
-        case '-': emit("\tsubl %%ecx, %%eax"); break;
+        case '-': emit("\tsubl %%ecx, %%eax"); break;   /* eax = left - right */
         case '*': emit("\timull %%ecx, %%eax"); break;
         case '/':
-            emit("\txchgl %%eax, %%ecx");
             emit("\tcltd");
             emit("\tidivl %%ecx");
             break;
         case '%':
-            emit("\txchgl %%eax, %%ecx");
             emit("\tcltd");
             emit("\tidivl %%ecx");
             emit("\tmovl %%edx, %%eax");
@@ -440,8 +447,11 @@ static int gen_expr(Method *m, Node *e) {
             else if (op == '>') set = "setg";
             else if (op == '=') set = "sete";
             else if (op == '!') set = "setne";
+            else if (op == '&') { emit("\tandl %%ecx, %%eax"); break; }  /* bitwise (len 1) */
+            else if (op == '|') { emit("\torl %%ecx, %%eax"); break; }
+            else if (op == '^') { emit("\txorl %%ecx, %%eax"); break; }
             else die("gen_x64: operator '%s'", e->str);
-            emit("\tcmpl %%ecx, %%eax");
+            emit("\tcmpl %%eax, %%ecx");   /* bandingkan eksplisit left vs right */
             emit("\t%s %%al", set);
             emit("\tmovzbl %%al, %%eax");
         }

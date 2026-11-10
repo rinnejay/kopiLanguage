@@ -12,6 +12,11 @@ enum {
     /* token multi-char; >= 256 agar tidak bertabrakan ASCII operator 1-char */
     T_PP = 256, T_MM, T_ADDEQ, T_SUBEQ, T_MULEQ, T_DIVEQ, T_MODEQ,
     T_ARROW,       /* => */
+    /* operator bitwise (v1.5): single-char & | ^ ~ memakai kode ASCII-nya
+     * langsung; multi-char di bawah >= 256 */
+    T_SHL, T_SHR, T_USHR,               /* << >> >>> */
+    T_ANDEQ, T_OREQ, T_XOREQ,           /* &= |= ^= */
+    T_SHLEQ, T_SHREQ, T_USHREQ,         /* <<= >>= >>>= */
 };
 
 typedef struct {

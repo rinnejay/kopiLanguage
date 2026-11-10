@@ -175,6 +175,7 @@ static int gen_expr(Method *m, Node *e) {
     case EX_UN:
         gen_expr(m, e->a);
         if (e->str[0] == '-') emit("\tneg\tw0, w0");
+        else if (e->str[0] == '~') emit("\tmvn\tw0, w0");
         else emit("\teor\tw0, w0, #1");
         return 0;
     case EX_CALL: {
@@ -392,7 +393,7 @@ static int gen_expr(Method *m, Node *e) {
         return 0;
     case EX_BIN: {
         char op = e->str[0];
-        if (op == '&' || op == '|') {
+        if ((op == '&' || op == '|') && e->str[1] != 0) {
             /* hasil 0/1 keduanya: and/or langsung karena operand boolean 0/1 */
             int lelse = nlab++, lend = nlab++;
             gen_expr(m, e->a);
@@ -422,6 +423,9 @@ static int gen_expr(Method *m, Node *e) {
         /* operator 2-karakter dulu supaya tidak tabrak case '<' / '>' */
         if (!strcmp(e->str, "<=")) { emit("\tcmp\tw9, w0"); emit("\tcset\tw0, le"); break; }
         if (!strcmp(e->str, ">=")) { emit("\tcmp\tw9, w0"); emit("\tcset\tw0, ge"); break; }
+        if (!strcmp(e->str, "<<")) { emit("\tlslv\tw0, w9, w0"); break; }   /* w9=left w0=right */
+        if (!strcmp(e->str, ">>")) { emit("\tasrv\tw0, w9, w0"); break; }
+        if (!strcmp(e->str, ">>>")) { emit("\tlsrv\tw0, w9, w0"); break; }
         switch (op) {
         case '+': emit("\tadd\tw0, w9, w0"); break;
         case '-': emit("\tsub\tw0, w9, w0"); break;
@@ -437,6 +441,9 @@ static int gen_expr(Method *m, Node *e) {
         case '>': emit("\tcmp\tw9, w0"); emit("\tcset\tw0, gt"); break;
         case '=': emit("\tcmp\tw9, w0"); emit("\tcset\tw0, eq"); break;
         case '!': emit("\tcmp\tw9, w0"); emit("\tcset\tw0, ne"); break;
+        case '&': emit("\tand\tw0, w9, w0"); break;     /* bitwise (len 1) */
+        case '|': emit("\torr\tw0, w9, w0"); break;
+        case '^': emit("\teor\tw0, w9, w0"); break;
         default:
             die("gen_a64: operator '%s'", e->str);
         }

@@ -133,7 +133,17 @@ Tok *lex_file(const char *path, int *ntoks) {
         if (p[0] == '/' && p[1] == '=') { PUSH(T_DIVEQ, 0, 0); p += 2; continue; }
         if (p[0] == '%' && p[1] == '=') { PUSH(T_MODEQ, 0, 0); p += 2; continue; }
         if (p[0] == '=' && p[1] == '>') { PUSH(T_ARROW, 0, 0); p += 2; continue; }
-        if (strchr("+-*/%(){};,.=!<>[]", *p) && *p) {
+        /* bitwise: shift & compound; single-char & | ^ ~ jatuh ke strchr */
+        if (p[0] == '&' && p[1] == '=') { PUSH(T_ANDEQ, 0, 0);  p += 2; continue; }
+        if (p[0] == '|' && p[1] == '=') { PUSH(T_OREQ, 0, 0);   p += 2; continue; }
+        if (p[0] == '^' && p[1] == '=') { PUSH(T_XOREQ, 0, 0);  p += 2; continue; }
+        if (p[0] == '<' && p[1] == '<' && p[2] == '=') { PUSH(T_SHLEQ, 0, 0);  p += 3; continue; }
+        if (p[0] == '<' && p[1] == '<') { PUSH(T_SHL, 0, 0);     p += 2; continue; }
+        if (p[0] == '>' && p[1] == '>' && p[2] == '>' && p[3] == '=') { PUSH(T_USHREQ, 0, 0); p += 4; continue; }
+        if (p[0] == '>' && p[1] == '>' && p[2] == '>') { PUSH(T_USHR, 0, 0);  p += 3; continue; }
+        if (p[0] == '>' && p[1] == '>' && p[2] == '=') { PUSH(T_SHREQ, 0, 0);  p += 3; continue; }
+        if (p[0] == '>' && p[1] == '>') { PUSH(T_SHR, 0, 0);     p += 2; continue; }
+        if (strchr("+-*/%(){};,.=!<>[]&|^~", *p) && *p) {
             PUSH((unsigned char)*p, 0, 0);
             p++;
             continue;

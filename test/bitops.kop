@@ -1,0 +1,60 @@
+/* bitops — verifikasi operator bitwise native & | ^ ~ << >> >>> + compound */
+
+class Main {
+    public static void main(String[] args) {
+        int a = 102;
+        int b = 51;
+        System.out.println(a & b);         // 34
+        System.out.println(a | b);         // 119
+        System.out.println(a ^ b);         // 85
+        System.out.println(~a);            // -103
+        System.out.println(3 << 4);        // 48
+        System.out.println(48 >> 3);       // 6
+        System.out.println(-8 >> 1);       // -4  (arithmetic)
+        System.out.println(-8 >>> 28);     // 15  (255FFFFF8 logis)
+        System.out.println(-4 >>> 28);     // 15
+        // presedensi: & > ^ > |   (3&5)=1, (2^1)=3, (1|3)=3
+        System.out.println(1 | 2 ^ 3 & 5); // 3
+        // shift pangkat dua dibangun ulang: 1<<10 = 1024
+        System.out.println(1 << 10);       // 1024
+        // masker nibble
+        System.out.println(171 & 15);      // 11 ('0xAB' low nibble)
+        System.out.println(171 >> 4);      // 10 (high nibble)
+        System.out.println((171 >> 4) | ((171 & 15) << 4)); // 186 (tukar nibble)
+
+        // compound assign
+        int x = 240;
+        x &= 60;                         // 0x30
+        System.out.println(x);             // 48
+        x |= 12;                           // 60
+        System.out.println(x);             // 60
+        x ^= 255;                         // 0xC3
+        System.out.println(x);             // 195
+        x <<= 2;                           // 0x30C
+        System.out.println(x);             // 780
+        x >>= 4;                           // 0x30
+        System.out.println(x);             // 48
+        int y = -8;
+        y >>>= 28;                         // 0xF
+        System.out.println(y);             // 15
+
+        // boolean tak terganggu: &&/|| tetap short-circuit
+        boolean ok = 5 > 3 && 7 < 9;
+        boolean hmm = true || false;
+        System.out.println(ok);            // 1
+        System.out.println(hmm);           // 1
+
+        // xor-swap klasik
+        int p = 7;
+        int q = 42;
+        p ^= q; q ^= p; p ^= q;
+        System.out.println(p);             // 42
+        System.out.println(q);             // 7
+
+        // popcount 8-bit lewat bit manips
+        int v = 171;
+        int n = 0;
+        while (v != 0) { n += v & 1; v >>>= 1; }
+        System.out.println(n);             // 5 (10101011)
+    }
+}

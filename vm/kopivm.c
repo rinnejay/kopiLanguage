@@ -18,6 +18,7 @@ enum {
     OP_NEWCLO, OP_CALLIND, OP_ENVLOAD, OP_IDXR, OP_IDXW, OP_ALEN,
     OP_NEWARR,                      /* lambda/closure + array arena */
     OP_NET,                         /* builtin Net.* (ubit syscall host) */
+    OP_BAND, OP_BOR, OP_BXOR, OP_SHL, OP_SHR, OP_USHR, OP_BNOT,   /* v1.5 bitwise */
 };
 
 #define MAXM 4096
@@ -179,6 +180,13 @@ static void run(void) {
         case OP_GE: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a >= b; break;
         case OP_EQ: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a == b; break;
         case OP_NE: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = a != b; break;
+        case OP_BAND: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a & b); break;
+        case OP_BOR:  b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a | b); break;
+        case OP_BXOR: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a ^ b); break;
+        case OP_SHL:  b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a << (b & 31)); break;
+        case OP_SHR:  b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a >> (b & 31)); break;
+        case OP_USHR: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)((uint32_t)a >> (b & 31)); break;
+        case OP_BNOT: a = stackv[--sp]; stackv[sp++] = ~a; break;
         case OP_JMP:
             f->pc = (int32_t)((uint32_t)m->code[f->pc] | ((uint32_t)m->code[f->pc + 1] << 8) |
                               ((uint32_t)m->code[f->pc + 2] << 16) | ((uint32_t)m->code[f->pc + 3] << 24));
