@@ -32,7 +32,7 @@ sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 
 ```
 Pengembangan  ██████████░░░░░░  ~62%  menuju bahasa serius (v2)
-v1.5d-A hari ini ████████████████  53/53 test hijau — HKDF/ExpandLabel RFC 5869+8446 lulus di 3 backend
+v1.5d-B hari ini ████████████████  55/55 test hijau — ChaCha20 RFC 7539 lulus di 3 backend
 ```
 
 | Versi | Isi |
@@ -42,8 +42,7 @@ v1.5d-A hari ini ████████████████  53/53 test hi
 | **v1.2** | **array `int[]` + arena memori `kopalloc`** (bump allocator, 1 batas 8 MB): `new int[n]`, `a[i]`, `a[i] = v`, `a.length`, bounds check runtime (`kopi: array tidak valid`, OOM rapi); fix ABI entry `main` (frame x30 sendiri); pustaka `lib/Arrays.kop` (sort/binSearch/find/count/...) dan `lib/Crypto.kop` (bitxor + FNV-1a + PRNG Lehmer + XOR-stream/Caesar) — **100% ditulis dalam bahasa Kopi** di atas aritmetika murni |
 | **v1.2.1** | scoping per-blok (`if/else`, `while`, `for`, blok `{}` telanjang — deklarasi direset di akhir blok, shadow antar cabang diperbolehkan ala sibling) + multi-deklarasi `int a = 0, b = 1;` — library kini bisa memakai nama loop yang sama di metode yang sama |
 | **v1.3** | **jaringan**: builtin `Net.*` = syscall Linux langsung tanpa libc — `socket`, `connect`, `rdb` (baca 1 byte), `wrb` (tulis 1 byte), `close`, dan `Net.bytes("literal")` (byte-as-int, dikonversi compile-time). Codegen native a64 (`svc #0`) & x64 (`syscall`) membangun `sockaddr_in` di stack sendiri; VM KOP1 jalur op `OP_NET`. Pustaka `lib/Tcp.kop` (open/send/recvAll/cat/indexOf — 100% Kopi) dan `lib/Http.kop` (klien HTTP/1.0 minimal: statusOf/bodyOf/getInto) + `examples/httpget.kop`; uji loopback (echo + `python -m http.server`) masuk test.sh (33 tes) |
-| **v1.5d-A** | **HKDF-SHA256 + ExpandLabel murni Kopi** (`lib/Kdf.kop`): `extract` (`HMAC(salt, IKM)`) dan `expand` (T(i)=HMAC(PRK, T(i−1) ‖ info ‖ i)) lulus kasus 1 RFC 5869 (PRK + OKM 42 byte + OKM 80 byte jalur potong); `expandLabel` (uint16 len ‖ "tls13 " ‖ uint8 len·label ‖ uint8 len·context) sudah sesuai RFC 8446 §7.1 — fondasi key schedule TLS 1.3; jebakan yang ditulis telanjang: byte-panjang harus MENDAHULUI datanya (salah taruh sesudah soalnya lolos tidak — tertangkap ref python hmac)
-
+| **v1.5d-B** | **ChaCha20 murni Kopi** (`lib/ChaCha.kop`): block function 16 kata + 20 round (quarter-round via `uadd` mod-2^32 dan `rotl` native), `xctr(key, nonce, counter, data)` keystream-XOR lewat blok beruntun; **lulus vektor resmi RFC 7539 §2.4.2** (key `00..1f`, nonce `…004a…`, counter 1, plaintext Sunscreen 114 byte) + roundtrip di VM, native a64, dan sintaks x64. Jebakan yang ditulis telanjang: (1) ciphertext `d31a8d34…` itu vektor §2.8.2 (AEAD), bukan §2.4.2 — ciphertext benar `6e2e359a…`; (2) nonce §2.4.2 `00000000 0000004a 00000000` mirip bentuk §2.3.2 `00000009 0000004a 00000000` — beda 1 word; (3) konstanta desimal setup state salah konversi tangan (`0x3320646e` = 857760878, saya tulis 857773998) — tertangkap karena python-mirror ternyata bebas-kesalahan
 `test.sh` memverifikasi **konsistensi output antar-backend**: program yang sama
 harus menghasilkan output byte-per-byte identik di VM, native aarch64, dan
 (sintaks assembly) x86-64.

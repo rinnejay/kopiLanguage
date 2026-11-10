@@ -1,0 +1,100 @@
+/* ChaCha.kop — ChaCha20 stream cipher (RFC 7539) murni di bahasa Kopi.
+ *
+ * State 16 kata 32-bit; 20 rounds (10 double-round); keystream LE.
+ * Bergantung Hash.kop (uadd / rotr).
+ *
+ * Uji: vektor RFC 7539 §2.4.2 (key 00..1f, nonce 000000090000004a00000000
+ * pada §2.4.2 urutan byte LE, counter 1, plaintext "Ladies and
+ * gentlemen..." → ciphertext `d31a8d34...`).
+ */
+
+import Hash;
+
+class ChaCha {
+
+    static int rotl(int x, int n) {
+        return (x << n) | (x >>> (32 - n));
+    }
+
+    /* quarter round: operasi pada referensi array? Kopi tak punya
+     * pointer — inline 4-kata lewat indeks state s + offset 0/4/8/12 */
+    static void qr(int[] s, int a, int b, int c, int d) {
+        s[a] = Hash.uadd(s[a], s[b]);
+        s[d] = rotl(s[d] ^ s[a], 16);
+        s[c] = Hash.uadd(s[c], s[d]);
+        s[b] = rotl(s[b] ^ s[c], 12);
+        s[a] = Hash.uadd(s[a], s[b]);
+        s[d] = rotl(s[d] ^ s[a], 8);
+        s[c] = Hash.uadd(s[c], s[d]);
+        s[b] = rotl(s[b] ^ s[c], 7);
+    }
+
+    static void roundTo(int[] x) {
+        for (int i = 0; i < 10; i++) {
+            /* kolom */
+            qr(x, 0, 4, 8, 12);
+            qr(x, 1, 5, 9, 13);
+            qr(x, 2, 6, 10, 14);
+            qr(x, 3, 7, 11, 15);
+            /* diagonal */
+            qr(x, 0, 5, 10, 15);
+            qr(x, 1, 6, 11, 12);
+            qr(x, 2, 7, 8, 13);
+            qr(x, 3, 4, 9, 14);
+        }
+    }
+
+    /* satu blok: state inisial (16 kata) → keystream 64 byte */
+    static int[] block(int[] init) {
+        int[] x = new int[16];
+        for (int i = 0; i < 16; i++) x[i] = init[i];
+        roundTo(x);
+        int[] ks = new int[64];
+        for (int i = 0; i < 16; i++) {
+            int w = Hash.uadd(x[i], init[i]);
+            int lo = w & 255;
+            int mi = (w >>> 8) & 255;
+            int hi2 = (w >>> 16) & 255;
+            int hi = (w >>> 24) & 255;
+            ks[i * 4] = lo;
+            ks[i * 4 + 1] = mi;
+            ks[i * 4 + 2] = hi2;
+            ks[i * 4 + 3] = hi;
+        }
+        return ks;
+    }
+
+    /* en/de-kript (keystream XOR):
+     * key 32 byte, nonce 12 byte, counter awal, data byte-as-int */
+    static int[] xctr(int[] key, int[] nonce, int counter, int[] data) {
+        /* state: konstanta + key LE + counter + nonce LE */
+        int[] init = new int[16];
+        init[0] = 1634760805;   /* 0x61707865 (python: int("61707865",16)) */
+        init[1] = 857760878;    /* 0x3320646e */
+        init[2] = 2036477234;   /* 0x79622d32 */
+        init[3] = 1797285236;   /* 0x6b206574 */
+        for (int i = 0; i < 8; i++) {
+            init[4 + i] = (key[4 * i] | (key[4 * i + 1] << 8)
+                           | (key[4 * i + 2] << 16)) | (key[4 * i + 3] << 24);
+        }
+        init[12] = counter;
+        init[13] = (nonce[0] | (nonce[1] << 8)) | ((nonce[2] << 16) | (nonce[3] << 24));
+        init[14] = (nonce[4] | (nonce[5] << 8)) | ((nonce[6] << 16) | (nonce[7] << 24));
+        init[15] = (nonce[8] | (nonce[9] << 8)) | ((nonce[10] << 16) | (nonce[11] << 24));
+
+        int n = data.length;
+        int[] out = new int[n];
+        int done = 0;
+        int blk = 0;
+        while (done < n) {
+            init[12] = counter + blk;
+            int[] ks = block(init);
+            int take = n - done;
+            if (take > 64) take = 64;
+            for (int i = 0; i < take; i++) out[done + i] = data[done + i] ^ ks[i];
+            done = done + take;
+            blk = blk + 1;
+        }
+        return out;
+    }
+}

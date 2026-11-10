@@ -59,6 +59,10 @@ python3 tools/gen_kdf.py "$T/kopi/hkdf.kop" >/dev/null
 printf '1\n1\n1\n1\n' > "$T/kopi/hkdf.ref"
 check hkdf "$T/kopi/hkdf.kop"
 
+# ─── ChaCha20: RFC 7539 §2.4.2 (sunscreen, key 00..1f, nonce 4a, ctr 1) ──
+printf '1\n1\n' > "$T/kopi/stream.ref"
+check stream test/stream.kop
+
 printf '42 == 42\n' > "$T/kopi/first.ref"
 check first examples/first.kop
 
@@ -216,7 +220,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec bigsmoke febig curve25519 hkdf; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost bitops hashvec bigsmoke febig curve25519 hkdf stream; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done
