@@ -235,7 +235,8 @@ def convert(md, page_title):
             anchor = '<a class="anchor" href="#%s" aria-label="tautan">#</a>' % sid
             out.append('<h%d id="%s">%s%s</h%d>' % (lvl, sid, inner, anchor, lvl))
             if 2 <= lvl <= 3:
-                plain = re.sub(r"`([^`]*)`", r"\1", text)
+                plain = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+                plain = re.sub(r"`([^`]*)`", r"\1", plain)
                 plain = re.sub(r"[*_]", "", plain)
                 toc.append((lvl, sid, plain))
             i += 1
