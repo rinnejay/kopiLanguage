@@ -1,0 +1,100 @@
+import Arrays;
+
+class Titik {
+    int x;
+    int y;
+    boolean hidup;
+
+    int kuadran() {
+        if (this.x > 0 && this.y > 0) return 1;
+        if (this.x < 0 && this.y > 0) return 2;
+        return 3;
+    }
+
+    int geser(int dx, int dy) {
+        this.x = this.x + dx;
+        this.y = this.y + dy;
+        return this.kuadran();
+    }
+
+    boolean samaPosisi(Titik o) {
+        return this.x == o.x && this.y == o.y;
+    }
+
+    static Titik buat(int ax, int ay) {
+        Titik t = new Titik();
+        t.x = ax;
+        t.y = ay;
+        t.hidup = true;
+        return t;
+    }
+}
+
+class Kotak {
+    int w;
+    int h;
+
+    int luas() {
+        return this.w * this.h;
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        // zero-init semua field
+        Titik a = new Titik();
+        System.out.println(a.x);
+        System.out.println(a.y);
+        System.out.println(a.hidup);
+
+        // factory + method instance + this
+        Titik b = Titik.buat(3, 4);
+        System.out.println(b.x);
+        System.out.println(b.kuadran());
+        System.out.println(b.geser(-10, 0));
+        System.out.println(b.x);
+        System.out.println(b.hidup);
+
+        // field boolean
+        Titik c = Titik.buat(1, 2);
+        c.hidup = false;
+        System.out.println(c.hidup);
+        if (c.hidup) System.out.println(99); else System.out.println(100);
+
+        // identitas referensi == / !=
+        System.out.println(c == b);
+        System.out.println(c != b);
+        System.out.println(a != b);
+
+        // samaPosisi: objek sebagai parameter
+        Titik d = Titik.buat(1, 2);
+        System.out.println(c.samaPosisi(d));
+        System.out.println(b.samaPosisi(d));
+
+        // dua class, class sebagai field lain? (objek sebagai param metode)
+        Kotak k = new Kotak();
+        k.w = 6;
+        k.h = 7;
+        System.out.println(k.luas());
+
+        // objek dalam loop: field dipakai berulang
+        int total = 0;
+        for (int i = 0; i < 4; i++) {
+            k.w = i + 1;
+            total += k.luas() * k.h;
+        }
+        System.out.println(total);
+
+        // objek ditangkap lambda (capture path)
+        int[] xs = new int[3];
+        xs[0] = 1; xs[1] = 2; xs[2] = 3;
+        int[] acc = new int[1];
+        xs.forEach(x => tambah(acc, b.x, x));
+        System.out.println(acc[0]);
+        System.out.println(Arrays.sum(xs));
+    }
+
+    static void tambah(int[] acc, int k, int x) {
+        acc[0] = acc[0] + k * x;
+    }
+}

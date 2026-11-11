@@ -1368,6 +1368,13 @@ check dochtour docs/contoh/tour.kop
 cp test/langtest.ref "$T/kopi/langtest.ref"
 check langtest test/langtest.kop
 
+# ─── fitur bahasa v1.12: class instance (new, field, method this) ───
+cp test/objtest.ref "$T/kopi/objtest.ref"
+check objtest test/objtest.kop
+./kopicc test/objtest.kop -t x64 -o "$T/kopi/objtest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/objtest64.s" -o /dev/null \
+    && echo "PASS  objtest [x64]" || { echo "FAIL  objtest [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
 check urltest test/urltest.kop

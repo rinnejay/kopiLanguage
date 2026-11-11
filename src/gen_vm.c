@@ -190,6 +190,14 @@ static void gen_bin_typed(Node *e) {
                 !strcmp(e->str, ">=");
     Ty P = isShift ? lt : ty_promote(lt, rt);
 
+    /* identitas objek (v1.12): ==/!= pada dua T_ARI → bandingkan referensi 64-bit */
+    if (lt == T_ARI && rt == T_ARI && isCmp) {
+        gen_expr(e->a);
+        gen_expr(e->b);
+        em8(op == '=' ? OP_EQ64 : OP_NE64);
+        return;
+    }
+
     gen_expr(e->a);
     emit_conv(lt, P);
     gen_expr(e->b);

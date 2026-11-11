@@ -16,9 +16,10 @@ class Main {
 ```
 
 - `main` boleh `static void main()` atau `static void main(String[] args)`.
-- Semua anggota class **statis**; class berfungsi sebagai namespace.
-- Tidak ada `package`, inheritance, interface, enum, generics, atau
-  instance (`new Kelas()`); lihat [06 — Batas](06-batas-roadmap.md).
+- Anggota class bisa **statis** (namespace) atau **instance** (field +
+  method `this`, sejak v1.12) — lihat bagian 12.
+- Tidak ada `package`, inheritance, interface, enum, atau generics;
+  lihat [06 — Batas](06-batas-roadmap.md).
 
 ## 2. Komentar
 
@@ -303,7 +304,75 @@ class Main {
 Semua class dalam satu build berbagi namespace. Simpan helper di file
 sendiri lalu `import Keranjang;`.
 
-## 12. JSON literal
+## 12. Class instance
+
+Sejak v1.12 sebuah class bisa punya **field** dan **method instance**
+(metode tanpa `static`). Instance dibuat dengan `new`, dan `this`
+merujuk objek yang sedang berjalan:
+
+```java
+class Titik {
+    int x;
+    int y;
+    boolean hidup;
+
+    int kuadran() {                    // method instance (tanpa static)
+        if (this.x > 0 && this.y > 0) return 1;
+        if (this.x < 0 && this.y > 0) return 2;
+        return 3;
+    }
+
+    int geser(int dx, int dy) {
+        this.x = this.x + dx;
+        this.y = this.y + dy;
+        return this.kuadran();         // panggil method lain lewat this
+    }
+
+    static Titik buat(int ax, int ay) {   // factory (pengganti constructor)
+        Titik t = new Titik();
+        t.x = ax;
+        t.y = ay;
+        t.hidup = true;
+        return t;
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        Titik a = new Titik();             // semua field = 0
+        System.out.println(a.x);           // 0
+        Titik b = Titik.buat(3, 4);
+        System.out.println(b.kuadran());   // 1
+        b.geser(-10, 0);
+        System.out.println(b.x);           // -7
+        System.out.println(b == Titik.buat(3, 4));  // 0 — identitas referensi
+    }
+}
+```
+
+Aturan yang berlaku:
+
+- **Deklarasi bertipe class**: `Titik t = new Titik();`, parameter
+  `boolean sama(Titik o)`, dan return `static Titik buat()` — semua
+  didukung. Class harus didefinisikan **sebelum** dirujuk sebagai tipe.
+- **Field** selalu di-zero saat `new` (jaminan sama dengan `new int[n]`).
+- **`p == q`** membandingkan **referensi** (identitas), bukan isi —
+  sama seperti Java. Gunakan method pembanding untuk isi.
+- Metode tanpa `static` = metode instance. `main` wajib `static`.
+
+Batas v1.12 (dirancang jujur):
+
+- Field hanya 32-bit: `int`, `boolean`, `byte`, `short`, `uint8`,
+  `uint16`. Field `long`/`double`/`String`/objek belum bisa disimpan.
+- Tidak ada constructor — semua field mulai dari 0; pakai factory
+  (`static Titik buat(...)`) untuk inisialisasi.
+- Dispatch **statis** (tanpa inheritance/interface/vtable); `Titik`
+  secara internal adalah tape `int[]` ber-ukuran jumlah field.
+- Receiver method/field harus variabel sederhana: `b.kuadran()` ok,
+  `buat(1,2).kuadran()` belum — simpan dulu ke variabel.
+- Objek bisa dipakai di lambda (ditangkap by-value seperti variabel lain).
+
+## 13. JSON literal
 
 ```java
 import Json;
@@ -324,7 +393,7 @@ class Main {
 - Maksimum 8 entri per literal; untuk lebih banyak susun bertahap.
 - `Json.parse` untuk teks JSON dari luar; `Json.write` untuk serialisasi.
 
-## 13. Memori: arena 32 MB, tanpa GC
+## 14. Memori: arena 32 MB, tanpa GC
 
 Semua alokasi dinamis (array, string hasil operasi) masuk **arena bump
 allocator** 32 MB. Tidak ada free per objek.
@@ -346,7 +415,7 @@ Aturan penting:
    reset per request/iterasi.
 5. Lebih dari 32 MB → `kopi: arena memori habis` + exit 1 (bukan crash).
 
-## 14. Keluar & kode status
+## 15. Keluar & kode status
 
 ```java
 Net.exit(0);      // keluar seketika; tidak ada finally/atexit
@@ -355,7 +424,7 @@ Net.exit(0);      // keluar seketika; tidak ada finally/atexit
 `Net.exit` memakai syscall `exit` langsung sehingga buffer stdio tidak
 di-flush. Selesaikan output (mis. `println`) sebelum memanggilnya.
 
-## 15. Contoh tur lengkap
+## 16. Contoh tur lengkap
 
 Lihat `docs/contoh/tour.kop` (dijalankan oleh `docs/check.sh`). Isinya
 menggabungkan: tipe, ternary, loop, array fungsional, String method,

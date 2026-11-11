@@ -378,6 +378,17 @@ static int gen_bin_typed(Method *m, Node *e) {
                 !strcmp(e->str, ">=");
     Ty P = isShift ? lt : ty_promote(lt, rt);
 
+    /* identitas objek (v1.12): ==/!= pada dua T_ARI → bandingkan pointer 64-bit */
+    if (lt == T_ARI && rt == T_ARI && isCmp) {
+        gen_expr(m, e->a);
+        push_x();
+        gen_expr(m, e->b);
+        pop_x("x9");
+        emit("\tcmp\tx9, x0");
+        emit("\tcset\tw0, %s", op == '=' ? "eq" : "ne");
+        return 0;
+    }
+
     gen_expr(m, e->a);
     widen_ty(lt);
     conv_ty(lt, P);

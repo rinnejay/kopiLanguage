@@ -114,10 +114,13 @@ enum {
     EX_STRLIT,     /* string literal dalam ekspresi (khusus Net.bytes)    */
     EX_CAST,       /* (tipe) expr : a=operand, dty=tipe tujuan            */
     EX_TSTR,       /* template `...{expr}...` : a=daftar bagian (byte/ekspresi) */
+    EX_NEWOBJ,     /* new Kelas() : str=nama class → didesugar EX_NEWARR  */
+    EX_FLD,        /* obj.field : a=objek, str=nama field → EX_IDX        */
     /* statements */
     ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR, ST_DO,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
     ST_IDXASG,     /* a[i] = v : a=array expr, b=index expr, c=value expr */
+    ST_FLDASG,     /* obj.field = v : a=objek, str=field, c=value expr    */
     ST_BLOCK,      /* blok { ... } : d=statement list (scope sendiri)      */
 };
 
@@ -131,6 +134,7 @@ typedef struct Node {
     int typed;         /* sudah melalui type_expr (cache resolusi) */
     int line;
     const char *file;  /* file sumber AST — untuk laporan error */
+    const char *cls;   /* ST_VAR/param: nama class bila deklarasi objek  */
     struct Method *meth; /* EX_CALL: metode target (untuk konversi argumen) */
     struct Node *a, *b, *c, *d;   /* anak generik */
     struct Node *next;        /* penghubung list statement */
@@ -139,6 +143,7 @@ typedef struct Node {
 typedef struct Param {
     const char *name;
     int ty;            /* tipe deklarasi (T_INT default; T_FN untuk fn) */
+    const char *cls;   /* tipe class (param `P p` → T_ARI + cls=P)      */
     struct Param *next;
 } Param;
 
@@ -158,11 +163,21 @@ typedef struct Method {
     int capcopy[32];
     Ty captty[32];
     int hidden;        /* metode lambda tersembunyi — jangan di-resolve ulang */
+    int is_inst;       /* metode instance (param pertama = this)          */
     struct Method *next;
 } Method;
 
+typedef struct Field {
+    const char *name;
+    int idx;           /* slot dalam tape instance */
+    int ty;            /* T_INT / T_BOOL / T_BYTE / T_SHORT / T_UINT8/16 */
+    struct Field *next;
+} Field;
+
 typedef struct Class {
     const char *name;
+    Field *fields;
+    int nfields;
     struct Class *next;
 } Class;
 

@@ -41,6 +41,8 @@ static Node *expr(void);
 static void resolve(void);
 static Node *stmt_single(void);
 static Node *block(void);
+static int tokat(int d, int t);
+static int lambda_ahead(void);
 static Method *cur_method;
 
 /* ---------- tipe ---------- */
@@ -347,10 +349,39 @@ static Node *stmt_single(void) {
         return n;
     }
 
+    /* deklarasi objek class: P p = new P(); / P p = metode(); */
+    if (t->type == T_ID && tokat(1, T_ID) && tokat(2, '=') && !lambda_ahead()) {
+        Node *n = newnode(ST_VAR, line);
+        n->dty = (int)T_ARI;
+        n->cls = xs(t->text);          /* divalidasi saat resolusi */
+        advance();                     /* nama class */
+        n->str = xs(peek()->text);
+        expect(T_ID, "nama variabel");
+        expect('=', "'=' — variabel lokal wajib diinisialisasi");
+        n->a = expr();
+        expect(';', "';'");
+        return n;
+    }
+
     /* assignment, a[i] = v, ++/+= kompon, atau call statement */
     if (t->type == T_ID) {
         int t2 = peek2()->type;
         if (t2 == '=') return parse_assignment(line, 1);
+        /* p.field = v; — penugasan field instance */
+        if (t2 == '.' && tokat(2, T_ID) && tokat(3, '=')) {
+            Node *s = newnode(ST_FLDASG, line);
+            Node *obj = newnode(EX_VAR, line);
+            obj->str = xs(t->text);
+            advance();                 /* nama objek */
+            advance();                 /* '.' */
+            s->a = obj;
+            s->str = xs(peek()->text);
+            advance();                 /* nama field */
+            expect('=', "'=' pada obj.field = v");
+            s->c = expr();
+            expect(';', "';' setelah obj.field = v");
+            return s;
+        }
         if (t2 == '[') {
             /* a[i] = v; (indeks di sisi kiri) */
             Node *s = newnode(ST_IDXASG, line);
@@ -384,11 +415,42 @@ static void skip_mods(void) {
     while (at(KW_PUBLIC) || at(KW_PRIVATE) || at(KW_STATIC) || at(KW_FINAL)) advance();
 }
 
+static int mods_static(void) {
+    /* seperti skip_mods tetapi melaporkan ada tidaknya 'static' */
+    int st = 0;
+    for (;;) {
+        if (at(KW_PUBLIC) || at(KW_PRIVATE) || at(KW_FINAL)) { advance(); continue; }
+        if (at(KW_STATIC)) { st = 1; advance(); continue; }
+        break;
+    }
+    return st;
+}
+
+static Class *find_class(const char *name) {
+    for (Class *c = prog.classes; c; c = c->next)
+        if (!strcmp(c->name, name)) return c;
+    return 0;
+}
+
+static Field *class_field(Class *c, const char *name) {
+    for (Field *f = c->fields; f; f = f->next)
+        if (!strcmp(f->name, name)) return f;
+    return 0;
+}
+
+/* tipe field instance: hanya 32-bit (satu slot tape int[]) di v1.12 */
+static int field_ty_ok(Ty t) {
+    return t == T_INT || t == T_BOOL || t == T_BYTE ||
+           t == T_SHORT || t == T_UINT8 || t == T_UINT16;
+}
+
 static void parse_class(void) {
     skip_mods();
     expect(KW_CLASS, "'class'");
     Tok *id = peek();
     expect(T_ID, "nama class");
+    if (find_class(xs(id->text)))
+        die("baris %d: class '%s' dideklarasikan dua kali", id->line, id->text);
     Class *c = xmalloc(sizeof(Class));
     c->name = xs(id->text);
     c->next = prog.classes;
@@ -397,34 +459,96 @@ static void parse_class(void) {
 
     expect('{', "'{' setelah nama class");
     while (!at('}')) {
-        skip_mods();
+        int was_static = mods_static();
         Tok *rt = peek();
-        Ty ret = type_opt();
-        if (ret == T_FN)
-            die("baris %d: metode dengan return lambda belum didukung — simpan lambda di variabel", rt->line);
+        /* field instance: `Tipe nama;` — tanpa inisialisasi, di-zero saat new */
+        if (at(T_ID) && tokat(1, T_ID) && tokat(2, ';') && find_class(xs(rt->text))) {
+            const char *fcls = xs(rt->text);
+            die("baris %d: field bertipe class ('%s %s;') belum didukung — "
+                "field v1 hanya 32-bit (int/boolean/byte/short)", rt->line, fcls, peek()->text);
+        }
+        Ty ret;
+        const char *retcls = 0;
+        if (at(T_ID) && tokat(1, T_ID) && tokat(2, '(') && find_class(xs(rt->text))) {
+            retcls = xs(rt->text);       /* tipe kembalian class: P make() */
+            advance();
+            ret = T_ARI;
+        } else {
+            ret = type_opt();
+            if (ret == T_FN)
+                die("baris %d: metode dengan return lambda belum didukung — simpan lambda di variabel", rt->line);
+        }
         Tok *mn = peek();
         expect(T_ID, "nama metode");
+        /* setelah nama: '(' → metode; ';' atau '=' → deklarasi field */
+        if (at(';') || at('=')) {
+            if (was_static)
+                die("baris %d: static field belum didukung — pakai method konstanta (static int W())", mn->line);
+            if (!field_ty_ok(ret) && !retcls)
+                die("baris %d: field '%s' bertipe ini belum didukung — "
+                    "field v1 hanya 32-bit (int/boolean/byte/short/uint8/uint16)",
+                    mn->line, mn->text);
+            if (at('=')) {
+                advance();
+                die("baris %d: field '%s' tidak boleh diinisialisasi — "
+                    "semua field di-zero saat 'new %s()', set nilainya lewat method atau penugasan",
+                    mn->line, mn->text, c->name);
+            }
+            advance();   /* ';' */
+            if (class_field(c, xs(mn->text)))
+                die("baris %d: field '%s' dideklarasikan dua kali", mn->line, mn->text);
+            Field *f = xmalloc(sizeof(Field));
+            f->name = xs(mn->text);
+            f->idx = c->nfields++;
+            f->ty = (int)(retcls ? T_INT : ret);
+            f->next = c->fields;
+            c->fields = f;
+            continue;
+        }
+        int is_static = was_static;
         Method *m = xmalloc(sizeof(Method));
         m->cls = c->name;
         m->name = xs(mn->text);
         m->ret = ret;
+        m->is_inst = !is_static;
         expect('(', "'(' setelah nama metode");
         Param **pp = &m->params;
+        if (m->is_inst) {
+            /* metode instance: param pertama implisit `this` (int[] tape) */
+            Param *th = xmalloc(sizeof(Param));
+            th->name = xs("this");
+            th->ty = (int)T_ARI;
+            th->cls = c->name;
+            *pp = th;
+            pp = &th->next;
+            m->nparams++;
+        }
         if (!at(')')) {
             do {
-                Ty pt = type_param();
+                Ty pt;
+                const char *pcls = 0;
+                if (at(T_ID) && tokat(1, T_ID) && find_class(xs(peek()->text))) {
+                    pcls = xs(peek()->text);      /* parameter bertipe class */
+                    advance();
+                    pt = T_ARI;
+                } else {
+                    pt = type_param();
+                }
                 if (pt == T_VOID) die("baris %d: tipe parameter void", peek()->line);
                 Tok *pn = peek();
                 expect(T_ID, "nama parameter");
                 Param *p = xmalloc(sizeof(Param));
                 p->name = xs(pn->text);
                 p->ty = (int)pt;
+                p->cls = pcls;
                 *pp = p;
                 pp = &p->next;
                 m->nparams++;
             } while (at(',') && (advance(), 1));
         }
         expect(')', "')' setelah parameter");
+        if (!strcmp(m->name, "main") && m->is_inst)
+            die("baris %d: main harus static — metode instance tidak bisa jadi titik masuk", mn->line);
         m->body = stmt_or_block();
         m->next = prog.methods;
         prog.methods = m;
@@ -807,6 +931,21 @@ static Node *primary(void) {
         expect(']', "']' pada new int[n]");
         return n;
     }
+    /* new Kelas() → EX_NEWOBJ (didesugar EX_NEWARR saat resolusi) */
+    if (at(T_ID) && !strcmp(xs(t->text), "new") &&
+        peek2()->type == T_ID && ts[ti + 2].type == '(') {
+        advance();                       /* new */
+        const char *cn = xs(peek()->text);
+        advance();
+        expect('(', "'(' setelah nama class");
+        if (!at(')'))
+            die("baris %d: constructor '%s(...)' belum didukung — semua field "
+                "di-zero saat new; set nilai lewat method atau penugasan field", line, cn);
+        expect(')', "')' setelah nama class");
+        Node *n = newnode(EX_NEWOBJ, line);
+        n->str = xs(cn);
+        return n;
+    }
     if (at(T_ID)) {
         /* panggilan metode / Class.metode(...): nama berlambang (. lalu id lalu '(') */
         if (peek2()->type == '(' ||
@@ -835,8 +974,17 @@ static Node *postfix(void) {
                 l = n;
                 break;
             }
-            if (ts[ti + 2].type != '(')
-                die("baris %d: setelah '.' hanya '.length' atau metode array", l->line);
+            if (ts[ti + 2].type != '(') {
+                /* akses field instance: obj.field (didesugar EX_IDX saat resolusi) */
+                advance();                       /* '.' */
+                const char *fname = xs(peek()->text);
+                advance();                       /* nama field */
+                Node *n = newnode(EX_FLD, l->line);
+                n->a = l;
+                n->str = fname;
+                l = n;
+                continue;
+            }
             /* gula: a.forEach(f, ...) → Arrays.forEach(a, f, ...) */
             advance();                              /* '.' */
             const char *mname = xs(peek()->text);
@@ -1031,7 +1179,7 @@ static Node *expr(void) {
 
 /* ---------- resolusi simbol ---------- */
 
-typedef struct { const char *name; int slot; Ty ty; } SVar;
+typedef struct { const char *name; int slot; Ty ty; const char *cls; } SVar;
 
 static SVar scope[1024];
 static int nscope;
@@ -1039,13 +1187,14 @@ static int nextslot;
 static int framebase;      /* batas frame metode aktif; scope di bawah ini
                               milik metode luar → ambil jadi capture */
 
-static void scope_push(const char *name, int slot, Ty ty) {
+static void scope_push(const char *name, int slot, Ty ty, const char *cls) {
     for (int i = framebase; i < nscope; i++)
         if (!strcmp(scope[i].name, name))
             die("baris ???: variabel '%s' dideklarasikan dua kali", name);
     scope[nscope].name = name;
     scope[nscope].slot = slot;
     scope[nscope].ty = ty;
+    scope[nscope].cls = cls;
     nscope++;
 }
 
@@ -1072,7 +1221,7 @@ static SVar *resolve_name(const char *name, int line) {
         hm->captslot[j] = scope[i].slot;
         hm->captty[j] = scope[i].ty;
         int copy = nextslot++;
-        scope_push(name, copy, scope[i].ty);   /* frame aktif memenangkan */
+        scope_push(name, copy, scope[i].ty, scope[i].cls);   /* frame aktif memenangkan */
         hm->capcopy[j] = copy;
         return &scope[nscope - 1];
     }
@@ -1175,9 +1324,9 @@ static Ty resolve_lambda(Node *ar) {
     cur_method = hm;
     framebase = nscope;                 /* frame baru */
     nextslot = 0;
-    scope_push("$env", nextslot++, T_FN);
+    scope_push("$env", nextslot++, T_FN, 0);
     for (Param *p = envp->next; p; p = p->next)
-        scope_push(p->name, nextslot++, T_INT);
+        scope_push(p->name, nextslot++, T_INT, 0);
     hm->nlocals = nextslot;
 
     /* badan */
@@ -1377,6 +1526,8 @@ static Ty type_expr_raw(Node *e) {
         }
         if ((op == '=' || op == '!') && two) {      /* == != */
             if (lt == T_BOOL && rt == T_BOOL) return T_BOOL;
+            /* identitas objek: bandingkan referensi (pointer), ala Java */
+            if (lt == T_ARI && rt == T_ARI) return T_BOOL;
             if (!ty_is_num(lt) || !ty_is_num(rt))
                 die("baris %d: '==' / '!=' butuh operand numerik/boolean", e->line);
             Ty p = ty_promote(lt, rt);
@@ -1558,7 +1709,58 @@ static Ty type_expr_raw(Node *e) {
             e->dty = (int)T_INT;
             return T_INT;
         }
-        Method *m = find_method(buf, dot + 1);
+        Method *m = 0;
+        /* metode instance — dua jalur parser:
+         *  1) postfix sugar: recv.m(...) → EX_CALL "Arrays.m", receiver = arg[0]
+         *  2) call_node:    recv.m(...) → EX_CALL "recv.m", receiver belum arg */
+        if (!strcmp(buf, "Arrays") && e->a && e->a->kind == EX_VAR) {
+            SVar *rv = lookup_name(e->a->str);
+            if (rv && rv->cls) {
+                Method *im = find_method(rv->cls, dot + 1);
+                if (im && im->is_inst) {
+                    char *full = xmalloc(strlen(rv->cls) + strlen(dot) + 1);
+                    sprintf(full, "%s.%s", rv->cls, dot + 1);
+                    e->str = full;
+                    m = im;
+                }
+            }
+        }
+        if (!m && strcmp(buf, "Net") && strcmp(buf, "Arrays")) {
+            /* receiver adalah variabel bertipe class (atau 'this') */
+            if (!strcmp(buf, "this")) {
+                if (cur_method && cur_method->is_inst) {
+                    Method *im = find_method(cur_method->cls, dot + 1);
+                    if (im && im->is_inst) {
+                        Node *recv = newnode(EX_VAR, e->line);
+                        recv->str = xs("this");
+                        recv->next = e->a;
+                        e->a = recv;
+                        e->ival = (long)((int)e->ival + 1);
+                        char *full = xmalloc(strlen(cur_method->cls) + strlen(dot) + 1);
+                        sprintf(full, "%s.%s", cur_method->cls, dot + 1);
+                        e->str = full;
+                        m = im;
+                    }
+                }
+            } else {
+                SVar *rv = lookup_name(buf);
+                if (rv && rv->cls) {
+                    Method *im = find_method(rv->cls, dot + 1);
+                    if (im && im->is_inst) {
+                        Node *recv = newnode(EX_VAR, e->line);
+                        recv->str = xs(buf);
+                        recv->next = e->a;
+                        e->a = recv;
+                        e->ival = (long)((int)e->ival + 1);
+                        char *full = xmalloc(strlen(rv->cls) + strlen(dot) + 1);
+                        sprintf(full, "%s.%s", rv->cls, dot + 1);
+                        e->str = full;
+                        m = im;
+                    }
+                }
+            }
+        }
+        if (!m) m = find_method(buf, dot + 1);
         /* Parser mengubah semua x.m(...) menjadi Arrays.m(x, ...).
          * Di sini kita belokkan ke Str.* bila penerimanya String. */
         if (!m && !strcmp(buf, "Arrays") && is_str_method(dot + 1)) {
@@ -1695,6 +1897,50 @@ static Ty type_expr_raw(Node *e) {
             die("baris %d: ukuran 'new int[n]' harus int", e->line);
         if ((long)e->ival < 0) e->ival = 0;
         return T_ARI;
+    case EX_NEWOBJ: {
+        /* new Kelas() → alokasi int[] ber-ukuran nfield (selalu ≥1),
+         * semua slot di-zero (jaminan zero-init array). */
+        Class *c = find_class(e->str);
+        if (!c)
+            die("baris %d: class '%s' tidak ada (definisikan class sebelum 'new')",
+                e->line, e->str);
+        int nf = c->nfields > 0 ? c->nfields : 1;
+        e->kind = EX_NEWARR;
+        e->dty = (int)T_ARI;
+        Node *sz = newnode(EX_INT, e->line);
+        sz->ival = nf;
+        sz->dty = (int)T_INT;
+        sz->typed = 1;
+        e->a = sz;
+        e->str = 0;
+        e->ival = nf;
+        return T_ARI;
+    }
+    case EX_FLD: {
+        /* obj.field → obj[idx]: receiver wajib variabel ber-class */
+        if (e->a->kind != EX_VAR)
+            die("baris %d: akses field '%s' butuh variabel objek sederhana "
+                "(simpan dulu: P p = ...; lalu p.%s)", e->line, e->str, e->str);
+        SVar *rv = lookup_name(e->a->str);
+        if (!rv)
+            die("baris %d: variabel '%s' tidak ada di scope", e->line, e->a->str);
+        if (!rv->cls)
+            die("baris %d: '%s' bukan objek class — tidak punya field '%s'",
+                e->line, e->a->str, e->str);
+        Class *c = find_class(rv->cls);
+        Field *f = c ? class_field(c, e->str) : 0;
+        if (!f)
+            die("baris %d: class %s tidak punya field '%s'", e->line, rv->cls, e->str);
+        type_expr(e->a);        /* resolusi slot receiver + cek T_ARI */
+        Node *idx = newnode(EX_INT, e->line);
+        idx->ival = f->idx;
+        idx->dty = (int)T_INT;
+        idx->typed = 1;
+        e->kind = EX_IDX;
+        e->b = idx;
+        e->str = 0;
+        return (Ty)f->ty;      /* field boolean tetap terbaca boolean */
+    }
     case EX_IDX: {
         Ty bt = type_expr(e->a);
         if (bt != T_ARI && bt != T_STR)
@@ -1746,7 +1992,11 @@ static void resolve_stmt(Node *s) {
     switch (s->kind) {
     case ST_VAR: {
         if (nscope >= 1020) die("terlalu banyak variabel lokal");
-        scope_push(s->str, nextslot++, (Ty)s->dty);
+        const char *vcls = s->cls;
+        if (vcls && !find_class(vcls))
+            die("baris %d: tipe class '%s' tidak ada (definisikan class sebelum dipakai)",
+                s->line, vcls);
+        scope_push(s->str, nextslot++, (Ty)s->dty, vcls);
         Ty et = type_expr(s->a);
         if (!ty_can_implicit((Ty)s->dty, et) && !fits_literal((Ty)s->dty, s->a))
             die("baris %d: inisialisasi '%s' tidak cocok dengan tipe deklarasinya (butuh cast)",
@@ -1835,6 +2085,41 @@ static void resolve_stmt(Node *s) {
             (void)t;
         }
         break;
+    case ST_FLDASG: {
+        /* obj.field = v → ST_IDXASG(obj, idx, v) dengan cek tipe field */
+        if (s->a->kind != EX_VAR)
+            die("baris %d: penugasan field butuh variabel objek sederhana "
+                "(simpan dulu: P p = ...; lalu p.%s = ...)", s->line, s->str);
+        SVar *rv = lookup_name(s->a->str);
+        if (!rv)
+            die("baris %d: variabel '%s' tidak ada di scope", s->line, s->a->str);
+        if (!rv->cls)
+            die("baris %d: '%s' bukan objek class — tidak punya field '%s'",
+                s->line, s->a->str, s->str);
+        Class *c = find_class(rv->cls);
+        Field *f = c ? class_field(c, s->str) : 0;
+        if (!f)
+            die("baris %d: class %s tidak punya field '%s'", s->line, rv->cls, s->str);
+        Ty vt = type_expr(s->a);
+        if (vt != T_ARI && vt != T_STR)
+            die("baris %d: ruas kiri '%s.%s' bukan objek", s->line, s->a->str, s->str);
+        Ty et = type_expr(s->c);
+        Ty ft = (Ty)f->ty;
+        int ok = ft == T_BOOL ? et == T_BOOL
+                              : (ty_can_implicit(ft, et) || fits_literal(ft, s->c));
+        if (!ok)
+            die("baris %d: penugasan '%s.%s' tidak cocok tipe (butuh cast)",
+                s->line, s->a->str, s->str);
+        Node *idx = newnode(EX_INT, s->line);
+        idx->ival = f->idx;
+        idx->dty = (int)T_INT;
+        idx->typed = 1;
+        s->kind = ST_IDXASG;
+        s->b = idx;
+        s->str = 0;
+        s->cls = 0;
+        break;
+    }
     case ST_IDXASG: {
         if (type_expr(s->a) != T_ARI)
             die("baris %d: penugasan a[i] = v butuh array int[] di ruas kiri", s->line);
@@ -1919,8 +2204,12 @@ static void resolve(void) {
         nscope = 0;
         framebase = 0;
         nextslot = 0;
-        for (Param *p = m->params; p; p = p->next)
-            scope_push(p->name, nextslot++, (Ty)p->ty);
+        for (Param *p = m->params; p; p = p->next) {
+            if (p->cls && !find_class(p->cls))
+                die("baris ???: tipe class '%s' tidak ada (param metode %s.%s)",
+                    p->cls, m->cls, m->name);
+            scope_push(p->name, nextslot++, (Ty)p->ty, p->cls);
+        }
         m->nlocals = nextslot;
         resolve_stmts(m->body);
         collect_cp_stmt(m->body);
