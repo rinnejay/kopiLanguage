@@ -1389,6 +1389,13 @@ check ctortest test/ctortest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/ctortest64.s" -o /dev/null \
     && echo "PASS  ctortest [x64]" || { echo "FAIL  ctortest [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── fitur bahasa v1.16: array bertipe long[] dan String[] ───
+cp test/arrtest.ref "$T/kopi/arrtest.ref"
+check arrtest test/arrtest.kop
+./kopicc test/arrtest.kop -t x64 -o "$T/kopi/arrtest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/arrtest64.s" -o /dev/null \
+    && echo "PASS  arrtest [x64]" || { echo "FAIL  arrtest [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
 check urltest test/urltest.kop

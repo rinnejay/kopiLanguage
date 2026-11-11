@@ -28,7 +28,7 @@ static int cur_ret_label;
 /* push hasil ekspresi: 32-bit (w0) atau pointer closure 64-bit (x0) */
 /* 32-bit int/bool vs 64-bit (pointer / numerik baru / float bits) */
 static int is64ty(Ty t) {
-    return t == T_FN || t == T_ARI || t == T_LONG || t == T_UINT64 ||
+    return t == T_FN || ty_is_arr(t) || t == T_LONG || t == T_UINT64 ||
            t == T_UINT8 || t == T_UINT16 || t == T_UINT32 ||
            t == T_BYTE || t == T_SHORT || t == T_STR ||
            t == T_FLOAT || t == T_DOUBLE;
@@ -385,8 +385,8 @@ static int gen_bin_typed(Method *m, Node *e) {
                 !strcmp(e->str, ">=");
     Ty P = isShift ? lt : ty_promote(lt, rt);
 
-    /* identitas objek (v1.12): ==/!= pada dua T_ARI → bandingkan pointer 64-bit */
-    if (lt == T_ARI && rt == T_ARI && isCmp) {
+    /* identitas objek (v1.12): ==/!= pada dua array → bandingkan pointer 64-bit */
+    if (ty_is_arr(lt) && lt == rt && isCmp) {
         gen_expr(m, e->a);
         push_x();
         gen_expr(m, e->b);

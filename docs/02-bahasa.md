@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.15.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.16.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
@@ -138,8 +138,28 @@ int[] c = Str.copy(a);        // salinan (byte-array helper)
 - Indeks di luar `0..length-1` menghentikan program dengan pesan
   `array tidak valid (indeks/ukuran salah)`.
 - Array bisa diparamkan/dikembalikan; ukuran tetap setelah dibuat.
-- Belum ada array literal (`{1,2,3}`) atau array bertipe (`String[]`,
-  `long[]`); gunakan `int[]`.
+
+Array bertipe (v1.16) — elemen 64-bit, fisik sama dengan `int[]`:
+
+```java
+long[] x = new long[4];       // elemen long 64-bit penuh
+x[1] = 123456789012345L;      // tanpa terpangkas 32-bit
+
+String[] s = new String[3];   // elemen String
+s[0] = "kopi";
+System.out.println(s[0]);     // mencetak teks elemen
+System.out.println(s.length);
+```
+
+- `String[] args` di `main` kini tipe sungguhan (`String[]`); isi
+  parameter tidak dibaca (program berdiri sendiri).
+- Identitas referensi berlaku juga untuk `long[]`/`String[]`:
+  `String[] t = s; t == s` → `1` (alias, bukan salinan).
+- Tidak ada konversi implisit antar tipe array: `int[] x = new long[2]`
+  ditolak, begitu juga melempar `long[]` ke parameter `int[]`.
+- Metode fungsional (`forEach`, `map`, ...) masih khusus `int[]`;
+  untuk `long[]`/`String[]` tulis loop `for` biasa.
+- Belum ada array literal (`{1,2,3}`) atau array multi-dimensi.
 
 ### Metode fungsional array (gula)
 

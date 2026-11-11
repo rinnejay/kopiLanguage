@@ -27,7 +27,7 @@
   <main class="content">
 <h1 id="02-bahasa-kopi-tutorial-lengkap">02 — Bahasa Kopi: tutorial lengkap<a class="anchor" href="#02-bahasa-kopi-tutorial-lengkap" aria-label="tautan">#</a></h1>
 <nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bentuk-program">1. Bentuk program</a></li><li class="toc-h2"><a href="#2-komentar">2. Komentar</a></li><li class="toc-h2"><a href="#3-tipe">3. Tipe</a></li><li class="toc-h3"><a href="#cast-promosi">Cast &amp; promosi</a></li><li class="toc-h2"><a href="#4-variabel-scope">4. Variabel &amp; scope</a></li><li class="toc-h2"><a href="#5-operator">5. Operator</a></li><li class="toc-h2"><a href="#6-kontrol-alir">6. Kontrol alir</a></li><li class="toc-h2"><a href="#7-array">7. Array</a></li><li class="toc-h3"><a href="#metode-fungsional-array-gula">Metode fungsional array (gula)</a></li><li class="toc-h2"><a href="#8-string">8. String</a></li><li class="toc-h3"><a href="#metode-instance-butuh-import-str">Metode instance (butuh import Str;)</a></li><li class="toc-h3"><a href="#template-string-backtick">Template string (backtick)</a></li><li class="toc-h2"><a href="#9-fungsi">9. Fungsi</a></li><li class="toc-h2"><a href="#10-lambda-fn">10. Lambda &amp; fn</a></li><li class="toc-h2"><a href="#11-class-sebagai-namespace">11. Class sebagai namespace</a></li><li class="toc-h2"><a href="#12-class-instance">12. Class instance</a></li><li class="toc-h2"><a href="#13-json-literal">13. JSON literal</a></li><li class="toc-h2"><a href="#14-memori-arena-32-mb-tanpa-gc">14. Memori: arena 32 MB, tanpa GC</a></li><li class="toc-h2"><a href="#15-keluar-kode-status">15. Keluar &amp; kode status</a></li><li class="toc-h3"><a href="#error-runtime-nomor-baris-stack-trace">Error runtime: nomor baris + stack trace</a></li><li class="toc-h2"><a href="#16-contoh-tur-lengkap">16. Contoh tur lengkap</a></li></ul></nav>
-<p>Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.15. Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).</p>
+<p>Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.16. Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).</p>
 <hr>
 <h2 id="1-bentuk-program">1. Bentuk program<a class="anchor" href="#1-bentuk-program" aria-label="tautan">#</a></h2>
 <pre><code class="language-java">class Main {
@@ -193,7 +193,21 @@ int[] c = Str.copy(a);        // salinan (byte-array helper)</code></pre>
 <ul>
 <li>Indeks di luar <code>0..length-1</code> menghentikan program dengan pesan <code>array tidak valid (indeks/ukuran salah)</code>.</li>
 <li>Array bisa diparamkan/dikembalikan; ukuran tetap setelah dibuat.</li>
-<li>Belum ada array literal (<code>{1,2,3}</code>) atau array bertipe (<code>String[]</code>, <code>long[]</code>); gunakan <code>int[]</code>.</li>
+</ul>
+<p>Array bertipe (v1.16) — elemen 64-bit, fisik sama dengan <code>int[]</code>:</p>
+<pre><code class="language-java">long[] x = new long[4];       // elemen long 64-bit penuh
+x[1] = 123456789012345L;      // tanpa terpangkas 32-bit
+
+String[] s = new String[3];   // elemen String
+s[0] = "kopi";
+System.out.println(s[0]);     // mencetak teks elemen
+System.out.println(s.length);</code></pre>
+<ul>
+<li><code>String[] args</code> di <code>main</code> kini tipe sungguhan (<code>String[]</code>); isi parameter tidak dibaca (program berdiri sendiri).</li>
+<li>Identitas referensi berlaku juga untuk <code>long[]</code>/<code>String[]</code>: <code>String[] t = s; t == s</code> → <code>1</code> (alias, bukan salinan).</li>
+<li>Tidak ada konversi implisit antar tipe array: <code>int[] x = new long[2]</code> ditolak, begitu juga melempar <code>long[]</code> ke parameter <code>int[]</code>.</li>
+<li>Metode fungsional (<code>forEach</code>, <code>map</code>, ...) masih khusus <code>int[]</code>; untuk <code>long[]</code>/<code>String[]</code> tulis loop <code>for</code> biasa.</li>
+<li>Belum ada array literal (<code>{1,2,3}</code>) atau array multi-dimensi.</li>
 </ul>
 <h3 id="metode-fungsional-array-gula">Metode fungsional array (gula)<a class="anchor" href="#metode-fungsional-array-gula" aria-label="tautan">#</a></h3>
 <pre><code class="language-java">int[] a = new int[5];
@@ -429,7 +443,7 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <p>Lihat <code>docs/contoh/tour.kop</code> (dijalankan oleh <code>docs/check.sh</code>). Isinya menggabungkan: tipe, ternary, loop, array fungsional, String method, template, lambda, JSON, dan memMark/memReset.</p>
 <p>Lanjut ke <a href="03-pustaka.html">03 — Pustaka</a>.</p>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.15 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.16 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/02-bahasa.md">Sunting halaman ini</a>
 </footer>
   </main>

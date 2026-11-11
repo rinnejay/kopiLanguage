@@ -47,9 +47,9 @@
 <td>reset per request/iterasi; hindari alokasi di loop panas</td>
 </tr>
 <tr>
-<td>Array bertipe (<code>String[]</code>, <code>long[]</code>, <code>double[]</code>)</td>
-<td>semua array praktis <code>int[]</code></td>
-<td>simpan indeks/offset ke array datar</td>
+<td>~~Array bertipe (<code>String[]</code>, <code>long[]</code>)~~ <strong>✅ v1.16</strong> (elemen 64-bit slot; identitas referensi berlaku)</td>
+<td>sisa: <code>double[]</code>; metode fungsional masih khusus <code>int[]</code></td>
+<td>array <code>long[]</code>/<code>String[]</code> pakai loop <code>for</code> biasa</td>
 </tr>
 <tr>
 <td><code>char</code> &amp; literal char</td>
@@ -254,16 +254,18 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>124/124</strong> (v1.15) — a64 + VM + sintaks x64 + dokumen HTML (131 PASS termasuk cek x64 yang tidak masuk counter).</li>
+<li>Suite: <strong>126/126</strong> (v1.16) — a64 + VM + sintaks x64 + dokumen HTML (136 PASS termasuk cek x64 yang tidak masuk counter).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>
 </ul>
 <h2 id="7-roadmap-urutan-usulan">7. Roadmap (urutan usulan)<a class="anchor" href="#7-roadmap-urutan-usulan" aria-label="tautan">#</a></h2>
 <ol>
-<li>~~Instance class~~ <strong>✅ v1.12–1.15</strong> (field + <code>new</code> + method <code>this</code> + identitas referensi + field <code>long</code>/<code>String</code>/class + constructor). Tahap lanjut: field <code>double</code>/<code>float</code>, overload constructor, vtable/inheritance.</li>
+<li>~~Instance class~~ <strong>✅ v1.12–1.15</strong> (field + <code>new</code> + method <code>this</code> + identitas referensi + field <code>long</code>/<code>String</code>/class + constructor). Tahap lanjut: field <code>double</code>/<code>float</code>, overload constructor, vtable/inheritance.<ul>
+<li><strong>Keputusan desain</strong>: Kopi tidak meniru Java sepenuhnya. Alih-alih <code>interface</code>, Kopi akan memakai <strong><code>struct</code> ala C</strong> — agregat data + metode namespace / fungsi bebas — agar bahasanya terasa natural di antara C dan Java, bukan klon Java. Polymorphism (bila jadi) lewat struct ber-pola vtable sederhana, bukan hierarki tipe Java.</li>
+</ul></li>
 <li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>
-<li><strong>Array bertipe + <code>char</code> + Unicode dasar</strong>.</li>
+<li>~~Array bertipe~~ <strong>✅ v1.16</strong> (<code>long[]</code>/<code>String[]</code> elemen 64-bit slot; sisa: <code>double[]</code>, array literal, multi-dimensi).</li>
 <li><strong>TLS server + verifikasi ECDSA/CertificateVerify + chain/hostname</strong>.</li>
 <li><strong>HTTP</strong>: multipart, range/ETag, chunked response, gzip.</li>
 <li><strong>DB client</strong> (SQLite via protokol file atau Postgres/Redis via socket).</li>
@@ -279,7 +281,7 @@
 <li>Tulis batas di docs, bukan hanya di kepala.</li>
 </ul>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.15 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.16 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/06-batas-roadmap.md">Sunting halaman ini</a>
 </footer>
   </main>

@@ -61,7 +61,11 @@ static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) |
         if (at('[')) { advance(); expect(']', "']' setelah '[' pada int[]"); return T_ARI; }
         return T_INT;
     }
-    if (at(KW_LONG))   { advance(); return T_LONG; }
+    if (at(KW_LONG)) {
+        advance();
+        if (at('[')) { advance(); expect(']', "']' setelah '[' pada long[]"); return T_LNGARR; }
+        return T_LONG;
+    }
     if (at(KW_DOUBLE)) { advance(); return T_DOUBLE; }
     if (at(KW_FLOAT))  { advance(); return T_FLOAT; }
     if (at(KW_UINT8))  { advance(); return T_UINT8; }
@@ -75,8 +79,8 @@ static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) |
     if (at(KW_FN)) { advance(); return T_FN; }
     if (at(KW_STRING)) {
         advance();
-        /* String[] hanya untuk parameter seperti String[] args */
-        if (at('[')) { advance(); expect(']', "']' pada String[]"); }
+        /* v1.16: String[] array bertipe slot 64-bit */
+        if (at('[')) { advance(); expect(']', "']' pada String[]"); return T_STRARR; }
         return T_STR;
     }
     die("baris %d: tipe tidak dikenal", peek()->line);
@@ -1082,14 +1086,19 @@ static Node *primary(void) {
         advance();
         return n;
     }
-    if (at(T_ID) && !strcmp(xs(t->text), "new") && peek2()->type == KW_INT) {
+    if (at(T_ID) && !strcmp(xs(t->text), "new") &&
+        (peek2()->type == KW_INT || peek2()->type == KW_LONG || peek2()->type == KW_STRING)) {
+        Ty aty;
+        if (peek2()->type == KW_INT)         aty = T_ARI;
+        else if (peek2()->type == KW_LONG)   aty = T_LNGARR;
+        else                                 aty = T_STRARR;
         advance();                       /* new */
-        advance();                       /* int   */
-        expect('[', "'[' setelah 'new int'");
+        advance();                       /* int/long/String */
+        expect('[', "'[' setelah 'new <tipe>'");
         Node *n = newnode(EX_NEWARR, line);
-        n->dty = (int)T_ARI;
+        n->dty = (int)aty;
         n->a = expr();
-        expect(']', "']' pada new int[n]");
+        expect(']', "']' pada new <tipe>[n]");
         return n;
     }
     /* new Kelas() / new Kelas(args) → EX_NEWOBJ (didesugar saat resolusi) */
@@ -1725,7 +1734,7 @@ static Ty type_expr_raw(Node *e) {
         if ((op == '=' || op == '!') && two) {      /* == != */
             if (lt == T_BOOL && rt == T_BOOL) return T_BOOL;
             /* identitas objek: bandingkan referensi (pointer), ala Java */
-            if (lt == T_ARI && rt == T_ARI) return T_BOOL;
+            if (ty_is_arr(lt) && lt == rt) return T_BOOL;
             if (!ty_is_num(lt) || !ty_is_num(rt))
                 die("baris %d: '==' / '!=' butuh operand numerik/boolean", e->line);
             Ty p = ty_promote(lt, rt);
@@ -2093,9 +2102,9 @@ static Ty type_expr_raw(Node *e) {
         return (Ty)e->dty;
     case EX_NEWARR:
         if (type_expr(e->a) != T_INT)
-            die("baris %d: ukuran 'new int[n]' harus int", e->line);
+            die("baris %d: ukuran 'new <tipe>[n]' harus int", e->line);
         if ((long)e->ival < 0) e->ival = 0;
-        return T_ARI;
+        return (Ty)e->dty;               /* T_ARI / T_LNGARR / T_STRARR */
     case EX_NEWOBJ: {
         /* new Kelas() → alokasi int[] ber-ukuran nfield (selalu ≥1),
          * semua slot di-zero (jaminan zero-init array).
@@ -2149,15 +2158,16 @@ static Ty type_expr_raw(Node *e) {
     }
     case EX_IDX: {
         Ty bt = type_expr(e->a);
-        if (bt != T_ARI && bt != T_STR)
+        if (!ty_is_arr(bt) && bt != T_STR)
             die("baris %d: indeks [..] hanya untuk array/String", e->line);
         if (type_expr(e->b) != T_INT)
             die("baris %d: indeks array harus int", e->line);
-        return T_INT;
+        /* String bukan array slot: s[i] → byte int (representasi T_ARI) */
+        return bt == T_STR ? T_INT : ty_elem(bt);
     }
     case EX_LEN: {
         Ty bt = type_expr(e->a);
-        if (bt != T_ARI && bt != T_STR)
+        if (!ty_is_arr(bt) && bt != T_STR)
             die("baris %d: .length hanya untuk array/String", e->line);
         return T_INT;
     }
@@ -2330,12 +2340,17 @@ static void resolve_stmt(Node *s) {
         break;
     }
     case ST_IDXASG: {
-        if (type_expr(s->a) != T_ARI)
-            die("baris %d: penugasan a[i] = v butuh array int[] di ruas kiri", s->line);
+        Ty at = type_expr(s->a);
+        if (!ty_is_arr(at))
+            die("baris %d: penugasan a[i] = v butuh array di ruas kiri", s->line);
         if (type_expr(s->b) != T_INT)
             die("baris %d: indeks array harus int", s->line);
-        if (type_expr(s->c) != T_INT)
-            die("baris %d: nilai penugasan a[i] harus int", s->line);
+        Ty et = type_expr(s->c);
+        if (at == T_STRARR && et != T_STR)
+            die("baris %d: elemen String[] harus String", s->line);
+        if (at != T_STRARR && !ty_is_int(et))
+            die("baris %d: elemen %s harus integer (perlu cast eksplisit)",
+                s->line, at == T_LNGARR ? "long[]" : "int[]");
         break;
     }
     default:
