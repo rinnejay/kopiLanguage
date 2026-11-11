@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.17.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.18.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
