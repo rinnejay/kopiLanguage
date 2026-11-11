@@ -1,0 +1,67 @@
+import Str;
+
+class Titik {
+    int x;
+    int y;
+    long besar;
+    String nama;
+    boolean hidup;
+
+    static Titik buat(int ax, int ay, String nm) {
+        Titik t = new Titik();
+        t.x = ax;
+        t.y = ay;
+        t.nama = nm;
+        t.hidup = true;
+        return t;
+    }
+
+    long luasBesar() {
+        return this.besar * (this.x + this.y);
+    }
+}
+
+class Kotak {
+    int w;
+    Titik pojok;
+}
+
+class Main {
+    public static void main(String[] args) {
+        // field long
+        Titik a = Titik.buat(10, 20, "alpha");
+        a.besar = 5000000000L;
+        System.out.println(a.besar);
+        System.out.println(a.luasBesar());
+
+        // field String + perbandingan isi
+        System.out.println(a.nama == "alpha");
+        System.out.println(a.nama == "beta");
+        a.nama = "gamma";
+        System.out.println(a.nama);
+
+        // field bertipe class: referensi ke objek lain
+        Kotak k = new Kotak();
+        k.w = 5;
+        k.pojok = Titik.buat(2, 3, "pojok");
+        System.out.println(k.pojok.x);
+        System.out.println(k.pojok.nama);
+        System.out.println(k.pojok.nama == "pojok");
+
+        // identitas: field menunjuk objek yang sama
+        Titik alias = k.pojok;
+        alias.x = 99;
+        System.out.println(k.pojok.x);
+        System.out.println(alias == k.pojok);
+
+        // objek berbeda, isi sama → bukan identitas
+        Titik lagi = Titik.buat(2, 3, "pojok");
+        System.out.println(lagi == k.pojok);
+
+        // ganti referensi field
+        k.pojok = lagi;
+        System.out.println(k.pojok.x);
+        k.pojok.x = 7;
+        System.out.println(lagi.x);
+    }
+}

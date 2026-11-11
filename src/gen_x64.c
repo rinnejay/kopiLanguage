@@ -164,6 +164,9 @@ static void gen_stmt(Method *m, Node *s) {
         else emit("\tmovl %%eax, -%ld(%%rbp)", (s->ival + 1) * 8);
         break;
     case ST_IDXASG: {
+        /* nilai slot: 32-bit (int dsb.) atau 64-bit (long/String/objek) */
+        Ty vt = (Ty)s->c->dty;
+        int v64 = ty_width(vt) == 64 || vt == T_ARI || vt == T_STR || vt == T_FN;
         gen_expr(m, s->c);               /* nilai */
         spush();
         gen_expr(m, s->a);               /* rax = array */
@@ -176,7 +179,7 @@ static void gen_stmt(Method *m, Node *s) {
         emit("\tcmpl (%r10), %%eax");
         emit("\tjae .Karr");
         emit("\tmovl %%eax, %%eax");     /* zero-extend idx */
-        emit("\tmovslq %%ecx, %%rcx");   /* nilai sign-extend 64 */
+        if (!v64) emit("\tmovslq %%ecx, %%rcx");   /* nilai sign-extend 64 */
         emit("\tmovq %%rcx, 8(%%r10,%%rax,8)");
         break;
     }

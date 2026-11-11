@@ -1375,6 +1375,13 @@ check objtest test/objtest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/objtest64.s" -o /dev/null \
     && echo "PASS  objtest [x64]" || { echo "FAIL  objtest [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── fitur bahasa v1.14: field instance 64-bit (long/String/class) ───
+cp test/reftest.ref "$T/kopi/reftest.ref"
+check reftest test/reftest.kop
+./kopicc test/reftest.kop -t x64 -o "$T/kopi/reftest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/reftest64.s" -o /dev/null \
+    && echo "PASS  reftest [x64]" || { echo "FAIL  reftest [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
 check urltest test/urltest.kop

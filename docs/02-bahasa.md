@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.13.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.14.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
@@ -307,45 +307,53 @@ sendiri lalu `import Keranjang;`.
 ## 12. Class instance
 
 Sejak v1.12 sebuah class bisa punya **field** dan **method instance**
-(metode tanpa `static`). Instance dibuat dengan `new`, dan `this`
+(metode tanpa `static`). Sejak v1.14 field juga bisa `long`, `String`,
+dan **bertipe class**. Instance dibuat dengan `new`, dan `this`
 merujuk objek yang sedang berjalan:
 
 ```java
 class Titik {
     int x;
     int y;
+    long besar;          // field 64-bit (v1.14)
+    String nama;         // field referensi (v1.14)
     boolean hidup;
 
-    int kuadran() {                    // method instance (tanpa static)
-        if (this.x > 0 && this.y > 0) return 1;
-        if (this.x < 0 && this.y > 0) return 2;
-        return 3;
-    }
-
-    int geser(int dx, int dy) {
-        this.x = this.x + dx;
-        this.y = this.y + dy;
-        return this.kuadran();         // panggil method lain lewat this
-    }
-
-    static Titik buat(int ax, int ay) {   // factory (pengganti constructor)
+    static Titik buat(int ax, int ay, String nm) {   // factory
         Titik t = new Titik();
         t.x = ax;
         t.y = ay;
+        t.nama = nm;
         t.hidup = true;
         return t;
     }
+
+    long luasBesar() {
+        return this.besar * (this.x + this.y);
+    }
+}
+
+class Kotak {
+    int w;
+    Titik pojok;         // field bertipe class (v1.14)
 }
 
 class Main {
     public static void main(String[] args) {
-        Titik a = new Titik();             // semua field = 0
-        System.out.println(a.x);           // 0
-        Titik b = Titik.buat(3, 4);
-        System.out.println(b.kuadran());   // 1
-        b.geser(-10, 0);
-        System.out.println(b.x);           // -7
-        System.out.println(b == Titik.buat(3, 4));  // 0 — identitas referensi
+        Titik a = Titik.buat(10, 20, "alpha");
+        a.besar = 5000000000L;
+        System.out.println(a.luasBesar());        // long utuh
+        System.out.println(a.nama == "alpha");    // isi String (Str.equals)
+
+        Kotak k = new Kotak();
+        k.pojok = Titik.buat(2, 3, "pojok");      // objek sebagai field
+        System.out.println(k.pojok.x);            // rantai field: 2
+        System.out.println(k.pojok.nama == "pojok");
+
+        Titik alias = k.pojok;                    // referensi yang sama
+        alias.x = 99;
+        System.out.println(k.pojok.x);            // 99 — identitas
+        System.out.println(alias == k.pojok);     // 1
     }
 }
 ```
@@ -353,23 +361,30 @@ class Main {
 Aturan yang berlaku:
 
 - **Deklarasi bertipe class**: `Titik t = new Titik();`, parameter
-  `boolean sama(Titik o)`, dan return `static Titik buat()` — semua
-  didukung. Class harus didefinisikan **sebelum** dirujuk sebagai tipe.
-- **Field** selalu di-zero saat `new` (jaminan sama dengan `new int[n]`).
+  `boolean sama(Titik o)`, return `static Titik buat()`, dan **field
+  bertipe class** (`Titik pojok;`) — semua didukung. Class harus
+  didefinisikan **sebelum** dirujuk sebagai tipe.
+- **Field** selalu di-zero saat `new` (referensi menunjuk *null*;
+  deref null = error runtime dengan stack trace di VM).
 - **`p == q`** membandingkan **referensi** (identitas), bukan isi —
-  sama seperti Java. Gunakan method pembanding untuk isi.
+  sama seperti Java. Untuk isi: `a.nama == "alpha"` membandingkan isi
+  String, dan method pembanding untuk objek.
+- **Penugasan field dicek nama class**: `k.pojok = new Kotak()` ke
+  field bertipe `Titik` ditolak dengan pesan jelas.
 - Metode tanpa `static` = metode instance. `main` wajib `static`.
 
-Batas v1.12 (dirancang jujur):
+Batas v1.14 (dirancang jujur):
 
-- Field hanya 32-bit: `int`, `boolean`, `byte`, `short`, `uint8`,
-  `uint16`. Field `long`/`double`/`String`/objek belum bisa disimpan.
+- Field `double`/`float` belum didukung (butuh jalur register float di
+  ketiga backend); field lain: 32-bit (`int`/`boolean`/`byte`/`short`)
+  dan 64-bit (`long`/`String`/tipe class).
 - Tidak ada constructor — semua field mulai dari 0; pakai factory
   (`static Titik buat(...)`) untuk inisialisasi.
 - Dispatch **statis** (tanpa inheritance/interface/vtable); `Titik`
-  secara internal adalah tape `int[]` ber-ukuran jumlah field.
-- Receiver method/field harus variabel sederhana: `b.kuadran()` ok,
-  `buat(1,2).kuadran()` belum — simpan dulu ke variabel.
+  secara internal adalah tape 64-bit ber-ukuran jumlah field.
+- Receiver method harus variabel sederhana: `b.kuadran()` ok,
+  `buat(1,2).kuadran()` dan `k.pojok.kuadran()` belum — simpan dulu ke
+  variabel. Rantai **field** (`k.pojok.x`, baca & tulis) didukung.
 - Objek bisa dipakai di lambda (ditangkap by-value seperti variabel lain).
 
 ## 13. JSON literal

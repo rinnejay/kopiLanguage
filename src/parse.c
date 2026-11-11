@@ -367,20 +367,43 @@ static Node *stmt_single(void) {
     if (t->type == T_ID) {
         int t2 = peek2()->type;
         if (t2 == '=') return parse_assignment(line, 1);
-        /* p.field = v; — penugasan field instance */
-        if (t2 == '.' && tokat(2, T_ID) && tokat(3, '=')) {
-            Node *s = newnode(ST_FLDASG, line);
-            Node *obj = newnode(EX_VAR, line);
-            obj->str = xs(t->text);
-            advance();                 /* nama objek */
-            advance();                 /* '.' */
-            s->a = obj;
-            s->str = xs(peek()->text);
-            advance();                 /* nama field */
-            expect('=', "'=' pada obj.field = v");
-            s->c = expr();
-            expect(';', "';' setelah obj.field = v");
-            return s;
+        /* p.field = v; / p.field1.field2 = v; — penugasan field instance */
+        if (t2 == '.' && tokat(2, T_ID)) {
+            int isasg = 0, nfdot = 2;
+            if (tokat(3, '=')) isasg = 1;
+            else if (tokat(3, '.') && tokat(4, T_ID) && tokat(5, '=')) { isasg = 1; nfdot = 3; }
+            else if (tokat(3, '.') && tokat(4, T_ID) && tokat(5, '('))
+                die("baris %d: pemanggilan method pada field belum didukung — "
+                    "simpan field ke variabel dulu: Tipe t = p.%s; lalu t.%s(...)",
+                    line, ts[ti + 2].text, ts[ti + 4].text);
+            if (isasg) {
+                Node *s = newnode(ST_FLDASG, line);
+                Node *obj = newnode(EX_VAR, line);
+                obj->str = xs(t->text);
+                advance();                 /* nama objek */
+                advance();                 /* '.' */
+                const char *f1 = xs(peek()->text);
+                expect(T_ID, "nama field");
+                if (nfdot == 2) {
+                    /* p.field = v */
+                    s->a = obj;
+                    s->str = f1;
+                } else {
+                    /* p.field1.field2 = v — base = p.field1 */
+                    expect('.', "'.' pada p.field1.field2");
+                    const char *f2 = xs(peek()->text);
+                    expect(T_ID, "nama field kedua");
+                    Node *base = newnode(EX_FLD, line);
+                    base->a = obj;
+                    base->str = f1;
+                    s->a = base;
+                    s->str = f2;
+                }
+                expect('=', "'=' pada obj.field = v");
+                s->c = expr();
+                expect(';', "';' setelah obj.field = v");
+                return s;
+            }
         }
         if (t2 == '[') {
             /* a[i] = v; (indeks di sisi kiri) */
@@ -438,10 +461,11 @@ static Field *class_field(Class *c, const char *name) {
     return 0;
 }
 
-/* tipe field instance: hanya 32-bit (satu slot tape int[]) di v1.12 */
+/* tipe field: 32-bit (slot tunggal) atau referensi 64-bit (long/String/class) */
 static int field_ty_ok(Ty t) {
     return t == T_INT || t == T_BOOL || t == T_BYTE ||
-           t == T_SHORT || t == T_UINT8 || t == T_UINT16;
+           t == T_SHORT || t == T_UINT8 || t == T_UINT16 ||
+           t == T_LONG || t == T_STR;   /* slot fisik 64-bit, v1.14 */
 }
 
 static void parse_class(void) {
@@ -461,11 +485,25 @@ static void parse_class(void) {
     while (!at('}')) {
         int was_static = mods_static();
         Tok *rt = peek();
-        /* field instance: `Tipe nama;` — tanpa inisialisasi, di-zero saat new */
+        /* field bertipe class: `Titik pojok;` — slot referensi 64-bit */
         if (at(T_ID) && tokat(1, T_ID) && tokat(2, ';') && find_class(xs(rt->text))) {
             const char *fcls = xs(rt->text);
-            die("baris %d: field bertipe class ('%s %s;') belum didukung — "
-                "field v1 hanya 32-bit (int/boolean/byte/short)", rt->line, fcls, peek()->text);
+            advance();                       /* nama class */
+            Tok *fn = peek();
+            expect(T_ID, "nama field");
+            advance();                       /* ';' */
+            if (was_static)
+                die("baris %d: static field belum didukung — pakai method konstanta (static int W())", fn->line);
+            if (class_field(c, xs(fn->text)))
+                die("baris %d: field '%s' dideklarasikan dua kali", fn->line, fn->text);
+            Field *f = xmalloc(sizeof(Field));
+            f->name = xs(fn->text);
+            f->idx = c->nfields++;
+            f->ty = (int)T_ARI;
+            f->cls = fcls;
+            f->next = c->fields;
+            c->fields = f;
+            continue;
         }
         Ty ret;
         const char *retcls = 0;
@@ -486,7 +524,8 @@ static void parse_class(void) {
                 die("baris %d: static field belum didukung — pakai method konstanta (static int W())", mn->line);
             if (!field_ty_ok(ret) && !retcls)
                 die("baris %d: field '%s' bertipe ini belum didukung — "
-                    "field v1 hanya 32-bit (int/boolean/byte/short/uint8/uint16)",
+                    "didukung: int/boolean/byte/short/uint8/uint16/long/String "
+                    "dan tipe class (double/float menyusul)",
                     mn->line, mn->text);
             if (at('=')) {
                 advance();
@@ -501,6 +540,7 @@ static void parse_class(void) {
             f->name = xs(mn->text);
             f->idx = c->nfields++;
             f->ty = (int)(retcls ? T_INT : ret);
+            f->cls = retcls;
             f->next = c->fields;
             c->fields = f;
             continue;
@@ -510,6 +550,7 @@ static void parse_class(void) {
         m->cls = c->name;
         m->name = xs(mn->text);
         m->ret = ret;
+        m->retcls = retcls;
         m->is_inst = !is_static;
         expect('(', "'(' setelah nama metode");
         Param **pp = &m->params;
@@ -1388,6 +1429,33 @@ static Ty type_expr(Node *e) {
     return t;
 }
 
+/* class dari ekspresi objek sederhana: variabel ber-class, akses field
+ * (berantai), atau `new Kelas()`. 0 bila bukan objek bertipe class. */
+static const char *obj_class(Node *n) {
+    if (n->kind == EX_VAR) {
+        SVar *rv = lookup_name(n->str);
+        return rv && rv->cls ? rv->cls : 0;
+    }
+    if (n->kind == EX_FLD) {
+        type_expr(n);            /* resolusi berantai: base dulu */
+        return n->cls;
+    }
+    if (n->kind == EX_NEWARR) return n->cls;
+    return 0;
+}
+
+static Field *field_of(Node *obj, const char *fname, int line) {
+    const char *bc = obj_class(obj);
+    if (!bc)
+        die("baris %d: akses field '%s' butuh variabel objek sederhana "
+            "(simpan dulu: P p = ...; lalu p.%s)", line, fname, fname);
+    Class *c = find_class(bc);
+    Field *f = c ? class_field(c, fname) : 0;
+    if (!f)
+        die("baris %d: class %s tidak punya field '%s'", line, bc, fname);
+    return f;
+}
+
 static Ty type_expr_raw(Node *e) {
     g_linefile = e->file;
     switch (e->kind) {
@@ -1907,6 +1975,7 @@ static Ty type_expr_raw(Node *e) {
         int nf = c->nfields > 0 ? c->nfields : 1;
         e->kind = EX_NEWARR;
         e->dty = (int)T_ARI;
+        e->cls = c->name;          /* identitas class untuk cek penugasan */
         Node *sz = newnode(EX_INT, e->line);
         sz->ival = nf;
         sz->dty = (int)T_INT;
@@ -1917,20 +1986,10 @@ static Ty type_expr_raw(Node *e) {
         return T_ARI;
     }
     case EX_FLD: {
-        /* obj.field → obj[idx]: receiver wajib variabel ber-class */
-        if (e->a->kind != EX_VAR)
-            die("baris %d: akses field '%s' butuh variabel objek sederhana "
-                "(simpan dulu: P p = ...; lalu p.%s)", e->line, e->str, e->str);
-        SVar *rv = lookup_name(e->a->str);
-        if (!rv)
-            die("baris %d: variabel '%s' tidak ada di scope", e->line, e->a->str);
-        if (!rv->cls)
-            die("baris %d: '%s' bukan objek class — tidak punya field '%s'",
-                e->line, e->a->str, e->str);
-        Class *c = find_class(rv->cls);
-        Field *f = c ? class_field(c, e->str) : 0;
-        if (!f)
-            die("baris %d: class %s tidak punya field '%s'", e->line, rv->cls, e->str);
+        /* obj.field → obj[idx]; base boleh variabel ber-class atau
+         * akses field berantai (v1.14). Class field tersimpan di e->cls
+         * agar rantai field (k.pojok.x) dan penugasan dicek tipe-nya. */
+        Field *f = field_of(e->a, e->str, e->line);
         type_expr(e->a);        /* resolusi slot receiver + cek T_ARI */
         Node *idx = newnode(EX_INT, e->line);
         idx->ival = f->idx;
@@ -1939,7 +1998,8 @@ static Ty type_expr_raw(Node *e) {
         e->kind = EX_IDX;
         e->b = idx;
         e->str = 0;
-        return (Ty)f->ty;      /* field boolean tetap terbaca boolean */
+        e->cls = f->cls;
+        return (Ty)f->ty;      /* long/String/boolean tetap tipe aslinya */
     }
     case EX_IDX: {
         Ty bt = type_expr(e->a);
@@ -2087,29 +2147,32 @@ static void resolve_stmt(Node *s) {
         break;
     case ST_FLDASG: {
         /* obj.field = v → ST_IDXASG(obj, idx, v) dengan cek tipe field */
-        if (s->a->kind != EX_VAR)
-            die("baris %d: penugasan field butuh variabel objek sederhana "
-                "(simpan dulu: P p = ...; lalu p.%s = ...)", s->line, s->str);
-        SVar *rv = lookup_name(s->a->str);
-        if (!rv)
-            die("baris %d: variabel '%s' tidak ada di scope", s->line, s->a->str);
-        if (!rv->cls)
-            die("baris %d: '%s' bukan objek class — tidak punya field '%s'",
-                s->line, s->a->str, s->str);
-        Class *c = find_class(rv->cls);
-        Field *f = c ? class_field(c, s->str) : 0;
-        if (!f)
-            die("baris %d: class %s tidak punya field '%s'", s->line, rv->cls, s->str);
+        Field *f = field_of(s->a, s->str, s->line);
         Ty vt = type_expr(s->a);
         if (vt != T_ARI && vt != T_STR)
-            die("baris %d: ruas kiri '%s.%s' bukan objek", s->line, s->a->str, s->str);
+            die("baris %d: ruas kiri '%s.%s' bukan objek", s->line, s->a->kind == EX_VAR ? s->a->str : "?", s->str);
         Ty et = type_expr(s->c);
         Ty ft = (Ty)f->ty;
-        int ok = ft == T_BOOL ? et == T_BOOL
-                              : (ty_can_implicit(ft, et) || fits_literal(ft, s->c));
+        int ok;
+        if (ft == T_BOOL)
+            ok = et == T_BOOL;
+        else if (ft == T_ARI) {
+            /* referensi objek; cek nama class bila bisa ditentukan */
+            const char *etcls = obj_class(s->c);
+            if (!etcls && s->c->kind == EX_CALL && s->c->meth && s->c->meth->retcls)
+                etcls = s->c->meth->retcls;
+            ok = et == T_ARI && (!etcls || !f->cls || !strcmp(etcls, f->cls));
+            if (!ok && et == T_ARI && etcls && f->cls && strcmp(etcls, f->cls))
+                die("baris %d: penugasan '%s' butuh %s, dapat %s",
+                    s->line, s->str, f->cls, etcls);
+        }
+        else if (ft == T_STR)
+            ok = et == T_STR;
+        else
+            ok = ty_can_implicit(ft, et) || fits_literal(ft, s->c);
         if (!ok)
-            die("baris %d: penugasan '%s.%s' tidak cocok tipe (butuh cast)",
-                s->line, s->a->str, s->str);
+            die("baris %d: penugasan '%s' tidak cocok tipe (butuh cast)",
+                s->line, s->str);
         Node *idx = newnode(EX_INT, s->line);
         idx->ival = f->idx;
         idx->dty = (int)T_INT;

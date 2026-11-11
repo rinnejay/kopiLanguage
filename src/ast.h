@@ -164,13 +164,15 @@ typedef struct Method {
     Ty captty[32];
     int hidden;        /* metode lambda tersembunyi — jangan di-resolve ulang */
     int is_inst;       /* metode instance (param pertama = this)          */
+    const char *retcls; /* tipe kembalian class (ret = T_ARI + retcls)    */
     struct Method *next;
 } Method;
 
 typedef struct Field {
     const char *name;
     int idx;           /* slot dalam tape instance */
-    int ty;            /* T_INT / T_BOOL / T_BYTE / T_SHORT / T_UINT8/16 */
+    int ty;            /* 32-bit: T_INT/BOOL/BYTE/SHORT/UINT8/16; 64-bit: T_LONG/T_STR/T_ARI(class) */
+    const char *cls;   /* tipe class (ty = T_ARI) */
     struct Field *next;
 } Field;
 

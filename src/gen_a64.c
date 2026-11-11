@@ -184,18 +184,25 @@ static void gen_stmt(Method *m, Node *s) {
         break;
     }
     case ST_IDXASG: {
+        /* nilai slot: 32-bit (int dsb.) atau 64-bit (long/String/objek) */
+        Ty vt = (Ty)s->c->dty;
+        int v64 = ty_width(vt) == 64 || vt == T_ARI || vt == T_STR || vt == T_FN;
         gen_expr(m, s->c);               /* nilai */
-        push_val(0);
+        push_val(v64);
         gen_expr(m, s->a);               /* x0 = array */
         push_val(1);
         gen_expr(m, s->b);               /* w0 = idx */
         emit("\tldr\tx1, [sp], #16");   /* array */
-        emit("\tldr\tw2, [sp], #16");  /* nilai */
+        if (v64) {
+            emit("\tldr\tx2, [sp], #16");  /* nilai 64-bit utuh */
+        } else {
+            emit("\tldr\tw2, [sp], #16");  /* nilai */
+        }
         emit("\tldr\tw3, [x1]");
         emit("\tcmp\tw0, w3");
         emit("\tb.hs\t.Karr");
         emit("\tsxtw\tx9, w0");
-        emit("\tsxtw\tx2, w2");
+        if (!v64) emit("\tsxtw\tx2, w2");
         emit("\tadd\tx1, x1, #8");
         emit("\tstr\tx2, [x1, x9, lsl #3]");
         break;
@@ -660,7 +667,11 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tsxtw\tx9, w0");
         emit("\tadd\tx1, x1, #8");
         emit("\tldr\tx0, [x1, x9, lsl #3]");
-        emit("\tmov\tw0, w0");          /* nilai int tetap 32-bit */
+        {   /* slot 64-bit (long/String/objek): jangan pangkas ke 32-bit */
+            Ty et = (Ty)e->dty;
+            if (ty_width(et) != 64 && et != T_ARI && et != T_STR && et != T_FN)
+                emit("\tmov\tw0, w0");      /* nilai int tetap 32-bit */
+        }
         return 0;
     }
     case EX_LEN:

@@ -37,8 +37,8 @@
 <th>Workaround sekarang</th>
 </tr></thead><tbody>
 <tr>
-<td>~~Instance class~~ <strong>✅ v1.12</strong> (field, <code>new</code>, method <code>this</code>, identitas referensi)</td>
-<td>sisa: tanpa constructor/inheritance/vtable; field hanya 32-bit</td>
+<td>~~Instance class~~ <strong>✅ v1.12–1.14</strong> (field, <code>new</code>, method <code>this</code>, identitas referensi; field <code>long</code>/<code>String</code>/class)</td>
+<td>sisa: tanpa constructor/inheritance/vtable; field <code>double</code>/<code>float</code> menyusul</td>
 <td>factory <code>static Kelas buat(...)</code>; dispatch statis</td>
 </tr>
 <tr>
@@ -82,9 +82,9 @@
 <td><code>Net.close</code>, <code>File.close</code></td>
 </tr>
 <tr>
-<td>Field instance bertipe <code>long</code>/<code>double</code>/<code>String</code>/objek</td>
-<td>satu slot tape = 32-bit</td>
-<td>simpan referensi di luar (Map/MapStr ber-key indeks)</td>
+<td>Field instance bertipe <code>double</code>/<code>float</code></td>
+<td>butuh jalur register float di 3 backend</td>
+<td>simpan sebagai <code>long</code>/<code>String</code> dulu, atau field <code>int</code> + pembagian</td>
 </tr>
 <tr>
 <td>Constructor</td>
@@ -254,14 +254,14 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>120/120</strong> (v1.13) — a64 + VM + sintaks x64 + dokumen HTML (127 PASS termasuk cek x64 yang tidak masuk counter).</li>
+<li>Suite: <strong>122/122</strong> (v1.14) — a64 + VM + sintaks x64 + dokumen HTML (128 PASS termasuk cek x64 yang tidak masuk counter).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>
 </ul>
 <h2 id="7-roadmap-urutan-usulan">7. Roadmap (urutan usulan)<a class="anchor" href="#7-roadmap-urutan-usulan" aria-label="tautan">#</a></h2>
 <ol>
-<li>~~Instance class~~ <strong>✅ v1.12</strong> (tahap 1: field + <code>new</code> + method <code>this</code> + identitas referensi). Tahap lanjut: field bertipe referensi (2 slot 64-bit), constructor, vtable/inheritance.</li>
+<li>~~Instance class~~ <strong>✅ v1.12–1.14</strong> (field + <code>new</code> + method <code>this</code> + identitas referensi + field <code>long</code>/<code>String</code>/class). Tahap lanjut: field <code>double</code>/<code>float</code>, constructor, vtable/inheritance.</li>
 <li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>
 <li><strong>Array bertipe + <code>char</code> + Unicode dasar</strong>.</li>
 <li><strong>TLS server + verifikasi ECDSA/CertificateVerify + chain/hostname</strong>.</li>
@@ -279,7 +279,7 @@
 <li>Tulis batas di docs, bukan hanya di kepala.</li>
 </ul>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.13 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.14 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/06-batas-roadmap.md">Sunting halaman ini</a>
 </footer>
   </main>
