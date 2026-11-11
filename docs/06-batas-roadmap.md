@@ -9,7 +9,7 @@ diuji, ditulis "belum".
 
 | Belum ada | Dampak | Workaround sekarang |
 |---|---|---|
-| ~~Instance class~~ **✅ v1.12–1.14** (field, `new`, method `this`, identitas referensi; field `long`/`String`/class) | sisa: tanpa constructor/inheritance/vtable; field `double`/`float` menyusul | factory `static Kelas buat(...)`; dispatch statis |
+| ~~Instance class~~ **✅ v1.12–1.15** (field, `new`, method `this`, identitas referensi; field `long`/`String`/class; **constructor**) | sisa: tanpa inheritance/vtable; field `double`/`float` menyusul | dispatch statis; tanpa overload constructor |
 | GC / free | arena 32 MB; wajib `memMark/memReset` | reset per request/iterasi; hindari alokasi di loop panas |
 | Array bertipe (`String[]`, `long[]`, `double[]`) | semua array praktis `int[]` | simpan indeks/offset ke array datar |
 | `char` & literal char | `'a'` adalah String | pakai kode byte (`97`) atau `charAt` |
@@ -19,7 +19,7 @@ diuji, ditulis "belum".
 | generic, enum, anotasi, overloading | API harus unik per nama | sufiks nama (`getInt/getStr`) |
 | `finally`/RAII | resource harus ditutup manual | `Net.close`, `File.close` |
 | Field instance bertipe `double`/`float` | butuh jalur register float di 3 backend | simpan sebagai `long`/`String` dulu, atau field `int` + pembagian |
-| Constructor | field mulai dari 0 | factory `static Kelas buat(...)` |
+| Constructor overload & `this(...)` | satu constructor per class | overload = nama berbeda (`buatKecil`, `buatBesar`) |
 | Method/field pada receiver ekspresi (`buat(1,2).x`) | dispatch statis via variabel | simpan dulu: `Kelas k = buat(1,2);` |
 | `System.out.print/println` sebagai ekspresi | tidak bisa dipakai di badan lambda ekspresi | bungkus dengan method `static void cetak(int x)` lalu `a.forEach(x => cetak(x))` |
 
@@ -98,8 +98,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **122/122** (v1.14) — a64 + VM + sintaks x64 + dokumen HTML
-  (128 PASS termasuk cek x64 yang tidak masuk counter).
+- Suite: **124/124** (v1.15) — a64 + VM + sintaks x64 + dokumen HTML
+  (131 PASS termasuk cek x64 yang tidak masuk counter).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal
@@ -109,9 +109,10 @@ Batas angka:
 
 ## 7. Roadmap (urutan usulan)
 
-1. ~~Instance class~~ **✅ v1.12–1.14** (field + `new` + method `this` +
-   identitas referensi + field `long`/`String`/class). Tahap lanjut:
-   field `double`/`float`, constructor, vtable/inheritance.
+1. ~~Instance class~~ **✅ v1.12–1.15** (field + `new` + method `this` +
+   identitas referensi + field `long`/`String`/class + constructor).
+   Tahap lanjut: field `double`/`float`, overload constructor,
+   vtable/inheritance.
 2. **GC sederhana** (mark-sweep) atau region eksplisit, agar server tidak
    wajib reset manual.
 3. **Array bertipe + `char` + Unicode dasar**.

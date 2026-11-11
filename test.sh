@@ -1382,6 +1382,13 @@ check reftest test/reftest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/reftest64.s" -o /dev/null \
     && echo "PASS  reftest [x64]" || { echo "FAIL  reftest [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── fitur bahasa v1.15: constructor — new Kelas(args) ───
+cp test/ctortest.ref "$T/kopi/ctortest.ref"
+check ctortest test/ctortest.kop
+./kopicc test/ctortest.kop -t x64 -o "$T/kopi/ctortest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/ctortest64.s" -o /dev/null \
+    && echo "PASS  ctortest [x64]" || { echo "FAIL  ctortest [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
 check urltest test/urltest.kop

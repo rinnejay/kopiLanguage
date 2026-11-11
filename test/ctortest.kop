@@ -1,0 +1,87 @@
+import Str;
+
+class Titik {
+    int x;
+    int y;
+    String nama;
+    long besar;
+
+    Titik(int ax, int ay, String nm) {
+        this.x = ax;
+        this.y = ay;
+        this.nama = nm;
+        this.besar = (long)(ax * 1000000);
+    }
+
+    long total() {
+        return this.besar + this.x + this.y;
+    }
+}
+
+class Kotak {
+    int w;
+    Titik pojok;
+
+    Kotak(int w0, int x0, int y0, String nm) {
+        this.w = w0;
+        this.pojok = new Titik(x0, y0, nm);
+    }
+}
+
+class Kosong {
+    int n;
+}
+
+class Nada {
+    int n;
+    String s;
+
+    Nada(int v) {
+        this.n = v;
+        this.s = "auto";
+        this.isi(v * 2);
+        if (this.n > 100) return;      // return tengah constructor
+        this.s = "kecil";
+    }
+
+    void isi(int x) {
+        this.n = this.n + x;
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        Titik a = new Titik(3, 4, "alpha");
+        System.out.println(a.x);
+        System.out.println(a.y);
+        System.out.println(a.nama);
+        System.out.println(a.nama == "alpha");
+        System.out.println(a.besar);
+        System.out.println(a.total());
+
+        Titik b = new Titik(0, 0, "nol");
+        System.out.println(b == a);
+
+        Kotak k = new Kotak(10, 7, 8, "pojok");
+        System.out.println(k.w);
+        System.out.println(k.pojok.x);
+        System.out.println(k.pojok.y);
+        System.out.println(k.pojok.nama == "pojok");
+        System.out.println(k.pojok.total());
+
+        // class tanpa constructor tetap bisa (zero-init)
+        Kosong z = new Kosong();
+        System.out.println(z.n);
+
+        // constructor memanggil method instance; return di tengah
+        Nada na = new Nada(10);
+        System.out.println(na.n);
+        System.out.println(na.s == "kecil");
+        Nada nb = new Nada(100);
+        System.out.println(nb.n);
+        System.out.println(nb.s == "auto");
+        Nada nz = new Nada(0);
+        System.out.println(nz.n);
+        System.out.println(nz.s == "kecil");
+    }
+}

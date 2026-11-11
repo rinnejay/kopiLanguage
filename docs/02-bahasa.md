@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.14.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.15.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
@@ -308,8 +308,9 @@ sendiri lalu `import Keranjang;`.
 
 Sejak v1.12 sebuah class bisa punya **field** dan **method instance**
 (metode tanpa `static`). Sejak v1.14 field juga bisa `long`, `String`,
-dan **bertipe class**. Instance dibuat dengan `new`, dan `this`
-merujuk objek yang sedang berjalan:
+dan **bertipe class**. Sejak v1.15 ada **constructor** — metode yang
+namanya sama dengan class, dipanggil lewat `new`. `this` merujuk
+objek yang sedang berjalan:
 
 ```java
 class Titik {
@@ -317,15 +318,12 @@ class Titik {
     int y;
     long besar;          // field 64-bit (v1.14)
     String nama;         // field referensi (v1.14)
-    boolean hidup;
 
-    static Titik buat(int ax, int ay, String nm) {   // factory
-        Titik t = new Titik();
-        t.x = ax;
-        t.y = ay;
-        t.nama = nm;
-        t.hidup = true;
-        return t;
+    Titik(int ax, int ay, String nm) {   // constructor (v1.15)
+        this.x = ax;
+        this.y = ay;
+        this.nama = nm;
+        this.besar = (long)(ax * 1000000);
     }
 
     long luasBesar() {
@@ -336,17 +334,20 @@ class Titik {
 class Kotak {
     int w;
     Titik pojok;         // field bertipe class (v1.14)
+
+    Kotak(int w0, int x0, int y0, String nm) {
+        this.w = w0;
+        this.pojok = new Titik(x0, y0, nm);   // constructor di dalam constructor
+    }
 }
 
 class Main {
     public static void main(String[] args) {
-        Titik a = Titik.buat(10, 20, "alpha");
-        a.besar = 5000000000L;
+        Titik a = new Titik(10, 20, "alpha");     // lewat constructor
         System.out.println(a.luasBesar());        // long utuh
         System.out.println(a.nama == "alpha");    // isi String (Str.equals)
 
-        Kotak k = new Kotak();
-        k.pojok = Titik.buat(2, 3, "pojok");      // objek sebagai field
+        Kotak k = new Kotak(5, 2, 3, "pojok");
         System.out.println(k.pojok.x);            // rantai field: 2
         System.out.println(k.pojok.nama == "pojok");
 
@@ -364,6 +365,11 @@ Aturan yang berlaku:
   `boolean sama(Titik o)`, return `static Titik buat()`, dan **field
   bertipe class** (`Titik pojok;`) — semua didukung. Class harus
   didefinisikan **sebelum** dirujuk sebagai tipe.
+- **Constructor** (v1.15): nama metode = nama class, tidak boleh
+  `static`, satu per class (tanpa overload). `new K(args)` mengalokasi
+  objek (semua field di-zero) lalu menjalankan badan constructor;
+  `return;` di tengah badan boleh, `return nilai;` tidak. Class tanpa
+  constructor tetap bisa `new K()` (semua field 0).
 - **Field** selalu di-zero saat `new` (referensi menunjuk *null*;
   deref null = error runtime dengan stack trace di VM).
 - **`p == q`** membandingkan **referensi** (identitas), bukan isi —
@@ -373,18 +379,19 @@ Aturan yang berlaku:
   field bertipe `Titik` ditolak dengan pesan jelas.
 - Metode tanpa `static` = metode instance. `main` wajib `static`.
 
-Batas v1.14 (dirancang jujur):
+Batas v1.15 (dirancang jujur):
 
 - Field `double`/`float` belum didukung (butuh jalur register float di
   ketiga backend); field lain: 32-bit (`int`/`boolean`/`byte`/`short`)
   dan 64-bit (`long`/`String`/tipe class).
-- Tidak ada constructor — semua field mulai dari 0; pakai factory
-  (`static Titik buat(...)`) untuk inisialisasi.
+- Tidak ada **overload** constructor (satu per class) dan tidak ada
+  `this(...)` pemanggil constructor lain.
 - Dispatch **statis** (tanpa inheritance/interface/vtable); `Titik`
   secara internal adalah tape 64-bit ber-ukuran jumlah field.
-- Receiver method harus variabel sederhana: `b.kuadran()` ok,
-  `buat(1,2).kuadran()` dan `k.pojok.kuadran()` belum — simpan dulu ke
-  variabel. Rantai **field** (`k.pojok.x`, baca & tulis) didukung.
+- Receiver method harus variabel atau **field**: `b.kuadran()` ok,
+  `k.pojok.kuadran()` ok (v1.15), `new Titik(1,2).x` belum — simpan
+  dulu ke variabel. Rantai **field** (`k.pojok.x`, baca & tulis)
+  didukung.
 - Objek bisa dipakai di lambda (ditangkap by-value seperti variabel lain).
 
 ## 13. JSON literal
