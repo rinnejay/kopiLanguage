@@ -26,8 +26,8 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="02-bahasa-kopi-tutorial-lengkap">02 — Bahasa Kopi: tutorial lengkap<a class="anchor" href="#02-bahasa-kopi-tutorial-lengkap" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bentuk-program">1. Bentuk program</a></li><li class="toc-h2"><a href="#2-komentar">2. Komentar</a></li><li class="toc-h2"><a href="#3-tipe">3. Tipe</a></li><li class="toc-h3"><a href="#cast-promosi">Cast &amp; promosi</a></li><li class="toc-h2"><a href="#4-variabel-scope">4. Variabel &amp; scope</a></li><li class="toc-h2"><a href="#5-operator">5. Operator</a></li><li class="toc-h2"><a href="#6-kontrol-alir">6. Kontrol alir</a></li><li class="toc-h2"><a href="#7-array">7. Array</a></li><li class="toc-h3"><a href="#metode-fungsional-array-gula">Metode fungsional array (gula)</a></li><li class="toc-h2"><a href="#8-string">8. String</a></li><li class="toc-h3"><a href="#metode-instance-butuh-import-str">Metode instance (butuh import Str;)</a></li><li class="toc-h3"><a href="#template-string-backtick">Template string (backtick)</a></li><li class="toc-h2"><a href="#9-fungsi">9. Fungsi</a></li><li class="toc-h2"><a href="#10-lambda-fn">10. Lambda &amp; fn</a></li><li class="toc-h2"><a href="#11-class-sebagai-namespace">11. Class sebagai namespace</a></li><li class="toc-h2"><a href="#12-class-instance">12. Class instance</a></li><li class="toc-h2"><a href="#13-json-literal">13. JSON literal</a></li><li class="toc-h2"><a href="#14-memori-arena-32-mb-tanpa-gc">14. Memori: arena 32 MB, tanpa GC</a></li><li class="toc-h2"><a href="#15-keluar-kode-status">15. Keluar &amp; kode status</a></li><li class="toc-h2"><a href="#16-contoh-tur-lengkap">16. Contoh tur lengkap</a></li></ul></nav>
-<p>Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.11. Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).</p>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bentuk-program">1. Bentuk program</a></li><li class="toc-h2"><a href="#2-komentar">2. Komentar</a></li><li class="toc-h2"><a href="#3-tipe">3. Tipe</a></li><li class="toc-h3"><a href="#cast-promosi">Cast &amp; promosi</a></li><li class="toc-h2"><a href="#4-variabel-scope">4. Variabel &amp; scope</a></li><li class="toc-h2"><a href="#5-operator">5. Operator</a></li><li class="toc-h2"><a href="#6-kontrol-alir">6. Kontrol alir</a></li><li class="toc-h2"><a href="#7-array">7. Array</a></li><li class="toc-h3"><a href="#metode-fungsional-array-gula">Metode fungsional array (gula)</a></li><li class="toc-h2"><a href="#8-string">8. String</a></li><li class="toc-h3"><a href="#metode-instance-butuh-import-str">Metode instance (butuh import Str;)</a></li><li class="toc-h3"><a href="#template-string-backtick">Template string (backtick)</a></li><li class="toc-h2"><a href="#9-fungsi">9. Fungsi</a></li><li class="toc-h2"><a href="#10-lambda-fn">10. Lambda &amp; fn</a></li><li class="toc-h2"><a href="#11-class-sebagai-namespace">11. Class sebagai namespace</a></li><li class="toc-h2"><a href="#12-class-instance">12. Class instance</a></li><li class="toc-h2"><a href="#13-json-literal">13. JSON literal</a></li><li class="toc-h2"><a href="#14-memori-arena-32-mb-tanpa-gc">14. Memori: arena 32 MB, tanpa GC</a></li><li class="toc-h2"><a href="#15-keluar-kode-status">15. Keluar &amp; kode status</a></li><li class="toc-h3"><a href="#error-runtime-nomor-baris-stack-trace">Error runtime: nomor baris + stack trace</a></li><li class="toc-h2"><a href="#16-contoh-tur-lengkap">16. Contoh tur lengkap</a></li></ul></nav>
+<p>Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.13. Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).</p>
 <hr>
 <h2 id="1-bentuk-program">1. Bentuk program<a class="anchor" href="#1-bentuk-program" aria-label="tautan">#</a></h2>
 <pre><code class="language-java">class Main {
@@ -404,11 +404,23 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <h2 id="15-keluar-kode-status">15. Keluar &amp; kode status<a class="anchor" href="#15-keluar-kode-status" aria-label="tautan">#</a></h2>
 <pre><code class="language-java">Net.exit(0);      // keluar seketika; tidak ada finally/atexit</code></pre>
 <p><code>Net.exit</code> memakai syscall <code>exit</code> langsung sehingga buffer stdio tidak di-flush. Selesaikan output (mis. <code>println</code>) sebelum memanggilnya.</p>
+<h3 id="error-runtime-nomor-baris-stack-trace">Error runtime: nomor baris + stack trace<a class="anchor" href="#error-runtime-nomor-baris-stack-trace" aria-label="tautan">#</a></h3>
+<p>Saat program <strong>VM</strong> menabrak error runtime — pembagian dengan nol, indeks array di luar batas, arena penuh, dsb. — <code>kopivm</code> mencetak pesan dengan <strong>baris sumber</strong> dan <strong>stack trace</strong> lalu keluar dengan kode status 1:</p>
+<pre><code>kopivm: error: indeks array di luar batas (5)
+  stack trace (terdalam dulu):
+    at luar (utama.kop:9)
+    at main (utama.kop:13)</code></pre>
+<ul>
+<li>Informasi baris membawa ongkos 3–5 byte per statement di bytecode dan tidak menambah operasi host (hanya menyimpan nomor baris).</li>
+<li>Nama file di-intern ke cpool; byte tambahan umumnya sekali per metode.</li>
+<li>Backend native (a64/x64) saat ini tetap mencetak pesan singkat tanpa trace — ini fitur VM (lihat roadmap: trap berline untuk native).</li>
+<li>Error saat <em>kompilasi</em> (<code>kopicc</code>) selalu sudah berline sejak awal.</li>
+</ul>
 <h2 id="16-contoh-tur-lengkap">16. Contoh tur lengkap<a class="anchor" href="#16-contoh-tur-lengkap" aria-label="tautan">#</a></h2>
 <p>Lihat <code>docs/contoh/tour.kop</code> (dijalankan oleh <code>docs/check.sh</code>). Isinya menggabungkan: tipe, ternary, loop, array fungsional, String method, template, lambda, JSON, dan memMark/memReset.</p>
 <p>Lanjut ke <a href="03-pustaka.html">03 — Pustaka</a>.</p>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.13 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/02-bahasa.md">Sunting halaman ini</a>
 </footer>
   </main>

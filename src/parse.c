@@ -2152,6 +2152,9 @@ static int cp_push(const char *s) {
     return prog.ncp++;
 }
 
+/* intern dari file lain (gen_vm: nama file sumber untuk stack trace) */
+int cp_intern(const char *s) { return cp_push(s); }
+
 /* kumpulkan string literal unik dari semua ST_PRINT ke cpool */
 static void collect_cp_stmt(Node *s) {
     if (!s) return;

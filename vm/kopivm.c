@@ -40,6 +40,8 @@ enum {
     OP_NORM,        /* 1 byte: tipe */
     OP_PRINTNUM,    /* 2 byte: tipe, newline */
     OP_PRINTBUF,    /* 1 byte: newline; tulis array byte ke fd 1 */
+    OP_LINE,        /* 2 byte: nomor baris sumber — stack trace */
+    OP_SRCFILE,     /* 2 byte: index cpool nama file sumber */
 };
 
 #define MAXM 4096
@@ -61,10 +63,8 @@ static int nmeths;
 static char *cpool[65536];
 static int ncp;
 
-static void dievm(const char *m) {
-    fprintf(stderr, "kopivm: %s\n", m);
-    exit(1);
-}
+static void dievm(const char *m);
+static void dievm2(const char *m, long v);
 
 /* heap untuk closure & array (bump arena; GC belum ada) */
 /* heap untuk closure & array (bump arena; GC belum ada).
@@ -74,10 +74,7 @@ static void dievm(const char *m) {
 static long *heap;
 static long heap_used;
 
-static void dievm2(const char *m, long v) {
-    fprintf(stderr, "kopivm: %s (%ld)\n", m, v);
-    exit(1);
-}
+static void dievm2(const char *m, long v);
 
 static uint8_t rd8(size_t *p) { return img[(*p)++]; }
 static uint16_t rd16(size_t *p) { uint16_t v = rd8(p); v |= (uint16_t)rd8(p) << 8; return v; }
@@ -126,12 +123,33 @@ static void load(const char *path) {
     }
 }
 
-typedef struct { int meth; long pc; long retbase; } Frame;
+typedef struct { int meth; long pc; long retbase; int line; const char *file; } Frame;
 
 static int64_t stackv[MAXSTACK];
 static long sp;
 static Frame frames[MAXFRAMES];
 static int nframes;
+
+/* error runtime + stack trace: setiap frame menyimpan baris/file sumber
+ * (diisi opcode OP_LINE / OP_SRCFILE yang dipancarkan compiler) */
+static void dievm(const char *m) {
+    fprintf(stderr, "kopivm: error: %s\n", m);
+    if (nframes > 0) {
+        fprintf(stderr, "  stack trace (terdalam dulu):\n");
+        for (int i = nframes - 1; i >= 0; i--) {
+            Frame *fr = &frames[i];
+            fprintf(stderr, "    at %s (%s:%d)\n", meths[fr->meth].name,
+                    fr->file ? fr->file : "?", fr->line);
+        }
+    }
+    exit(1);
+}
+
+static void dievm2(const char *m, long v) {
+    char buf[320];
+    snprintf(buf, sizeof buf, "%s (%ld)", m, v);
+    dievm(buf);
+}
 static int64_t localsv[MAXFRAMES][MAXLOC];
 
 static uint64_t rd64code(Meth *m, long *pc) {
@@ -223,6 +241,8 @@ static void run(void) {
     frames[0].meth = mid;
     frames[0].pc = 0;
     frames[0].retbase = 0;
+    frames[0].line = 0;
+    frames[0].file = 0;
     memset(localsv[0], 0, sizeof localsv[0]);
 
     for (;;) {
@@ -234,6 +254,18 @@ static void run(void) {
         int64_t a, b;
 
         switch (op) {
+        case OP_LINE: {
+            int ln = m->code[f->pc] | (m->code[f->pc + 1] << 8);
+            f->pc += 2;
+            if (ln) f->line = ln;
+            break;
+        }
+        case OP_SRCFILE: {
+            int ci = m->code[f->pc] | (m->code[f->pc + 1] << 8);
+            f->pc += 2;
+            if (ci >= 0 && ci < ncp) f->file = cpool[ci];
+            break;
+        }
         case OP_ICONST: {
             int32_t v = (int32_t)m->code[f->pc] | ((int32_t)m->code[f->pc + 1] << 8) |
                         ((int32_t)m->code[f->pc + 2] << 16) | ((int32_t)m->code[f->pc + 3] << 24);
@@ -319,6 +351,8 @@ static void run(void) {
             frames[nframes].meth = cm;
             frames[nframes].pc = 0;
             frames[nframes].retbase = base;
+            frames[nframes].line = 0;
+            frames[nframes].file = 0;
             nframes++;
             break;
         }
@@ -394,6 +428,8 @@ static void run(void) {
             frames[nframes].meth = (int)cm;
             frames[nframes].pc = 0;
             frames[nframes].retbase = base;
+            frames[nframes].line = 0;
+            frames[nframes].file = 0;
             nframes++;
             break;
         }

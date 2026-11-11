@@ -328,7 +328,7 @@ def page(outname, title, body, toc, srcfile):
   <main class="content">
 %s
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.13 · lisensi MIT</span>
   <a href="%s/blob/main/docs/%s">Sunting halaman ini</a>
 </footer>
   </main>

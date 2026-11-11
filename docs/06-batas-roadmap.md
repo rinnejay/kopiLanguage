@@ -98,8 +98,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **119/119** (v1.12) — a64 + VM + sintaks x64 + dokumen HTML
-  (126 PASS termasuk cek x64 yang tidak masuk counter).
+- Suite: **120/120** (v1.13) — a64 + VM + sintaks x64 + dokumen HTML
+  (127 PASS termasuk cek x64 yang tidak masuk counter).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal
@@ -121,7 +121,8 @@ Batas angka:
 7. **Ekosistem**: package manager, LSP, formatter, CI lintas platform,
    fuzzing, audit keamanan.
 8. **Performa**: register allocation/const-folding, `sendfile`,
-   buffer pooling, event-loop yang lebih hemat.
+   buffer pooling, event-loop yang lebih hemat; trap error berline
+   untuk backend native (a64/x64) — VM sudah selesai (v1.13).
 
 ## 8. Cara berkontribusi tanpa membuat kesalahan
 

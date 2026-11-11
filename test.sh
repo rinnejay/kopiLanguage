@@ -1487,6 +1487,30 @@ check dnsresolv test/dnsresolv.kop
 kill $DPID 2>/dev/null
 wait $DPID 2>/dev/null
 
+# ─── v1.13: error runtime berline + stack trace di VM ───
+cat > "$T/kopi/traceerr.kop" <<'EOF'
+class Main {
+    static int bagi(int a, int b) {
+        return a / b;
+    }
+
+    static void main() {
+        System.out.println(bagi(10, 0));
+    }
+}
+EOF
+./kopicc "$T/kopi/traceerr.kop" -t vm -o "$T/kopi/traceerr.kbc"
+errout="$(./kopivm "$T/kopi/traceerr.kbc" 2>&1 >/dev/null)"
+trc=$?
+if [ $trc -ne 0 ] && echo "$errout" | grep -q "kopivm: error: pembagian dengan nol" \
+   && echo "$errout" | grep -q "stack trace" \
+   && echo "$errout" | grep -Eq "at bagi \(.*traceerr\.kop:3\)" \
+   && echo "$errout" | grep -Eq "at main \(.*traceerr\.kop:7\)"; then
+    echo "PASS  traceerr [vm]"; PASS=$((PASS+1))
+else
+    echo "FAIL  traceerr [vm]"; FAIL=$((FAIL+1)); echo "$errout" | head -6
+fi
+
 # ─── situs dokumentasi HTML (GitHub Pages) ───
 # gen_libref dulu: signature lib/*.kop harus sinkron dengan docs/api-*.md
 if python3 tools/gen_libref.py > "$T/kopi/libref.out" 2>&1 &&

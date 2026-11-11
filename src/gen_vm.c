@@ -26,6 +26,7 @@ enum {
     OP_FADD, OP_FSUB, OP_FMUL, OP_FDIV, OP_FMOD, OP_FNEG,
     OP_FLT, OP_FGT, OP_FLE, OP_FGE, OP_FEQ, OP_FNE,
     OP_CONV, OP_NORM, OP_PRINTNUM, OP_PRINTBUF,
+    OP_LINE, OP_SRCFILE,            /* v1.13: baris sumber utk stack trace */
 };
 
 typedef struct {
@@ -39,7 +40,10 @@ typedef struct {
 
 static Ctx cx;
 static Method *cur_meth;
-static int brk_lab[64], cont_lab[64], brk_sp;
+static int brk_lab[64], cont_lab[64], brk_sp, last_line;
+static const char *last_file;
+
+int cp_intern(const char *s);    /* parse.c — intern nama file ke cpool */
 
 static void em8(int v) { cx.buf[cx.len++] = (uint8_t)v; }
 static void em16(int v) { em8(v & 0xff); em8((v >> 8) & 0xff); }
@@ -68,6 +72,16 @@ static void gen_expr(Node *e);
 static void gen_stmts(Node *lst);
 
 static void gen_stmt(Node *s) {
+    /* direktif baris sumber (v1.13): kopivm menyimpannya per frame untuk
+     * stack trace saat error runtime. Nama file di-intern ke cpool hanya
+     * ketika berganti — umumnya sekali di awal metode. */
+    if (s->line > 0) {
+        if (s->line != last_line) { em8(OP_LINE); em16(s->line & 0xffff); last_line = s->line; }
+    }
+    if (s->file && (!last_file || strcmp(s->file, last_file))) {
+        em8(OP_SRCFILE); em16(cp_intern(s->file));
+        last_file = s->file;
+    }
     switch (s->kind) {
     case ST_VAR:
     case ST_ASSIGN:
@@ -428,6 +442,7 @@ static void gen_expr(Node *e) {
 static void write_method(FILE *f, Method *m) {
     cur_meth = m;
     cx.len = 0; cx.nfixes = 0; cx.nlab = 0;
+    last_line = 0; last_file = 0;
     memset(cx.labpos, 0xff, sizeof(cx.labpos));
 
     gen_stmts(m->body);
@@ -459,6 +474,11 @@ static void write_method(FILE *f, Method *m) {
 }
 
 void gen_vm(const char *outpath) {
+    /* pre-pass: intern nama file sumber tiap metode SEBELUM header ditulis,
+     * agar jumlah cpool di header sudah final (SRCFILE untuk stack trace) */
+    for (Method *m = prog.methods; m; m = m->next)
+        if (m->body && m->body->file)
+            cp_intern(m->body->file);
     if (prog.ncp > 0xffff) die("terlalu banyak konstanta string");
     if (prog.nmethods > 0xffff) die("terlalu banyak metode");
     FILE *f = fopen(outpath, "wb");

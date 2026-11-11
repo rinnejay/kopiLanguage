@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.11.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.13.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
@@ -423,6 +423,27 @@ Net.exit(0);      // keluar seketika; tidak ada finally/atexit
 
 `Net.exit` memakai syscall `exit` langsung sehingga buffer stdio tidak
 di-flush. Selesaikan output (mis. `println`) sebelum memanggilnya.
+
+### Error runtime: nomor baris + stack trace
+
+Saat program **VM** menabrak error runtime — pembagian dengan nol,
+indeks array di luar batas, arena penuh, dsb. — `kopivm` mencetak
+pesan dengan **baris sumber** dan **stack trace** lalu keluar dengan
+kode status 1:
+
+```
+kopivm: error: indeks array di luar batas (5)
+  stack trace (terdalam dulu):
+    at luar (utama.kop:9)
+    at main (utama.kop:13)
+```
+
+- Informasi baris membawa ongkos 3–5 byte per statement di bytecode
+  dan tidak menambah operasi host (hanya menyimpan nomor baris).
+- Nama file di-intern ke cpool; byte tambahan umumnya sekali per metode.
+- Backend native (a64/x64) saat ini tetap mencetak pesan singkat tanpa
+  trace — ini fitur VM (lihat roadmap: trap berline untuk native).
+- Error saat *kompilasi* (`kopicc`) selalu sudah berline sejak awal.
 
 ## 16. Contoh tur lengkap
 
