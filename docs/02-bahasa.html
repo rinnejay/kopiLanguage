@@ -250,7 +250,7 @@ System.out.println(`literal {{x}} \{y\}`);</code></pre>
 <ul>
 <li><code>{ekspresi}</code> boleh ekspresi apa pun (panggilan metode, aritmetika, template bersarang).</li>
 <li>Angka/boolean memakai <code>Str.fromInt/fromLong/fromDouble/boolText</code>, jadi <strong><code>import Str;</code> wajib</strong> bila ada interpolasi non-String.</li>
-<li>Escape: <code>\n \t \r \\ \</code> \{ \}<code>; </code>{{<code>/</code>}}` untuk kurung literal.</li>
+<li>Escape: <code>\n</code>, <code>\t</code>, <code>\r</code>, <code>\\</code>, <code>\{</code>, <code>\}</code> (backtick di-escape dengan backslash + backtick); <code>{{</code>/<code>}}</code> = kurung literal.</li>
 <li>Hanya backtick yang memformat; <code>"..."</code>/<code>'...'</code> tetap literal.</li>
 </ul>
 <h2 id="9-fungsi">9. Fungsi<a class="anchor" href="#9-fungsi" aria-label="tautan">#</a></h2>
@@ -347,9 +347,8 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <li>Lebih dari 32 MB → <code>kopi: arena memori habis</code> + exit 1 (bukan crash).</li>
 </ol>
 <h2 id="14-keluar-kode-status">14. Keluar &amp; kode status<a class="anchor" href="#14-keluar-kode-status" aria-label="tautan">#</a></h2>
-<pre><code class="language-java">Net.exit(0);      // keluar seketika (tidak menjalankan finally — indeed
-                  // tidak ada finally; buffer stdout ikut tidak di-flush)</code></pre>
-<p>Gunakan <code>System.out.println</code> sebelum <code>Net.exit</code> bila perlu output; hindari <code>Net.exit</code> tepat setelah <code>print</code> tanpa newline karena buffer belum tentu ter-flush.</p>
+<pre><code class="language-java">Net.exit(0);      // keluar seketika; tidak ada finally/atexit</code></pre>
+<p><code>Net.exit</code> memakai syscall <code>exit</code> langsung sehingga buffer stdio tidak di-flush. Selesaikan output (mis. <code>println</code>) sebelum memanggilnya.</p>
 <h2 id="15-contoh-tur-lengkap">15. Contoh tur lengkap<a class="anchor" href="#15-contoh-tur-lengkap" aria-label="tautan">#</a></h2>
 <p>Lihat <code>docs/contoh/tour.kop</code> (dijalankan oleh <code>docs/check.sh</code>). Isinya menggabungkan: tipe, ternary, loop, array fungsional, String method, template, lambda, JSON, dan memMark/memReset.</p>
 <p>Lanjut ke <a href="03-pustaka.html">03 — Pustaka</a>.</p>

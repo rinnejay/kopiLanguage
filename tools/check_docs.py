@@ -39,7 +39,7 @@ def check_pages():
                        % (src, h.count("<pre>"), fences // 2))
         plain = re.sub(r"<pre>.*?</pre>", "", h, flags=re.S)
         plain = re.sub(r"<code>.*?</code>", "", plain, flags=re.S)
-        for marker in ("**", "```"):
+        for marker in ("**", "```", "`"):
             if marker in plain:
                 bad.append("sisa markdown %r: docs/%s" % (marker, out))
         # deteksi HTML kedaluwarsa (md berubah tapi belum di-generate)

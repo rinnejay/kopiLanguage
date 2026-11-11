@@ -222,7 +222,8 @@ System.out.println(`literal {{x}} \{y\}`);
   template bersarang).
 - Angka/boolean memakai `Str.fromInt/fromLong/fromDouble/boolText`,
   jadi **`import Str;` wajib** bila ada interpolasi non-String.
-- Escape: `\n \t \r \\ \` \{ \}`; `{{`/`}}` untuk kurung literal.
+- Escape: `\n`, `\t`, `\r`, `\\`, `\{`, `\}` (backtick di-escape dengan
+  backslash + backtick); `{{`/`}}` = kurung literal.
 - Hanya backtick yang memformat; `"..."`/`'...'` tetap literal.
 
 ## 9. Fungsi
@@ -348,13 +349,11 @@ Aturan penting:
 ## 14. Keluar & kode status
 
 ```java
-Net.exit(0);      // keluar seketika (tidak menjalankan finally — indeed
-                  // tidak ada finally; buffer stdout ikut tidak di-flush)
+Net.exit(0);      // keluar seketika; tidak ada finally/atexit
 ```
 
-Gunakan `System.out.println` sebelum `Net.exit` bila perlu output; hindari
-`Net.exit` tepat setelah `print` tanpa newline karena buffer belum tentu
-ter-flush.
+`Net.exit` memakai syscall `exit` langsung sehingga buffer stdio tidak
+di-flush. Selesaikan output (mis. `println`) sebelum memanggilnya.
 
 ## 15. Contoh tur lengkap
 
