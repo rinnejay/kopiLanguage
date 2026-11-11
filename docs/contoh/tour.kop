@@ -1,0 +1,77 @@
+// tour.kop — tur fitur bahasa Kopi (dipakai docs/check.sh).
+import Str;
+import Arrays;
+import Json;
+
+class Helper {
+    static int dua() { return 2; }
+    static int faktorial(int n) {
+        if (n <= 1) { return 1; }
+        return n * faktorial(n - 1);
+    }
+}
+
+class Main {
+    static int terapkan(fn f, int x) { return f(x); }
+    static void cetak(int x) { System.out.print(x); }
+
+    public static void main(String[] args) {
+        // tipe & aritmetika
+        int a = 40;
+        long besar = 5000000000L;
+        double pi = 3.5;
+        boolean aktif = true;
+        System.out.println(a + Helper.dua());
+        System.out.println(besar);
+        System.out.println((int)pi);
+        System.out.println(aktif);
+
+        // ternary & do/while
+        int maks = a > 10 ? a : 10;
+        System.out.println(maks);
+        int i = 0;
+        do { i++; } while (i < 3);
+        System.out.println(i);
+
+        // array + lambda fungsional
+        int[] xs = new int[5];
+        for (int k = 0; k < xs.length; k++) xs[k] = k + 1;
+        int[] genap = xs.filter(x => x % 2 == 0);
+        int total = xs.reduce(0, (acc, x) => acc + x);
+        System.out.println(genap.length);
+        System.out.println(total);
+        xs.forEach(x => cetak(x));
+        System.out.println("");
+
+        // String native + metode instance
+        String s = "  Kopi Bahasa  ";
+        System.out.println(s.trim().upper());
+        System.out.println("arena".charAt(2));
+        System.out.println("realtime".substring(0, 4));
+        System.out.println("game server".indexOf("server"));
+        System.out.println("ab".repeat(3));
+
+        // template string
+        int umur = 20;
+        System.out.println(`Halo {s.trim()}, umur {umur}, besok {umur + 1}`);
+
+        // lambda + capture
+        int faktor = 3;
+        fn kali = x => x * faktor;
+        System.out.println(kali(7));
+        System.out.println(terapkan(kali, 5));
+
+        // JSON
+        int[] u = json {"nama": "budi", "umur": 20};
+        System.out.println(Json.asInt(Json.get(u, "umur")));
+        int[] arr = json [1, 2, 3];
+        System.out.println(Json.count(arr));
+
+        // arena
+        int mark = Net.memMark();
+        int[] sementara = new int[1000];
+        System.out.println(sementara.length);
+        Net.memReset(mark);
+        System.out.println(Net.memMark() == mark);
+    }
+}

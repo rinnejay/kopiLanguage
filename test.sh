@@ -1360,6 +1360,10 @@ else
     echo "FAIL  game: build"; FAIL=$((FAIL+1))
 fi
 
+# ─── contoh dokumentasi harus tetap hidup ───
+cp docs/contoh/tour.ref "$T/kopi/dochtour.ref"
+check dochtour docs/contoh/tour.kop
+
 # ─── fitur bahasa v1.11: ternary, do/while, metode String ───
 cp test/langtest.ref "$T/kopi/langtest.ref"
 check langtest test/langtest.kop
@@ -1475,6 +1479,13 @@ sleep 0.4
 check dnsresolv test/dnsresolv.kop
 kill $DPID 2>/dev/null
 wait $DPID 2>/dev/null
+
+# ─── situs dokumentasi HTML (GitHub Pages) ───
+if python3 tools/check_docs.py > "$T/kopi/docshtml.out" 2>&1; then
+    echo "PASS  docshtml"; PASS=$((PASS+1))
+else
+    echo "FAIL  docshtml"; FAIL=$((FAIL+1)); tail -3 "$T/kopi/docshtml.out"
+fi
 
 echo "----"
 echo "hasil: $PASS pass, $FAIL fail"

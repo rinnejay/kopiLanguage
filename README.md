@@ -28,6 +28,37 @@
 sendiri, type checker sendiri, generator assembly sendiri, dan mesin virtual
 sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 
+**Dokumentasi lengkap ada di [`docs/`](docs/README.md)** — tutorial bahasa,
+pustaka standar, server/jaringan, arsitektur compiler, dan batas jujur.
+Versi online: **https://rinnejay.github.io/**
+
+## Dokumentasi HTML (GitHub Pages)
+
+Situs statis siap pakai ada di `docs/` (`index.html`, `style.css`,
+`.nojekyll`) dan bisa langsung dipublikasikan:
+
+1. Push repo ini ke GitHub.
+2. **Settings → Pages → Build and deployment**
+3. Source: **Deploy from a branch** → Branch: `main` → folder **`/docs`**
+4. Simpan; situs tersedia di `https://<user>.github.io/<repo>/`.
+   Untuk repo ini dokumentasi sudah dipublikasikan di
+   **https://rinnejay.github.io/** (repo
+   [`rinnejay/rinnejay.github.io`](https://github.com/rinnejay/rinnejay.github.io)).
+
+Setelah mengubah file `.md` di `docs/`, regenerasi HTML:
+
+```sh
+make docs          # tools/md2html.py + tools/check_docs.py
+sh docs/check.sh   # sekaligus menguji contoh kode
+
+# salin ke checkout GitHub Pages, lalu commit/push di sana:
+tools/deploy_pages.sh /path/ke/rinnejay.github.io
+cd /path/ke/rinnejay.github.io && git add -A \
+  && git commit -m "docs: perbarui" && git push
+```
+
+Tidak perlu Jekyll/Node: HTML dihasilkan skrip Python standar.
+
 ## Struktur pustaka
 
 Pustaka standar (`lib/`) dikelompokkan per fungsi; `import Nama;` tetap
@@ -48,7 +79,7 @@ modul yang diimpor — file lokal selalu menang atas `lib/`.
 
 ```
 Pengembangan     ████████████░░░░  ~72%  menuju bahasa serius (v2)
-v1.11.0 hari ini ████████████████ 114/114 test hijau — ternary, do/while, metode instance String (a64 + VM)
+v1.11.0 hari ini ████████████████ 117/117 test hijau — ternary, do/while, metode instance String (a64 + VM)
 ```
 
 | Versi | Isi |
@@ -74,7 +105,7 @@ v1.11.0 hari ini ████████████████ 114/114 test h
 | **v1.8.0** | **tipe `String` native**: literal `"..."` **dan** `'...'` bertipe `String`, concat `+`, perbandingan isi `==`/`!=`, `.length`, indeks `s[i]` (byte), parameter/return `String`, serta **interop dua arah dengan `int[]`** (perpustakaan `Str`/`File`/`Path`/`Json` tetap bekerja). `System.out.println/print` menerima `String`; template `{s}` mendukung `String`; builtin `Net.cat`, `Net.sequal`, `Net.sne`. Escape `\0` ditolak (tak ada pemotongan cpool diam-diam). Uji `strnative` VM+a64 + sintaks x64; suite 85/85 |
 | **v1.8.1** | **`Net.bytes` tidak lagi wajib**: literal `"..."`/`'...'` sudah `String` dan bisa langsung dipakai sebagai path/buffer/parameter `int[]` (interop implisit). Pemeriksaan argumen builtin `Net.*` (openb/mkdirb/unlinkb/renameb/sendto/recvfrom/recvb/sendb) kini menerima `String` maupun `int[]`. `Net.bytes` dipertahankan hanya untuk kompatibilitas dan sebagai cara eksplisit membuat byte-array dari literal (tetap literal-only). Uji `strnative` diperluas: `int[] a = "abc"`, `Json.parse("...")`, `File.create("...")`, dan `Net.openb("...")` langsung. Suite 85/85 |
 | **v1.9.0** | **server minimal**: builtin `Net.listen`, `Net.accept` (accept4 — `accept` diblokir seccomp Android), `Net.setsockopt`, `Net.memMark/memReset` (arena per-request), `Net.argc/argv/getenv`, `Net.recv1` (satu `read`, bukan blocking-until-full). Library **`.kop`**: `MapStr` (peta String→int), `HttpServer` (parser request HTTP/1.1, method/path/query/header/body/urlDecode, response builder, kirim), `Static` (MIME + file statis + tolak `..`), `Log` (stderr + timestamp UTC). Contoh `examples/server/ServerDemo.kop`: listen → accept → parse → route → response → `memReset`, dengan endpoint `/`, `/health`, `/json`, `/time`, `/echo`, `/sum`, `/header`, `/static/*`, 404/403. Diuji 200 request beruntun tanpa OOM di a64 & VM, plus x64 sintaks; suite 87/87 |
-| **v1.11.0** | **ergonomi bahasa**: operator **ternary `kondisi ? a : b`** (bersarang, cabang harus bertipe sama atau String/int[]), **`do { } while (kondisi);`** (dengan `break`/`continue`), dan **metode instance String**: `s.trim() s.upper() s.lower() s.substring(a,n) s.charAt(i) s.indexOf(x[,from]) s.contains() s.startsWith() s.endsWith() s.equals() s.equalsIgnoreCase() s.isEmpty() s.repeat(n) s.toInt() s.replaceSeq() s.padLeft() s.padRight() s.countByte() s.utf8Count()` → didesugar ke `Str.*` (butuh `import Str;`, error jelas bila lupa). `kopicc --version`. Uji deterministik baru `langtest`; uji `netbulk` diperbaiki (sebelumnya mengharapkan 32/32 byte acak berbeda — flaky ~12%). Suite 114/114 |
+| **v1.11.0** | **ergonomi bahasa**: operator **ternary `kondisi ? a : b`** (bersarang, cabang harus bertipe sama atau String/int[]), **`do { } while (kondisi);`** (dengan `break`/`continue`), dan **metode instance String**: `s.trim() s.upper() s.lower() s.substring(a,n) s.charAt(i) s.indexOf(x[,from]) s.contains() s.startsWith() s.endsWith() s.equals() s.equalsIgnoreCase() s.isEmpty() s.repeat(n) s.toInt() s.replaceSeq() s.padLeft() s.padRight() s.countByte() s.utf8Count()` → didesugar ke `Str.*` (butuh `import Str;`, error jelas bila lupa). `kopicc --version`. Uji deterministik baru `langtest`; uji `netbulk` diperbaiki (sebelumnya mengharapkan 32/32 byte acak berbeda — flaky ~12%). Suite 117/117 (termasuk uji dokumen HTML) |
 | **v1.10.0** | **event-loop & auth**: builtin **`Net.pollfd(fds, revents, ms)`** (poll(2) via libc; revents 1=siap baca, 2=error/hup) → contoh **`ServerEvent`** melayani banyak koneksi HTTP dalam satu proses (klien yang mengirim header separuh tidak memblokir klien lain; diuji 6 koneksi separuh + 1 normal < 0,01 dtk). **Perbaikan penting**: `new int[n]` kini **selalu men-zero-kan elemen** di ketiga backend — sebelumnya mengandalkan arena baru; setelah `memReset` array berisi sampah dan SHA-256/HMAC menghasilkan hash salah (ditemukan lewat PBKDF2). Arena x64 disamakan 32 MB. Auth: **`Pbkdf2`** (RFC 8018; buffer sementara di-reset tiap iterasi supaya 4096+ iterasi tidak OOM), **`Jwt`** HS256, **`Session`** ber-expiry, **`Auth`** Basic/Bearer — semua diuji lawan `hashlib`/`hmac`. **`Resolv`**: parser `/etc/resolv.conf` + kueri DNS UDP ber-timeout (diuji server DNS Python). Suite 112/112; teks RFC 7539 kini dibundel di `test/data/` sehingga uji Poly1305 tidak lagi di-skip |
 | **v1.9.1** | **game realtime `Kopi Arena`**: contoh `examples/game/` — server UDP otoritatif 20 tick/detik, klien terminal (WASD/panah, ANSI, raw mode), bot penguji. Modul contoh (bukan `lib/`): `Arena`, `ArenaServer`, `Wire`, `Render`. Builtin baru `Net.setnonblock`, `Net.key` (stdin non-blocking), `Net.ttyRaw`, `Net.localport`. Arena memakai `memMark/memReset` per iterasi, jadi server jalan lama tanpa OOM. Uji: unit aturan arena, bot (join/gerak/snapshot/quit), klien 40 frame, 2 backend + sintaks x64 |
 | **v1.9.2** | **HTTP/1.1 + URL + MIME**: `lib/net/Url.kop` (encode/decode, form, `pair`, `resolve` RFC 3986, `normalize`, `ip4`) diuji lawan `urllib.parse`; `Http` diperluas `getFull`, `exchange`, `follow` (redirect 301/302/303/307/308), `payload`/`dechunk`, `basic`, `formPost`, `jsonPost`, timeout 5 dtk; `HttpServer` dapat `keepAlive`, `responseKA`/`respond`/`responseFor` (HEAD), `cookie`/`setCookie`, `bodyAny`/`dechunk`; `Mime.kop` + `Static.serveKA`. Builtin `Net.settimeout(fd, ms)` (SO_RCVTIMEO/SO_SNDTIMEO). Eksperimen: `ServerDemo` kini keep-alive per koneksi, `/setcookie`, `/cookie`, HEAD, body chunked; diuji Python di a64 & VM |

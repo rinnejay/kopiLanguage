@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dokumentasi Kopi · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a class="active" href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="dokumentasi-kopi">Dokumentasi Kopi<a class="anchor" href="#dokumentasi-kopi" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#jalur-pemakai-bahasa">Jalur pemakai bahasa</a></li><li class="toc-h2"><a href="#jalur-pengembang-compiler">Jalur pengembang compiler</a></li><li class="toc-h2"><a href="#contoh-kode">Contoh kode</a></li><li class="toc-h2"><a href="#prasyarat">Prasyarat</a></li><li class="toc-h2"><a href="#uji-cepat">Uji cepat</a></li></ul></nav>
+<p>Kopi (☕) adalah bahasa pemrograman statis ala Java yang <strong>compiler, type checker, generator assembly, dan mesin virtualnya ditulis 100% di C</strong>. Program Kopi bisa dikompilasi ke <strong>assembly aarch64</strong>, <strong>assembly x86-64</strong>, atau <strong>bytecode KOP1</strong> yang dijalankan <code>kopivm</code>.</p>
+<p>Versi <strong>HTML</strong> untuk GitHub Pages ada di folder ini (<code>index.html</code>, <code>style.css</code>, <code>.nojekyll</code>) dan sudah live di <strong>https://rinnejay.github.io/</strong>. Regenerasi setelah mengubah <code>.md</code>:</p>
+<pre><code class="language-sh">make docs</code></pre>
+<p>Dokumentasi ini dibagi menjadi jalur belajar dan jalur kontributor.</p>
+<h2 id="jalur-pemakai-bahasa">Jalur pemakai bahasa<a class="anchor" href="#jalur-pemakai-bahasa" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dokumen</th>
+<th>Isi</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="01-mulai.html">01 — Mulai</a></td>
+<td>build, <code>kopicc</code>, <code>kopivm</code>, hello world, target, alur compile/link</td>
+</tr>
+<tr>
+<td><a href="02-bahasa.html">02 — Bahasa</a></td>
+<td>tutorial lengkap sintaks &amp; semantik</td>
+</tr>
+<tr>
+<td><a href="03-pustaka.html">03 — Pustaka</a></td>
+<td><code>Str</code>, <code>Math</code>, <code>Arrays</code>, <code>Json</code>, <code>Map</code>, <code>File</code>, jaringan, kripto, auth</td>
+</tr>
+<tr>
+<td><a href="04-server.html">04 — Server</a></td>
+<td>TCP/UDP, HTTP klien/server, event loop, WebSocket, TLS klien, game realtime</td>
+</tr>
+<tr>
+<td><a href="06-batas-roadmap.html">06 — Batas &amp; roadmap</a></td>
+<td>yang sudah ada, yang belum, dan jebakan yang harus diketahui</td>
+</tr>
+</tbody></table></div>
+<h2 id="jalur-pengembang-compiler">Jalur pengembang compiler<a class="anchor" href="#jalur-pengembang-compiler" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Dokumen</th>
+<th>Isi</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="05-developer.html">05 — Arsitektur &amp; kontribusi</a></td>
+<td>pipeline compiler, struktur file, konvensi 3 backend, cara menambah fitur, aturan uji</td>
+</tr>
+</tbody></table></div>
+<h2 id="contoh-kode">Contoh kode<a class="anchor" href="#contoh-kode" aria-label="tautan">#</a></h2>
+<ul>
+<li><code>docs/contoh/hello.kop</code> — program paling kecil</li>
+<li><code>docs/contoh/tour.kop</code> — tur fitur bahasa (dijalankan di uji dokumen)</li>
+<li><code>examples/</code> — contoh nyata: game realtime (<code>examples/game</code>), server HTTP (<code>examples/server</code>), WebSocket (<code>examples/ws</code>), proyek 54 file (<code>examples/proyekbesar</code>)</li>
+</ul>
+<h2 id="prasyarat">Prasyarat<a class="anchor" href="#prasyarat" aria-label="tautan">#</a></h2>
+<ul>
+<li>Linux/aarch64 (Termux Android didukung) atau Linux/x86-64</li>
+<li><code>cc</code> (clang/gcc), <code>make</code>, <code>sh</code>, <code>python3</code> (untuk uji oracle)</li>
+<li>Tanpa dependensi runtime selain libc. Link tetap memakai <code>cc</code>.</li>
+</ul>
+<h2 id="uji-cepat">Uji cepat<a class="anchor" href="#uji-cepat" aria-label="tautan">#</a></h2>
+<pre><code class="language-sh">make            # kopicc + kopivm
+make test       # 117 uji (a64, VM, sintaks x64, dokumen)
+./kopicc --version</code></pre>
+<p>Jika semua hijau, Anda siap mengikuti tutorial.</p>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/README.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

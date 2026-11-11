@@ -1,0 +1,228 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 — Developer · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a class="active" href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="05-arsitektur-compiler-panduan-kontribusi">05 — Arsitektur compiler &amp; panduan kontribusi<a class="anchor" href="#05-arsitektur-compiler-panduan-kontribusi" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-peta-repositori">1. Peta repositori</a></li><li class="toc-h2"><a href="#2-pipeline">2. Pipeline</a></li><li class="toc-h2"><a href="#3-struktur-data-inti-ast-h">3. Struktur data inti (ast.h)</a></li><li class="toc-h2"><a href="#4-lexer">4. Lexer</a></li><li class="toc-h2"><a href="#5-parser-resolusi">5. Parser &amp; resolusi</a></li><li class="toc-h2"><a href="#6-konvensi-backend">6. Konvensi backend</a></li><li class="toc-h3"><a href="#aarch64-gen-a64-c">aarch64 (gena64.c)</a></li><li class="toc-h3"><a href="#x86-64-gen-x64-c">x86-64 (genx64.c)</a></li><li class="toc-h3"><a href="#vm-gen-vm-c-vm-kopivm-c">VM (genvm.c + vm/kopivm.c)</a></li><li class="toc-h2"><a href="#7-menambah-fitur-bahasa-checklist">7. Menambah fitur bahasa (checklist)</a></li><li class="toc-h2"><a href="#8-menambah-builtin-net-checklist">8. Menambah builtin Net. (checklist)</a></li><li class="toc-h2"><a href="#9-menambah-pustaka-kop">9. Menambah pustaka .kop</a></li><li class="toc-h2"><a href="#10-uji-kualitas">10. Uji &amp; kualitas</a></li><li class="toc-h2"><a href="#11-debugging">11. Debugging</a></li><li class="toc-h2"><a href="#12-gaya-kode-c">12. Gaya kode C</a></li><li class="toc-h2"><a href="#13-alur-rilis">13. Alur rilis</a></li><li class="toc-h2"><a href="#14-ide-kontribusi-berikutnya">14. Ide kontribusi berikutnya</a></li></ul></nav>
+<p>Dokumen ini untuk siapa pun yang ingin mengubah compiler, runtime, atau pustaka Kopi. Prinsipnya: <strong>satu unit compile, tiga backend, satu suite uji</strong>.</p>
+<hr>
+<h2 id="1-peta-repositori">1. Peta repositori<a class="anchor" href="#1-peta-repositori" aria-label="tautan">#</a></h2>
+<pre><code class="language-text">kopi/
+├── src/
+│   ├── lex.h            token &amp; keyword (semua token multi-karakter ≥ 256)
+│   ├── lex.c            lexer: angka, string, template backtick, komentar
+│   ├── ast.h            Ty, Node, Method, Prog + aturan promosi tipe
+│   ├── units.c          import &amp; penggabungan multi-file (splice token)
+│   ├── parse.c          parser recursive-descent + resolusi tipe + scope
+│   ├── gen_a64.c        codegen aarch64 (assembly)
+│   ├── gen_x64.c        codegen x86-64 (assembly)
+│   ├── gen_vm.c         codegen bytecode KOP1
+│   └── main.c           driver CLI (--help/--version/-t/-o)
+├── vm/kopivm.c          mesin virtual KOP1 + builtin Net host
+├── lib/                 pustaka standar ditulis di Kopi
+├── examples/            program contoh (game, server, ws, proyek besar)
+├── test/                uji sumber (oracle/vektor)
+├── tools/               generator oracle Python + server uji
+├── test.sh              suite regresi (a64 + VM + sintaks x64)
+├── docs/                dokumentasi ini
+└── Makefile</code></pre>
+<h2 id="2-pipeline">2. Pipeline<a class="anchor" href="#2-pipeline" aria-label="tautan">#</a></h2>
+<pre><code class="language-text">file .kop
+  │ units_load_many(): baca import, gabung token (sekali per realpath)
+  ▼
+lexer (lex.c) ── token stream
+  ▼
+parser (parse.c) ── AST Node + daftar Method/Class
+  ▼
+resolve()/type_expr() ── scope, slot lokal, cek tipe, cache e-&gt;dty
+  ▼
+gen_a64 / gen_x64 / gen_vm ── teks assembly atau bytecode
+  ▼
+cc (link libc)  atau  kopivm</code></pre>
+<p>Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.</p>
+<h2 id="3-struktur-data-inti-ast-h">3. Struktur data inti (<code>ast.h</code>)<a class="anchor" href="#3-struktur-data-inti-ast-h" aria-label="tautan">#</a></h2>
+<ul>
+<li><code>Ty</code>: <code>T_INT T_BOOL T_VOID T_STR T_FN T_ARI T_LONG T_DOUBLE T_FLOAT T_UINT8/16/32/64 T_BYTE T_SHORT</code>. Helper: <code>ty_is_int/num/float/uint</code>, <code>ty_width</code>, <code>ty_rank</code>, <code>ty_promote</code>, <code>ty_can_implicit</code>.</li>
+<li><code>Node</code>: <code>kind</code>, <code>str</code>, <code>ival</code>, <code>fval</code>, <code>cp</code>, <code>dty</code>, <code>typed</code>, <code>line</code>, <code>a..d</code>, <code>next</code>, <code>file</code>, <code>meth</code>.<ul>
+<li><code>EX_*</code> ekspresi, <code>ST_*</code> statement.</li>
+<li><code>dty</code> = tipe hasil/deklarasi; <strong>cache</strong> agar <code>type_expr</code> tidak dijalankan dua kali (<code>typed</code>).</li>
+</ul></li>
+<li><code>Method</code>: nama, class, param (<code>Param *params</code>), <code>ret</code>, slot, index.</li>
+<li><code>Prog</code>: daftar method, cpool string, <code>mainidx</code>.</li>
+</ul>
+<blockquote><code>ast.h</code> juga dipakai <code>kopivm.c</code>; mengubah enum Node/Ty berarti menyesuaikan VM juga.</blockquote>
+<h2 id="4-lexer">4. Lexer<a class="anchor" href="#4-lexer" aria-label="tautan">#</a></h2>
+<ul>
+<li>Semua token multi-karakter/keyword bernilai <strong>≥ 256</strong> (<code>T_*</code>, <code>KW_*</code>). Operator ASCII (<code>+</code>, <code>-</code>, <code>*</code>, <code>(</code>, <code>?</code>, ...) memakai nilai byte.</li>
+<li>Menambah keyword: tambah <code>KW_*</code> di <code>lex.h</code>, entri tabel di <code>lex.c</code> (<code>kwtab</code>), lalu parse di <code>parse.c</code>.</li>
+<li>String: <code>"..."</code> dan <code>'...'</code>; escape <code>\n \t \r \\ \" \'</code>; <code>\0</code>/<code>\xNN</code> <strong>tidak</strong> didukung.</li>
+<li>Template: hanya backtick; <code>{expr}</code>; escape <code>\{ \}</code>; <code>{{</code>/<code>}}</code>.</li>
+<li>Angka: desimal, <code>0x</code>, <code>0b</code>, sufiks <code>L U UL f</code> (dan <code>.</code>/<code>e</code> untuk float).</li>
+</ul>
+<h2 id="5-parser-resolusi">5. Parser &amp; resolusi<a class="anchor" href="#5-parser-resolusi" aria-label="tautan">#</a></h2>
+<ul>
+<li><code>units.c</code> menyisipkan token file impor; file sama hanya sekali.</li>
+<li><code>parse.c</code>: <code>expr()</code> (ternary di paling atas, <code>||</code>), lalu <code>and → bitor → bitxor → bitand → eq → rel → shift → add → mul → unary → postfix → primary</code>.</li>
+<li>Pemanggilan <code>a.m(args)</code> dibuat oleh <code>call_node()</code> menjadi <code>EX_CALL</code> dengan <code>str="a.m"</code>. Untuk ekspresi berbentuk lain, <code>postfix()</code> menulis ulang menjadi <code>Arrays.m(receiver,args)</code>; <strong>type_expr</strong> kemudian membelokkan ke <code>Str.*</code> bila receiver String (lihat <code>is_str_method</code>/<code>str_method_target</code>).</li>
+<li>Scope: array <code>scope[1024]</code>, <code>nextslot</code>; tiap blok menyimpan/memulihkan <code>nscope</code>. Variabel lokal wajib punya inisialisasi.</li>
+<li><code>resolve_stmt</code> menetapkan <code>s-&gt;ival</code> = slot, <code>s-&gt;dty</code>; <code>type_expr</code> menetapkan <code>e-&gt;dty</code> dan <code>e-&gt;typed</code>.</li>
+<li>Batas yang disengaja: maks 8 parameter metode, tidak ada overloading (nama metode unik per unit), <code>main</code> 0/1 parameter.</li>
+</ul>
+<h2 id="6-konvensi-backend">6. Konvensi backend<a class="anchor" href="#6-konvensi-backend" aria-label="tautan">#</a></h2>
+<h3 id="aarch64-gen-a64-c">aarch64 (<code>gen_a64.c</code>)<a class="anchor" href="#aarch64-gen-a64-c" aria-label="tautan">#</a></h3>
+<ul>
+<li>Nilai ekspresi di <code>w0</code> (int/bool) atau <code>x0</code> (long/double/pointer/fn); <code>gen_expr</code> mengembalikan <code>1</code> bila 64-bit.</li>
+<li>Operand stack: setiap push memakai <strong>16 byte</strong> (<code>str x0,[sp,#-16]!</code>). Setiap builtin/ekspresi <strong>wajib</strong> menyeimbangkan <code>sp</code>; kebocoran 16 byte pernah menyebabkan variabel lokal rusak (bug <code>recvfrom</code>, v1.9.3).</li>
+<li>Lokal: <code>(slot+1)*8</code> dari <code>x29</code>.</li>
+<li>Array: <code>[0]=length</code>, elemen 8-byte sign-extended; <code>new int[n]</code> men-zero-kan elemen.</li>
+<li>Pemeriksaan batas melompat ke <code>.Karr</code> (pesan runtime).</li>
+<li>Label unik: pakai <code>nlab++</code> (jangan hardcode <code>.L1</code>).</li>
+<li><code>brk_lab/cont_lab</code> menangani <code>break</code>/<code>continue</code> bersarang.</li>
+<li>Panggilan libc (<code>getenv</code>, <code>system</code>, <code>poll</code>) memakai <code>bl</code>; simpan register caller-saved yang masih dibutuhkan setelah panggilan.</li>
+<li>Entry <code>main</code>: alokasi arena 32 MB via <code>malloc</code>, simpan argc/argv, lalu panggil <code>main</code> Kopi.</li>
+</ul>
+<h3 id="x86-64-gen-x64-c">x86-64 (<code>gen_x64.c</code>)<a class="anchor" href="#x86-64-gen-x64-c" aria-label="tautan">#</a></h3>
+<ul>
+<li>Sama secara konsep; stack slot 8 byte, <code>par</code> melacak paritas agar panggilan libc 16-byte aligned. Arg 1–6 di register, 7–8 di stack (maks 8 parameter).</li>
+<li>Panggilan libc lewat <code>@PLT</code>.</li>
+<li><code>is64ty</code>, <code>push_val</code>, label, dan cek batas harus konsisten dengan a64.</li>
+<li>Backend ini <strong>belum dijalankan runtime</strong> di CI; verifikasi hanya sintaks: <code>cc -target x86_64-linux-gnu -c out.s</code>.</li>
+</ul>
+<h3 id="vm-gen-vm-c-vm-kopivm-c">VM (<code>gen_vm.c</code> + <code>vm/kopivm.c</code>)<a class="anchor" href="#vm-gen-vm-c-vm-kopivm-c" aria-label="tautan">#</a></h3>
+<ul>
+<li>Mesin stack; opcode di <code>vm/kopivm.c</code> (<code>OP_*</code>).</li>
+<li>Nilai selalu 64-bit; operasi int32 harus dinormalisasi (<code>OP_NORM</code>) agar semantik sama dengan native.</li>
+<li><code>OP_NET</code> + field <code>bi</code> memetakan builtin <code>Net.*</code> ke syscall host.</li>
+<li>Heap 32 MB (<code>HEAPLEN</code> = 4M elemen 64-bit); <code>new</code> men-zero-kan.</li>
+<li>Label = indeks instruksi (<code>newlab/mark</code>), bukan string.</li>
+</ul>
+<h2 id="7-menambah-fitur-bahasa-checklist">7. Menambah fitur bahasa (checklist)<a class="anchor" href="#7-menambah-fitur-bahasa-checklist" aria-label="tautan">#</a></h2>
+<p>Contoh nyata: ternary &amp; do/while (v1.11).</p>
+<ol>
+<li><strong>Token/keyword</strong> — <code>lex.h</code> (+ tabel <code>lex.c</code> bila keyword).</li>
+<li><strong>AST</strong> — tambah <code>EX_*</code>/<code>ST_*</code> di <code>ast.h</code>; dokumentasikan field (<code>a</code>,<code>b</code>,<code>c</code>).</li>
+<li><strong>Parser</strong> — buat node di <code>parse.c</code> pada precedence/posisi yang benar; pastikan <code>expect()</code> untuk delimiter.</li>
+<li><strong>Resolusi</strong> — <code>type_expr</code> (ekspresi) atau <code>resolve_stmt</code> (statement): cek tipe, isi <code>e-&gt;dty</code>, dan <code>s-&gt;dty</code>.</li>
+<li><strong>a64</strong> — <code>gen_expr</code>/<code>gen_stmt</code>; alokasikan label <code>nlab</code>; jaga <code>sp</code>.</li>
+<li><strong>x64</strong> — implementasi setara; jaga paritas <code>par</code>.</li>
+<li><strong>VM</strong> — opcode/<code>jmp/mark</code>; pastikan nilai di stack sesuai.</li>
+<li><strong>Uji</strong> — tambah <code>test/*.kop</code> + ref; jalankan a64 &amp; VM, plus cek sintaks x64.</li>
+<li><strong>Docs</strong> — <code>docs/</code>, <code>README.md</code> changelog, dan contoh bila perlu.</li>
+</ol>
+<p>Aturan: <strong>jangan menambah fitur di satu backend saja.</strong> Kalau belum sempat, tolak di parser dengan pesan jelas.</p>
+<h2 id="8-menambah-builtin-net-checklist">8. Menambah builtin <code>Net.*</code> (checklist)<a class="anchor" href="#8-menambah-builtin-net-checklist" aria-label="tautan">#</a></h2>
+<ol>
+<li><code>parse.c</code>: cabang <code>bi = N; want = jumlah_arg</code> + validasi tipe argumen dan tipe hasil (<code>e-&gt;dty</code>).</li>
+<li><code>gen_a64.c</code>: blok <code>if (e-&gt;ival == N)</code>, hitung layout stack (arg ×16), syscall/libc, <strong>bersihkan <code>sp</code> persis</strong>.</li>
+<li><code>gen_x64.c</code>: blok setara; perhatikan <code>par</code> dan register caller-saved.</li>
+<li><code>vm/kopivm.c</code>: cabang <code>bi == N</code> di <code>OP_NET</code>; konversi pointer array (<code>long*</code>) dan hasil.</li>
+<li>Bungkus dengan API <code>.kop</code> bila perlu (<code>lib/net/*.kop</code>).</li>
+<li>Uji a64 + VM (nilai harus sama), lalu <code>cc -target x86_64-linux-gnu -c</code> untuk asm x64.</li>
+</ol>
+<p>Contoh yang bisa ditiru: <code>Net.pollfd</code>, <code>Net.settimeout</code>, <code>Net.recv1</code>, <code>Net.localport</code>.</p>
+<h2 id="9-menambah-pustaka-kop">9. Menambah pustaka <code>.kop</code><a class="anchor" href="#9-menambah-pustaka-kop" aria-label="tautan">#</a></h2>
+<ul>
+<li>Cukup buat <code>lib/&lt;kategori&gt;/Nama.kop</code> dengan <code>class Nama { static ... }</code>.</li>
+<li>Import relatif: modul boleh <code>import</code> modul lain; hindari siklus.</li>
+<li>Ingat aturan pencarian: file lokal menang; <strong>jangan menamai file uji sama dengan modul</strong> (mis. <code>test/Str.kop</code> akan menutupi <code>lib/core/Str</code>).</li>
+<li>Tulis uji deterministik: program <code>.kop</code> yang mencetak hasil, ref dari oracle Python bila ada standar (mis. <code>hashlib</code>, <code>urllib.parse</code>).</li>
+</ul>
+<h2 id="10-uji-kualitas">10. Uji &amp; kualitas<a class="anchor" href="#10-uji-kualitas" aria-label="tautan">#</a></h2>
+<p><code>test.sh</code>:</p>
+<pre><code class="language-sh">check nama path.kop          # jalankan VM &amp; a64, diff ke $T/kopi/nama.ref</code></pre>
+<ul>
+<li>Ref dibuat dari oracle/skrip, bukan dari salah satu backend, kecuali output memang didefinisikan oleh implementasi (mis. aturan game).</li>
+<li>Uji x64 hanya <strong>assembler</strong> (<code>cc -target x86_64-linux-gnu -c</code>), bukan runtime. Jangan mengklaim x64 berjalan bila belum dijalankan.</li>
+<li>Uji acak harus deterministik: contoh nyata bug uji <code>netbulk</code> yang mengharapkan 32/32 byte acak berbeda (flaky ~12%) — diperbaiki menjadi "ada beda".</li>
+<li>Bila menemukan bug: tambahkan uji regresi yang gagal sebelum fix.</li>
+<li>Jalankan <code>sh test.sh</code> sampai <strong>0 fail</strong> sebelum commit.</li>
+</ul>
+<h2 id="11-debugging">11. Debugging<a class="anchor" href="#11-debugging" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Masalah</th>
+<th>Cara</th>
+</tr></thead><tbody>
+<tr>
+<td>hasil beda a64 vs VM</td>
+<td>bandingkan output; cek normalisasi int/<code>OP_NORM</code>, <code>is64ty</code></td>
+</tr>
+<tr>
+<td>crash/abort</td>
+<td>pesan runtime; cek indeks array, arena, <code>memReset</code></td>
+</tr>
+<tr>
+<td>variabel lokal berubah</td>
+<td>stack tidak seimbang di codegen/builtin</td>
+</tr>
+<tr>
+<td>hash/uang aneh setelah <code>memReset</code></td>
+<td>array tidak ter-zero (sudah diperbaiki; jangan andalkan)</td>
+</tr>
+<tr>
+<td>asm x64 gagal</td>
+<td>label ganda (pakai <code>nlab</code>), <code>%</code> escape di <code>emit</code></td>
+</tr>
+<tr>
+<td>VM salah</td>
+<td>periksa urutan <code>--sp</code>/<code>sp++</code>, tipe 32/64</td>
+</tr>
+<tr>
+<td>lambat</td>
+<td>buka <code>.s</code>; cari panggilan per byte (<code>Net.wrb</code>) di loop</td>
+</tr>
+</tbody></table></div>
+<p>Tips:</p>
+<pre><code class="language-sh">./kopicc prog.kop -t vm -o prog.kbc &amp;&amp; ./kopivm prog.kbc
+./kopicc prog.kop -t a64 -o prog.s &amp;&amp; cc prog.s -o prog &amp;&amp; ./prog
+grep -n "Karr\|kopalloc" prog.s</code></pre>
+<p>VM sering lebih mudah karena tidak ada masalah ABI/stack, tetapi bug codegen native hanya muncul di a64/x64.</p>
+<h2 id="12-gaya-kode-c">12. Gaya kode C<a class="anchor" href="#12-gaya-kode-c" aria-label="tautan">#</a></h2>
+<ul>
+<li>C11, tanpa dependensi; alokasi compiler pakai <code>malloc/realloc</code> biasa.</li>
+<li>Error compile: <code>die("baris %d: ...", e-&gt;line, ...)</code>; jangan silent.</li>
+<li>Output assembly lewat <code>emit(...)</code>; ingat <code>%</code> harus <code>%%</code> di format.</li>
+<li>Setiap case codegen harus punya label unik (<code>nlab</code>).</li>
+<li>Komentar menjelaskan <strong>mengapa</strong>, bukan mengulang kode.</li>
+<li>Jalankan <code>make</code> bebas warning (warning yang ada saat ini sudah diketahui; jangan menambah yang baru).</li>
+</ul>
+<h2 id="13-alur-rilis">13. Alur rilis<a class="anchor" href="#13-alur-rilis" aria-label="tautan">#</a></h2>
+<ol>
+<li><code>make &amp;&amp; sh test.sh</code> → 0 fail.</li>
+<li>Perbarui <code>README.md</code> (status + changelog), <code>docs/</code> bila fitur berubah.</li>
+<li>Commit pesan ringkas berisi fitur + hasil uji.</li>
+<li><code>git push origin HEAD</code>.</li>
+<li>Tag rilis (opsional): <code>git tag vX.Y.Z &amp;&amp; git push --tags</code>.</li>
+</ol>
+<h2 id="14-ide-kontribusi-berikutnya">14. Ide kontribusi berikutnya<a class="anchor" href="#14-ide-kontribusi-berikutnya" aria-label="tautan">#</a></h2>
+<p>Lihat <a href="06-batas-roadmap.html">06 — Batas &amp; roadmap</a>. Yang paling berdampak: instance class (<code>new</code>/field/vtable), GC, array bertipe, TLS server + ECDSA, multipart/range HTTP, DB client.</p>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/05-developer.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 — Mulai · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a class="active" href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="01-mulai">01 — Mulai<a class="anchor" href="#01-mulai" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-build">1. Build</a></li><li class="toc-h2"><a href="#2-program-pertama">2. Program pertama</a></li><li class="toc-h2"><a href="#3-anatomi-program">3. Anatomi program</a></li><li class="toc-h2"><a href="#4-argumen-program">4. Argumen program</a></li><li class="toc-h2"><a href="#5-import">5. Import</a></li><li class="toc-h2"><a href="#6-alur-kerja-singkat">6. Alur kerja singkat</a></li><li class="toc-h2"><a href="#7-kesalahan-umum-saat-mulai">7. Kesalahan umum saat mulai</a></li></ul></nav>
+<h2 id="1-build">1. Build<a class="anchor" href="#1-build" aria-label="tautan">#</a></h2>
+<pre><code class="language-sh">cd ~/kopi
+make            # menghasilkan ./kopicc dan ./kopivm
+make test       # menjalankan seluruh suite (butuh python3)</code></pre>
+<p><code>Makefile</code> hanya memakai <code>cc</code> (clang/gcc), <code>-O2 -std=c11</code>. Tidak ada dependency pihak ketiga.</p>
+<p>Cek versi:</p>
+<pre><code class="language-sh">./kopicc --version
+# kopicc 1.11.0 (Kopi) — target a64 | x64 | vm</code></pre>
+<h2 id="2-program-pertama">2. Program pertama<a class="anchor" href="#2-program-pertama" aria-label="tautan">#</a></h2>
+<p>Buat <code>hello.kop</code>:</p>
+<pre><code class="language-java">class Main {
+    public static void main(String[] args) {
+        System.out.println("Halo dunia dari Kopi!");
+    }
+}</code></pre>
+<p>Kompilasi ke native (aarch64, di HP/ARM):</p>
+<pre><code class="language-sh">./kopicc hello.kop -t a64 -o hello.s
+cc hello.s -o hello
+./hello</code></pre>
+<p>Atau lewat VM portabel:</p>
+<pre><code class="language-sh">./kopicc hello.kop -t vm -o hello.kbc
+./kopivm hello.kbc</code></pre>
+<p>Atau target x86-64 (di PC):</p>
+<pre><code class="language-sh">./kopicc hello.kop -t x64 -o hello64.s
+cc hello64.s -o hello64
+./hello64</code></pre>
+<blockquote><code>kopicc</code> hanya menghasilkan <strong>assembly/bytecode</strong>. Menjadi executable masih lewat <code>cc</code>. Di x86-64 gunakan <code>gcc</code>/<code>clang</code> biasa. Di Termux, <code>cc -target x86_64-linux-gnu -c</code> bisa dipakai untuk cek sintaks x64 tanpa menjalankannya.</blockquote>
+<h2 id="3-anatomi-program">3. Anatomi program<a class="anchor" href="#3-anatomi-program" aria-label="tautan">#</a></h2>
+<ul>
+<li>Wajib ada satu metode bernama <code>main</code> di class mana pun: <code>static void main()</code> atau <code>static void main(String[] args)</code>.</li>
+<li>Class hanya berisi <strong>metode static</strong> (belum ada instance/field).</li>
+<li>Semua file <code>.kop</code> yang diimpor digabung jadi satu unit compile.</li>
+<li>Tidak ada <code>package</code>; nama class harus unik dalam satu build.</li>
+</ul>
+<pre><code class="language-java">class Util {
+    static int dua() { return 2; }
+}
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(Util.dua() * 21);
+    }
+}</code></pre>
+<p>Kompilasi multi-file langsung juga boleh:</p>
+<pre><code class="language-sh">./kopicc Main.kop Util.kop -t a64 -o app.s</code></pre>
+<h2 id="4-argumen-program">4. Argumen program<a class="anchor" href="#4-argumen-program" aria-label="tautan">#</a></h2>
+<p><code>Net.argc()</code> / <code>Net.argv(i)</code> berisi argumen <strong>setelah</strong> nama program (native) atau setelah path bytecode (VM).</p>
+<pre><code class="language-java">import Str;
+
+class Main {
+    public static void main(String[] args) {
+        int port = 8080;
+        if (Net.argc() &gt; 0) port = Str.toInt(Net.argv(0));
+        System.out.println(port);
+    }
+}</code></pre>
+<pre><code class="language-sh">./app 9090        # port = 9090
+./kopivm app.kbc 9090</code></pre>
+<h2 id="5-import">5. Import<a class="anchor" href="#5-import" aria-label="tautan">#</a></h2>
+<pre><code class="language-java">import Str;              // cari Str.kop di folder pengimpor, lalu lib/
+import "util.kop";       // path relatif terhadap file pengimpor
+import Http;</code></pre>
+<p>Urutan pencarian modul <code>import Nama;</code>:</p>
+<ol>
+<li>folder file pengimpor — <code>Nama.kop</code>, lalu <code>nama.kop</code> (lokal menang)</li>
+<li><code>lib/</code> di samping <code>kopicc</code> (bisa dioverride <code>KOPPATH</code>)</li>
+<li>subfolder <code>lib/&lt;kategori&gt;/Nama.kop</code> (<code>core/</code>, <code>net/</code>, <code>crypto/</code>)</li>
+</ol>
+<p>File yang sama (realpath) hanya dimuat sekali. <strong>Jebakan</strong>: file lokal bernama sama dengan modul (tanpa peduli huruf besar/kecil) akan menang, sehingga <code>import Str</code> dari folder yang berisi <code>str.kop</code> akan memuat file lokal. Ini alasan file uji tidak boleh dinamai sama dengan modul.</p>
+<h2 id="6-alur-kerja-singkat">6. Alur kerja singkat<a class="anchor" href="#6-alur-kerja-singkat" aria-label="tautan">#</a></h2>
+<pre><code class="language-text">source .kop ──lex/parse/type──&gt; AST ──gen──&gt; .s (a64/x64) ──cc──&gt; binary
+                                   └──────&gt; .kbc (KOP1) ──kopivm──&gt; jalan</code></pre>
+<ul>
+<li>Untuk debug cepat gunakan <code>-t vm</code>: error runtime VM lebih mudah dibaca.</li>
+<li>Untuk performa gunakan native <code>-t a64</code> (di ARM) atau <code>-t x64</code> (di PC).</li>
+<li>Assembly yang dihasilkan manusiawi; buka <code>.s</code> bila ingin tahu kenapa sesuatu lambat/aneh.</li>
+</ul>
+<h2 id="7-kesalahan-umum-saat-mulai">7. Kesalahan umum saat mulai<a class="anchor" href="#7-kesalahan-umum-saat-mulai" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Gejala</th>
+<th>Sebab / solusi</th>
+</tr></thead><tbody>
+<tr>
+<td><code>tidak ada metode main()</code></td>
+<td>tidak ada <code>static void main(...)</code></td>
+</tr>
+<tr>
+<td><code>variabel lokal wajib diinisialisasi</code></td>
+<td><code>int x;</code> tidak boleh; tulis <code>int x = 0;</code></td>
+</tr>
+<tr>
+<td><code>metode String 'trim' butuh 'import Str;'</code></td>
+<td>tambahkan <code>import Str;</code></td>
+</tr>
+<tr>
+<td><code>karakter tidak dikenal '?'</code></td>
+<td>versi lama; v1.11+ mendukung ternary</td>
+</tr>
+<tr>
+<td><code>arena memori habis</code></td>
+<td>alokasi &gt;32 MB tanpa <code>Net.memReset</code> (lihat 02 &amp; 06)</td>
+</tr>
+<tr>
+<td><code>array tidak valid</code></td>
+<td>indeks negatif / ≥ panjang; cek <code>.length</code></td>
+</tr>
+</tbody></table></div>
+<p>Lanjut ke <a href="02-bahasa.html">02 — Bahasa</a>.</p>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/01-mulai.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

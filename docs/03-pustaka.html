@@ -1,0 +1,369 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 — Pustaka · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a class="active" href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="03-pustaka-standar">03 — Pustaka standar<a class="anchor" href="#03-pustaka-standar" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-str-teks-konversi">1. Str — teks &amp; konversi</a></li><li class="toc-h2"><a href="#2-arrays-array-int">2. Arrays — array int[]</a></li><li class="toc-h2"><a href="#3-math-digits-stats-matrix">3. Math, Digits, Stats, Matrix</a></li><li class="toc-h2"><a href="#4-json">4. Json</a></li><li class="toc-h2"><a href="#5-koleksi">5. Koleksi</a></li><li class="toc-h2"><a href="#6-file-path-time">6. File, Path, Time</a></li><li class="toc-h2"><a href="#7-log">7. Log</a></li><li class="toc-h2"><a href="#8-jaringan">8. Jaringan</a></li><li class="toc-h3"><a href="#tcp">Tcp</a></li><li class="toc-h3"><a href="#udp">Udp</a></li><li class="toc-h3"><a href="#dns-resolv">Dns / Resolv</a></li><li class="toc-h3"><a href="#url">Url</a></li><li class="toc-h3"><a href="#http-klien">Http (klien)</a></li><li class="toc-h3"><a href="#httpserver-static-mime">HttpServer, Static, Mime</a></li><li class="toc-h3"><a href="#websocket">WebSocket</a></li><li class="toc-h3"><a href="#tls-klien-tls-1-3">Tls (klien TLS 1.3)</a></li><li class="toc-h2"><a href="#9-kriptografi">9. Kriptografi</a></li><li class="toc-h2"><a href="#10-auth-session">10. Auth &amp; session</a></li><li class="toc-h2"><a href="#11-log-observability">11. Log + observability</a></li></ul></nav>
+<p>Semua pustaka <strong>ditulis dalam bahasa Kopi</strong> (<code>lib/*.kop</code>) di atas builtin <code>Net</code> dan tipe dasar. Import selalu eksplisit:</p>
+<pre><code class="language-java">import Str;
+import Math;
+import HttpServer;</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Folder</th>
+<th>Modul</th>
+</tr></thead><tbody>
+<tr>
+<td><code>lib/core/</code></td>
+<td><code>Str</code> <code>Math</code> <code>Digits</code> <code>Stats</code> <code>Matrix</code> <code>Arrays</code> <code>Json</code> <code>Map</code> <code>MapStr</code> <code>Set</code> <code>Deque</code> <code>File</code> <code>Path</code> <code>Time</code> <code>Log</code></td>
+</tr>
+<tr>
+<td><code>lib/net/</code></td>
+<td><code>Tcp</code> <code>Udp</code> <code>Dns</code> <code>Resolv</code> <code>Http</code> <code>HttpServer</code> <code>Static</code> <code>Mime</code> <code>Url</code> <code>WebSocket</code> <code>Jwt</code> <code>Session</code> <code>Auth</code> <code>Rfc</code> <code>Tls</code></td>
+</tr>
+<tr>
+<td><code>lib/crypto/</code></td>
+<td><code>Crypto</code> <code>Cipher</code> <code>Hash</code> <code>Pbkdf2</code> <code>Kdf</code> <code>Big</code> <code>X25519</code> <code>ChaCha</code> <code>Poly</code> <code>Aead</code> <code>Rand</code> <code>Der</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="1-str-teks-konversi">1. <code>Str</code> — teks &amp; konversi<a class="anchor" href="#1-str-teks-konversi" aria-label="tautan">#</a></h2>
+<p><code>String</code> dan <code>int[]</code> byte kompatibel; hampir semua fungsi <code>Str</code> menerima keduanya.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Guna</th>
+</tr></thead><tbody>
+<tr>
+<td><code>len(s) isEmpty(s)</code></td>
+<td>panjang byte / kosong</td>
+</tr>
+<tr>
+<td><code>eq(a,b) cmp(a,b) equalsIgnoreCase(a,b)</code></td>
+<td>perbandingan isi</td>
+</tr>
+<tr>
+<td><code>copy(s) cat(a,b) slice(s,from,n) at(s,i)</code></td>
+<td>salin, gabung, potong, indeks</td>
+</tr>
+<tr>
+<td><code>indexOf(s,ndl,from) lastIndexOf(s,ndl) contains startsWith endsWith</code></td>
+<td>pencarian</td>
+</tr>
+<tr>
+<td><code>trim trimLeft trimRight upper lower reverse repeat(n)</code></td>
+<td>transformasi</td>
+</tr>
+<tr>
+<td><code>replaceByte(from,to) replaceSeq(old,new)</code></td>
+<td>ganti byte / substring</td>
+</tr>
+<tr>
+<td><code>countByte(b) splitCount(sep) splitAt(sep,idx)</code></td>
+<td>hitung/pisah</td>
+</tr>
+<tr>
+<td><code>padLeft(s,w,pad) padRight(...)</code></td>
+<td>padding dengan byte <code>pad</code></td>
+</tr>
+<tr>
+<td><code>fromInt fromUInt fromLong fromULong fromDouble boolText</code></td>
+<td>angka → teks</td>
+</tr>
+<tr>
+<td><code>toInt isDigits utf8Count hex(data)</code></td>
+<td>parsing / utilitas</td>
+</tr>
+<tr>
+<td><code>print(s) line(s)</code></td>
+<td>tulis byte ke stdout (tanpa/dengan newline)</td>
+</tr>
+</tbody></table></div>
+<p><code>padLeft(Str.fromInt(7), 3, 48)</code> → <code>"007"</code>.</p>
+<h2 id="2-arrays-array-int">2. <code>Arrays</code> — array <code>int[]</code><a class="anchor" href="#2-arrays-array-int" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Guna</th>
+</tr></thead><tbody>
+<tr>
+<td><code>sum max min find count arrEq</code></td>
+<td>agregat</td>
+</tr>
+<tr>
+<td><code>take(n) drop(n) merge(a,b) sort(a) binSearch(v)</code></td>
+<td>potong/gabung/urut/cari</td>
+</tr>
+<tr>
+<td><code>copy(a) reverse(a)</code></td>
+<td>salinan / balik</td>
+</tr>
+<tr>
+<td><code>forEach(f) forEachIndexed(f)</code></td>
+<td>iterasi</td>
+</tr>
+<tr>
+<td><code>map(f) filter(pred)</code></td>
+<td>transformasi</td>
+</tr>
+<tr>
+<td><code>reduce(init,f) any(pred) all(pred)</code></td>
+<td>lipat / uji</td>
+</tr>
+<tr>
+<td><code>countWhere(pred) findIndex(pred) sumBy(f)</code></td>
+<td>agregat lambda</td>
+</tr>
+</tbody></table></div>
+<p>Bentuk gula: <code>a.map(x =&gt; x * 2)</code>, <code>a.reduce(0, (s, x) =&gt; s + x)</code>.</p>
+<h2 id="3-math-digits-stats-matrix">3. <code>Math</code>, <code>Digits</code>, <code>Stats</code>, <code>Matrix</code><a class="anchor" href="#3-math-digits-stats-matrix" aria-label="tautan">#</a></h2>
+<ul>
+<li><strong><code>Math</code></strong> (80+ fungsi): <code>abs sign min max clamp diff sumTo avgFloor</code>, bit (<code>isEven popcount highestBit bitLength isPowerOfTwo nextPow2 reverseBits</code>), pangkat/akar/log (<code>pow mod addMod mulMod powMod sqrt cbrt log2 log10</code>), FPB/modular (<code>gcd lcm isCoprime extendedGcd modInverse</code>), prima (<code>isPrime nextPrime primesUpTo primeCount nthPrime factorize eulerPhi</code>), kombinatorika (<code>factorial binomial permutation catalan fib lucas</code>), geometri (<code>distanceSq manhattan rectArea isRightTriangle</code>).</li>
+<li><strong><code>Digits</code></strong>: <code>reverse digitSum digitCount pow10 digitProduct isPalindrome isArmstrong digitalRoot printBase</code>.</li>
+<li><strong><code>Stats</code></strong>: <code>sum product min max range mean median mode variance stddev countEven countOdd</code>.</li>
+<li><strong><code>Matrix</code></strong> (<code>int[]</code> datar, persegi): <code>zero identity add sub scale mul transpose trace det det1 det2 det3 isIdentity</code>.</li>
+</ul>
+<p>Semua fungsi integer membungkus 32-bit; untuk matematika besar pakai <code>long</code>/<code>Big</code>.</p>
+<h2 id="4-json">4. <code>Json</code><a class="anchor" href="#4-json" aria-label="tautan">#</a></h2>
+<p>Representasi: tape <code>int[]</code>; literal <code>json {...}</code> / <code>json [...]</code>.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Guna</th>
+</tr></thead><tbody>
+<tr>
+<td><code>parse(text) write(v)</code></td>
+<td>teks ⇄ tape</td>
+</tr>
+<tr>
+<td><code>print/line(v)</code></td>
+<td>ke stdout</td>
+</tr>
+<tr>
+<td><code>typeOf isNull isBool isNumber isString isArray isObject</code></td>
+<td>inspeksi</td>
+</tr>
+<tr>
+<td><code>count(v) at(arr,i) get(obj,key) has(obj,key)</code></td>
+<td>akses</td>
+</tr>
+<tr>
+<td><code>put del add</code></td>
+<td>ubah (immutable, hasil tape baru)</td>
+</tr>
+<tr>
+<td><code>asInt asDouble asBool asText</code></td>
+<td>konversi nilai</td>
+</tr>
+<tr>
+<td><code>nullV boolV num str arrN objN arr1..arr8 obj1..obj4</code></td>
+<td>konstruktor</td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-java">int[] u = json {"nama": "budi", "umur": 20};
+int umur = Json.asInt(Json.get(u, "umur"));</code></pre>
+<h2 id="5-koleksi">5. Koleksi<a class="anchor" href="#5-koleksi" aria-label="tautan">#</a></h2>
+<ul>
+<li><strong><code>Map</code></strong> (int→int, open addressing): <code>make(cap) put get getOr has remove clear size grow forEach(f)</code>.</li>
+<li><strong><code>MapStr</code></strong> (String→int, kapasitas+pool tetap): <code>make(cap,poolCap) put get getOr has remove clear size used keyAtSlot valAtSlot</code>.</li>
+<li><strong><code>Set</code></strong> (di atas Map): <code>make add has remove size clear grow forEach</code>.</li>
+<li><strong><code>Deque</code></strong>: <code>make(cap) pushBack pushFront popFront popBack get size capacity isEmpty isFull clear</code>.</li>
+</ul>
+<p><code>Map</code>/<code>Set</code> bisa tumbuh via <code>grow</code>; <code>MapStr</code> tidak (cocok untuk header).</p>
+<h2 id="6-file-path-time">6. File, Path, Time<a class="anchor" href="#6-file-path-time" aria-label="tautan">#</a></h2>
+<pre><code class="language-java">import File; import Path; import Time;
+
+int fd = File.openRead("data.txt");
+int n = File.size(fd);
+int[] buf = new int[n];
+File.readInto(fd, buf);
+File.close(fd);
+
+int out = File.create("hasil.txt");
+File.writeAll(out, Net.bytes("halo\n"));
+File.close(out);
+
+System.out.println(Time.format(Time.epoch()));
+System.out.println(Time.sleepMs(10));</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>Fungsi</th>
+</tr></thead><tbody>
+<tr>
+<td><code>File</code></td>
+<td><code>openRead create append close writeAll readInto seekSet seekCur seekEnd size remove renameTo mkdir</code> + flag <code>O_*</code></td>
+</tr>
+<tr>
+<td><code>Path</code></td>
+<td><code>join base dir ext isAbsolute sep SEP</code></td>
+</tr>
+<tr>
+<td><code>Time</code></td>
+<td><code>epoch monoMs sleepMs civil weekday format</code> (UTC)</td>
+</tr>
+</tbody></table></div>
+<p><code>File.readInto</code> membaca sampai buffer penuh/EOF. Untuk file besar, baca per blok.</p>
+<h2 id="7-log">7. <code>Log</code><a class="anchor" href="#7-log" aria-label="tautan">#</a></h2>
+<pre><code class="language-java">import Log;
+Log.info(Net.bytes("boot"), Net.bytes("siap"));
+Log.warn(...); Log.error(...);</code></pre>
+<p>Menulis ke stderr dengan timestamp UTC. <code>Log.emit(level,tag,msg)</code> untuk level kustom.</p>
+<h2 id="8-jaringan">8. Jaringan<a class="anchor" href="#8-jaringan" aria-label="tautan">#</a></h2>
+<h3 id="tcp"><code>Tcp</code><a class="anchor" href="#tcp" aria-label="tautan">#</a></h3>
+<pre><code class="language-java">int fd = Tcp.open(Tcp.loopback(), 8080);   // -errno bila gagal
+Tcp.sendBuf(fd, req);
+int n = Tcp.recvAll(fd, buf);              // sampai EOF/buffer penuh
+Tcp.shutdown(fd, 1);                       // 0=RD 1=WR 2=RDWR
+Tcp.drop(fd);</code></pre>
+<p><code>Tcp.ip(a,b,c,d)</code>, <code>Tcp.loopback()</code>, <code>Tcp.num(v)</code>, <code>Tcp.cat/indexOf/tail</code>.</p>
+<h3 id="udp"><code>Udp</code><a class="anchor" href="#udp" aria-label="tautan">#</a></h3>
+<pre><code class="language-java">int s = Udp.open();
+Udp.bind(s, 0, 9000);
+Udp.sendTo(s, ip, port, Net.bytes("hi"));   // maks 1200 byte/datagram
+int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></pre>
+<h3 id="dns-resolv"><code>Dns</code> / <code>Resolv</code><a class="anchor" href="#dns-resolv" aria-label="tautan">#</a></h3>
+<ul>
+<li><code>Dns.lookup(addr, port, nama, hasil, cap)</code> — DNS <strong>over TCP</strong> ke server eksplisit.</li>
+<li><code>Resolv.servers()</code> — baca <code>/etc/resolv.conf</code> (fallback <code>8.8.8.8</code>).</li>
+<li><code>Resolv.lookupUdp(server, port, nama, timeoutMs, hasil, cap)</code> — DNS <strong>UDP</strong> dengan timeout.</li>
+<li><code>Resolv.lookup(nama, timeoutMs, hasil, cap)</code> — coba semua server.</li>
+</ul>
+<p><code>hasil[0]</code> = RCODE, <code>hasil[1..4]</code> = oktet IPv4.</p>
+<h3 id="url"><code>Url</code><a class="anchor" href="#url" aria-label="tautan">#</a></h3>
+<p><code>encode decode formEncode formDecode pair appendQuery hasScheme scheme authority host portOf path query fragment ip4 normalize resolve</code>.</p>
+<pre><code class="language-java">int[] u = Url.resolve("http://a/b/c/d;p?q", "../g");  // http://a/b/g</code></pre>
+<h3 id="http-klien"><code>Http</code> (klien)<a class="anchor" href="#http-klien" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Guna</th>
+</tr></thead><tbody>
+<tr>
+<td><code>getInto(addr,port,host,path,buf)</code></td>
+<td>GET lama (HTTP/1.0)</td>
+</tr>
+<tr>
+<td><code>getFull(addr,port,host,path,cap)</code></td>
+<td>GET HTTP/1.1 → array respons</td>
+</tr>
+<tr>
+<td><code>exchange(addr,port,method,host,path,headers,body,cap)</code></td>
+<td>transaksi bebas</td>
+</tr>
+<tr>
+<td><code>follow(...)</code></td>
+<td>ikuti redirect (host sama)</td>
+</tr>
+<tr>
+<td><code>payload(resp)</code></td>
+<td>body sebenarnya (chunked/Content-Length)</td>
+</tr>
+<tr>
+<td><code>basic(user,pass)</code></td>
+<td>header Authorization Basic</td>
+</tr>
+<tr>
+<td><code>formPost(...) jsonPost(...)</code></td>
+<td>POST ter-encode</td>
+</tr>
+<tr>
+<td><code>statusOf bodyOf headerValue hasHeader</code></td>
+<td>parsing respons</td>
+</tr>
+</tbody></table></div>
+<p>Timeout socket 5 detik dipasang otomatis.</p>
+<h3 id="httpserver-static-mime"><code>HttpServer</code>, <code>Static</code>, <code>Mime</code><a class="anchor" href="#httpserver-static-mime" aria-label="tautan">#</a></h3>
+<p><code>HttpServer</code>: <code>readRequest method path target version headerValue contentLength body bodyAny queryValue urlDecode statusText response responseKA respond responseFor headOnly send keepAlive cookie setCookie methodIs</code>.</p>
+<p><code>Static.serve(path)</code> / <code>serveKA(path,keep)</code> menyajikan file + MIME dan menolak <code>..</code>. <code>Mime.of(path)</code> untuk Content-Type.</p>
+<h3 id="websocket"><code>WebSocket</code><a class="anchor" href="#websocket" aria-label="tautan">#</a></h3>
+<p><code>accept(key) isUpgrade(req) handshake(req) frame(op,payload) text binary ping pong close(code) decode(buf,n) payload(f) opcode(f)</code>.</p>
+<h3 id="tls-klien-tls-1-3"><code>Tls</code> (klien TLS 1.3)<a class="anchor" href="#tls-klien-tls-1-3" aria-label="tautan">#</a></h3>
+<p><code>handshake(ip, port, pinSpki, randSes)</code> → context; <code>writeApp(ctx,data)</code>, <code>readApp(ctx)</code>. <code>pinSpki</code> = SHA-256 DER SPKI leaf (TOFU). Belum ada TLS server dan belum verifikasi ECDSA CertificateVerify.</p>
+<h2 id="9-kriptografi">9. Kriptografi<a class="anchor" href="#9-kriptografi" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>Isi</th>
+</tr></thead><tbody>
+<tr>
+<td><code>Hash</code></td>
+<td><code>sha256 hmac sha1 eq toHex</code></td>
+</tr>
+<tr>
+<td><code>Pbkdf2</code></td>
+<td><code>sha256(pass,salt,iter,dkLen)</code></td>
+</tr>
+<tr>
+<td><code>Cipher</code></td>
+<td><code>b64enc b64dec hexenc hexdec rc4 vigenere</code></td>
+</tr>
+<tr>
+<td><code>Kdf</code></td>
+<td>HKDF + ExpandLabel TLS</td>
+</tr>
+<tr>
+<td><code>Rand</code></td>
+<td><code>bytes(n)</code> dari <code>/dev/urandom</code></td>
+</tr>
+<tr>
+<td><code>Aead</code>, <code>ChaCha</code>, <code>Poly</code></td>
+<td>ChaCha20-Poly1305 (TLS record)</td>
+</tr>
+<tr>
+<td><code>Big</code>, <code>X25519</code></td>
+<td>aritmetika medan 2²⁵⁵−19 &amp; X25519</td>
+</tr>
+<tr>
+<td><code>Der</code></td>
+<td>parser DER minimal + pin SPKI</td>
+</tr>
+</tbody></table></div>
+<h2 id="10-auth-session">10. Auth &amp; session<a class="anchor" href="#10-auth-session" aria-label="tautan">#</a></h2>
+<pre><code class="language-java">import Pbkdf2; import Jwt; import Session; import Auth; import MapStr;
+
+int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);
+int[] token = Jwt.sign(payloadJson, secret);
+int valid = Jwt.verify(token, secret, out);      // 1 sah, 0 salah, -1 bentuk
+
+int[] ids  = MapStr.make(256, 8192);
+int[] exps = MapStr.make(256, 8192);
+int[] sid  = Session.create(ids, exps, uid, 3600);
+int uid2   = Session.get(ids, exps, sid, Net.time());
+
+int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
+Auth.checkBasic(h, Net.bytes("budi"), Net.bytes("rahasia"));
+Auth.bearer(h);</code></pre>
+<p>Penyimpanan sesi masih in-memory (dua <code>MapStr</code>); belum persisten.</p>
+<h2 id="11-log-observability">11. <code>Log</code> + observability<a class="anchor" href="#11-log-observability" aria-label="tautan">#</a></h2>
+<p>Belum ada metrics/tracing. Pola yang disarankan: <code>Log.info</code> per request dengan tag + path, dan kirim <code>X-Request-Id</code> sendiri. Lihat <code>docs/04-server.md</code>.</p>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/03-pustaka.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

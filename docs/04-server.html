@@ -1,0 +1,293 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 — Server · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a class="active" href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="04-jaringan-server">04 — Jaringan &amp; server<a class="anchor" href="#04-jaringan-server" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-builtin-net-yang-tersedia">1. Builtin Net yang tersedia</a></li><li class="toc-h2"><a href="#2-server-tcp-minimal-blocking">2. Server TCP minimal (blocking)</a></li><li class="toc-h2"><a href="#3-http-server-blocking-keep-alive">3. HTTP server blocking + keep-alive</a></li><li class="toc-h3"><a href="#helper-respons">Helper respons</a></li><li class="toc-h2"><a href="#4-event-loop-banyak-klien-satu-proses">4. Event loop: banyak klien, satu proses</a></li><li class="toc-h2"><a href="#5-websocket">5. WebSocket</a></li><li class="toc-h2"><a href="#6-tls-klien">6. TLS klien</a></li><li class="toc-h2"><a href="#7-auth-session-jwt-di-server">7. Auth, session, JWT di server</a></li><li class="toc-h2"><a href="#8-game-realtime-udp">8. Game realtime (UDP)</a></li><li class="toc-h2"><a href="#9-deployment-operasional">9. Deployment &amp; operasional</a></li><li class="toc-h2"><a href="#10-menguji-server">10. Menguji server</a></li></ul></nav>
+<p>Dokumen ini menghubungkan builtin <code>Net.*</code> dengan pola server yang sudah diuji di repo. Semua contoh ada versi lengkapnya di <code>examples/</code>.</p>
+<hr>
+<h2 id="1-builtin-net-yang-tersedia">1. Builtin <code>Net</code> yang tersedia<a class="anchor" href="#1-builtin-net-yang-tersedia" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Builtin</th>
+<th>Guna</th>
+</tr></thead><tbody>
+<tr>
+<td><code>Net.socket(domain,type)</code></td>
+<td><code>2</code>=AF_INET, <code>1</code>=SOCK_STREAM, <code>2</code>=SOCK_DGRAM</td>
+</tr>
+<tr>
+<td><code>Net.bind(fd, ip, port)</code></td>
+<td>ikat lokal; <code>ip=0</code> = 0.0.0.0</td>
+</tr>
+<tr>
+<td><code>Net.listen(fd, backlog)</code> / <code>Net.accept(fd)</code></td>
+<td>server TCP (accept memakai <code>accept4</code>)</td>
+</tr>
+<tr>
+<td><code>Net.connect(fd, ip, port)</code></td>
+<td>klien TCP</td>
+</tr>
+<tr>
+<td><code>Net.sendto(fd, ip, port, buf)</code> / <code>Net.recvfrom(fd, buf, from)</code></td>
+<td>UDP; <code>from[0]</code>=ip, <code>from[1]</code>=port</td>
+</tr>
+<tr>
+<td><code>Net.sendb</code> / <code>Net.recvb</code></td>
+<td>kirim / baca sampai buffer penuh</td>
+</tr>
+<tr>
+<td><code>Net.recv1(fd, buf)</code></td>
+<td><strong>satu</strong> <code>read</code> (HTTP/WebSocket)</td>
+</tr>
+<tr>
+<td><code>Net.rdb</code> / <code>Net.wrb</code></td>
+<td>satu byte</td>
+</tr>
+<tr>
+<td><code>Net.shutdown(fd, how)</code></td>
+<td>0=RD 1=WR 2=RDWR</td>
+</tr>
+<tr>
+<td><code>Net.setsockopt(fd, lvl, opt, val)</code></td>
+<td>SO_REUSEADDR=1/2, TCP_NODELAY=6/1</td>
+</tr>
+<tr>
+<td><code>Net.settimeout(fd, ms)</code></td>
+<td>SO_RCVTIMEO + SO_SNDTIMEO</td>
+</tr>
+<tr>
+<td><code>Net.setnonblock(fd)</code></td>
+<td>O_NONBLOCK</td>
+</tr>
+<tr>
+<td><code>Net.pollfd(fds,revents,ms)</code></td>
+<td>poll(2); revents 1=siap baca, 2=error/hup</td>
+</tr>
+<tr>
+<td><code>Net.localport(fd)</code></td>
+<td>port lokal</td>
+</tr>
+<tr>
+<td><code>Net.memMark()</code> / <code>Net.memReset(m)</code></td>
+<td>arena per request</td>
+</tr>
+<tr>
+<td><code>Net.argc/argv/getenv</code></td>
+<td>konfigurasi program</td>
+</tr>
+<tr>
+<td><code>Net.time/mono/sleep/exit</code></td>
+<td>waktu &amp; proses</td>
+</tr>
+</tbody></table></div>
+<p>Alamat IPv4 disusun dengan <code>Tcp.ip(a,b,c,d)</code>; <code>Tcp.loopback()</code> = <code>127.0.0.1</code>; <code>0</code> pada <code>bind</code> berarti semua antarmuka.</p>
+<h2 id="2-server-tcp-minimal-blocking">2. Server TCP minimal (blocking)<a class="anchor" href="#2-server-tcp-minimal-blocking" aria-label="tautan">#</a></h2>
+<pre><code class="language-java">import Tcp;
+import Log;
+
+class Main {
+    public static void main(String[] args) {
+        int lfd = Net.socket(2, 1);
+        Net.setsockopt(lfd, 1, 2, 1);          // SO_REUSEADDR
+        Net.bind(lfd, 0, 9000);
+        Net.listen(lfd, 16);
+
+        while (true) {
+            int c = Net.accept(lfd);
+            if (c &lt; 0) { Net.sleep(5); continue; }
+            int mark = Net.memMark();
+            int[] buf = new int[4096];
+            int n = Net.recv1(c, buf);
+            if (n &gt; 0) Net.sendb(c, Net.bytes("HALO\n"));
+            Net.close(c);
+            Net.memReset(mark);
+        }
+    }
+}</code></pre>
+<p>Pola penting: <code>mark</code> diambil <strong>sebelum</strong> alokasi per koneksi, lalu <code>memReset(mark)</code> setelah selesai. Tanpa itu server akan OOM.</p>
+<h2 id="3-http-server-blocking-keep-alive">3. HTTP server blocking + keep-alive<a class="anchor" href="#3-http-server-blocking-keep-alive" aria-label="tautan">#</a></h2>
+<p><code>examples/server/ServerDemo.kop</code> memakai <code>Routes.kop</code>:</p>
+<pre><code class="language-java">while (true) {
+    int c = Net.accept(fd);
+    if (c &lt; 0) { Net.sleep(5); continue; }
+    while (true) {
+        int mark = Net.memMark();
+        int[] req = HttpServer.readRequest(c, 16384);
+        if (req.length == 0) { Net.memReset(mark); break; }
+
+        int keep = 0;
+        if (HttpServer.keepAlive(req)) keep = 1;
+        int[] resp = Routes.handle(req, keep);
+        HttpServer.send(c, resp);
+        Net.memReset(mark);
+        if (keep == 0) break;
+    }
+    Net.close(c);
+}</code></pre>
+<p><code>Routes.handle</code> menangani <code>/</code>, <code>/health</code>, <code>/json</code>, <code>/time</code>, <code>/echo</code>, <code>/sum</code>, <code>/header</code>, <code>/setcookie</code>, <code>/cookie</code>, <code>/static/*</code>.</p>
+<h3 id="helper-respons">Helper respons<a class="anchor" href="#helper-respons" aria-label="tautan">#</a></h3>
+<pre><code class="language-java">HttpServer.responseFor(req, 200, ctype, body, keep);  // HEAD otomatis tanpa body
+HttpServer.respond(code, ctype, body, extraHeader, keep);
+HttpServer.headOnly(resp);
+HttpServer.setCookie(name, value, path, maxAge);
+HttpServer.cookie(req, name);
+HttpServer.bodyAny(req);       // mendukung Transfer-Encoding: chunked
+HttpServer.keepAlive(req);     // HTTP/1.1 default keep-alive</code></pre>
+<h2 id="4-event-loop-banyak-klien-satu-proses">4. Event loop: banyak klien, satu proses<a class="anchor" href="#4-event-loop-banyak-klien-satu-proses" aria-label="tautan">#</a></h2>
+<p>Untuk melayani banyak koneksi tanpa thread, pakai <code>Net.pollfd</code>. <code>examples/server/ServerEvent.kop</code> adalah implementasi lengkap (32 koneksi, buffer 8 KiB/koneksi, keep-alive, timeout 20 dtk).</p>
+<p>Kerangka:</p>
+<pre><code class="language-java">int lfd = Net.socket(2, 1);
+Net.setsockopt(lfd, 1, 2, 1);
+Net.bind(lfd, 0, port);
+Net.listen(lfd, 64);
+Net.setnonblock(lfd);
+
+int MAXC = 32, BZ = 8192;
+int[] cfd = new int[MAXC];      // -1 = kosong
+int[] clen = new int[MAXC];
+int[] cbuf = new int[MAXC * BZ];
+int[] pfds = new int[MAXC + 1];
+int[] rev  = new int[MAXC + 1];
+int[] slot = new int[MAXC + 1];
+
+while (true) {
+    pfds[0] = lfd; slot[0] = -1;
+    int np = 1;
+    for (int i = 0; i &lt; MAXC; i++)
+        if (cfd[i] &gt;= 0) { pfds[np] = cfd[i]; slot[np] = i; np++; }
+
+    int nready = Net.pollfd(pfds, rev, 500);   // -1 = tunggu terus
+    if (nready &lt;= 0) { /* timeout: bersihkan koneksi idle */ continue; }
+
+    if ((rev[0] &amp; 1) != 0) {
+        while (true) {
+            int c = Net.accept(lfd);
+            if (c &lt; 0) break;
+            Net.setnonblock(c);
+            // taruh di slot kosong
+        }
+    }
+    for (int k = 1; k &lt; np; k++) {
+        if ((rev[k] &amp; 3) == 0) continue;
+        int s = slot[k];
+        int n = Net.recv1(cfd[s], tmp);        // satu read
+        // append ke cbuf[s*BZ ..], deteksi request lengkap, route,
+        // kirim, memReset mark per request
+    }
+}</code></pre>
+<p>Kontrak <code>revents</code>: <strong>selalu ditulis</strong>, <code>0</code> = tidak siap, <code>1</code> = ada data, <code>2</code> = error/hup (tetap panggil <code>recv1</code> untuk menguras sisa data).</p>
+<p>Kunci kebenaran:</p>
+<ul>
+<li>Socket <strong>non-blocking</strong>; <code>recv1</code> boleh mengembalikan <code>-EAGAIN</code>.</li>
+<li>Satu koneksi = satu buffer; jangan berbagi buffer antar koneksi.</li>
+<li>Deteksi request lengkap = <code>\r\n\r\n</code> + <code>Content-Length</code> (lihat <code>complete()</code> di <code>ServerEvent.kop</code>).</li>
+<li>Simpan semua state yang harus hidup (fd, buffer, config) <strong>sebelum</strong> <code>memMark</code>.</li>
+<li>CPU-bound handler tetap memblokir seluruh loop; batasi pekerjaan berat.</li>
+</ul>
+<p>Uji <code>tools/event_probe.py</code> membuktikan 6 koneksi yang mengirim header separuh tidak memblokir koneksi ke-7.</p>
+<h2 id="5-websocket">5. WebSocket<a class="anchor" href="#5-websocket" aria-label="tautan">#</a></h2>
+<p><code>examples/ws/WsEcho.kop</code>:</p>
+<pre><code class="language-java">int[] req = HttpServer.readRequest(c, 8192);
+if (WebSocket.isUpgrade(req)) {
+    Net.sendb(c, WebSocket.handshake(req));
+    int[] buf = new int[65536];
+    while (true) {
+        int n = Net.recv1(c, buf);
+        if (n &lt;= 0) break;
+        int[] f = WebSocket.decode(buf, n);       // [op, len, payload...]
+        if (f[0] == 8) { Net.sendb(c, WebSocket.close(1000)); break; }
+        if (f[0] == 9) Net.sendb(c, WebSocket.pong(WebSocket.payload(f)));
+        else if (f[0] == 1) Net.sendb(c, WebSocket.text(WebSocket.payload(f)));
+    }
+}</code></pre>
+<p>Handshake: <code>Sec-WebSocket-Accept = base64(SHA1(key + GUID))</code> — sudah disediakan <code>WebSocket.handshake(req)</code>.</p>
+<p>Batas: satu frame per <code>read</code> (tanpa fragmentasi/continuation), payload &lt; 64 KiB, tanpa TLS/kompresi. Klien harus mengirim frame <strong>bermask</strong>.</p>
+<h2 id="6-tls-klien">6. TLS klien<a class="anchor" href="#6-tls-klien" aria-label="tautan">#</a></h2>
+<pre><code class="language-java">import Tls;
+import Rand;
+
+int[] pin = ...;                                  // SHA-256 DER SPKI leaf (TOFU)
+int[] ctx = Tls.handshake(addr, 443, pin, Rand.bytes(32));
+if (ctx.length &gt; 0) {
+    Tls.writeApp(ctx, Net.bytes("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"));
+    int[] data = Tls.readApp(ctx);
+}</code></pre>
+<p>Yang <strong>belum</strong>: TLS server, verifikasi ECDSA CertificateVerify, validasi rantai/PKI, hostname, masa berlaku, session resumption.</p>
+<h2 id="7-auth-session-jwt-di-server">7. Auth, session, JWT di server<a class="anchor" href="#7-auth-session-jwt-di-server" aria-label="tautan">#</a></h2>
+<pre><code class="language-java">int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
+if (!Auth.checkBasic(h, user, pass)) {
+    int[] r = HttpServer.respond(401, ctype,
+                  Net.bytes("unauthorized\n"), Auth.challenge(Net.bytes("admin")), keep);
+    HttpServer.send(c, r);
+    continue;
+}</code></pre>
+<p>Session in-memory:</p>
+<pre><code class="language-java">int[] ids  = MapStr.make(256, 8192);
+int[] exps = MapStr.make(256, 8192);
+// login:
+int[] sid = Session.create(ids, exps, uid, 3600);
+int[] extra = HttpServer.setCookie(Net.bytes("sid"), sid, Net.bytes("/"), 3600);
+// request berikutnya:
+int uid = Session.get(ids, exps, HttpServer.cookie(req, Net.bytes("sid")), Net.time());</code></pre>
+<p>JWT:</p>
+<pre><code class="language-java">int[] out = new int[256];
+if (Jwt.verify(token, secret, out) != 1) { /* 401 */ }</code></pre>
+<p>Simpan password sebagai <code>Pbkdf2.sha256(pass, salt, 100000, 32)</code> + salt acak (<code>Rand.bytes(16)</code>), jangan plaintext.</p>
+<h2 id="8-game-realtime-udp">8. Game realtime (UDP)<a class="anchor" href="#8-game-realtime-udp" aria-label="tautan">#</a></h2>
+<p>Pola <code>examples/game/</code>:</p>
+<ol>
+<li>Server UDP non-blocking, tick 20/dtk.</li>
+<li>Pesan biner kecil (<code>Wire.kop</code>), 1 datagram = 1 pesan.</li>
+<li>Snapshot server-authoritative dikirim ke tiap pemain tiap tick.</li>
+<li>Klien mengirim input 10×/dtk, menggambar snapshot terbaru.</li>
+<li><code>Net.memMark/memReset</code> per iterasi; dunia dialokasikan sebelum loop.</li>
+</ol>
+<p>Batas: UDP tidak reliable/berurut; tanpa interpolasi; satu proses.</p>
+<h2 id="9-deployment-operasional">9. Deployment &amp; operasional<a class="anchor" href="#9-deployment-operasional" aria-label="tautan">#</a></h2>
+<ul>
+<li>Jalankan di port &gt; 1024 (tidak perlu root).</li>
+<li><strong>Single-thread</strong>: taruh di belakang reverse proxy (nginx/caddy) untuk TLS, buffering, dan banyak koneksi; atau jalankan beberapa proses dengan <code>SO_REUSEADDR</code> + port berbeda di belakang LB.</li>
+<li>Belum ada graceful shutdown / signal handler. Pola aman: kirim SIGTERM dari supervisor; request yang sedang berjalan bisa terpotong.</li>
+<li>Log ke stderr (<code>Log</code>), biarkan supervisor yang mengumpulkan.</li>
+<li>Pantau RSS: tanpa GC, kebocoran logis = OOM. Uji beban: <code>200+</code> request beruntun, 6 koneksi lambat, dan tes kebocoran dengan <code>memMark</code>.</li>
+<li>Untuk file statis, <code>Static</code> membaca seluruh file ke memori; file besar sebaiknya dilayani reverse proxy.</li>
+</ul>
+<h2 id="10-menguji-server">10. Menguji server<a class="anchor" href="#10-menguji-server" aria-label="tautan">#</a></h2>
+<ul>
+<li>Python <code>http.client</code> untuk keep-alive/HEAD/cookie/chunked (<code>tools/event_probe.py</code>, srvtest di <code>test.sh</code>).</li>
+<li><code>socket</code> mentah untuk WebSocket (<code>tools/ws_probe.py</code>).</li>
+<li>DNS lokal (<code>tools/dns_test_server.py</code>).</li>
+<li>Selalu uji <strong>dua backend</strong> (a64 + VM) karena bug codegen bisa berbeda.</li>
+</ul>
+<p>Lanjut ke <a href="05-developer.html">05 — Developer</a>.</p>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/04-server.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

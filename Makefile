@@ -17,4 +17,8 @@ clean:
 test: all
 	sh test.sh
 
-.PHONY: all clean test
+docs:
+	python3 tools/md2html.py
+	python3 tools/check_docs.py
+
+.PHONY: all clean test docs

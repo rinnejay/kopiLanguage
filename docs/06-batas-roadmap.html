@@ -1,0 +1,272 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 — Batas &amp; roadmap · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a class="active" href="06-batas-roadmap.html">Batas</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="06-batas-jujur-roadmap">06 — Batas jujur &amp; roadmap<a class="anchor" href="#06-batas-jujur-roadmap" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bahasa">1. Bahasa</a></li><li class="toc-h2"><a href="#2-runtime-backend">2. Runtime &amp; backend</a></li><li class="toc-h2"><a href="#3-jaringan">3. Jaringan</a></li><li class="toc-h2"><a href="#4-keamanan">4. Keamanan</a></li><li class="toc-h2"><a href="#5-tooling-ekosistem">5. Tooling &amp; ekosistem</a></li><li class="toc-h2"><a href="#6-uji">6. Uji</a></li><li class="toc-h2"><a href="#7-roadmap-urutan-usulan">7. Roadmap (urutan usulan)</a></li><li class="toc-h2"><a href="#8-cara-berkontribusi-tanpa-membuat-kesalahan">8. Cara berkontribusi tanpa membuat kesalahan</a></li></ul></nav>
+<p>Dokumen ini sengaja dibuat tanpa eufemisme. Kalau sebuah klaim belum diuji, ditulis "belum".</p>
+<hr>
+<h2 id="1-bahasa">1. Bahasa<a class="anchor" href="#1-bahasa" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Belum ada</th>
+<th>Dampak</th>
+<th>Workaround sekarang</th>
+</tr></thead><tbody>
+<tr>
+<td>Instance class (<code>new Kelas()</code>, field, inheritance, interface, vtable)</td>
+<td>state harus dibungkus <code>int[]</code> + method static</td>
+<td>pola <code>MapStr</code>/array + class namespace</td>
+</tr>
+<tr>
+<td>GC / free</td>
+<td>arena 32 MB; wajib <code>memMark/memReset</code></td>
+<td>reset per request/iterasi; hindari alokasi di loop panas</td>
+</tr>
+<tr>
+<td>Array bertipe (<code>String[]</code>, <code>long[]</code>, <code>double[]</code>)</td>
+<td>semua array praktis <code>int[]</code></td>
+<td>simpan indeks/offset ke array datar</td>
+</tr>
+<tr>
+<td><code>char</code> &amp; literal char</td>
+<td><code>'a'</code> adalah String</td>
+<td>pakai kode byte (<code>97</code>) atau <code>charAt</code></td>
+</tr>
+<tr>
+<td>Unicode/UTF-8 penuh</td>
+<td><code>length</code> = byte; <code>upper/lower</code> ASCII</td>
+<td><code>utf8Count</code>; batasi input ke ASCII</td>
+</tr>
+<tr>
+<td><code>switch</code>, <code>try/catch</code>, <code>throw</code>, <code>assert</code>, <code>goto</code></td>
+<td>kontrol alur terbatas</td>
+<td><code>if/else</code>, kode error negatif</td>
+</tr>
+<tr>
+<td>static field &amp; inisialisasi kelas</td>
+<td>konstanta harus method</td>
+<td><code>static int W() { return 60; }</code></td>
+</tr>
+<tr>
+<td>generic, enum, anotasi, overloading</td>
+<td>API harus unik per nama</td>
+<td>sufiks nama (<code>getInt/getStr</code>)</td>
+</tr>
+<tr>
+<td><code>finally</code>/RAII</td>
+<td>resource harus ditutup manual</td>
+<td><code>Net.close</code>, <code>File.close</code></td>
+</tr>
+<tr>
+<td><code>System.out.print/println</code> sebagai ekspresi</td>
+<td>tidak bisa dipakai di badan lambda ekspresi</td>
+<td>bungkus dengan method <code>static void cetak(int x)</code> lalu <code>a.forEach(x =&gt; cetak(x))</code></td>
+</tr>
+</tbody></table></div>
+<p>Batas teknis lain:</p>
+<ul>
+<li>Maksimum <strong>8 parameter</strong> metode (batas native).</li>
+<li>Lambda dinamis maksimum <strong>5 argumen</strong>.</li>
+<li>Literal <code>json</code> maksimum <strong>8 entri</strong> per objek/array.</li>
+<li>Nilai <code>int</code> membungkus (wrap), bukan overflow error.</li>
+<li><code>Net.bytes</code> hanya menerima literal string (bukan variabel).</li>
+</ul>
+<h2 id="2-runtime-backend">2. Runtime &amp; backend<a class="anchor" href="#2-runtime-backend" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Hal</th>
+<th>Status</th>
+</tr></thead><tbody>
+<tr>
+<td>aarch64 native</td>
+<td><strong>dijalankan</strong> di Termux/ARM, diuji suite</td>
+</tr>
+<tr>
+<td>VM KOP1</td>
+<td><strong>dijalankan</strong>, diuji suite</td>
+</tr>
+<tr>
+<td>x86-64 native</td>
+<td><strong>hanya verifikasi sintaks</strong> (<code>cc -target x86_64-linux-gnu -c</code>); belum dieksekusi di CI</td>
+</tr>
+<tr>
+<td>Thread / fork / async</td>
+<td>tidak ada; server single-thread</td>
+</tr>
+<tr>
+<td>Signal handler / graceful shutdown</td>
+<td>tidak ada</td>
+</tr>
+<tr>
+<td>Diagnostik runtime</td>
+<td>pesan tanpa nomor baris/stack trace</td>
+</tr>
+<tr>
+<td>Arena</td>
+<td>32 MB (a64/x64/VM), tanpa GC</td>
+</tr>
+<tr>
+<td>Cross-compile</td>
+<td>a64 hanya di ARM; x64 hanya di x86-64</td>
+</tr>
+</tbody></table></div>
+<p>Konsekuensi: service CPU-bound memblokir semua klien; satu request lambat menahan loop (kecuali I/O non-blocking). Untuk produksi: reverse proxy + beberapa proses.</p>
+<h2 id="3-jaringan">3. Jaringan<a class="anchor" href="#3-jaringan" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Belum ada</th>
+<th>Catatan</th>
+</tr></thead><tbody>
+<tr>
+<td>IPv6</td>
+<td>hanya <code>AF_INET</code></td>
+</tr>
+<tr>
+<td>TLS <strong>server</strong></td>
+<td>tidak ada; pakai reverse proxy</td>
+</tr>
+<tr>
+<td>Verifikasi ECDSA CertificateVerify</td>
+<td>TLS klien memakai pin SPKI TOFU + verifikasi Finished</td>
+</tr>
+<tr>
+<td>Validasi rantai/PKI, hostname, expiry</td>
+<td>belum</td>
+</tr>
+<tr>
+<td>Session resumption/PSK TLS</td>
+<td>belum</td>
+</tr>
+<tr>
+<td>DNS sistem penuh</td>
+<td><code>Resolv</code> hanya A, tanpa cache/<code>search</code>/AAAA/DNS-over-TLS</td>
+</tr>
+<tr>
+<td>HTTP/2, WebSocket fragmentation, kompresi</td>
+<td>belum</td>
+</tr>
+<tr>
+<td>Multipart, range request, ETag/Last-Modified, chunked response streaming</td>
+<td>belum</td>
+</tr>
+<tr>
+<td>DB client (SQLite/Postgres/Redis)</td>
+<td>belum</td>
+</tr>
+<tr>
+<td><code>sendfile</code>/zero-copy</td>
+<td>belum; <code>Static</code> membaca file ke memori</td>
+</tr>
+</tbody></table></div>
+<p>Batas angka:</p>
+<ul>
+<li>Datagram UDP maksimum <strong>1200 byte</strong> per kirim/terima.</li>
+<li><code>HttpServer.readRequest(c, max)</code> dibatasi <code>max</code> byte; body lebih besar terpotong.</li>
+<li>WebSocket: satu frame per <code>read</code>, payload &lt; 64 KiB, tanpa continuation.</li>
+<li><code>MapStr</code>: kapasitas &amp; pool tetap (tanpa grow).</li>
+<li>Antrian/backpressure tidak ada; klien lambat bisa menahan buffer.</li>
+</ul>
+<h2 id="4-keamanan">4. Keamanan<a class="anchor" href="#4-keamanan" aria-label="tautan">#</a></h2>
+<ul>
+<li>TLS klien: TOFU pin; bukan PKI lengkap.</li>
+<li><code>Auth</code>/<code>Jwt</code> memakai perbandingan konstan sederhana, tetapi belum ada audit keamanan independen.</li>
+<li>Tidak ada sandbox; program Kopi punya akses penuh syscall lewat <code>Net.*</code> (file, jaringan, <code>system</code> via <code>Net.ttyRaw</code>).</li>
+<li>Tidak ada limit ukuran header/URL bawaan; lakukan validasi sendiri.</li>
+<li>Jangan memakai <code>Jwt</code>/<code>Session</code> untuk produksi tanpa masa berlaku, rotasi kunci, dan penyimpanan persisten.</li>
+</ul>
+<h2 id="5-tooling-ekosistem">5. Tooling &amp; ekosistem<a class="anchor" href="#5-tooling-ekosistem" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Belum ada</th>
+<th>Dampak</th>
+</tr></thead><tbody>
+<tr>
+<td>Package manager/versioning</td>
+<td><code>import</code> menggabungkan source; tidak ada dependensi versi</td>
+</tr>
+<tr>
+<td>Debugger, stack trace, breakpoint</td>
+<td>debug via <code>println</code>, VM, dan inspeksi <code>.s</code></td>
+</tr>
+<tr>
+<td>LSP, formatter, linter, syntax highlight resmi</td>
+<td>editor belum terintegrasi</td>
+</tr>
+<tr>
+<td>CI lintas arsitektur</td>
+<td>suite berjalan di Termux/aarch64; x64 runtime belum</td>
+</tr>
+<tr>
+<td>Spesifikasi formal</td>
+<td>docs + kode adalah acuan</td>
+</tr>
+<tr>
+<td>Benchmark otomatis</td>
+<td>ada <code>bench.py</code> untuk proyek besar, bukan regresi perf</td>
+</tr>
+<tr>
+<td>Fuzzing parser</td>
+<td>belum</td>
+</tr>
+<tr>
+<td>Audit memori (ASAN)</td>
+<td>belum dijadikan gerbang</td>
+</tr>
+</tbody></table></div>
+<h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
+<ul>
+<li>Suite: <strong>117/117</strong> (v1.11) — a64 + VM + sintaks x64 + dokumen HTML.</li>
+<li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
+<li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
+<li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>
+</ul>
+<h2 id="7-roadmap-urutan-usulan">7. Roadmap (urutan usulan)<a class="anchor" href="#7-roadmap-urutan-usulan" aria-label="tautan">#</a></h2>
+<ol>
+<li><strong>Instance class</strong> — field, <code>new</code>, method instance, vtable; ini mengubah parser, type system, dan 3 backend. Lakukan bertahap dengan suite tetap hijau.</li>
+<li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>
+<li><strong>Array bertipe + <code>char</code> + Unicode dasar</strong>.</li>
+<li><strong>TLS server + verifikasi ECDSA/CertificateVerify + chain/hostname</strong>.</li>
+<li><strong>HTTP</strong>: multipart, range/ETag, chunked response, gzip.</li>
+<li><strong>DB client</strong> (SQLite via protokol file atau Postgres/Redis via socket).</li>
+<li><strong>Ekosistem</strong>: package manager, LSP, formatter, CI lintas platform, fuzzing, audit keamanan.</li>
+<li><strong>Performa</strong>: register allocation/const-folding, <code>sendfile</code>, buffer pooling, event-loop yang lebih hemat.</li>
+</ol>
+<h2 id="8-cara-berkontribusi-tanpa-membuat-kesalahan">8. Cara berkontribusi tanpa membuat kesalahan<a class="anchor" href="#8-cara-berkontribusi-tanpa-membuat-kesalahan" aria-label="tautan">#</a></h2>
+<ul>
+<li>Jangan menambah fitur hanya di satu backend.</li>
+<li>Setiap bug diperbaiki + diberi uji regresi.</li>
+<li>Jangan mengklaim "x64 berjalan" atau "TLS aman" tanpa bukti runtime.</li>
+<li>Jaga <code>sh test.sh</code> 0 fail sebelum commit.</li>
+<li>Tulis batas di docs, bukan hanya di kepala.</li>
+</ul>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/06-batas-roadmap.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>
