@@ -110,7 +110,117 @@ static Node *block(void) {
 
 static Node *stmt_or_block(void) {
     if (at('{')) return block();
+
     return stmt_single();
+}
+
+/* ── switch (v1.19): desugar ke rantai if/else ────────────────────
+ * switch (e) { case A: ... default: ... }
+ *   →  { int #swN = e;
+ *        if (#swN == A) { ... } else if (#swN == B) { ... } else { ... } }
+ * - TANPA fall-through: badan tiap case dibungkus blok sendiri.
+ * - break/continue di dalam badan tetap milik loop terluar (karena
+ *   hasilnya if/else biasa) — bukan break milik switch.
+ * - case hanya menerima literal bilangan bulat (boleh negatif). */
+static int swtmp_n = 0;
+
+static Node *parse_switch(int line) {
+    advance();                       /* kata 'switch' */
+    expect('(', "'(' setelah switch");
+    Node *sel = expr();
+    expect(')', "')' setelah selector switch");
+    expect('{', "'{' membuka badan switch");
+
+    struct { long val; Node *body; int line; } cases[64];
+    Node *dflt = 0;
+    int nc = 0;
+    while (!at('}')) {
+        if (at(KW_CASE)) {
+            int cl = peek()->line;
+            advance();
+            int neg = 0;
+            if (at('-')) { advance(); neg = 1; }
+            if (!at(T_NUM))
+                die("baris %d: case harus literal bilangan bulat", cl);
+            long v = peek()->num;
+            advance();
+            if (neg) v = -v;
+            expect(':', "':' setelah nilai case");
+            for (int i = 0; i < nc; i++)
+                if (cases[i].val == v)
+                    die("baris %d: case %ld duplikat", cl, v);
+            if (nc >= 64)
+                die("baris %d: terlalu banyak case (maks 64)", cl);
+            /* badan case: statement sampai case/default/'}' — tanpa fall-through */
+            Node *blk = newnode(ST_BLOCK, cl);
+            Node *head = 0, *tail = 0;
+            while (!at(KW_CASE) && !at(KW_DEFAULT) && !at('}')) {
+                Node *s = stmt_single();
+                while (tail && tail->next) tail = tail->next;
+                if (tail) tail->next = s; else head = s;
+                tail = s;
+            }
+            blk->d = head;
+            cases[nc].val = v;
+            cases[nc].body = blk;
+            cases[nc].line = cl;
+            nc++;
+        } else if (at(KW_DEFAULT)) {
+            int dl = peek()->line;
+            if (dflt)
+                die("baris %d: default duplikat", dl);
+            advance();
+            expect(':', "':' setelah default");
+            Node *blk = newnode(ST_BLOCK, dl);
+            Node *head = 0, *tail = 0;
+            while (!at(KW_CASE) && !at(KW_DEFAULT) && !at('}')) {
+                Node *s = stmt_single();
+                while (tail && tail->next) tail = tail->next;
+                if (tail) tail->next = s; else head = s;
+                tail = s;
+            }
+            blk->d = head;
+            dflt = blk;
+        } else {
+            die("baris %d: 'case'/'default' diharapkan di dalam switch",
+                peek()->line);
+        }
+    }
+    expect('}', "'}' penutup switch");
+    if (nc == 0 && !dflt)
+        die("baris %d: switch tanpa satu pun case/default", line);
+
+    /* variabel temp unik: selector dievaluasi sekali */
+    char nm[32];
+    snprintf(nm, sizeof nm, "#sw%d", swtmp_n++);
+    Node *decl = newnode(ST_VAR, line);
+    decl->dty = (int)T_INT;
+    decl->str = xs(nm);
+    decl->a = sel;
+
+    /* bangun rantai if dari case terakhir */
+    Node *chain = dflt;
+    for (int i = nc - 1; i >= 0; i--) {
+        Node *cmp = newnode(EX_BIN, cases[i].line);
+        cmp->str = "==";
+        cmp->a = newnode(EX_VAR, cases[i].line);
+        cmp->a->str = xs(nm);
+        Node *lit = newnode(EX_INT, cases[i].line);
+        lit->ival = cases[i].val;
+        lit->dty = (int)T_INT;
+        cmp->b = lit;
+        Node *iff = newnode(ST_IF, cases[i].line);
+        iff->a = cmp;
+        iff->b = cases[i].body;
+        iff->c = chain;
+        chain = iff;
+    }
+
+    /* blok pembungkus: deklarasi temp + rantai if (scope sendiri) */
+    Node *wrap = newnode(ST_BLOCK, line);
+    decl->next = chain;
+    wrap->d = decl;
+    return wrap;
 }
 
 static Node *parse_assignment(int line, int eat_semi) {
@@ -322,6 +432,7 @@ static Node *stmt_single(void) {
     }
     case KW_BREAK: { advance(); expect(';', "';'"); Node *n = newnode(ST_BRK, line); return n; }
     case KW_CONTINUE: { advance(); expect(';', "';'"); Node *n = newnode(ST_CONT, line); return n; }
+    case KW_SWITCH: return parse_switch(line);   /* v1.19 */
     case '{': {
         Node *n = newnode(ST_BLOCK, line);
         n->d = block();

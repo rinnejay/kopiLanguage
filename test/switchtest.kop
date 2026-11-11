@@ -1,0 +1,80 @@
+// switchtest.kop — switch (v1.19): desugar if/else, tanpa fall-through,
+// break/continue tetap milik loop terluar.
+import Str;
+class Main {
+    static int next(int[] st) {
+        st[0] = st[0] + 1;
+        return st[0];
+    }
+    public static void main(String[] args) {
+        int x = 2;
+        switch (x) {
+            case 1: System.out.println("satu");
+            case 2: System.out.println("dua");
+            case 3: System.out.println("tiga");
+            default: System.out.println("lain");
+        }
+
+        // selector dievaluasi sekali (efek samping dihitung satu kali)
+        int[] st = new int[1];
+        switch (next(st)) {
+            case 1: System.out.println("satu");
+            default: System.out.println(st[0]);
+        }
+
+        // nilai case negatif; byte sebagai selector
+        int n = -3;
+        switch (n) {
+            case -3: System.out.println("neg tiga");
+            case -2: System.out.println("neg dua");
+            default: System.out.println("lain");
+        }
+        byte b = 2;
+        switch (b) {
+            case 2: System.out.println("byte dua");
+            default: System.out.println("byte lain");
+        }
+
+        // tanpa default & tidak cocok: tidak ada yang jalan
+        switch (n) {
+            case 5: System.out.println("lima");
+        }
+
+        // break/continue milik loop terluar
+        for (int i = 0; i < 4; i++) {
+            switch (i) {
+                case 1: System.out.println("satu"); continue;
+                case 2: System.out.println("dua");
+                default: System.out.println(i);
+            }
+            System.out.println("setelah switch");
+        }
+        for (int i = 0; i < 4; i++) {
+            switch (i) {
+                case 2: System.out.println(`berhenti di {i}`); break;
+                default: System.out.println(`iterasi {i}`);
+            }
+            System.out.println("bawah");
+        }
+
+        // switch bersarang + deklarasi di badan case (scope per case)
+        int a = 1, c = 2;
+        switch (a) {
+            case 1:
+                switch (c) {
+                    case 2: System.out.println("1-2");
+                    default: System.out.println("1-x");
+                }
+                System.out.println("case 1 selesai");
+            case 2: System.out.println("dua-a");
+            default: System.out.println("default-luar");
+        }
+        switch (a) {
+            case 1:
+                int lokal = 42;
+                System.out.println(lokal);
+            default: System.out.println("akhir");
+        }
+        System.out.println("selesai");
+    }
+}

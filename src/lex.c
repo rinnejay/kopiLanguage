@@ -33,6 +33,7 @@ static struct { const char *kw; int type; } kws[] = {
     {"return", KW_RETURN}, {"true", KW_TRUE}, {"false", KW_FALSE},
     {"break", KW_BREAK}, {"continue", KW_CONTINUE}, {"import", KW_IMPORT},
     {"fn", KW_FN}, {"json", KW_JSON},
+    {"switch", KW_SWITCH}, {"case", KW_CASE}, {"default", KW_DEFAULT},   /* v1.19 */
     {0, 0},
 };
 

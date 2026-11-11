@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.18.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.19.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
@@ -122,7 +122,34 @@ for (;;) { break; }           // init/kondisi/update boleh kosong
 ```
 
 `break` keluar dari loop terdekat; `continue` lanjut ke iterasi berikut.
-Belum ada `switch`, `try/catch`, `throw`, atau `assert`.
+### switch (v1.19)
+
+```java
+switch (x) {
+    case 1: System.out.println("satu");
+    case 2: System.out.println("dua");
+    default: System.out.println("lain");
+}
+```
+
+Aturan:
+
+- **Tanpa fall-through**: badan tiap `case` adalah blok sendiri — setelah
+  badan selesai, eksekusi keluar dari switch (tidak jalan ke case berikut).
+- `case` hanya menerima literal bilangan bulat (boleh negatif, mis.
+  `case -3:`); `default` opsional dan boleh di posisi mana pun.
+- Selector dievaluasi **sekali** (disimpan ke variabel temp compiler).
+- `break`/`continue` di dalam badan case tetap milik **loop terluar**
+  (switch adalah rantai if/else, bukan blok loop) — di luar loop, `break`
+  tidak valid.
+- Deklarasi di badan case hanya terlihat di case itu (scope per case).
+- Selector bertipe int-ish (`int`/`byte`/`short`); `long`/`String` ditolak
+  (butuh cast / bandingkan dengan `if`).
+- Duplikat case atau duplikat `default` ditolak compiler; maksimum 64 case.
+
+`switch` murni gula parser — bytecode & mesin native tidak berubah.
+
+Belum ada `try/catch`, `throw`, atau `assert`.
 
 ## 7. Array
 

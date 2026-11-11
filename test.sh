@@ -1410,6 +1410,13 @@ check packedreuse test/packedreuse.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/packedreuse64.s" -o /dev/null \
     && echo "PASS  packedreuse [x64]" || { echo "FAIL  packedreuse [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── fitur bahasa v1.19: switch (desugar if/else, tanpa fall-through) ───
+cp test/switchtest.ref "$T/kopi/switchtest.ref"
+check switchtest test/switchtest.kop
+./kopicc test/switchtest.kop -t x64 -o "$T/kopi/switchtest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/switchtest64.s" -o /dev/null \
+    && echo "PASS  switchtest [x64]" || { echo "FAIL  switchtest [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
 check urltest test/urltest.kop

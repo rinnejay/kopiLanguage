@@ -15,7 +15,7 @@ diuji, ditulis "belum".
 | ~~String = `int[]`~~ **✅ v1.17** (String opaque; interop eksplisit `Net.mkstr`/`Net.strbytes`) | ~~byte-per-slot~~ **✅ v1.18 packed** (1 byte/karakter; konversi otomatis compiler di batas) | alokasi String besar 5× lebih hemat; tidak ada perubahan semantik sumber |
 | `char` & literal char | `'a'` adalah String | pakai kode byte (`97`) atau `charAt` |
 | Unicode/UTF-8 penuh | `length` = byte; `upper/lower` ASCII | `utf8Count`; batasi input ke ASCII |
-| `switch`, `try/catch`, `throw`, `assert`, `goto` | kontrol alur terbatas | `if/else`, kode error negatif |
+| ~~`switch`~~ **✅ v1.19** (desugar if/else; tanpa fall-through; selector int-ish dievaluasi sekali; break/continue milik loop terluar) `try/catch`, `throw`, `assert`, `goto` | kontrol alur terbatas | `if/else`, kode error negatif |
 | static field & inisialisasi kelas | konstanta harus method | `static int W() { return 60; }` |
 | generic, enum, anotasi, overloading | API harus unik per nama | sufiks nama (`getInt/getStr`) |
 | `finally`/RAII | resource harus ditutup manual | `Net.close`, `File.close` |
@@ -99,8 +99,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **130/130** (v1.18) — a64 + VM + sintaks x64 + dokumen HTML
-  (142 PASS termasuk cek x64 yang tidak masuk counter).
+- Suite: **132/132** (v1.19) — a64 + VM + sintaks x64 + dokumen HTML
+  (144 PASS termasuk cek x64 yang tidak masuk counter).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal
