@@ -119,7 +119,7 @@ Digits.printBase(255, 16);                    // ff
 
 ## File
 
-`lib/core/File.kop` · 13 fungsi
+`lib/core/File.kop` · 15 fungsi
 
 I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.
 
@@ -156,6 +156,8 @@ File.close(r);
 | `static int remove(int[] path)` | hapus elemen |
 | `static int renameTo(int[] oldp, int[] newp)` | ganti nama file/direktori |
 | `static int mkdir(int[] path)` | buat direktori |
+| `static String readText(String path)` | v1.17.1: I/O teks langsung — kode biasa tak perlu sentuh int[] |
+| `static boolean writeText(String path, String text)` | — |
 
 **Konstanta**
 
@@ -246,7 +248,7 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20
 | `static int[] wr(int[] v)` | (internal) tulis nilai JSON ke teks |
 | `static int[] keyAt(int[] obj, int idx)` | kunci pasangan ke-i pada objek |
 | `static int[] valAt(int[] obj, int idx)` | nilai pasangan ke-i pada objek |
-| `static int[] write(int[] v)` | API publik: serialisasi ke teks |
+| `static String write(int[] v)` | API publik: serialisasi ke teks |
 | `static void print(int[] v)` | tulis ke stdout (fd 1) byte demi byte — melengkapi println(int) |
 | `static void line(int[] v)` | tulis dengan newline |
 

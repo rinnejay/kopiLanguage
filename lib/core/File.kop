@@ -31,4 +31,27 @@ class File {
     static int remove(int[] path) { return Net.unlinkb(path); }
     static int renameTo(int[] oldp, int[] newp) { return Net.renameb(oldp, newp); }
     static int mkdir(int[] path) { return Net.mkdirb(path); }
+
+    /* v1.17.1: I/O teks langsung — kode biasa tak perlu sentuh int[] */
+    static String readText(String path) {
+        int fd = openRead(path);
+        if (fd < 0) return Net.mkstr(new int[0]);
+        int n = size(fd);
+        int[] buf = new int[n > 0 ? n : 1];
+        int got = readInto(fd, buf);
+        Net.close(fd);
+        if (got < 0) got = 0;
+        if (got > n) got = n;
+        int[] out = new int[got];
+        for (int i = 0; i < got; i++) out[i] = buf[i];
+        return Net.mkstr(out);
+    }
+
+    static boolean writeText(String path, String text) {
+        int fd = create(path);
+        if (fd < 0) return false;
+        writeAll(fd, text);
+        Net.close(fd);
+        return true;
+    }
 }

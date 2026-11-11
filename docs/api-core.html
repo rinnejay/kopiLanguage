@@ -266,7 +266,7 @@ Digits.printBase(255, 16);                    // ff</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="file">File<a class="anchor" href="#file" aria-label="tautan">#</a></h2>
-<p><code>lib/core/File.kop</code> · 13 fungsi</p>
+<p><code>lib/core/File.kop</code> · 15 fungsi</p>
 <p>I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.</p>
 <pre><code class="language-java">import File;
 
@@ -339,6 +339,14 @@ File.close(r);</code></pre>
 <tr>
 <td><code>static int mkdir(int[] path)</code></td>
 <td>buat direktori</td>
+</tr>
+<tr>
+<td><code>static String readText(String path)</code></td>
+<td>v1.17.1: I/O teks langsung — kode biasa tak perlu sentuh int[]</td>
+</tr>
+<tr>
+<td><code>static boolean writeText(String path, String text)</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <p><strong>Konstanta</strong></p>
@@ -609,7 +617,7 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <td>nilai pasangan ke-i pada objek</td>
 </tr>
 <tr>
-<td><code>static int[] write(int[] v)</code></td>
+<td><code>static String write(int[] v)</code></td>
 <td>API publik: serialisasi ke teks</td>
 </tr>
 <tr>

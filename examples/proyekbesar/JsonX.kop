@@ -10,5 +10,5 @@ class JsonX {
     static int getInt(int[] j, int[] key) {
         return Json.asInt(Json.get(j, key));
     }
-    static int[] write(int[] j) { return Json.write(j); }
+    static String write(int[] j) { return Json.write(j); }
 }

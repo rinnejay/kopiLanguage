@@ -1,5 +1,6 @@
 // uji v1.17: String opaque — interop eksplisit Net.mkstr/Net.strbytes
 import Str;
+import File;
 class Main {
     public static void main(String[] args) {
         String s = "  Kopi Bahasa  ";
@@ -27,5 +28,10 @@ class Main {
         // concat tetap bebas
         String gab = Str.fromInt(7) + " " + t;
         System.out.println(gab);
+
+        // v1.17.1: I/O teks langsung
+        File.writeText("mkstrtest.txt", "simpan teks");
+        System.out.println(File.readText("mkstrtest.txt"));
+        File.remove("mkstrtest.txt");
     }
 }

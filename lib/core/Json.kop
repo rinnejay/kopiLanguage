@@ -580,7 +580,7 @@ class Json {
     }
 
     /* API publik: serialisasi ke teks */
-    static int[] write(int[] v) { return wr(v); }
+    static String write(int[] v) { return Net.mkstr(wr(v)); }
 
     /* tulis ke stdout (fd 1) byte demi byte — melengkapi println(int) */
     static void print(int[] v) {
