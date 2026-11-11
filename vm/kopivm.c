@@ -42,6 +42,8 @@ enum {
     OP_PRINTBUF,    /* 1 byte: newline; tulis array byte ke fd 1 */
     OP_LINE,        /* 2 byte: nomor baris sumber — stack trace */
     OP_SRCFILE,     /* 2 byte: index cpool nama file sumber */
+    OP_IDXB,        /* v1.18: byte ke-i dari String packed */
+    OP_PRINTSTR     /* 1 byte: newline; tulis String packed ke fd 1 */
 };
 
 #define MAXM 4096
@@ -219,12 +221,26 @@ static char **vargv;
 
 static int64_t mk_str_arr(const char *s) {
     size_t n = s ? strlen(s) : 0;
-    if (heap_used + (long)n + 1 > HEAPLEN) dievm("arena penuh (string)");
+    /* v1.18: String packed — 8 byte per slot 64-bit, little-endian */
+    long slots = ((long)n + 7) >> 3;
+    if (heap_used + slots + 1 > HEAPLEN) dievm("arena penuh (string)");
     long *blk = heap + heap_used;
-    heap_used += (long)n + 1;
+    heap_used += slots + 1;
     blk[0] = (long)n;
-    for (size_t i = 0; i < n; i++) blk[1 + i] = (long)(unsigned char)s[i];
+    for (long k = 0; k < slots; k++) blk[1 + k] = 0;
+    for (size_t i = 0; i < n; i++)
+        blk[1 + (i >> 3)] |= (long)(unsigned char)s[i] << ((i & 7) * 8);
     return (int64_t)blk;
+}
+
+/* baca byte ke-i dari blok packed (v1.18) */
+static inline long getb(const long *blk, long i) {
+    return (blk[1 + (i >> 3)] >> ((i & 7) * 8)) & 0xff;
+}
+
+/* tulis byte ke-i blok packed (slot sudah di-zero) */
+static inline void setb(long *blk, long i, long v) {
+    blk[1 + (i >> 3)] |= (v & 0xff) << ((i & 7) * 8);
 }
 
 static void run(void) {
@@ -480,6 +496,16 @@ static void run(void) {
             blk[1 + idx] = val;
             break;
         }
+        case OP_IDXB: {                       /* v1.18: byte ke-i String packed */
+            int64_t idx = stackv[--sp];
+            long *blk = (long *)stackv[--sp];
+            if ((long *)0 == blk || blk < heap || blk >= heap + HEAPLEN)
+                dievm("string tidak valid (di luar arena)");
+            if (idx < 0 || blk[0] <= idx)
+                dievm2("indeks string di luar batas", (long)idx);
+            stackv[sp++] = getb(blk, idx);
+            break;
+        }
         case OP_ALEN: {
             long *blk = (long *)stackv[--sp];
             stackv[sp++] = blk[0];
@@ -519,32 +545,25 @@ static void run(void) {
             } else if (bi == 4) {                 /* close(fd) */
                 int64_t fdi = stackv[--sp];
                 stackv[sp++] = close((int)fdi);
-            } else if (bi == 5) {                 /* Net.bytes("literal") */
+            } else if (bi == 5) {                 /* Net.bytes("literal") → String packed (v1.18) */
                 uint16_t cp16 = (uint16_t)m->code[f->pc] | ((uint16_t)m->code[f->pc + 1] << 8);
                 f->pc += 2;
-                const char *s = cpool[cp16];
-                long n = 0;
-                while (s[n]) n++;                 /* strlen (byte-as-int, tanpa NUL) */
-                if (heap_used + n + 1 > HEAPLEN) dievm("arena penuh (Net.bytes)");
-                long *blk = heap + heap_used;
-                heap_used += n + 1;
-                blk[0] = n;
-                for (long i = 0; i < n; i++)
-                    blk[1 + i] = (long)(unsigned char)s[i];
-                stackv[sp++] = (int64_t)blk;
-            } else if (bi == 40) {                /* Net.mkstr(int[] bytes) → String */
+                stackv[sp++] = mk_str_arr(cpool[cp16]);
+            } else if (bi == 40) {                /* Net.mkstr(int[] bytes) → String packed */
                 long *src = (long *)stackv[--sp];
                 if (!src || src < heap || src >= heap + HEAPLEN)
                     dievm("Net.mkstr: sumber bukan array valid");
                 long n = src[0];
-                if (heap_used + n + 1 > HEAPLEN) dievm("arena penuh (Net.mkstr)");
+                long slots = (n + 7) >> 3;
+                if (heap_used + slots + 1 > HEAPLEN) dievm("arena penuh (Net.mkstr)");
                 long *blk = heap + heap_used;
-                heap_used += n + 1;
+                heap_used += slots + 1;
                 blk[0] = n;
+                for (long k = 0; k < slots; k++) blk[1 + k] = 0;
                 for (long i = 0; i < n; i++) {
                     long b = src[1 + i];
                     if (b < 0 || b > 255) dievm2("Net.mkstr: byte di luar 0..255", b);
-                    blk[1 + i] = b;
+                    setb(blk, i, b);
                 }
                 stackv[sp++] = (int64_t)blk;
             } else if (bi == 41) {                /* Net.strbytes(String) → int[] */
@@ -556,7 +575,7 @@ static void run(void) {
                 long *blk = heap + heap_used;
                 heap_used += n + 1;
                 blk[0] = n;
-                for (long i = 0; i < n; i++) blk[1 + i] = src[1 + i];
+                for (long i = 0; i < n; i++) blk[1 + i] = getb(src, i);
                 stackv[sp++] = (int64_t)blk;
             } else if (bi == 6) {                 /* Net.openr("literal") → fd */
                 uint16_t cp16 = (uint16_t)m->code[f->pc] | ((uint16_t)m->code[f->pc + 1] << 8);
@@ -696,19 +715,21 @@ static void run(void) {
                 long *a = (long *)stackv[--sp];
                 long la = a[0], lb = b[0];
                 long total = la + lb;
-                if (heap_used + total + 1 > HEAPLEN) dievm("arena penuh (cat)");
+                long slots = (total + 7) >> 3;
+                if (heap_used + slots + 1 > HEAPLEN) dievm("arena penuh (cat)");
                 long *blk = heap + heap_used;
-                heap_used += total + 1;
+                heap_used += slots + 1;
                 blk[0] = total;
-                for (long i = 0; i < la; i++) blk[1 + i] = a[1 + i];
-                for (long j = 0; j < lb; j++) blk[1 + la + j] = b[1 + j];
+                for (long k = 0; k < slots; k++) blk[1 + k] = 0;
+                for (long i = 0; i < la; i++) setb(blk, i, getb(a, i));
+                for (long j = 0; j < lb; j++) setb(blk, la + j, getb(b, j));
                 stackv[sp++] = (int64_t)blk;
             } else if (bi == 23 || bi == 24) {    /* sequal / sne */
                 long *b = (long *)stackv[--sp];
                 long *a = (long *)stackv[--sp];
                 int eq = (a[0] == b[0]);
                 for (long i = 0; eq && i < a[0]; i++)
-                    if (a[1 + i] != b[1 + i]) eq = 0;
+                    if (getb(a, i) != getb(b, i)) eq = 0;
                 if (bi == 24) eq = eq ? 0 : 1;
                 stackv[sp++] = eq;
             } else if (bi == 25) {                /* listen(fd, backlog) */
@@ -966,6 +987,14 @@ static void run(void) {
             for (long i = 0; i < len; i++) tmp[i] = (unsigned char)(buf[1 + i] & 0xff);
             fwrite(tmp, 1, (size_t)len, stdout);
             free(tmp);
+            if (ln) fputc(10, stdout);
+            break;
+        }
+        case OP_PRINTSTR: {                   /* v1.18: String packed → fd 1 */
+            int ln = m->code[f->pc++];
+            long *blk = (long *)stackv[--sp];
+            long len = blk[0];
+            for (long i = 0; i < len; i++) fputc((int)getb(blk, i), stdout);
             if (ln) fputc(10, stdout);
             break;
         }

@@ -1,0 +1,53 @@
+// packedreuse.kop — regresi v1.18: String packed di arena daur ulang.
+// Bug lama: loop zero helper packed menulis ke [dst+slot*8] bukan
+// [dst+8+slot*8], sehingga byte sampah arena ter-OR ke slot data —
+// baru tampak saat String dialokasikan di area yang sudah pernah
+// dipakai (setelah Net.memReset / banyak alokasi).
+import Hash;
+import Str;
+class Main {
+    static int[] copy(int[] a) {
+        int[] o = new int[a.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        return o;
+    }
+    /* kerja berat murni int[]: mengisi arena dengan data bukan nol */
+    static int[] work(int[] pass, int[] salt) {
+        int[] pass2 = copy(pass);
+        int[] salt2 = copy(salt);
+        int[] t = new int[32];
+        int[] ucur = new int[32];
+        int[] out = new int[32];
+        int mark = Net.memMark();
+        int[] msg = new int[8];
+        for (int i = 0; i < 4; i++) msg[i] = salt2[i];
+        msg[4] = 0;
+        msg[7] = 1;
+        int[] u = Hash.hmac(pass2, msg);
+        for (int i = 0; i < 32; i++) { ucur[i] = u[i]; t[i] = u[i]; }
+        for (int i = 0; i < 32; i++) out[i] = t[i];
+        Net.memReset(mark);          /* arena mundur — daur ulang */
+        return out;
+    }
+    public static void main(String[] args) {
+        int[] h1 = work(Net.strbytes("password"), Net.strbytes("salt"));
+        /* String baru TEPAT di area arena bekas — pemicu bug */
+        String s = Net.bytes("password");
+        String t = Net.bytes("salt");
+        int[] b = Net.strbytes(s);
+        int[] c = Net.strbytes(t);
+        System.out.println(s);
+        System.out.println(t);
+        for (int i = 0; i < b.length; i++) System.out.println(b[i]);
+        for (int i = 0; i < c.length; i++) System.out.println(c[i]);
+        String u = s + t;
+        System.out.println(u == "passwordsalt");
+        System.out.println(s[0]);
+        System.out.println(t[0]);
+        System.out.println(u.length);
+        System.out.println(Net.mkstr(b) == s);
+        /* dan sekali lagi lewat mkstr dari buffer segar */
+        String m = Net.mkstr(copy(b));
+        System.out.println(m == "password");
+    }
+}

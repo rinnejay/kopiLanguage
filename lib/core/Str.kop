@@ -289,8 +289,8 @@ class Str {
     /* ── konversi untuk template & umum (v1.7.1) ─────────────── */
 
     static String boolText(boolean b) {
-        if (b) return Net.mkstr(Net.bytes("true"));
-        return Net.mkstr(Net.bytes("false"));
+        if (b) return Net.bytes("true");
+        return Net.bytes("false");
     }
 
     /* uint32 (nilai kanonik zero-extended di int) */
@@ -352,13 +352,13 @@ class Str {
         boolean isnan = d != d;
         double x = d;
         if (neg) x = -x;
-        if (isnan) return Net.mkstr(Net.bytes("nan"));
+        if (isnan) return Net.bytes("nan");
         if (x > 9000000000000000000.0) {
-            if (neg) return Net.mkstr(Net.bytes("-inf"));
-            return Net.mkstr(Net.bytes("inf"));
+            if (neg) return Net.bytes("-inf");
+            return Net.bytes("inf");
         }
         long ip = (long)x;
-        int[] o = Net.strbytes(fromLong(ip));
+        String o = fromLong(ip);
         double frac = x - (double)ip;
         if (frac > 0.0000005) {
             int[] fd = new int[6];
@@ -372,14 +372,13 @@ class Str {
             }
             while (k > 0 && fd[k - 1] == 48) k--;
             if (k > 0) {
-                o = cat(o, Net.bytes("."));
                 int[] fr = new int[k];
                 for (int i = 0; i < k; i++) fr[i] = fd[i];
-                o = cat(o, fr);
+                o = o + Net.bytes(".") + Net.mkstr(fr);
             }
         }
-        if (neg) o = cat(Net.bytes("-"), o);
-        return Net.mkstr(o);
+        if (neg) o = Net.bytes("-") + o;
+        return o;
     }
 
     static void print(int[] s) {

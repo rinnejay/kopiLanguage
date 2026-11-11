@@ -27,6 +27,7 @@ enum {
     OP_FLT, OP_FGT, OP_FLE, OP_FGE, OP_FEQ, OP_FNE,
     OP_CONV, OP_NORM, OP_PRINTNUM, OP_PRINTBUF,
     OP_LINE, OP_SRCFILE,            /* v1.13: baris sumber utk stack trace */
+    OP_IDXB, OP_PRINTSTR            /* v1.18: String packed */
 };
 
 typedef struct {
@@ -163,7 +164,9 @@ static void gen_stmt(Node *s) {
             Ty pt = (Ty)s->a->dty;
             if (pt == T_INT || pt == T_BOOL) {
                 em8(s->ival ? OP_PRINTILN : OP_PRINTI);
-            } else if (pt == T_ARI || pt == T_STR) {
+            } else if (pt == T_STR) {
+                em8(OP_PRINTSTR); em8(s->ival ? 1 : 0);   /* v1.18: packed */
+            } else if (pt == T_ARI) {
                 em8(OP_PRINTBUF); em8(s->ival ? 1 : 0);
             } else {
                 em8(OP_PRINTNUM); em8((int)pt); em8(s->ival ? 1 : 0);
@@ -367,7 +370,8 @@ static void gen_expr(Node *e) {
     case EX_IDX:
         gen_expr(e->a);          /* array pointer */
         gen_expr(e->b);          /* indeks */
-        em8(OP_IDXR);
+        if ((Ty)e->a->dty == T_STR) em8(OP_IDXB);   /* v1.18: String packed */
+        else em8(OP_IDXR);
         break;
     case EX_LEN:
         gen_expr(e->a);

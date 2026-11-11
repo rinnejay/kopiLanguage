@@ -782,7 +782,7 @@ static Node *mk_netbytes(const char *text, int line) {
     Node *n = newnode(EX_NET, line);
     n->ival = 5;
     n->str = xs(text);        /* cpool diisi nanti saat type_expr */
-    n->dty = (int)T_ARI;
+    n->dty = (int)T_STR;      /* v1.18: Net.bytes menghasilkan String packed */
     return n;
 }
 
@@ -948,6 +948,27 @@ static Ty desugar_net2(Node *e, int bi, Node *a, Node *b, Ty ret) {
     e->next = savenext;
     e->dty = (int)ret;
     return ret;
+}
+
+/* v1.18: bungkus ekspresi jadi Net.strbytes(expr) / Net.mkstr(expr) —
+ * konversi material antar representasi String packed ↔ buffer byte.
+ * Dipakai compiler untuk koersi implisit di batas pemanggilan. */
+static Ty type_expr(Node *e);
+
+static void wrap_conv(Node *aa, const char *fn) {
+    Node *inner = newnode(aa->kind, aa->line);
+    *inner = *aa;
+    inner->next = 0;                     /* jangan ikutkan sisa argumen luar */
+    aa->kind = EX_CALL;
+    aa->str = xs(fn);
+    aa->a = inner;
+    aa->ival = 1;
+    aa->b = 0;
+    aa->cp = 0;
+    aa->cls = 0;
+    aa->meth = 0;
+    aa->typed = 0;
+    type_expr(aa);
 }
 
 static Node *parse_tstr(const char *raw, int line) {
@@ -1697,6 +1718,9 @@ static Ty type_expr_raw(Node *e) {
         if (t1 == t2) {
             r = t1;
         } else if ((t1 == T_STR || t1 == T_ARI) && (t2 == T_STR || t2 == T_ARI)) {
+            /* v1.18: cabang buffer dinormalisasi ke String packed */
+            if (t1 == T_ARI) wrap_conv(e->b, "Net.mkstr");
+            if (t2 == T_ARI) wrap_conv(e->c, "Net.mkstr");
             r = T_STR;
         } else {
             die("baris %d: cabang ternary harus bertipe sama (pakai cast)", e->line);
@@ -1713,6 +1737,9 @@ static Ty type_expr_raw(Node *e) {
             int rs = (rt == T_STR || rt == T_ARI);
             if (!ls || !rs)
                 die("baris %d: operasi String hanya dengan String/teks", e->line);
+            /* v1.18: buffer byte dinormalisasi ke String packed dulu */
+            if (lt == T_ARI) wrap_conv(e->a, "Net.mkstr");
+            if (rt == T_ARI) wrap_conv(e->b, "Net.mkstr");
             if (op == '+' && !two)
                 return desugar_net2(e, 22, e->a, e->b, T_STR);
             if ((op == '=' || op == '!') && two)
@@ -1830,8 +1857,8 @@ static Ty type_expr_raw(Node *e) {
                 e->kind = EX_NET;
                 e->ival = bi;
                 e->cp = cp_push(e->a->str);
-                e->dty = (int)T_ARI;
-                return T_ARI;
+                e->dty = (int)T_STR;    /* v1.18: Net.bytes menghasilkan String packed */
+                return T_STR;
             }
             if (bi == 6) {
                 if (narg != 1 || e->a == 0 || e->a->kind != EX_STRLIT)
@@ -1847,6 +1874,21 @@ static Ty type_expr_raw(Node *e) {
             Node *aa = e->a;
             for (int i = 0; i < narg; i++, aa = aa->next) {
                 Ty t = type_expr(aa);
+                /* v1.18: normalisasi representasi di batas builtin.
+                 * cat/sequal/sne: semua argumen wajib String packed.
+                 * buffer read-only: String → Net.strbytes (salinan).
+                 * buffer yang diisi builtin: wajib int[] mentah. */
+                if (bi == 22 || bi == 23 || bi == 24) {
+                    if (t == T_ARI) { wrap_conv(aa, "Net.mkstr"); t = T_STR; }
+                } else if (t == T_STR) {
+                    int robuf = (bi == 3 || bi == 8) ? i == 1 :
+                                (bi == 10) ? i == 3 :
+                                (bi == 13 || bi == 14 || bi == 15 || bi == 32) ? i == 0 :
+                                (bi == 16) ? i <= 1 : 0;
+                    if (robuf) { wrap_conv(aa, "Net.strbytes"); t = T_ARI; }
+                    else if (bi == 2 || bi == 7 || bi == 11 || bi == 33 || bi == 39)
+                        die("baris %d: buffer yang diisi builtin harus int[] — pakai Net.strbytes dulu", e->line);
+                }
                 /* recvb/sendb: (fd int, buf int[]) */
                 if (bi == 7 || bi == 8) {
                     if (i == 0 && t != T_INT)
@@ -2091,6 +2133,8 @@ static Ty type_expr_raw(Node *e) {
                 for (int k = 0; k < i && p; k++) p = p->next;
                 if (p) pt = (Ty)p->ty;
             }
+            /* v1.18: String → param int[] = salinan byte eksplisit (auto) */
+            if (pt == T_ARI && at == T_STR) { wrap_conv(aa, "Net.strbytes"); at = T_ARI; }
             if (pt == T_FN) {
                 if (at != T_FN)
                     die("baris %d: argumen %s butuh lambda (fn)", e->line, e->str);
@@ -2225,6 +2269,9 @@ static void resolve_stmt(Node *s) {
                 s->line, vcls);
         scope_push(s->str, nextslot++, (Ty)s->dty, vcls);
         Ty et = type_expr(s->a);
+        /* v1.18: konversi representasi String ↔ buffer otomatis */
+        if ((Ty)s->dty == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
+        else if ((Ty)s->dty == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
         if (!ty_can_implicit((Ty)s->dty, et) && !fits_literal((Ty)s->dty, s->a))
             die("baris %d: inisialisasi '%s' tidak cocok dengan tipe deklarasinya (butuh cast)",
                 s->line, s->str);
@@ -2235,6 +2282,9 @@ static void resolve_stmt(Node *s) {
         SVar *v = resolve_name(s->str, s->line);
         Ty et = type_expr(s->a);
         int compound = (int)s->cp;
+        /* v1.18: konversi representasi String ↔ buffer otomatis */
+        if (v->ty == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
+        else if (v->ty == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
         if (!ty_can_implicit(v->ty, et) &&
             !(compound && ty_is_int(v->ty) && ty_is_int(et)) &&
             !fits_literal(v->ty, s->a))
@@ -2291,6 +2341,9 @@ static void resolve_stmt(Node *s) {
             Ty et = type_expr(s->a);
             /* ret metode aktif: cari lewat prog? simpan global current */
             if (!cur_method) die("internal: return tanpa metode");
+            /* v1.18: konversi representasi String ↔ buffer otomatis */
+            if (cur_method->ret == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
+            else if (cur_method->ret == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
             if (!ty_can_implicit(cur_method->ret, et) &&
                 !fits_literal(cur_method->ret, s->a))
                 die("baris %d: return tidak cocok dengan tipe metode (butuh cast)", s->line);

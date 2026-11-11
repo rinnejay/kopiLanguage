@@ -286,25 +286,45 @@ static void gen_stmt(Method *m, Node *s) {
             gen_expr(m, s->a);
             emit("\tsub\tsp, sp, #32");
             emit("\tstr\tx0, [sp]");
-            emit("\tstr\twzr, [sp, #8]");
-            emit(".L%d:", lloop);
-            emit("\tldr\tx14, [sp]");
-            emit("\tldr\tw16, [sp, #8]");
-            emit("\tldr\tw15, [x14]");
-            emit("\tcmp\tw16, w15");
-            emit("\tb.hs\t.L%d", lend);
-            emit("\tsxtw\tx9, w16");
-            emit("\tlsl\tx9, x9, #3");
-            emit("\tadd\tx9, x9, #8");
-            emit("\tldr\tw0, [x14, x9]");
-            emit("\tadrp\tx1, :got:stdout");
-            emit("\tldr\tx1, [x1, :got_lo12:stdout]");
-            emit("\tldr\tx1, [x1]");
-            emit("\tbl\tfputc");
-            emit("\tldr\tw16, [sp, #8]");
-            emit("\tadd\tw16, w16, #1");
-            emit("\tstr\tw16, [sp, #8]");
-            emit("\tb\t.L%d", lloop);
+            if ((Ty)s->a->dty == T_STR) {   /* v1.18: String packed */
+                emit("\tstr\txzr, [sp, #8]");   /* counter 64-bit di stack */
+                emit(".L%d:", lloop);
+                emit("\tldr\tx14, [sp]");
+                emit("\tldr\tx15, [x14]");      /* len (reload — fputc merusak) */
+                emit("\tldr\tx16, [sp, #8]");   /* i */
+                emit("\tcmp\tx16, x15");
+                emit("\tb.hs\t.L%d", lend);
+                emit("\tadd\tx14, x14, #8");    /* data = blk+8 */
+                emit("\tldrb\tw0, [x14, x16]");
+                emit("\tadrp\tx1, :got:stdout");
+                emit("\tldr\tx1, [x1, :got_lo12:stdout]");
+                emit("\tldr\tx1, [x1]");
+                emit("\tbl\tfputc");
+                emit("\tldr\tx16, [sp, #8]");
+                emit("\tadd\tx16, x16, #1");
+                emit("\tstr\tx16, [sp, #8]");
+                emit("\tb\t.L%d", lloop);
+            } else {                        /* buffer byte-per-slot (debug) */
+                emit("\tstr\twzr, [sp, #8]");
+                emit(".L%d:", lloop);
+                emit("\tldr\tx14, [sp]");
+                emit("\tldr\tw16, [sp, #8]");
+                emit("\tldr\tw15, [x14]");
+                emit("\tcmp\tw16, w15");
+                emit("\tb.hs\t.L%d", lend);
+                emit("\tsxtw\tx9, w16");
+                emit("\tlsl\tx9, x9, #3");
+                emit("\tadd\tx9, x9, #8");
+                emit("\tldr\tw0, [x14, x9]");
+                emit("\tadrp\tx1, :got:stdout");
+                emit("\tldr\tx1, [x1, :got_lo12:stdout]");
+                emit("\tldr\tx1, [x1]");
+                emit("\tbl\tfputc");
+                emit("\tldr\tw16, [sp, #8]");
+                emit("\tadd\tw16, w16, #1");
+                emit("\tstr\tw16, [sp, #8]");
+                emit("\tb\t.L%d", lloop);
+            }
             emit(".L%d:", lend);
             if (s->ival) {
                 emit("\tmov\tw0, #10");
@@ -657,7 +677,7 @@ static int gen_expr(Method *m, Node *e) {
         return 1;
     }
     case EX_IDX: {                       /* hasil: w0 = elemen (32-bit) */
-        gen_expr(m, e->a);               /* x0 = array pointer */
+        gen_expr(m, e->a);               /* x0 = array/String pointer */
         push_val(1);
         gen_expr(m, e->b);               /* w0 = idx */
         emit("\tldr\tx1, [sp], #16");
@@ -666,6 +686,10 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tb.hs\t.Karr");          /* (>0 unsigned): negatif ikut tertangkap */
         emit("\tsxtw\tx9, w0");
         emit("\tadd\tx1, x1, #8");
+        if ((Ty)e->a->dty == T_STR) {   /* v1.18: String packed — byte di dalam slot */
+            emit("\tldrb\tw0, [x1, x9]");
+            return 0;
+        }
         emit("\tldr\tx0, [x1, x9, lsl #3]");
         {   /* slot 64-bit (long/String/objek): jangan pangkas ke 32-bit */
             Ty et = (Ty)e->dty;
@@ -682,35 +706,13 @@ static int gen_expr(Method *m, Node *e) {
         int ln = netlbl++;                /* label unik per kemunculan */
         /* 0=socket(domain,type) 1=connect(fd,ipBE,port) 2=rdb(fd)
          * 3=wrb(fd,b) 4=close(fd) 5=bytes("lit") → int[]                    */
-        if (e->ival == 5) {              /* Net.bytes("literal") → arena       */
+        if (e->ival == 5) {              /* Net.bytes("literal") → String packed (v1.18) */
             int c = (int)e->cp;
             emit("\tadrp\tx9, :got:cpool%d", c);
             emit("\tldr\tx9, [x9, :got_lo12:cpool%d]", c);
-            emit("\tmov\tw2, #0");                       /* strlen */
-            emit(".LNB%da:", ln);
-            emit("\tldrb\tw1, [x9, x2]");
-            emit("\tadd\tw2, w2, #1");
-            emit("\tcbnz\tw1, .LNB%da", ln);
-            emit("\tsub\tw2, w2, #1");                   /* len = w2 */
-            emit("\tsxtw\tx10, w2");
-            emit("\tlsl\tx0, x10, #3");
-            emit("\tadd\tx0, x0, #8");
-            emit("\tbl\tkopalloc");
-            emit("\tstr\tx10, [x0]");                    /* len */
-            emit("\tmov\tx11, x0");                      /* simpan hasil */
-            emit("\tmov\tx12, #0");                      /* i */
-            emit(".LNB%db:", ln);
-            emit("\tcmp\tx12, x10");
-            emit("\tb.hs\t.LNB%dc", ln);
-            emit("\tldrb\tw1, [x9, x12]");
-            emit("\tlsl\tx13, x12, #3");
-            emit("\tadd\tx13, x13, #8");
-            emit("\tstr\tx1, [x11, x13]");
-            emit("\tadd\tx12, x12, #1");
-            emit("\tb\t.LNB%db", ln);
-            emit(".LNB%dc:", ln);
-            emit("\tmov\tx0, x11");
-            return 1;                       /* hasil pointer array 64-bit */
+            emit("\tmov\tx0, x9");
+            emit("\tbl\tkop_str_from_cstr");
+            return 1;                       /* hasil pointer String packed */
         }
         if (e->ival == 6) {              /* Net.openr("literal") → fd          */
             int c = (int)e->cp;
@@ -1136,84 +1138,17 @@ static int gen_expr(Method *m, Node *e) {
                 gen_expr(m, aa);
                 push_val(1);                    /* pointer array/String */
             }
-            if (e->ival == 22) {                /* cat(a,b) */
-                char la[40], lb[40], ld[40];
-                snprintf(la, sizeof la, ".LCA%dA", ln);
-                snprintf(lb, sizeof lb, ".LCA%dB", ln);
-                snprintf(ld, sizeof ld, ".LCA%dD", ln);
-                emit("\tldr\tx10, [sp]");           /* b */
-                emit("\tldr\tx11, [sp, #16]");       /* a */
-                emit("\tldr\tw12, [x10]");
-                emit("\tldr\tw13, [x11]");
-                emit("\tadd\tw14, w12, w13");
-                emit("\tsxtw\tx0, w14");
-                emit("\tlsl\tx0, x0, #3");
-                emit("\tadd\tx0, x0, #8");
-                emit("\tbl\tkopalloc");
-                emit("\tldr\tx10, [sp]");
-                emit("\tldr\tx11, [sp, #16]");
-                emit("\tldr\tw12, [x10]");
-                emit("\tldr\tw13, [x11]");
-                emit("\tadd\tw14, w12, w13");
-                emit("\tsxtw\tx14, w14");
-                emit("\tstr\tx14, [x0]");
-                emit("\tmov\tw9, #0");
-                emit("%s:", la);
-                emit("\tcmp\tw9, w13");
-                emit("\tb.hs\t%s", ld);
-                emit("\tsxtw\tx15, w9");
-                emit("\tlsl\tx15, x15, #3");
-                emit("\tadd\tx15, x15, #8");
-                emit("\tldr\tx16, [x11, x15]");
-                emit("\tstr\tx16, [x0, x15]");
-                emit("\tadd\tw9, w9, #1");
-                emit("\tb\t%s", la);
-                emit("%s:", ld);
-                emit("\tmov\tw9, #0");
-                emit("%s:", lb);
-                emit("\tcmp\tw9, w12");
-                emit("\tb.hs\t.LCA%dE", ln);
-                emit("\tsxtw\tx15, w9");
-                emit("\tlsl\tx15, x15, #3");
-                emit("\tadd\tx15, x15, #8");
-                emit("\tldr\tx16, [x10, x15]");
-                emit("\tadd\tw17, w13, w9");
-                emit("\tsxtw\tx17, w17");
-                emit("\tlsl\tx17, x17, #3");
-                emit("\tadd\tx17, x17, #8");
-                emit("\tstr\tx16, [x0, x17]");
-                emit("\tadd\tw9, w9, #1");
-                emit("\tb\t%s", lb);
-                emit(".LCA%dE:", ln);
+            if (e->ival == 22) {                /* cat(a,b) → kop_cat_packed (v1.18) */
+                emit("\tldr\tx0, [sp, #16]");       /* a */
+                emit("\tldr\tx1, [sp]");            /* b */
+                emit("\tbl\tkop_cat_packed");
                 emit("\tadd\tsp, sp, #32");
                 return 1;
             }
-            /* sequal / sne */
-            emit("\tldr\tx10, [sp]");
-            emit("\tldr\tx11, [sp, #16]");
-            emit("\tldr\tw12, [x10]");
-            emit("\tldr\tw13, [x11]");
-            emit("\tcmp\tw12, w13");
-            emit("\tb.ne\t.LSE%dN", ln);
-            emit("\tmov\tw9, #0");
-            emit(".LSE%dL:", ln);
-            emit("\tcmp\tw9, w12");
-            emit("\tb.hs\t.LSE%dY", ln);
-            emit("\tsxtw\tx15, w9");
-            emit("\tlsl\tx15, x15, #3");
-            emit("\tadd\tx15, x15, #8");
-            emit("\tldr\tx16, [x11, x15]");
-            emit("\tldr\tx17, [x10, x15]");
-            emit("\tcmp\tx16, x17");
-            emit("\tb.ne\t.LSE%dN", ln);
-            emit("\tadd\tw9, w9, #1");
-            emit("\tb\t.LSE%dL", ln);
-            emit(".LSE%dY:", ln);
-            emit("\tmov\tw0, #1");
-            emit("\tb\t.LSE%dD", ln);
-            emit(".LSE%dN:", ln);
-            emit("\tmov\tw0, wzr");
-            emit(".LSE%dD:", ln);
+            /* sequal / sne → kop_sequal_packed (v1.18) */
+            emit("\tldr\tx0, [sp, #16]");       /* a */
+            emit("\tldr\tx1, [sp]");            /* b */
+            emit("\tbl\tkop_sequal_packed");
             emit("\tadd\tsp, sp, #32");
             if (e->ival == 24) emit("\teor\tw0, w0, #1");
             return 0;
@@ -1545,35 +1480,11 @@ static int gen_expr(Method *m, Node *e) {
             return 0;
         }
         if (e->ival == 40 || e->ival == 41) { /* mkstr(int[])→String | strbytes(String)→int[] */
-            /* fisik byte-per-slot (v1.17): keduanya salinan blok bernah-panjang */
+            /* v1.18: konversi representasi via helper runtime */
             gen_expr(m, e->a);
             push_val(1);
-            emit("\tldr\tx10, [sp]");              /* sumber */
-            emit("\tldr\tw11, [x10]");             /* n byte */
-            emit("\tsxtw\tx12, w11");
-            emit("\tlsl\tx0, x12, #3");
-            emit("\tadd\tx0, x0, #8");
-            emit("\tbl\tkopalloc");
-            emit("\tstr\tx12, [x0]");              /* len */
-            emit("\tmov\tx13, #0");
-            emit(".LMK%dL:", ln);
-            emit("\tcmp\tx13, x12");
-            emit("\tb.hs\t.LMK%dD", ln);
-            emit("\tlsl\tx14, x13, #3");
-            emit("\tadd\tx14, x14, #8");
-            if (e->ival == 40) {
-                /* cek rentang byte 0..255 */
-                emit("\tldr\tx15, [x10, x14]");
-                emit("\tcmp\tx15, #255");
-                emit("\tb.hi\t.Kbnd");
-                emit("\tstr\tx15, [x0, x14]");
-            } else {
-                emit("\tldr\tx15, [x10, x14]");
-                emit("\tstr\tx15, [x0, x14]");
-            }
-            emit("\tadd\tx13, x13, #1");
-            emit("\tb\t.LMK%dL", ln);
-            emit(".LMK%dD:", ln);
+            emit("\tldr\tx0, [sp]");
+            emit("\tbl\t%s", e->ival == 40 ? "kop_mkstr" : "kop_strbytes");
             emit("\tadd\tsp, sp, #16");
             return 0;
         }
@@ -1893,7 +1804,7 @@ void gen_a64(const char *outpath) {
     emit("\tadd\tx0, x3, x2");
     emit("\tret");
 
-    /* x0 = char* C → x0 = int[] byte-array (arena) */
+    /* x0 = char* C → x0 = String packed (v1.18: 8 byte per slot) */
     emit(".text");
     emit("\t.globl kop_str_from_cstr");
     emit("kop_str_from_cstr:");
@@ -1908,28 +1819,247 @@ void gen_a64(const char *outpath) {
     emit("\tb\t.LSCa");
     emit(".LSCb:");
     emit("\tstp\tx9, x2, [sp, #-16]!");
-    emit("\tsxtw\tx10, w2");
-    emit("\tlsl\tx0, x10, #3");
+    emit("\tsxtw\tx10, w2");                       /* n */
+    emit("\tadd\tx11, x10, #7");
+    emit("\tlsr\tx11, x11, #3");                   /* slots */
+    emit("\tlsl\tx0, x11, #3");
     emit("\tadd\tx0, x0, #8");
     emit("\tbl\tkopalloc");
     emit("\tldp\tx9, x2, [sp], #16");
-    emit("\tsxtw\tx10, w2");
-    emit("\tstr\tx10, [x0]");
-    emit("\tmov\tx11, x0");
+    emit("\tsxtw\tx10, w2");                       /* n */
+    emit("\tadd\tx11, x10, #7");
+    emit("\tlsr\tx11, x11, #3");                   /* slots (recompute) */
+    emit("\tmov\tx12, #0");
+    emit("\tadd\tx13, x0, #8");                    /* basis slot data */
+    emit(".LSCz:");
+    emit("\tcmp\tx12, x11");
+    emit("\tb.hs\t.LSCw");
+    emit("\tstr\txzr, [x13, x12, lsl #3]");
+    emit("\tadd\tx12, x12, #1");
+    emit("\tb\t.LSCz");
+    emit(".LSCw:");
+    emit("\tstr\tx10, [x0]");                      /* len = n */
     emit("\tmov\tx12, #0");
     emit(".LSCc:");
     emit("\tcmp\tx12, x10");
     emit("\tb.hs\t.LSCd");
     emit("\tldrb\tw1, [x9, x12]");
-    emit("\tlsl\tx13, x12, #3");
-    emit("\tadd\tx13, x13, #8");
-    emit("\tstr\tx1, [x11, x13]");
+    emit("\tand\tx13, x12, #7");
+    emit("\tlsl\tx13, x13, #3");                   /* shift */
+    emit("\tlsr\tx14, x12, #3");
+    emit("\tlsl\tx14, x14, #3");
+    emit("\tadd\tx14, x14, #8");                   /* slot offset */
+    emit("\tldr\tx15, [x0, x14]");
+    emit("\tlsl\tx16, x1, x13");
+    emit("\torr\tx15, x15, x16");
+    emit("\tstr\tx15, [x0, x14]");
     emit("\tadd\tx12, x12, #1");
     emit("\tb\t.LSCc");
     emit(".LSCd:");
-    emit("\tmov\tx0, x11");
     emit("\tldp\tx29, x30, [sp], #16");
     emit("\tret");
+
+    /* ── v1.18: runtime String packed ───────────────────────────── */
+
+    /* x0 = int[] byte-per-slot → x0 = String packed (byte 0..255) */
+    emit(".text");
+    emit("\t.globl kop_mkstr");
+    emit("kop_mkstr:");
+    emit("\tstp\tx29, x30, [sp, #-16]!");
+    emit("\tmov\tx29, sp");
+    emit("\tmov\tx9, x0");
+    emit("\tldr\tx10, [x9]");                      /* n */
+    emit("\tadd\tx11, x10, #7");
+    emit("\tlsr\tx11, x11, #3");                   /* slots */
+    emit("\tlsl\tx0, x11, #3");
+    emit("\tadd\tx0, x0, #8");
+    emit("\tbl\tkopalloc");
+    emit("\tmov\tx12, #0");
+    emit("\tadd\tx14, x0, #8");                    /* basis slot data */
+    emit(".LMKz:");
+    emit("\tcmp\tx12, x11");
+    emit("\tb.hs\t.LMKw");
+    emit("\tstr\txzr, [x14, x12, lsl #3]");
+    emit("\tadd\tx12, x12, #1");
+    emit("\tb\t.LMKz");
+    emit(".LMKw:");
+    emit("\tstr\tx10, [x0]");
+    emit("\tmov\tx13, #0");
+    emit(".LMKl:");
+    emit("\tcmp\tx13, x10");
+    emit("\tb.hs\t.LMKd");
+    emit("\tadd\tx14, x9, #8");
+    emit("\tldr\tx14, [x14, x13, lsl #3]");        /* byte-per-slot src */
+    emit("\tcmp\tx14, #255");
+    emit("\tb.hi\t.Kbnd");
+    emit("\tand\tx15, x13, #7");
+    emit("\tlsl\tx15, x15, #3");                   /* shift */
+    emit("\tlsl\tx14, x14, x15");
+    emit("\tlsr\tx16, x13, #3");
+    emit("\tlsl\tx16, x16, #3");
+    emit("\tadd\tx16, x16, #8");
+    emit("\tldr\tx17, [x0, x16]");
+    emit("\torr\tx17, x17, x14");
+    emit("\tstr\tx17, [x0, x16]");
+    emit("\tadd\tx13, x13, #1");
+    emit("\tb\t.LMKl");
+    emit(".LMKd:");
+    emit("\tldp\tx29, x30, [sp], #16");
+    emit("\tret");
+
+    /* x0 = String packed → x0 = int[] byte-per-slot */
+    emit(".text");
+    emit("\t.globl kop_strbytes");
+    emit("kop_strbytes:");
+    emit("\tstp\tx29, x30, [sp, #-16]!");
+    emit("\tmov\tx29, sp");
+    emit("\tmov\tx9, x0");
+    emit("\tldr\tx10, [x9]");                      /* n */
+    emit("\tlsl\tx0, x10, #3");
+    emit("\tadd\tx0, x0, #8");
+    emit("\tbl\tkopalloc");
+    emit("\tstr\tx10, [x0]");
+    emit("\tmov\tx11, #0");
+    emit(".LSB1:");
+    emit("\tcmp\tx11, x10");
+    emit("\tb.hs\t.LSB2");
+    emit("\tlsr\tx13, x11, #3");
+    emit("\tlsl\tx13, x13, #3");
+    emit("\tadd\tx13, x13, #8");
+    emit("\tldr\tx14, [x9, x13]");                 /* slot packed */
+    emit("\tand\tx15, x11, #7");
+    emit("\tlsl\tx15, x15, #3");                   /* shift */
+    emit("\tlsr\tx14, x14, x15");
+    emit("\tand\tx14, x14, #0xff");
+    emit("\tlsl\tx16, x11, #3");
+    emit("\tadd\tx16, x16, #8");
+    emit("\tstr\tx14, [x0, x16]");
+    emit("\tadd\tx11, x11, #1");
+    emit("\tb\t.LSB1");
+    emit(".LSB2:");
+    emit("\tldp\tx29, x30, [sp], #16");
+    emit("\tret");
+
+    /* x0, x1 = String packed → x0 = concat packed */
+    emit(".text");
+    emit("\t.globl kop_cat_packed");
+    emit("kop_cat_packed:");
+    emit("\tstp\tx29, x30, [sp, #-16]!");
+    emit("\tmov\tx29, sp");
+    emit("\tmov\tx9, x0");
+    emit("\tmov\tx10, x1");
+    emit("\tldr\tx11, [x9]");                      /* la */
+    emit("\tldr\tx12, [x10]");                     /* lb */
+    emit("\tadd\tx13, x11, x12");                  /* total */
+    emit("\tadd\tx14, x13, #7");
+    emit("\tlsr\tx14, x14, #3");                   /* slots */
+    emit("\tstp\tx9, x10, [sp, #-16]!");
+    emit("\tstp\tx11, x12, [sp, #-16]!");
+    emit("\tlsl\tx0, x14, #3");
+    emit("\tadd\tx0, x0, #8");
+    emit("\tbl\tkopalloc");
+    emit("\tldp\tx11, x12, [sp], #16");
+    emit("\tldp\tx9, x10, [sp], #16");
+    emit("\tmov\tx15, #0");
+    emit("\tadd\tx1, x0, #8");                     /* basis slot data */
+    emit(".LCz:");
+    emit("\tcmp\tx15, x14");
+    emit("\tb.hs\t.LCw");
+    emit("\tstr\txzr, [x1, x15, lsl #3]");
+    emit("\tadd\tx15, x15, #1");
+    emit("\tb\t.LCz");
+    emit(".LCw:");
+    emit("\tstr\tx13, [x0]");                      /* len = total */
+    emit("\tmov\tx15, #0");                        /* i untuk a */
+    emit(".LCa:");
+    emit("\tcmp\tx15, x11");
+    emit("\tb.hs\t.LCb");
+    emit("\tlsr\tx16, x15, #3");
+    emit("\tlsl\tx16, x16, #3");
+    emit("\tadd\tx16, x16, #8");
+    emit("\tldr\tx17, [x9, x16]");
+    emit("\tand\tx1, x15, #7");
+    emit("\tlsl\tx1, x1, #3");
+    emit("\tlsr\tx17, x17, x1");
+    emit("\tand\tx17, x17, #0xff");                /* getb(a, i) */
+    emit("\tlsr\tx2, x15, #3");
+    emit("\tlsl\tx2, x2, #3");
+    emit("\tadd\tx2, x2, #8");
+    emit("\tldr\tx3, [x0, x2]");
+    emit("\tand\tx1, x15, #7");
+    emit("\tlsl\tx1, x1, #3");
+    emit("\tlsl\tx17, x17, x1");
+    emit("\torr\tx3, x3, x17");
+    emit("\tstr\tx3, [x0, x2]");
+    emit("\tadd\tx15, x15, #1");
+    emit("\tb\t.LCa");
+    emit(".LCb:");
+    emit("\tmov\tx15, #0");                        /* j untuk b */
+    emit(".LCc:");
+    emit("\tcmp\tx15, x12");
+    emit("\tb.hs\t.LCd");
+    emit("\tlsr\tx16, x15, #3");
+    emit("\tlsl\tx16, x16, #3");
+    emit("\tadd\tx16, x16, #8");
+    emit("\tldr\tx17, [x10, x16]");
+    emit("\tand\tx1, x15, #7");
+    emit("\tlsl\tx1, x1, #3");
+    emit("\tlsr\tx17, x17, x1");
+    emit("\tand\tx17, x17, #0xff");                /* getb(b, j) */
+    emit("\tadd\tx5, x15, x11");                   /* pos = la + j */
+    emit("\tlsr\tx2, x5, #3");
+    emit("\tlsl\tx2, x2, #3");
+    emit("\tadd\tx2, x2, #8");
+    emit("\tldr\tx3, [x0, x2]");
+    emit("\tand\tx1, x5, #7");
+    emit("\tlsl\tx1, x1, #3");
+    emit("\tlsl\tx17, x17, x1");
+    emit("\torr\tx3, x3, x17");
+    emit("\tstr\tx3, [x0, x2]");
+    emit("\tadd\tx15, x15, #1");
+    emit("\tb\t.LCc");
+    emit(".LCd:");
+    emit("\tldp\tx29, x30, [sp], #16");
+    emit("\tret");
+
+    /* x0, x1 = String packed → w0 = isi sama (1/0) */
+    emit(".text");
+    emit("\t.globl kop_sequal_packed");
+    emit("kop_sequal_packed:");
+    emit("\tstp\tx29, x30, [sp, #-16]!");
+    emit("\tmov\tx29, sp");
+    emit("\tldr\tx9, [x0]");                       /* la */
+    emit("\tldr\tx10, [x1]");                      /* lb */
+    emit("\tcmp\tx9, x10");
+    emit("\tb.ne\t.LSQn");
+    emit("\tmov\tx11, #0");
+    emit(".LSQ1:");
+    emit("\tcmp\tx11, x9");
+    emit("\tb.hs\t.LSQy");
+    emit("\tlsr\tx12, x11, #3");
+    emit("\tlsl\tx12, x12, #3");
+    emit("\tadd\tx12, x12, #8");
+    emit("\tldr\tx13, [x0, x12]");
+    emit("\tand\tx14, x11, #7");
+    emit("\tlsl\tx14, x14, #3");
+    emit("\tlsr\tx13, x13, x14");
+    emit("\tand\tx13, x13, #0xff");
+    emit("\tldr\tx15, [x1, x12]");
+    emit("\tlsr\tx15, x15, x14");
+    emit("\tand\tx15, x15, #0xff");
+    emit("\tcmp\tx13, x15");
+    emit("\tb.ne\t.LSQn");
+    emit("\tadd\tx11, x11, #1");
+    emit("\tb\t.LSQ1");
+    emit(".LSQy:");
+    emit("\tmov\tw0, #1");
+    emit("\tb\t.LSQd");
+    emit(".LSQn:");
+    emit("\tmov\tw0, #0");
+    emit(".LSQd:");
+    emit("\tldp\tx29, x30, [sp], #16");
+    emit("\tret");
+
 
     emit("\t.section .data");
     emit("\t.align 3");

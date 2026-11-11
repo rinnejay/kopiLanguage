@@ -262,23 +262,40 @@ static void gen_stmt(Method *m, Node *s) {
         } else if ((Ty)s->a->dty == T_ARI || (Ty)s->a->dty == T_STR) {
             int lloop = nlab++, lend = nlab++;
             gen_expr(m, s->a);
-            emit("\tsubq $16, %%rsp");
-            emit("\tmovq %%rax, (%%rsp)");
-            emit("\tmovq $0, 8(%%rsp)");
-            emit(".L%d:", lloop);
-            emit("\tmovq (%%rsp), %%r10");
-            emit("\tmovq 8(%%rsp), %%r11");
-            emit("\tmovq (%%r10), %%rax");
-            emit("\tcmpq %%rax, %%r11");
-            emit("\tjge .L%d", lend);
-            emit("\tmovq %%r11, %%rax");
-            emit("\tshlq $3, %%rax");
-            emit("\tmovq 8(%%r10,%%rax), %%rdi");
-            emit("\tmovq stdout@GOTPCREL(%%rip), %%rsi");
-            emit("\tmovq (%%rsi), %%rsi");
-            emit("\tcall fputc@PLT");
-            emit("\tincq 8(%%rsp)");
-            emit("\tjmp .L%d", lloop);
+            emit("\tsubq $32, %%rsp");
+            emit("\tmovq %%rax, 16(%%rsp)");
+            if ((Ty)s->a->dty == T_STR) {   /* v1.18: String packed */
+                emit("\tmovq $0, 8(%%rsp)");     /* counter 64-bit */
+                emit(".L%d:", lloop);
+                emit("\tmovq 16(%%rsp), %%r10");
+                emit("\tmovq (%r10), %%rax");    /* len */
+                emit("\tcmpq %%rax, 8(%%rsp)");
+                emit("\tjge .L%d", lend);
+                emit("\tmovq 16(%%rsp), %%r10");
+                emit("\tmovq 8(%%rsp), %%r11");
+                emit("\tmovzbl 8(%%r10,%%r11,1), %%edi");
+                emit("\tmovq stdout@GOTPCREL(%%rip), %%rsi");
+                emit("\tmovq (%%rsi), %%rsi");
+                emit("\tcall fputc@PLT");
+                emit("\tincq 8(%%rsp)");
+                emit("\tjmp .L%d", lloop);
+            } else {                        /* buffer byte-per-slot (debug) */
+                emit("\tmovq $0, 8(%%rsp)");
+                emit(".L%d:", lloop);
+                emit("\tmovq 16(%%rsp), %%r10");
+                emit("\tmovq 8(%%rsp), %%r11");
+                emit("\tmovq (%r10), %%rax");
+                emit("\tcmpq %%rax, %%r11");
+                emit("\tjge .L%d", lend);
+                emit("\tmovq %%r11, %%rax");
+                emit("\tshlq $3, %%rax");
+                emit("\tmovq 8(%%r10,%%rax), %%rdi");
+                emit("\tmovq stdout@GOTPCREL(%%rip), %%rsi");
+                emit("\tmovq (%%rsi), %%rsi");
+                emit("\tcall fputc@PLT");
+                emit("\tincq 8(%%rsp)");
+                emit("\tjmp .L%d", lloop);
+            }
             emit(".L%d:", lend);
             if (s->ival) {
                 emit("\tmovl $10, %%edi");
@@ -674,7 +691,7 @@ static int gen_expr(Method *m, Node *e) {
         return 1;
     }
     case EX_IDX: {
-        gen_expr(m, e->a);               /* rax = array */
+        gen_expr(m, e->a);               /* rax = array/String */
         spush();
         gen_expr(m, e->b);               /* eax = idx */
         emit("\tpopq %%r10");           /* array */
@@ -682,6 +699,10 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tjae .Karr");            /* unsigned: negatif tertangkap */
         emit("\tmovl %%eax, %%eax");
         emit("\tcltq");
+        if ((Ty)e->a->dty == T_STR) {   /* v1.18: byte ke-i String packed */
+            emit("\tmovzbl 8(%%r10,%%rax), %%eax");
+            return 0;
+        }
         emit("\tmovq (%%r10,%%rax,8), %%rax");   /* elemen 8-byte */
         return 0;
     }
@@ -692,38 +713,10 @@ static int gen_expr(Method *m, Node *e) {
     case EX_NET: {                       /* syscall Linux langsung (tanpa libc) */
         int ln = netlbl++;                /* label unik per kemunculan */
         /* 0=socket 1=connect 2=rdb 3=wrb 4=close 5=bytes */
-        if (e->ival == 5) {              /* Net.bytes("literal") → int[]       */
+        if (e->ival == 5) {              /* Net.bytes("literal") → String packed (v1.18) */
             int c = (int)e->cp;
-            /* 1) strlen(s) → rcx */
-            emit("\tleaq cpool%d(%%rip), %%rsi", c);
-            emit("\txorl %%ecx, %%ecx");
-            emit(".LNX%da:", ln);
-            emit("\tcmpb $0, (%%rsi,%%rcx)");
-            emit("\tje .LNX%db", ln);
-            emit("\taddq $1, %%rcx");
-            emit("\tjmp .LNX%da", ln);
-            emit(".LNX%db:", ln);
-            /* 2) alokasi arena 8*len + 8 */
-            emit("\tmovq %%rcx, %%rdi");
-            emit("\tshlq $3, %%rdi");
-            emit("\taddq $8, %%rdi");
-            emit("\tcall kopalloc");
-            emit("\tmovq %%rcx, (%%rax)");               /* len */
-            emit("\tmovq %%rax, %%rbx");                 /* hasil (rbx callee-saved) */
-            /* 3) salin byte-as-int: rbx+8+8i = s[i] */
-            emit("\tleaq cpool%d(%%rip), %%rsi", c);
-            emit("\txorl %%ecx, %%ecx");
-            emit(".LNX%dc:", ln);
-            emit("\tcmpq %%rcx, (%%rax)");
-            emit("\tjbe .LNX%dd", ln);                    /* i >= len → selesai */
-            emit("\tmovzbl (%%rsi,%%rcx), %%edx");
-            emit("\tshlq $3, %%rcx");
-            emit("\tmovq %%rdx, 8(%%rbx,%%rcx)");
-            emit("\tshrq $3, %%rcx");
-            emit("\taddq $1, %%rcx");
-            emit("\tjmp .LNX%dc", ln);
-            emit(".LNX%dd:", ln);
-            emit("\tmovq %%rbx, %%rax");
+            emit("\tleaq cpool%d(%%rip), %%rdi", c);
+            emit("\tcall kop_str_from_cstr");
             return 1;
         }
         if (e->ival == 6) {              /* Net.openr("literal") → fd          */
@@ -1134,81 +1127,17 @@ static int gen_expr(Method *m, Node *e) {
                 gen_expr(m, aa);
                 spush();
             }
-            if (e->ival == 22) {                     /* cat(a,b) */
-                int l1 = nlab++, l2 = nlab++, l3 = nlab++;
-                emit("\tmovq (%%rsp), %%r10");
-                emit("\tmovq 16(%%rsp), %%r11");
-                emit("\tmovl (%%r10), %%r12d");
-                emit("\tmovl (%%r11), %%r13d");
-                emit("\tmovl %%r12d, %%r14d");
-                emit("\taddl %%r13d, %%r14d");
-                emit("\tmovslq %%r14d, %%rdi");
-                emit("\tshlq $3, %%rdi");
-                emit("\taddq $8, %%rdi");
-                emit("\tcall kopalloc");
-                emit("\tmovq %%rax, %%r15");
-                emit("\tmovq (%%rsp), %%r10");
-                emit("\tmovq 16(%%rsp), %%r11");
-                emit("\tmovl (%%r10), %%r12d");
-                emit("\tmovl (%%r11), %%r13d");
-                emit("\tmovl %%r12d, %%r14d");
-                emit("\taddl %%r13d, %%r14d");
-                emit("\tmovslq %%r14d, %%rax");
-                emit("\tmovq %%rax, (%%r15)");
-                emit("\txorl %%ecx, %%ecx");
-                emit(".LCAX%dA:", l1);
-                emit("\tcmpl %%r13d, %%ecx");
-                emit("\tjge .LCAX%dB", l2);
-                emit("\tmovslq %%ecx, %%rax");
-                emit("\tshlq $3, %%rax");
-                emit("\tmovq 8(%%r11,%%rax), %%rdx");
-                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
-                emit("\tincl %%ecx");
-                emit("\tjmp .LCAX%dA", l1);
-                emit(".LCAX%dB:", l2);
-                emit("\txorl %%ecx, %%ecx");
-                emit(".LCAX%dC:", l3);
-                emit("\tcmpl %%r12d, %%ecx");
-                emit("\tjge .LCAX%dD", l1);
-                emit("\tmovslq %%ecx, %%rax");
-                emit("\tshlq $3, %%rax");
-                emit("\tmovq 8(%%r10,%%rax), %%rdx");
-                emit("\tmovl %%r13d, %%eax");
-                emit("\taddl %%ecx, %%eax");
-                emit("\tmovslq %%eax, %%rax");
-                emit("\tshlq $3, %%rax");
-                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
-                emit("\tincl %%ecx");
-                emit("\tjmp .LCAX%dC", l3);
-                emit(".LCAX%dD:", l1);
+            if (e->ival == 22) {                     /* cat(a,b) → kop_cat_packed (v1.18) */
+                emit("\tmovq 16(%%rsp), %%rdi");     /* a */
+                emit("\tmovq (%%rsp), %%rsi");       /* b */
+                emit("\tcall kop_cat_packed");
                 emit("\taddq $16, %%rsp");
-                emit("\tmovq %%r15, %%rax");
                 return 1;
             }
-            emit("\tmovq (%%rsp), %%r10");
-            emit("\tmovq 16(%%rsp), %%r11");
-            emit("\tmovl (%%r10), %%r12d");
-            emit("\tmovl (%%r11), %%r13d");
-            emit("\tcmpl %%r13d, %%r12d");
-            emit("\tjne .LSEX%dN", ln);
-            emit("\txorl %%ecx, %%ecx");
-            emit(".LSEX%dL:", ln);
-            emit("\tcmpl %%r12d, %%ecx");
-            emit("\tjge .LSEX%dY", ln);
-            emit("\tmovslq %%ecx, %%rax");
-            emit("\tshlq $3, %%rax");
-            emit("\tmovq 8(%%r11,%%rax), %%rdx");
-            emit("\tmovq 8(%%r10,%%rax), %%rsi");
-            emit("\tcmpq %%rsi, %%rdx");
-            emit("\tjne .LSEX%dN", ln);
-            emit("\tincl %%ecx");
-            emit("\tjmp .LSEX%dL", ln);
-            emit(".LSEX%dY:", ln);
-            emit("\tmovl $1, %%eax");
-            emit("\tjmp .LSEX%dD", ln);
-            emit(".LSEX%dN:", ln);
-            emit("\txorl %%eax, %%eax");
-            emit(".LSEX%dD:", ln);
+            /* sequal / sne → kop_sequal_packed (v1.18) */
+            emit("\tmovq 16(%%rsp), %%rdi");
+            emit("\tmovq (%%rsp), %%rsi");
+            emit("\tcall kop_sequal_packed");
             emit("\taddq $16, %%rsp");
             if (e->ival == 24) emit("\txorl $1, %%eax");
             return 0;
@@ -1522,38 +1451,11 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmovl $0, %%eax");
             return 0;
         }
-        if (e->ival == 40 || e->ival == 41) {      /* mkstr(int[])→String | strbytes(String)→int[] */
-            /* fisik byte-per-slot (v1.17): keduanya salinan blok bernah-panjang */
+        if (e->ival == 40 || e->ival == 41) {      /* v1.18: konversi representasi via helper */
             gen_expr(m, e->a); spush();
-            emit("\tmovq (%%rsp), %%r10");         /* sumber */
-            emit("\tmovslq (%%r10), %%r12");       /* n byte */
-            emit("\tmovq %%r12, %%rdi");
-            emit("\tshlq $3, %%rdi");
-            emit("\taddq $8, %%rdi");
-            emit("\tcall kopalloc");
-            emit("\tmovq %%r12, (%%rax)");         /* len */
-            emit("\tmovq %%rax, %%r15");
-            emit("\txorl %%ecx, %%ecx");
-            int l1 = nlab++, l2 = nlab++;
-            emit(".LMKX%dA:", l1);
-            emit("\tcmpq %%r12, %%rcx");
-            emit("\tjge .LMKX%dB", l2);
-            emit("\tmovslq %%ecx, %%rax");
-            emit("\tshlq $3, %%rax");
-            if (e->ival == 40) {
-                emit("\tmovq 8(%%r10,%%rax), %%rdx");
-                emit("\tcmpq $255, %%rdx");
-                emit("\tja .Kbnd");
-                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
-            } else {
-                emit("\tmovq 8(%%r10,%%rax), %%rdx");
-                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
-            }
-            emit("\tincl %%ecx");
-            emit("\tjmp .LMKX%dA", l1);
-            emit(".LMKX%dB:", l2);
+            emit("\tmovq (%%rsp), %%rdi");
+            emit("\tcall %s", e->ival == 40 ? "kop_mkstr" : "kop_strbytes");
             emit("\taddq $16, %%rsp");
-            emit("\tmovq %%r15, %%rax");
             return 0;
         }
         int n = 0;
@@ -1751,28 +1653,289 @@ void gen_x64(const char *outpath) {
     emit("\tincq %%rcx");
     emit("\tjmp .LSCXa");
     emit(".LSCXb:");
+    /* v1.18: String packed — 8 byte per slot little-endian */
     emit("\tpushq %%r10");
     emit("\tpushq %%rcx");
-    emit("\tmovq %%rcx, %%rdi");
+    emit("\tleaq 7(%%rcx), %%rdi");
+    emit("\tshrq $3, %%rdi");
     emit("\tshlq $3, %%rdi");
     emit("\taddq $8, %%rdi");
     emit("\tcall kopalloc");
     emit("\tpopq %%rcx");
     emit("\tpopq %%r10");
-    emit("\tmovq %%rcx, (%%rax)");
-    emit("\tmovq %%rax, %%r11");
-    emit("\txorl %%edx, %%edx");
+    emit("\tmovq %%rcx, %%r9");                  /* n */
+    emit("\tmovq %%rax, %%r11");                 /* dst */
+    emit("\tleaq 7(%%r9), %%rdx");
+    emit("\tshrq $3, %%rdx");                    /* slots */
+    emit("\txorl %%r8d, %%r8d");
+    emit(".LSCXz:");
+    emit("\tcmpq %%rdx, %%r8");
+    emit("\tjge .LSCXw");
+    emit("\tmovq $0, 8(%%r11,%%r8,8)");          /* zero slot data (v1.18 fix) */
+    emit("\tincq %%r8");
+    emit("\tjmp .LSCXz");
+    emit(".LSCXw:");
+    emit("\tmovq %%r9, (%%r11)");                /* len */
+    emit("\txorl %%r8d, %%r8d");                 /* i */
     emit(".LSCXc:");
-    emit("\tcmpq %%rcx, %%rdx");
+    emit("\tcmpq %%r9, %%r8");
     emit("\tjge .LSCXd");
-    emit("\tmovzbl (%%r10,%%rdx), %%esi");
-    emit("\tmovq %%rdx, %%r8");
-    emit("\tshlq $3, %%r8");
-    emit("\tmovq %%rsi, 8(%%r11,%%r8)");
-    emit("\tincq %%rdx");
+    emit("\tmovzbl (%%r10,%%r8), %%esi");
+    emit("\tmovq %%r8, %%rcx");
+    emit("\tandq $7, %%rcx");
+    emit("\tshlq $3, %%rcx");                    /* shift */
+    emit("\tshlq %%cl, %%rsi");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");                    /* slot offset */
+    emit("\torq %%rsi, (%%r11,%%rdx)");
+    emit("\tincq %%r8");
     emit("\tjmp .LSCXc");
     emit(".LSCXd:");
     emit("\tmovq %%r11, %%rax");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+
+    /* ── v1.18: runtime String packed ───────────────────────────── */
+
+    /* rdi = int[] byte-per-slot → rax = String packed */
+    emit(".text");
+    emit("\t.globl kop_mkstr");
+    emit("kop_mkstr:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tpushq %%rdi");
+    emit("\tmovslq (%%rdi), %%r9");              /* n */
+    emit("\tpushq %%r9");
+    emit("\tleaq 7(%%r9), %%rdi");
+    emit("\tshrq $3, %%rdi");
+    emit("\tshlq $3, %%rdi");
+    emit("\taddq $8, %%rdi");
+    emit("\tcall kopalloc");
+    emit("\tpopq %%r9");
+    emit("\tpopq %%r10");
+    emit("\tmovq %%rax, %%r11");                 /* dst */
+    emit("\tleaq 7(%%r9), %%rdx");
+    emit("\tshrq $3, %%rdx");                    /* slots */
+    emit("\txorl %%r8d, %%r8d");
+    emit(".LMKXz:");
+    emit("\tcmpq %%rdx, %%r8");
+    emit("\tjge .LMKXw");
+    emit("\tmovq $0, 8(%%r11,%%r8,8)");          /* zero slot data (v1.18 fix) */
+    emit("\tincq %%r8");
+    emit("\tjmp .LMKXz");
+    emit(".LMKXw:");
+    emit("\tmovq %%r9, (%%r11)");                /* len */
+    emit("\txorl %%r8d, %%r8d");                 /* i */
+    emit(".LMKXl:");
+    emit("\tcmpq %%r9, %%r8");
+    emit("\tjge .LMKXd");
+    emit("\tmovq 8(%%r10,%%r8,8), %%rsi");       /* byte */
+    emit("\tcmpq $255, %%rsi");
+    emit("\tja .Kbnd");
+    emit("\tmovq %%r8, %%rcx");
+    emit("\tandq $7, %%rcx");
+    emit("\tshlq $3, %%rcx");                    /* shift */
+    emit("\tshlq %%cl, %%rsi");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");                    /* slot offset */
+    emit("\torq %%rsi, (%%r11,%%rdx)");
+    emit("\tincq %%r8");
+    emit("\tjmp .LMKXl");
+    emit(".LMKXd:");
+    emit("\tmovq %%r11, %%rax");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+
+    /* rdi = String packed → rax = int[] byte-per-slot */
+    emit(".text");
+    emit("\t.globl kop_strbytes");
+    emit("kop_strbytes:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tpushq %%rdi");
+    emit("\tmovslq (%%rdi), %%r9");              /* n */
+    emit("\tpushq %%r9");
+    emit("\tmovq %%r9, %%rdi");
+    emit("\tshlq $3, %%rdi");
+    emit("\taddq $8, %%rdi");
+    emit("\tcall kopalloc");
+    emit("\tpopq %%r9");
+    emit("\tpopq %%r10");
+    emit("\tmovq %%r9, (%%rax)");                /* len */
+    emit("\tmovq %%rax, %%r11");                 /* dst */
+    emit("\txorl %%r8d, %%r8d");                 /* i */
+    emit(".LSBXl:");
+    emit("\tcmpq %%r9, %%r8");
+    emit("\tjge .LSBXd");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");                    /* src slot offset */
+    emit("\tmovq (%%r10,%%rdx), %%rsi");
+    emit("\tmovq %%r8, %%rcx");
+    emit("\tandq $7, %%rcx");
+    emit("\tshlq $3, %%rcx");                    /* shift */
+    emit("\tshrq %%cl, %%rsi");
+    emit("\tandq $255, %%rsi");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");                    /* dst offset */
+    emit("\tmovq %%rsi, (%%r11,%%rdx)");
+    emit("\tincq %%r8");
+    emit("\tjmp .LSBXl");
+    emit(".LSBXd:");
+    emit("\tmovq %%r11, %%rax");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+
+    /* rdi, rsi = String packed → rax = concat packed */
+    emit(".text");
+    emit("\t.globl kop_cat_packed");
+    emit("kop_cat_packed:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tpushq %%r12");
+    emit("\tpushq %%r13");
+    emit("\tpushq %%r14");
+    emit("\tpushq %%r15");
+    emit("\tmovq %%rdi, %%r10");                 /* a */
+    emit("\tmovq %%rsi, %%r11");                 /* b */
+    emit("\tmovslq (%%r10), %%r12");             /* la */
+    emit("\tmovslq (%%r11), %%r13");             /* lb */
+    emit("\tmovq %%r12, %%r14");
+    emit("\taddq %%r13, %%r14");                 /* total */
+    emit("\tmovq %%r14, %%r15");
+    emit("\taddq $7, %%r15");
+    emit("\tshrq $3, %%r15");                    /* slots */
+    emit("\tpushq %%r10");
+    emit("\tpushq %%r11");
+    emit("\tpushq %%r14");
+    emit("\tpushq %%r15");
+    emit("\tmovq %%r15, %%rdi");
+    emit("\tshlq $3, %%rdi");
+    emit("\taddq $8, %%rdi");
+    emit("\tcall kopalloc");
+    emit("\tpopq %%r15");
+    emit("\tpopq %%r14");
+    emit("\tpopq %%r11");
+    emit("\tpopq %%r10");
+    emit("\tmovq %%rax, %%r9");                  /* dst */
+    emit("\tmovq %%r15, %%rcx");                 /* slots */
+    emit("\txorl %%r8d, %%r8d");
+    emit(".LCXz:");
+    emit("\tcmpq %%rcx, %%r8");
+    emit("\tjge .LCXw");
+    emit("\tmovq $0, 8(%%r9,%%r8,8)");           /* zero slot data (v1.18 fix) */
+    emit("\tincq %%r8");
+    emit("\tjmp .LCXz");
+    emit(".LCXw:");
+    emit("\tmovq %%r14, (%%r9)");                /* len = total */
+    emit("\txorl %%r8d, %%r8d");                 /* i (dari a) */
+    emit(".LCXa:");
+    emit("\tcmpq %%r12, %%r8");
+    emit("\tjge .LCXb");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");
+    emit("\tmovq (%%r10,%%rdx), %%rsi");         /* src slot */
+    emit("\tmovq %%r8, %%rcx");
+    emit("\tandq $7, %%rcx");
+    emit("\tshlq $3, %%rcx");                    /* src shift */
+    emit("\tshrq %%cl, %%rsi");
+    emit("\tandq $255, %%rsi");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");                    /* dst slot offset */
+    emit("\tshlq %%cl, %%rsi");
+    emit("\torq %%rsi, (%%r9,%%rdx)");
+    emit("\tincq %%r8");
+    emit("\tjmp .LCXa");
+    emit(".LCXb:");
+    emit("\txorl %%r8d, %%r8d");                 /* j (dari b) */
+    emit(".LCXc:");
+    emit("\tcmpq %%r13, %%r8");
+    emit("\tjge .LCXd");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");
+    emit("\tmovq (%%r11,%%rdx), %%rsi");         /* src slot */
+    emit("\tmovq %%r8, %%rcx");
+    emit("\tandq $7, %%rcx");
+    emit("\tshlq $3, %%rcx");                    /* src shift */
+    emit("\tshrq %%cl, %%rsi");
+    emit("\tandq $255, %%rsi");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\taddq %%r12, %%rdx");                 /* pos = la + j */
+    emit("\tmovq %%rdx, %%r15");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");                    /* dst slot offset */
+    emit("\tmovq %%r15, %%rcx");
+    emit("\tandq $7, %%rcx");
+    emit("\tshlq $3, %%rcx");                    /* dst shift */
+    emit("\tshlq %%cl, %%rsi");
+    emit("\torq %%rsi, (%%r9,%%rdx)");
+    emit("\tincq %%r8");
+    emit("\tjmp .LCXc");
+    emit(".LCXd:");
+    emit("\tmovq %%r9, %%rax");
+    emit("\tpopq %%r15");
+    emit("\tpopq %%r14");
+    emit("\tpopq %%r13");
+    emit("\tpopq %%r12");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+
+    /* rdi, rsi = String packed → eax = isi sama (1/0) */
+    emit(".text");
+    emit("\t.globl kop_sequal_packed");
+    emit("kop_sequal_packed:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tpushq %%r12");
+    emit("\tpushq %%r13");
+    emit("\tmovq %%rdi, %%r10");                 /* a */
+    emit("\tmovq %%rsi, %%r11");                 /* b */
+    emit("\tmovslq (%%r10), %%r12");             /* la */
+    emit("\tmovslq (%%r11), %%r13");             /* lb */
+    emit("\tcmpq %%r13, %%r12");
+    emit("\tjne .LSQXn");
+    emit("\txorl %%r8d, %%r8d");                 /* i */
+    emit(".LSQXl:");
+    emit("\tcmpq %%r12, %%r8");
+    emit("\tjge .LSQXy");
+    emit("\tmovq %%r8, %%rdx");
+    emit("\tshrq $3, %%rdx");
+    emit("\tshlq $3, %%rdx");
+    emit("\taddq $8, %%rdx");
+    emit("\tmovq (%%r10,%%rdx), %%rax");         /* slot a */
+    emit("\tmovq %%r8, %%rcx");
+    emit("\tandq $7, %%rcx");
+    emit("\tshlq $3, %%rcx");                    /* shift */
+    emit("\tshrq %%cl, %%rax");
+    emit("\tandq $255, %%rax");
+    emit("\tmovq (%%r11,%%rdx), %%rsi");         /* slot b */
+    emit("\tshrq %%cl, %%rsi");
+    emit("\tandq $255, %%rsi");
+    emit("\tcmpq %%rsi, %%rax");
+    emit("\tjne .LSQXn");
+    emit("\tincq %%r8");
+    emit("\tjmp .LSQXl");
+    emit(".LSQXy:");
+    emit("\tmovl $1, %%eax");
+    emit("\tjmp .LSQXd");
+    emit(".LSQXn:");
+    emit("\txorl %%eax, %%eax");
+    emit(".LSQXd:");
+    emit("\tpopq %%r13");
+    emit("\tpopq %%r12");
     emit("\tpopq %%rbp");
     emit("\tret");
 

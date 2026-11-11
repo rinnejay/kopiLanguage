@@ -185,6 +185,12 @@ findIndex sumBy copy reverse`.
 String adalah **tipe teks native** (v1.17: opaque — tidak lagi sama dengan
 `int[]`); literal `"..."` dan `'...'` adalah String (bukan char).
 
+**v1.18: representasi packed** — byte tersimpan rapat **1 byte per karakter**
+(8 byte per slot 64-bit, little-endian): `"Kopi"` memakai 8+8 = 16 byte arena,
+bukan 40. Konversi `int[] ↔ String` tetap eksplisit dan tetap satu-satunya
+cara berpindah representasi; compiler menyisipkannya otomatis di batas
+(deklarasi, assignment, return, argumen) sehingga kode sumber tidak berubah.
+
 ```java
 String s = "Kopi";
 System.out.println(s.length);       // 4 (byte)
@@ -196,7 +202,7 @@ System.out.println(s == "Kopi");    // perbandingan isi
 `+` untuk String hanya dengan String; untuk angka gunakan `Str.fromInt`
 atau template.
 
-Interop String ↔ byte buffer kini **eksplisit** (v1.17):
+Interop String ↔ byte buffer kini **eksplisit** (v1.17, tetap di v1.18):
 
 ```java
 int[] buf = Net.strbytes(s);   // teks → salinan byte

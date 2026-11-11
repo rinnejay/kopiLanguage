@@ -444,7 +444,7 @@ class Main {
 
         String u = s + t;
         System.out.println(u.length);
-        String v = Net.mkstr(Net.bytes("bytes"));
+        String v = Net.bytes("bytes");
         System.out.println(v);
         int[] w = Net.strbytes(u);
         System.out.println(w.length);
@@ -458,7 +458,7 @@ class Main {
         System.out.println(s == t);
         System.out.println("literal" + "" == "literal");
 
-        int[] lit = "abc";
+        int[] lit = Net.strbytes("abc");
         System.out.println(lit.length);
         System.out.println(Json.parse("{\"a\":1}").length > 0);
         int fd2 = Net.openb("strnative_net.txt", 577, 420);
@@ -1402,6 +1402,13 @@ check mkstrtest test/mkstrtest.kop
 ./kopicc test/mkstrtest.kop -t x64 -o "$T/kopi/mkstrtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/mkstrtest64.s" -o /dev/null \
     && echo "PASS  mkstrtest [x64]" || { echo "FAIL  mkstrtest [x64]"; FAIL=$((FAIL+1)); }
+
+# ─── fitur bahasa v1.18: String packed 1 byte/karakter ───
+cp test/packedreuse.ref "$T/kopi/packedreuse.ref"
+check packedreuse test/packedreuse.kop
+./kopicc test/packedreuse.kop -t x64 -o "$T/kopi/packedreuse64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/packedreuse64.s" -o /dev/null \
+    && echo "PASS  packedreuse [x64]" || { echo "FAIL  packedreuse [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"

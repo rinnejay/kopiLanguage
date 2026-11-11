@@ -224,13 +224,14 @@ int idx = a.findIndex(x =&gt; x == 3);</code></pre>
 <p>Daftar: <code>forEach forEachIndexed map filter reduce any all countWhere findIndex sumBy copy reverse</code>.</p>
 <h2 id="8-string">8. String<a class="anchor" href="#8-string" aria-label="tautan">#</a></h2>
 <p>String adalah <strong>tipe teks native</strong> (v1.17: opaque — tidak lagi sama dengan <code>int[]</code>); literal <code>"..."</code> dan <code>'...'</code> adalah String (bukan char).</p>
+<p><strong>v1.18: representasi packed</strong> — byte tersimpan rapat <strong>1 byte per karakter</strong> (8 byte per slot 64-bit, little-endian): <code>"Kopi"</code> memakai 8+8 = 16 byte arena, bukan 40. Konversi <code>int[] ↔ String</code> tetap eksplisit dan tetap satu-satunya cara berpindah representasi; compiler menyisipkannya otomatis di batas (deklarasi, assignment, return, argumen) sehingga kode sumber tidak berubah.</p>
 <pre><code class="language-java">String s = "Kopi";
 System.out.println(s.length);       // 4 (byte)
 System.out.println(s[0]);           // 75 ('K')
 System.out.println(s + " Bahasa");  // konkatenasi String+String
 System.out.println(s == "Kopi");    // perbandingan isi</code></pre>
 <p><code>+</code> untuk String hanya dengan String; untuk angka gunakan <code>Str.fromInt</code> atau template.</p>
-<p>Interop String ↔ byte buffer kini <strong>eksplisit</strong> (v1.17):</p>
+<p>Interop String ↔ byte buffer kini <strong>eksplisit</strong> (v1.17, tetap di v1.18):</p>
 <pre><code class="language-java">int[] buf = Net.strbytes(s);   // teks → salinan byte
 String t = Net.mkstr(buf);     // byte → teks baru (materialisasi)</code></pre>
 <ul>
@@ -452,7 +453,7 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <p>Lihat <code>docs/contoh/tour.kop</code> (dijalankan oleh <code>docs/check.sh</code>). Isinya menggabungkan: tipe, ternary, loop, array fungsional, String method, template, lambda, JSON, dan memMark/memReset.</p>
 <p>Lanjut ke <a href="03-pustaka.html">03 — Pustaka</a>.</p>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.17 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.18 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/02-bahasa.md">Sunting halaman ini</a>
 </footer>
   </main>
