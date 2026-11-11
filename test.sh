@@ -1481,7 +1481,9 @@ kill $DPID 2>/dev/null
 wait $DPID 2>/dev/null
 
 # ─── situs dokumentasi HTML (GitHub Pages) ───
-if python3 tools/check_docs.py > "$T/kopi/docshtml.out" 2>&1; then
+# gen_libref dulu: signature lib/*.kop harus sinkron dengan docs/api-*.md
+if python3 tools/gen_libref.py > "$T/kopi/libref.out" 2>&1 &&
+   python3 tools/check_docs.py > "$T/kopi/docshtml.out" 2>&1; then
     echo "PASS  docshtml"; PASS=$((PASS+1))
 else
     echo "FAIL  docshtml"; FAIL=$((FAIL+1)); tail -3 "$T/kopi/docshtml.out"

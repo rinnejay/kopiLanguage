@@ -15,6 +15,11 @@ import HttpServer;
 | `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` |
 | `lib/crypto/` | `Crypto` `Cipher` `Hash` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
 
+> **Referensi API lengkap** (signature semua fungsi diekstrak langsung dari
+> source): [Referensi pustaka](api.md) → [Core](api-core.md) ·
+> [Net](api-net.md) · [Crypto](api-crypto.md). Halaman di bawah ini adalah
+> turunan berisi modul yang paling sering dipakai dengan pola pemakaian.
+
 ---
 
 ## 1. `Str` — teks & konversi

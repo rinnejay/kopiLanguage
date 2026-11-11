@@ -18,6 +18,7 @@ test: all
 	sh test.sh
 
 docs:
+	python3 tools/gen_libref.py
 	python3 tools/md2html.py
 	python3 tools/check_docs.py
 

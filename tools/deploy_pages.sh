@@ -12,15 +12,10 @@ target="${1:?pakai: tools/deploy_pages.sh /path/ke/rinnejay.github.io}"
 python3 tools/md2html.py >/dev/null
 python3 tools/check_docs.py
 
-cp docs/index.html "$target/"
-cp docs/01-mulai.html "$target/"
-cp docs/02-bahasa.html "$target/"
-cp docs/03-pustaka.html "$target/"
-cp docs/04-server.html "$target/"
-cp docs/05-developer.html "$target/"
-cp docs/06-batas-roadmap.html "$target/"
-cp docs/404.html "$target/"
-cp docs/style.css "$target/"
+cp docs/index.html docs/01-mulai.html docs/02-bahasa.html docs/03-pustaka.html \
+   docs/04-server.html docs/05-developer.html docs/06-batas-roadmap.html \
+   docs/api.html docs/api-core.html docs/api-net.html docs/api-crypto.html \
+   docs/404.html docs/style.css "$target/"
 cp docs/.nojekyll "$target/"
 
 echo "disalin ke $target"

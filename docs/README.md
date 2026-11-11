@@ -22,6 +22,7 @@ Dokumentasi ini dibagi menjadi jalur belajar dan jalur kontributor.
 | [01 — Mulai](01-mulai.md) | build, `kopicc`, `kopivm`, hello world, target, alur compile/link |
 | [02 — Bahasa](02-bahasa.md) | tutorial lengkap sintaks & semantik |
 | [03 — Pustaka](03-pustaka.md) | `Str`, `Math`, `Arrays`, `Json`, `Map`, `File`, jaringan, kripto, auth |
+| [Referensi pustaka](api.md) | **indeks 42 modul `lib/` + cara menerapkan** → [Core](api-core.md) · [Net](api-net.md) · [Crypto](api-crypto.md) |
 | [04 — Server](04-server.md) | TCP/UDP, HTTP klien/server, event loop, WebSocket, TLS klien, game realtime |
 | [06 — Batas & roadmap](06-batas-roadmap.md) | yang sudah ada, yang belum, dan jebakan yang harus diketahui |
 

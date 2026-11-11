@@ -19,7 +19,7 @@ bad = []
 
 
 def check_pages():
-    for src, out, _title, _label in md2html.PAGES:
+    for src, out, _title, _label in list(md2html.PAGES) + md2html.NONAV:
         mp = os.path.join(DOCS, src)
         hp = os.path.join(DOCS, out)
         if not os.path.isfile(hp):

@@ -1,0 +1,1098 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi API — Net · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-api-net">Referensi API — Net<a class="anchor" href="#referensi-api-net" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#auth">Auth</a></li><li class="toc-h2"><a href="#dns">Dns</a></li><li class="toc-h2"><a href="#http">Http</a></li><li class="toc-h2"><a href="#httpserver">HttpServer</a></li><li class="toc-h2"><a href="#jwt">Jwt</a></li><li class="toc-h2"><a href="#mime">Mime</a></li><li class="toc-h2"><a href="#resolv">Resolv</a></li><li class="toc-h2"><a href="#rfc">Rfc</a></li><li class="toc-h2"><a href="#session">Session</a></li><li class="toc-h2"><a href="#static">Static</a></li><li class="toc-h2"><a href="#tcp">Tcp</a></li><li class="toc-h2"><a href="#tls">Tls</a></li><li class="toc-h2"><a href="#udp">Udp</a></li><li class="toc-h2"><a href="#url">Url</a></li><li class="toc-h2"><a href="#websocket">WebSocket</a></li></ul></nav>
+<p>TCP/UDP, HTTP, WebSocket, URL, auth, DNS, TLS. Semua signature di bawah diekstrak langsung dari source <code>lib/net/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="auth">Auth<a class="anchor" href="#auth" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Auth.kop</code> · 8 fungsi</p>
+<p>Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401.</p>
+<pre><code class="language-java">import Auth;
+
+int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
+if (!Auth.checkBasic(h, user, pass)) { /* 401 */ }</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int spaceAt(int[] v)</code></td>
+<td>(internal) posisi spasi pertama di header</td>
+</tr>
+<tr>
+<td><code>static int[] scheme(int[] v)</code></td>
+<td>skema URL</td>
+</tr>
+<tr>
+<td><code>static int[] token(int[] v)</code></td>
+<td>bagian token setelah skema</td>
+</tr>
+<tr>
+<td><code>static boolean same(int[] a, int[] b)</code></td>
+<td>bandingkan dua nilai</td>
+</tr>
+<tr>
+<td><code>static int[] basicRaw(int[] v)</code></td>
+<td>hasil "user:pass" dari Basic, kosong bila bukan Basic</td>
+</tr>
+<tr>
+<td><code>static boolean checkBasic(int[] v, int[] user, int[] pass)</code></td>
+<td>true bila Basic cocok user:pass</td>
+</tr>
+<tr>
+<td><code>static int[] bearer(int[] v)</code></td>
+<td>token Bearer</td>
+</tr>
+<tr>
+<td><code>static int[] challenge(int[] realm)</code></td>
+<td>baris header tantangan untuk 401</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="dns">Dns<a class="anchor" href="#dns" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Dns.kop</code> · 6 fungsi</p>
+<p>Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.</p>
+<pre><code class="language-java">import Dns;
+
+int[] hasil = new int[5];
+Dns.lookup(serverIp, 53, Net.bytes("example.com"), hasil, 512);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Hanya record A; ID 0; satu jawaban pertama.</li>
+<li>Untuk resolver sistem lihat <code>Resolv</code>.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] qname(int[] dotted)</code></td>
+<td>nama "kopi.test" (byte-as-int, pemisah titik ASCII 46) → QNAME: panjang·oktet ... lalu terminator 0</td>
+</tr>
+<tr>
+<td><code>static int[] query(int[] dottedName, int qtype)</code></td>
+<td>permintaan penuh: header + QNAME + QTYPE + QCLASS=1 (IN)</td>
+</tr>
+<tr>
+<td><code>static int skipName(int[] m, int i)</code></td>
+<td>lewati nama di dalam pesan: label (hitung byte) atau pointer 2 byte (≥ 0xC0); kembalikan indeks sesudah nama</td>
+</tr>
+<tr>
+<td><code>static int rcodeOf(int[] resp)</code></td>
+<td>nilai RCODE dari flag byte ke-4</td>
+</tr>
+<tr>
+<td><code>static int parseA(int[] buf, int[] hasil)</code></td>
+<td>telaah pesan DNS mentah (tanpa awalan panjang TCP) menjadi A. hasil[0]=RCODE, hasil[1..4]=oktet IPv4 (atau -1).</td>
+</tr>
+<tr>
+<td><code>static int lookup(int addr, int port, int[] dottedName, int[] hasil, int cap)</code></td>
+<td>kirim kueri A (qtype=1) ke addr:port (TCP, awalan panjang 2 byte) dan telaah balasannya melalui hasil: hasil[0] = RCODE (0 = NOERROR, 3 = NXDOMAIN, ...), hasil[1..4] = oktet IPv…</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="http">Http<a class="anchor" href="#http" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Http.kop</code> · 27 fungsi</p>
+<p>Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.</p>
+<pre><code class="language-java">import Tcp;
+import Http;
+
+int[] r = Http.getFull(Tcp.loopback(), 8080, Net.bytes("127.0.0.1"), Net.bytes("/health"), 8192);
+System.out.println(Http.statusOf(r));
+System.out.println(Http.payload(r));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>API lama (<code>getInto</code>, <code>statusOf</code>, <code>bodyOf</code>) tetap tersedia.</li>
+<li>Redirect hanya diikuti bila host sama.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] req(int[] host, int[] path)</code></td>
+<td>susun baris permintaan GET lengkap: "GET &lt;path&gt; HTTP/1.0\r\nHost: &lt;host&gt;\r\n\r\n" (Net.bytes literal sama di-dedup compiler ke satu isi cpool)</td>
+</tr>
+<tr>
+<td><code>static int statusOf(int[] resp)</code></td>
+<td>kode status HTTP dari baris pertama ("HTTP/1.0 200 OK"), -1 bila tidak cocol dengan format baris status</td>
+</tr>
+<tr>
+<td><code>static int[] bodyOf(int[] resp)</code></td>
+<td>isi (body) respons: semua byte setelah pemisah CRLF CRLF. tanpa pemisah (jawaban tak utuh) → seluruh respons dibalikkan.</td>
+</tr>
+<tr>
+<td><code>static int getInto(int addr, int port, int[] host, int[] path, int[] buf)</code></td>
+<td>kirim GET dan muat SELURUH respons (header + body) ke buf. sukses → total byte respons (≥ 0); gagal → kode negatif. buf terlalu kecil → respons terpotong (batas v1 tercatat).</td>
+</tr>
+<tr>
+<td><code>static int postInto(int addr, int port, int[] host, int[] path, int[] body, int[] buf)</code></td>
+<td>kirim POST dengan body (Content-Length dari Tcp.num), muat SELURUH respons ke buf — semantik sama dengan getInto.</td>
+</tr>
+<tr>
+<td><code>static int[] body(int addr, int port, int[] host, int[] path, int cap)</code></td>
+<td>kenyamanan: GET lalu langsung ke body. galat ditandai array hasil [0] = kode negatif (body tidak mungkin negatif).</td>
+</tr>
+<tr>
+<td><code>static int[] reqEx(int[] method, int[] host, int[] path, int[] headers, int[] body)</code></td>
+<td>kirim permintaan generik dengan header tambahan. <code>headers</code> berisi baris mentah "Nama: nilai\r\n" (boleh kosong). body kosong (length 0) → tanpa Content-Length (GET/HEAD). HTTP/1…</td>
+</tr>
+<tr>
+<td><code>static int requestInto(int addr, int port, int[] method, int[] host, int[] path, int[] headers, int[] body, int[] buf)</code></td>
+<td>satu putaran penuh dengan method/header/body bebas.</td>
+</tr>
+<tr>
+<td><code>static int getWith(int addr, int port, int[] host, int[] path, int[] headers, int[] buf)</code></td>
+<td>GET dengan header tambahan</td>
+</tr>
+<tr>
+<td><code>static int postWith(int addr, int port, int[] host, int[] path, int[] headers, int[] body, int[] buf)</code></td>
+<td>POST dengan header tambahan + body</td>
+</tr>
+<tr>
+<td><code>static int bodyStart(int[] resp)</code></td>
+<td>indeks awal body (setelah CRLF CRLF), -1 bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int[] headerBlock(int[] resp)</code></td>
+<td>potongan header mentah (tanpa baris status &amp; tanpa CRLF CRLF)</td>
+</tr>
+<tr>
+<td><code>static int lowerc(int c)</code></td>
+<td>(internal) huruf kecil ASCII</td>
+</tr>
+<tr>
+<td><code>static boolean nameEq(int[] line, int at, int[] name)</code></td>
+<td>(internal) nama header cocok pada posisi</td>
+</tr>
+<tr>
+<td><code>static int[] headerValue(int[] resp, int[] name)</code></td>
+<td>nilai header (tanpa spasi tepi), array kosong bila tidak ada. perbandingan nama case-insensitive; baris pertama yang cocok dipakai.</td>
+</tr>
+<tr>
+<td><code>static boolean hasHeader(int[] resp, int[] name)</code></td>
+<td>true bila respons punya header name</td>
+</tr>
+<tr>
+<td><code>static int hexVal(int c)</code></td>
+<td>═══ v1.9.2: HTTP/1.1 — chunked, redirect, form, auth ═══════</td>
+</tr>
+<tr>
+<td><code>static boolean hasToken(int[] resp, int[] name, int[] tok)</code></td>
+<td>cari token (case-insensitive) di nilai header</td>
+</tr>
+<tr>
+<td><code>static int[] dechunk(int[] raw)</code></td>
+<td>decode Transfer-Encoding: chunked (hex-size CRLF data CRLF ... 0)</td>
+</tr>
+<tr>
+<td><code>static int[] payload(int[] resp)</code></td>
+<td>body sebenarnya: chunked → decode; Content-Length → potong</td>
+</tr>
+<tr>
+<td><code>static int[] req11(int[] method, int[] hostHdr, int[] path, int[] headers, int[] body, int keep)</code></td>
+<td>susun permintaan HTTP/1.1 (keep=1 → keep-alive, else close)</td>
+</tr>
+<tr>
+<td><code>static int[] exchange(int addr, int port, int[] method, int[] hostHdr, int[] path, int[] headers, int[] body, int cap)</code></td>
+<td>satu transaksi; timeoutMs &gt; 0 memasang SO_RCVTIMEO/SO_SNDTIMEO</td>
+</tr>
+<tr>
+<td><code>static int[] getFull(int addr, int port, int[] hostHdr, int[] path, int cap)</code></td>
+<td>GET + respons lengkap (status, header, body)</td>
+</tr>
+<tr>
+<td><code>static int[] follow(int addr, int port, int[] hostHdr, int[] path, int maxHops, int cap)</code></td>
+<td>ikuti 301/302/303/307/308 (maks maxHops, host harus sama)</td>
+</tr>
+<tr>
+<td><code>static int[] basic(int[] user, int[] pass)</code></td>
+<td>header "Authorization: Basic ..." dari user:pass</td>
+</tr>
+<tr>
+<td><code>static int[] formPost(int addr, int port, int[] hostHdr, int[] path, int[] form, int cap)</code></td>
+<td>POST application/x-www-form-urlencoded</td>
+</tr>
+<tr>
+<td><code>static int[] jsonPost(int addr, int port, int[] hostHdr, int[] path, int[] jsonBody, int cap)</code></td>
+<td>POST application/json</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="httpserver">HttpServer<a class="anchor" href="#httpserver" aria-label="tautan">#</a></h2>
+<p><code>lib/net/HttpServer.kop</code> · 33 fungsi</p>
+<p>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie, chunked.</p>
+<pre><code class="language-java">import HttpServer;
+
+int[] req = HttpServer.readRequest(c, 16384);
+int keep = 0;
+if (HttpServer.keepAlive(req)) keep = 1;
+int[] resp = HttpServer.responseFor(req, 200, Net.bytes("text/plain"), Net.bytes("ok\n"), keep);
+HttpServer.send(c, resp);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Tidak ada multipart/HTTP2/TLS server.</li>
+<li>Routing manual; lihat examples/server.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int findByte(int[] s, int b, int from, int to)</code></td>
+<td>(internal) cari byte dalam rentang</td>
+</tr>
+<tr>
+<td><code>static int[] readRequest(int fd, int max)</code></td>
+<td>baca request (header + body sesuai Content-Length). hasil = seluruh byte request; array kosong bila EOF/galat.</td>
+</tr>
+<tr>
+<td><code>static int[] requestLine(int[] req)</code></td>
+<td>baris pertama request (method target versi)</td>
+</tr>
+<tr>
+<td><code>static int[] method(int[] req)</code></td>
+<td>method request (GET/POST/...)</td>
+</tr>
+<tr>
+<td><code>static int[] target(int[] req)</code></td>
+<td>target request (path + query)</td>
+</tr>
+<tr>
+<td><code>static int[] path(int[] req)</code></td>
+<td>bagian path</td>
+</tr>
+<tr>
+<td><code>static int[] pathOnly(int[] target)</code></td>
+<td>path tanpa query</td>
+</tr>
+<tr>
+<td><code>static int[] version(int[] req)</code></td>
+<td>versi HTTP dari baris request</td>
+</tr>
+<tr>
+<td><code>static int[] headerValue(int[] req, int[] name)</code></td>
+<td>nilai header pertama bernama name</td>
+</tr>
+<tr>
+<td><code>static int contentLength(int[] req)</code></td>
+<td>nilai Content-Length (0 bila tidak ada)</td>
+</tr>
+<tr>
+<td><code>static int[] body(int[] req)</code></td>
+<td>isi body request</td>
+</tr>
+<tr>
+<td><code>static int hexv(int c)</code></td>
+<td>(internal) hex char → nilai</td>
+</tr>
+<tr>
+<td><code>static int[] urlDecode(int[] s)</code></td>
+<td>decode %XX dan + menjadi byte</td>
+</tr>
+<tr>
+<td><code>static int[] queryValue(int[] req, int[] key)</code></td>
+<td>nilai parameter query bernama key</td>
+</tr>
+<tr>
+<td><code>static int[] statusText(int code)</code></td>
+<td>teks status standar untuk kode</td>
+</tr>
+<tr>
+<td><code>static int[] responseKA(int code, int[] ctype, int[] body, int keep)</code></td>
+<td>bangun respons dengan keep-alive eksplisit</td>
+</tr>
+<tr>
+<td><code>static int[] respond(int code, int[] ctype, int[] body, int[] extra, int keep)</code></td>
+<td>respons dengan header tambahan (mis. Set-Cookie)</td>
+</tr>
+<tr>
+<td><code>static int[] response(int code, int[] ctype, int[] body)</code></td>
+<td>bangun respons (Connection: close)</td>
+</tr>
+<tr>
+<td><code>static int[] headOnly(int[] resp)</code></td>
+<td>HEAD: header tetap (Content-Length body), tanpa body</td>
+</tr>
+<tr>
+<td><code>static int[] responseFor(int[] req, int code, int[] ctype, int[] body, int keep)</code></td>
+<td>respons yang meniru kepala request (keep-alive/HEAD)</td>
+</tr>
+<tr>
+<td><code>static boolean methodIs(int[] req, int[] m)</code></td>
+<td>true bila method request = m</td>
+</tr>
+<tr>
+<td><code>static int[] text(int code, int[] body)</code></td>
+<td>ubah nilai menjadi teks</td>
+</tr>
+<tr>
+<td><code>static int[] html(int code, int[] body)</code></td>
+<td>respons HTML lengkap dengan status</td>
+</tr>
+<tr>
+<td><code>static int[] jsonResponse(int[] body)</code></td>
+<td>respons application/json lengkap</td>
+</tr>
+<tr>
+<td><code>static int[] notFound()</code></td>
+<td>respons 404 siap kirim</td>
+</tr>
+<tr>
+<td><code>static int[] forbidden()</code></td>
+<td>respons 403 siap kirim</td>
+</tr>
+<tr>
+<td><code>static boolean keepAlive(int[] req)</code></td>
+<td>true bila klien minta koneksi tetap terbuka</td>
+</tr>
+<tr>
+<td><code>static int[] cookie(int[] req, int[] name)</code></td>
+<td>nilai cookie dari header "Cookie: a=1; b=2"</td>
+</tr>
+<tr>
+<td><code>static int[] setCookie(int[] name, int[] value, int[] path, int maxAge)</code></td>
+<td>baris Set-Cookie; maxAge &lt; 0 → tanpa Max-Age</td>
+</tr>
+<tr>
+<td><code>static int hexv2(int c)</code></td>
+<td>decode body chunked (permintaan upload)</td>
+</tr>
+<tr>
+<td><code>static int[] dechunk(int[] raw)</code></td>
+<td>uraikan body chunked menjadi data biasa</td>
+</tr>
+<tr>
+<td><code>static int[] bodyAny(int[] req)</code></td>
+<td>body permintaan: chunked bila Transfer-Encoding: chunked</td>
+</tr>
+<tr>
+<td><code>static int send(int fd, int[] resp)</code></td>
+<td>kirim respons ke koneksi; jumlah byte</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] CRLF()</code></td>
+<td>(internal) \r\n</td>
+</tr>
+<tr>
+<td><code>static int[] CRLF2()</code></td>
+<td>(internal) \r\n\r\n</td>
+</tr>
+<tr>
+<td><code>static int[] SP()</code></td>
+<td>(internal) spasi</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="jwt">Jwt<a class="anchor" href="#jwt" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Jwt.kop</code> · 6 fungsi</p>
+<p>JWT HS256: tanda tangan, verifikasi, ambil payload.</p>
+<pre><code class="language-java">import Jwt;
+
+int[] token = Jwt.sign(Net.bytes("{\"sub\":\"budi\"}"), secret);
+int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Hanya HS256; <code>exp</code>/<code>iat</code> tidak diperiksa otomatis.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] b64(int[] raw)</code></td>
+<td>base64url tanpa padding</td>
+</tr>
+<tr>
+<td><code>static int[] unb64(int[] s)</code></td>
+<td>(internal) base64url decode</td>
+</tr>
+<tr>
+<td><code>static int[] sign(int[] payload, int[] secret)</code></td>
+<td>tanda tangani payload dengan HS256 → token</td>
+</tr>
+<tr>
+<td><code>static boolean same(int[] a, int[] b)</code></td>
+<td>bandingkan dua array byte secara konstan (panjang sama)</td>
+</tr>
+<tr>
+<td><code>static int verify(int[] token, int[] secret, int[] payloadOut)</code></td>
+<td>hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah</td>
+</tr>
+<tr>
+<td><code>static int[] payloadOf(int[] token)</code></td>
+<td>payload JSON dari token tanpa verifikasi (hati-hati)</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] HEADER()</code></td>
+<td>header JWT bawaan {"alg":"HS256"}</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="mime">Mime<a class="anchor" href="#mime" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Mime.kop</code> · 1 fungsi</p>
+<p>Pemetaan ekstensi file → header Content-Type.</p>
+<pre><code class="language-java">import Mime;
+
+int[] ct = Mime.of(Net.bytes("app.js")); // application/javascript</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] of(int[] path)</code></td>
+<td>Content-Type berdasarkan ekstensi</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="resolv">Resolv<a class="anchor" href="#resolv" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Resolv.kop</code> · 5 fungsi</p>
+<p>Resolver DNS UDP + pembaca <code>/etc/resolv.conf</code>, dengan timeout.</p>
+<pre><code class="language-java">import Resolv;
+
+int[] hasil = new int[5];
+Resolv.lookup(Net.bytes("example.com"), 2000, hasil, 512);
+// hasil[0]=RCODE, hasil[1..4]=oktet IPv4</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Tanpa cache/AAAA/<code>search</code>/<code>ndots</code>.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int defaultServer()</code></td>
+<td>IP server nama pertama /etc/resolv.conf (0 bila gagal)</td>
+</tr>
+<tr>
+<td><code>static int[] parse(int[] text)</code></td>
+<td>telaah teks resolv.conf → daftar ip (flat)</td>
+</tr>
+<tr>
+<td><code>static int[] servers()</code></td>
+<td>semua IP nameserver dari /etc/resolv.conf</td>
+</tr>
+<tr>
+<td><code>static int lookupUdp(int serverIp, int port, int[] name, int timeoutMs, int[] hasil, int cap)</code></td>
+<td>satu kueri A lewat UDP; hasil[0]=RCODE, hasil[1..4]=oktet</td>
+</tr>
+<tr>
+<td><code>static int lookup(int[] name, int timeoutMs, int[] hasil, int cap)</code></td>
+<td>coba semua server dari resolv.conf</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="rfc">Rfc<a class="anchor" href="#rfc" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Rfc.kop</code> · 5 fungsi</p>
+<p>Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan.</p>
+<pre><code class="language-java">import Rfc;
+
+int[] balas = Rfc.daytime(serverIp);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Protokol lama; jangan dipakai untuk layanan baru.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int echoInto(int addr, int port, int[] data, int[] out)</code></td>
+<td>kirim data, baca balikan sebanyak data.length; sukses → jumlah byte ≥ 0 (biasanya == data.length); gagal → negatif</td>
+</tr>
+<tr>
+<td><code>static int discard(int addr, int port, int[] data)</code></td>
+<td>kirim data ke port discard (9); 0 bila sukses</td>
+</tr>
+<tr>
+<td><code>static int readAll(int addr, int port, int[] buf)</code></td>
+<td>buka, muat ke buf hingga EOF/server tutup, tutup; sukses → n ≥ 0</td>
+</tr>
+<tr>
+<td><code>static int fill(int addr, int port, int[] buf)</code></td>
+<td>muat buf PENUH pattern (server tak berhenti sendiri) lalu tutup</td>
+</tr>
+<tr>
+<td><code>static int ask(int addr, int port, int[] enqu, int[] buf)</code></td>
+<td>kirim pertanyaan (harus sudah diakhiri '\r\n'), muat balasan</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="session">Session<a class="anchor" href="#session" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Session.kop</code> · 6 fungsi</p>
+<p>Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry).</p>
+<pre><code class="language-java">import Session;
+import MapStr;
+
+int[] ids = MapStr.make(256, 8192);
+int[] exps = MapStr.make(256, 8192);
+int[] sid = Session.create(ids, exps, uid, 3600);
+int uid2 = Session.get(ids, exps, sid, Net.time());</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Belum persisten; restart server = sesi hilang.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] newId()</code></td>
+<td>id sesi acak 128-bit ter-encode hex</td>
+</tr>
+<tr>
+<td><code>static boolean put(int[] ids, int[] exps, int[] id, int uid, int ttl, int now)</code></td>
+<td>simpan pasangan</td>
+</tr>
+<tr>
+<td><code>static int[] create(int[] ids, int[] exps, int uid, int ttl)</code></td>
+<td>buat/buka file</td>
+</tr>
+<tr>
+<td><code>static int get(int[] ids, int[] exps, int[] id, int now)</code></td>
+<td>-1 bila tidak ada / kedaluwarsa (entri dibersihkan sekalian)</td>
+</tr>
+<tr>
+<td><code>static boolean drop(int[] ids, int[] exps, int[] id)</code></td>
+<td>hapus sesi</td>
+</tr>
+<tr>
+<td><code>static int sweep(int[] ids, int[] exps, int now)</code></td>
+<td>buang semua sesi kedaluwarsa; hasil = jumlah yang dibuang</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="static">Static<a class="anchor" href="#static" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Static.kop</code> · 3 fungsi</p>
+<p>Penyajian file statis + MIME; menolak path traversal <code>..</code>.</p>
+<pre><code class="language-java">import Static;
+
+int[] resp = Static.serve(Net.bytes("public/index.html"));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Membaca seluruh file ke memori; file besar sebaiknya lewat reverse proxy.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] mime(int[] path)</code></td>
+<td>kompatibilitas: dulu ada di Static, kini delegasi ke Mime</td>
+</tr>
+<tr>
+<td><code>static int[] serve(int[] path)</code></td>
+<td>sajikan file; tolak path traversal "..".</td>
+</tr>
+<tr>
+<td><code>static int[] serveKA(int[] path, int keep)</code></td>
+<td>varian keep-alive</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="tcp">Tcp<a class="anchor" href="#tcp" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Tcp.kop</code> · 13 fungsi</p>
+<p>Transport TCP di atas builtin <code>Net</code>: buka koneksi, kirim/terima buffer, shutdown, helper alamat.</p>
+<pre><code class="language-java">import Tcp;
+
+int fd = Tcp.open(Tcp.loopback(), 8080);
+Tcp.sendBuf(fd, Net.bytes("GET / HTTP/1.1\r\n\r\n"));
+int[] buf = new int[4096];
+int n = Tcp.recvAll(fd, buf);
+Tcp.drop(fd);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>recvAll</code> berhenti saat EOF atau buffer penuh.</li>
+<li><code>open</code> menutup fd sendiri bila connect gagal.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int ip(int a, int b, int c, int d)</code></td>
+<td>susun alamat dari 4 oktet a.b.c.d</td>
+</tr>
+<tr>
+<td><code>static int loopback()</code></td>
+<td>alamat khas untuk uji: 127.0.0.1</td>
+</tr>
+<tr>
+<td><code>static int open(int addr, int port)</code></td>
+<td>buka TCP klien. sukses → fd ≥ 0; gagal → kode negatif (sumber galat dibedakan: socket → 0, connect → -errno).</td>
+</tr>
+<tr>
+<td><code>static int drop(int fd)</code></td>
+<td>tutup koneksi (alias builtin close agar satu API yang diingat)</td>
+</tr>
+<tr>
+<td><code>static int shutdown(int fd, int how)</code></td>
+<td>half-close: SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2</td>
+</tr>
+<tr>
+<td><code>static int send(int fd, int[] buf, int len)</code></td>
+<td>kirim len byte pertama buf. sukses → 0; gagal → kode negatif dan sisa byte tidak jadi terkirim (penelepon yang memutus).</td>
+</tr>
+<tr>
+<td><code>static int sendBuf(int fd, int[] buf)</code></td>
+<td>kirim seluruh buf. sukses → 0; gagal → kode negatif</td>
+</tr>
+<tr>
+<td><code>static int recvAll(int fd, int[] buf)</code></td>
+<td>baca hingga EOF atau buf penuh. sukses → jumlah byte ≥ 0. satu syscall = satu byte, jadi galat baca builtin hanya muncul sekali lalu identik EOF: keduanya mengerucut ke akhir baca.</td>
+</tr>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>gabung a lalu b jadi array baru</td>
+</tr>
+<tr>
+<td><code>static int[] tail(int[] xs, int from)</code></td>
+<td>potong mulai indeks from sampai akhir</td>
+</tr>
+<tr>
+<td><code>static int indexOf(int[] hay, int[] needle, int from)</code></td>
+<td>indeks pertama needle dalam hay mulai dari indeks from; -1 bila tak ada</td>
+</tr>
+<tr>
+<td><code>static int recvN(int fd, int[] buf, int n)</code></td>
+<td>baca tepat n byte (atau berhenti di EOF/buf penuh); kembalikan jumlah byte yang benar-benar terbaca — untuk protokol berbatas panjang eksplisit (DNS-over-TCP misalnya)</td>
+</tr>
+<tr>
+<td><code>static int[] num(int v)</code></td>
+<td>v ≥ 0 → digit ASCII desimal (tanpa tanda); dipakai Content-Length</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="tls">Tls<a class="anchor" href="#tls" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Tls.kop</code> · 25 fungsi</p>
+<p>Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah.</p>
+<pre><code class="language-java">import Tls;
+import Rand;
+
+int[] ctx = Tls.handshake(ip, 443, pinSpki, Rand.bytes(32));
+Tls.writeApp(ctx, Net.bytes("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"));
+int[] data = Tls.readApp(ctx);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Bukan TLS server; belum verifikasi ECDSA CertificateVerify/rantai/hostname.</li>
+<li>Pin SPKI = SHA-256 DER SPKI leaf (TOFU).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>(internal) gabung byte</td>
+</tr>
+<tr>
+<td><code>static int[] cat3(int[] a, int[] b, int[] c)</code></td>
+<td>(internal) gabung tiga array</td>
+</tr>
+<tr>
+<td><code>static int[] arr1(int a)</code></td>
+<td>(internal) array satu byte</td>
+</tr>
+<tr>
+<td><code>static int[] arr2(int a, int b)</code></td>
+<td>(internal) array dua byte</td>
+</tr>
+<tr>
+<td><code>static int[] arr3(int a, int b, int cc)</code></td>
+<td>(internal) array tiga byte</td>
+</tr>
+<tr>
+<td><code>static int[] sliceOf(int[] x, int from, int len)</code></td>
+<td>(internal) potong array</td>
+</tr>
+<tr>
+<td><code>static int[] u16(int v)</code></td>
+<td>(internal) encode uint16 besar-endian</td>
+</tr>
+<tr>
+<td><code>static int[] u24(int v)</code></td>
+<td>(internal) encode uint24 besar-endian</td>
+</tr>
+<tr>
+<td><code>static int get16(int[] x, int p)</code></td>
+<td>(internal) baca uint16 pada posisi</td>
+</tr>
+<tr>
+<td><code>static int get24(int[] x, int p)</code></td>
+<td>(internal) baca uint24 pada posisi</td>
+</tr>
+<tr>
+<td><code>static int[] tkey(int[] secret)</code></td>
+<td>(internal) client write key dari secret</td>
+</tr>
+<tr>
+<td><code>static int[] tiv(int[] secret)</code></td>
+<td>(internal) client write iv dari secret</td>
+</tr>
+<tr>
+<td><code>static int[] nonceOf(int[] iv, int seq)</code></td>
+<td>nonce = iv ^ (seq 64-bit big-endian di byte 4..11) (RFC 8446 §5.2). seq 32-bit: s[0..3] nol, sehingga hanya n[8..11] yang ter-XOR. Hindari shift &gt;= 32 (UB di C).</td>
+</tr>
+<tr>
+<td><code>static int[] seal(int[] key, int[] iv, int seq, int ctype, int[] payload)</code></td>
+<td>seal: payload + ctype → record luar penuh</td>
+</tr>
+<tr>
+<td><code>static int[] openRec(int[] key, int[] iv, int seq, int[] rec, int[] okOut)</code></td>
+<td>open: verifikasi tag dulu, lalu unplug keystream. okOut[0] = -1 galat, selain itu inner type (1..255). balikan = isi plaintext (tanpa inner type).</td>
+</tr>
+<tr>
+<td><code>static int[] recvExact(int fd, int n)</code></td>
+<td>(internal) baca tepat n byte dari fd</td>
+</tr>
+<tr>
+<td><code>static int[] recvRecord(int fd)</code></td>
+<td>(internal) baca satu record TLS</td>
+</tr>
+<tr>
+<td><code>static int[] extOf(int id, int[] body)</code></td>
+<td>(internal) bangun extension</td>
+</tr>
+<tr>
+<td><code>static int[] chMsg(int[] sk, int[] rnd)</code></td>
+<td>handshake message ClientHello (tanpa header record)</td>
+</tr>
+<tr>
+<td><code>static int[] parseSH(int[] isi)</code></td>
+<td>isi fragment SH (dari record header). balikan = key_share pub server (32 byte) atau kosong bila gagal.</td>
+</tr>
+<tr>
+<td><code>static int[] gate(int ip, int port, int[] pin)</code></td>
+<td>Untuk uji: gate() pakai Rand; gateFixed dipatok kunci ephemeral. Inti bersama di handshake().</td>
+</tr>
+<tr>
+<td><code>static int[] gateFixed(int ip, int port, int[] pin, int[] fsk, int[] frnd)</code></td>
+<td>(internal) handshake dengan pin &amp; kunci tetap (uji)</td>
+</tr>
+<tr>
+<td><code>static int[] handshake(int ip, int port, int[] pin, int[] randSes)</code></td>
+<td>handshake TLS 1.3; context untuk writeApp/readApp</td>
+</tr>
+<tr>
+<td><code>static int writeApp(int[] ctx, int[] data)</code></td>
+<td>kirim data aplikasi terenkripsi</td>
+</tr>
+<tr>
+<td><code>static int[] readApp(int[] ctx)</code></td>
+<td>baca data aplikasi (deenkripsi)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="udp">Udp<a class="anchor" href="#udp" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Udp.kop</code> · 7 fungsi</p>
+<p>Datagram UDP: bind, kirim/terima satu datagram, shutdown.</p>
+<pre><code class="language-java">import Udp;
+
+int s = Udp.open();
+Udp.bind(s, 0, 9000);
+int[] buf = new int[1200];
+int[] from = new int[2];
+int n = Udp.recvFrom(s, buf, from);
+Udp.sendTo(s, from[0], from[1], Net.bytes("pong"));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Maksimum 1200 byte per datagram.</li>
+<li>Tidak ada retransmisi/urutan; paket bisa hilang.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int loopback()</code></td>
+<td>alamat 127.0.0.1</td>
+</tr>
+<tr>
+<td><code>static int open()</code></td>
+<td>buka socket UDP (AF_INET, SOCK_DGRAM) → fd / negatif</td>
+</tr>
+<tr>
+<td><code>static int bind(int fd, int addr, int port)</code></td>
+<td>ikat ke alamat lokal → 0 / -errno</td>
+</tr>
+<tr>
+<td><code>static int sendTo(int fd, int addr, int port, int[] data)</code></td>
+<td>kirim satu datagram: data[0..len-1] (maks 1200 byte) → n / -errno</td>
+</tr>
+<tr>
+<td><code>static int recvFrom(int fd, int[] buf, int[] from)</code></td>
+<td>terima satu datagram ke buf; sumber diisi ke from[0]=ip, from[1]=port. hasil = jumlah byte (≥0) atau kode negatif.</td>
+</tr>
+<tr>
+<td><code>static int shutdown(int fd, int how)</code></td>
+<td>half-close (SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2)</td>
+</tr>
+<tr>
+<td><code>static int close(int fd)</code></td>
+<td>tutup deskriptor</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="url">Url<a class="anchor" href="#url" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Url.kop</code> · 26 fungsi</p>
+<p>URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4.</p>
+<pre><code class="language-java">import Url;
+
+int[] u = Url.resolve("http://a/b/c/d;p?q", "../g"); // http://a/b/g
+int[] q = Url.appendQuery(Url.pair("q", "a b"), Url.pair("n", "3"));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>decode</code> memperlakukan <code>+</code> sebagai spasi (form).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int hexv(int c)</code></td>
+<td>(internal) hex char → nilai</td>
+</tr>
+<tr>
+<td><code>static int hexc(int v)</code></td>
+<td>(internal) nilai → hex char</td>
+</tr>
+<tr>
+<td><code>static boolean unreserved(int c)</code></td>
+<td>(internal) karakter RFC 3986 unreserved</td>
+</tr>
+<tr>
+<td><code>static int find(int[] s, int b, int from)</code></td>
+<td>indeks elemen, -1 bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int[] encode(int[] s)</code></td>
+<td>percent-encode semua kecuali unreserved</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int[] s)</code></td>
+<td>percent-decode; '+' diperlakukan sebagai spasi</td>
+</tr>
+<tr>
+<td><code>static int[] formEncode(int[] s)</code></td>
+<td>form-urlencoded: spasi → '+', lalu encode sisanya</td>
+</tr>
+<tr>
+<td><code>static int[] formDecode(int[] s)</code></td>
+<td>decode form: %XX, + menjadi spasi</td>
+</tr>
+<tr>
+<td><code>static int[] pair(int[] name, int[] val)</code></td>
+<td>nama=nilai (keduanya di-encode sebagai form)</td>
+</tr>
+<tr>
+<td><code>static int[] appendQuery(int[] q, int[] p)</code></td>
+<td>gabungkan query: q kosong → p; selain itu q + "&amp;" + p</td>
+</tr>
+<tr>
+<td><code>static int schemeEnd(int[] u)</code></td>
+<td>indeks ':' skema (ALPHA ( ALPHA / DIGIT / "+" / "-" / "." ) ':')</td>
+</tr>
+<tr>
+<td><code>static boolean hasScheme(int[] u)</code></td>
+<td>true bila URL diawali skema:</td>
+</tr>
+<tr>
+<td><code>static int[] scheme(int[] u)</code></td>
+<td>skema URL</td>
+</tr>
+<tr>
+<td><code>static int authStart(int[] u)</code></td>
+<td>awal otoritas "//" setelah skema; -1 bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int authEnd(int[] u)</code></td>
+<td>(internal) posisi akhir authority</td>
+</tr>
+<tr>
+<td><code>static int[] authority(int[] u)</code></td>
+<td>bagian authority (host:port)</td>
+</tr>
+<tr>
+<td><code>static int[] host(int[] u)</code></td>
+<td>host tanpa port</td>
+</tr>
+<tr>
+<td><code>static int portOf(int[] u, int def)</code></td>
+<td>port eksplisit atau default skema</td>
+</tr>
+<tr>
+<td><code>static int pathStart(int[] u)</code></td>
+<td>(internal) posisi awal path</td>
+</tr>
+<tr>
+<td><code>static int[] path(int[] u)</code></td>
+<td>bagian path</td>
+</tr>
+<tr>
+<td><code>static int[] query(int[] u)</code></td>
+<td>bagian query tanpa tanda ?</td>
+</tr>
+<tr>
+<td><code>static int[] fragment(int[] u)</code></td>
+<td>bagian fragment tanpa tanda #</td>
+</tr>
+<tr>
+<td><code>static int ip4(int[] s)</code></td>
+<td>empat oktet "a.b.c.d" → ip; 0 bila tidak valid</td>
+</tr>
+<tr>
+<td><code>static int[] normalize(int[] p)</code></td>
+<td>normalisasi path (titik-titik RFC 3986 §5.2.4)</td>
+</tr>
+<tr>
+<td><code>static int[] dropFragment(int[] u)</code></td>
+<td>URL tanpa fragment</td>
+</tr>
+<tr>
+<td><code>static int[] resolve(int[] base, int[] rel)</code></td>
+<td>resolusi referensi relatif terhadap base absolut</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="websocket">WebSocket<a class="anchor" href="#websocket" aria-label="tautan">#</a></h2>
+<p><code>lib/net/WebSocket.kop</code> · 12 fungsi</p>
+<p>Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask.</p>
+<pre><code class="language-java">import WebSocket;
+
+if (WebSocket.isUpgrade(req)) {
+    Net.sendb(c, WebSocket.handshake(req));
+    int[] f = WebSocket.decode(buf, n);
+    Net.sendb(c, WebSocket.text(WebSocket.payload(f)));
+}</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Satu frame per read; tanpa fragmentasi/deflate; payload &lt; 64 KiB.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] accept(int[] key)</code></td>
+<td>Sec-WebSocket-Accept = base64(SHA1(key + GUID))</td>
+</tr>
+<tr>
+<td><code>static boolean isUpgrade(int[] req)</code></td>
+<td>true bila request minta upgrade websocket</td>
+</tr>
+<tr>
+<td><code>static int[] handshake(int[] req)</code></td>
+<td>respons 101 Switching Protocols</td>
+</tr>
+<tr>
+<td><code>static int[] frame(int op, int[] payload)</code></td>
+<td>bangun frame server (tanpa mask)</td>
+</tr>
+<tr>
+<td><code>static int[] text(int[] s)</code></td>
+<td>ubah nilai menjadi teks</td>
+</tr>
+<tr>
+<td><code>static int[] binary(int[] s)</code></td>
+<td>frame op=2 (biner)</td>
+</tr>
+<tr>
+<td><code>static int[] ping(int[] s)</code></td>
+<td>frame ping</td>
+</tr>
+<tr>
+<td><code>static int[] pong(int[] s)</code></td>
+<td>frame pong</td>
+</tr>
+<tr>
+<td><code>static int[] close(int code)</code></td>
+<td>tutup deskriptor</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int[] b, int n)</code></td>
+<td>hasil: [opcode, panjang, payload...]; array kosong bila &lt; 2 byte</td>
+</tr>
+<tr>
+<td><code>static int opcode(int[] f)</code></td>
+<td>opcode frame (1 teks, 2 biner, 8 close)</td>
+</tr>
+<tr>
+<td><code>static int[] payload(int[] f)</code></td>
+<td>payload frame (unmasked)</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] GUID()</code></td>
+<td>GUID RFC 6455 untuk handshake</td>
+</tr>
+</tbody></table></div>
+<hr>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-net.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

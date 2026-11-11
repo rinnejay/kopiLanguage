@@ -3,6 +3,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
+python3 tools/gen_libref.py >/dev/null
 python3 tools/md2html.py >/dev/null
 python3 tools/check_docs.py
 

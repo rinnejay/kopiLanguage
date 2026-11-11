@@ -26,6 +26,15 @@ PAGES = [
     ("04-server.md", "04-server.html", "04 — Server", "Server"),
     ("05-developer.md", "05-developer.html", "05 — Developer", "Developer"),
     ("06-batas-roadmap.md", "06-batas-roadmap.html", "06 — Batas & roadmap", "Batas"),
+    ("api.md", "api.html", "Referensi pustaka", "API"),
+]
+
+# Halaman referensi API (dihasilkan tools/gen_libref.py) — masuk situs dan
+# validasi, tetapi tidak ditampilkan di nav agar nav tetap pendek.
+NONAV = [
+    ("api-core.md", "api-core.html", "Referensi API — Core", ""),
+    ("api-net.md", "api-net.html", "Referensi API — Net", ""),
+    ("api-crypto.md", "api-crypto.html", "Referensi API — Crypto", ""),
 ]
 
 GITHUB = "https://github.com/rinnejay/kopiLanguage"
@@ -424,7 +433,7 @@ def main():
     with open(os.path.join(DOCS, ".nojekyll"), "w", encoding="utf-8") as f:
         f.write("")
 
-    for src, outname, title, _label in PAGES:
+    for src, outname, title, _label in list(PAGES) + NONAV:
         path = os.path.join(DOCS, src)
         with open(path, encoding="utf-8") as f:
             md = f.read()

@@ -30,7 +30,9 @@ sendiri. Tidak ada dependensi selain libc (`printf` saja untuk `println`).
 
 **Dokumentasi lengkap ada di [`docs/`](docs/README.md)** — tutorial bahasa,
 pustaka standar, server/jaringan, arsitektur compiler, dan batas jujur.
-Versi online: **https://rinnejay.github.io/**
+**Referensi API** semua 42 modul `lib/` (588 fungsi + builtin `Net.*`,
+signature diekstrak otomatis dari source oleh `tools/gen_libref.py`):
+[`docs/api.md`](docs/api.md). Versi online: **https://rinnejay.github.io/**
 
 ## Dokumentasi HTML (GitHub Pages)
 

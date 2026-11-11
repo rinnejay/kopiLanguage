@@ -1,0 +1,548 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi pustaka · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a class="active" href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-pustaka">Referensi pustaka<a class="anchor" href="#referensi-pustaka" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — [buka referensi](api-core.md)</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — [buka referensi](api-net.md)</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — [buka referensi](api-crypto.md)</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
+<p>Ringkasan semua modul di <code>lib/</code>. Setiap modul adalah class Kopi dengan method static; impor memakai nama class.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Kelompok</th>
+<th>Folder</th>
+<th>Modul</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Core</strong></td>
+<td><code>lib/core/</code></td>
+<td><code>Arrays</code>, <code>Deque</code>, <code>Digits</code>, <code>File</code>, <code>Json</code>, <code>Log</code>, <code>Map</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>Path</code>, <code>Set</code>, <code>Stats</code>, <code>Str</code>, <code>Time</code></td>
+</tr>
+<tr>
+<td><strong>Net</strong></td>
+<td><code>lib/net/</code></td>
+<td><code>Auth</code>, <code>Dns</code>, <code>Http</code>, <code>HttpServer</code>, <code>Jwt</code>, <code>Mime</code>, <code>Resolv</code>, <code>Rfc</code>, <code>Session</code>, <code>Static</code>, <code>Tcp</code>, <code>Tls</code>, <code>Udp</code>, <code>Url</code>, <code>WebSocket</code></td>
+</tr>
+<tr>
+<td><strong>Crypto</strong></td>
+<td><code>lib/crypto/</code></td>
+<td><code>Aead</code>, <code>Big</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Poly</code>, <code>Rand</code>, <code>X25519</code></td>
+</tr>
+</tbody></table></div>
+<h2 id="daftar-modul">Daftar modul<a class="anchor" href="#daftar-modul" aria-label="tautan">#</a></h2>
+<h3 id="core-buka-referensi-api-core-md">Core — <a href="api-core.html">buka referensi</a><a class="anchor" href="#core-buka-referensi-api-core-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-core.html#arrays"><code>Arrays</code></a></td>
+<td><code>lib/core/Arrays.kop</code></td>
+<td>23</td>
+<td>Operasi array <code>int[]</code>: agregat, potong/gabung, sort, pencarian, dan gaya fungsional (lambda).</td>
+</tr>
+<tr>
+<td><a href="api-core.html#deque"><code>Deque</code></a></td>
+<td><code>lib/core/Deque.kop</code></td>
+<td>11</td>
+<td>Antrean dua ujung (ring buffer) berkapasitas tetap: push/pop depan-belakang.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#digits"><code>Digits</code></a></td>
+<td><code>lib/core/Digits.kop</code></td>
+<td>11</td>
+<td>Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#file"><code>File</code></a></td>
+<td><code>lib/core/File.kop</code></td>
+<td>13</td>
+<td>I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#json"><code>Json</code></a></td>
+<td><code>lib/core/Json.kop</code></td>
+<td>57</td>
+<td>Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape <code>int[]</code>; literal bahasa memakai…</td>
+</tr>
+<tr>
+<td><a href="api-core.html#log"><code>Log</code></a></td>
+<td><code>lib/core/Log.kop</code></td>
+<td>4</td>
+<td>Logging ke stderr dengan timestamp UTC dan level.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#map"><code>Map</code></a></td>
+<td><code>lib/core/Map.kop</code></td>
+<td>13</td>
+<td>Hash map int→int dengan open addressing dan <code>grow</code> eksplisit.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#mapstr"><code>MapStr</code></a></td>
+<td><code>lib/core/MapStr.kop</code></td>
+<td>17</td>
+<td>Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan…</td>
+</tr>
+<tr>
+<td><a href="api-core.html#math"><code>Math</code></a></td>
+<td><code>lib/core/Math.kop</code></td>
+<td>72</td>
+<td>Matematika integer 32-bit: bit, pangkat/akar/log, FPB/modular, prima, kombinatorika, dan geometri.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#matrix"><code>Matrix</code></a></td>
+<td><code>lib/core/Matrix.kop</code></td>
+<td>15</td>
+<td>Matriks persegi yang disimpan sebagai <code>int[]</code> datar (baris demi baris): aritmetika, transpose, trace,…</td>
+</tr>
+<tr>
+<td><a href="api-core.html#path"><code>Path</code></a></td>
+<td><code>lib/core/Path.kop</code></td>
+<td>6</td>
+<td>Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#set"><code>Set</code></a></td>
+<td><code>lib/core/Set.kop</code></td>
+<td>8</td>
+<td>Himpunan int di atas Map: tambah/hapus/uji keanggotaan.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#stats"><code>Stats</code></a></td>
+<td><code>lib/core/Stats.kop</code></td>
+<td>14</td>
+<td>Statistik deskriptif sederhana untuk array int: mean, median, modus, variansi, standar deviasi.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#str"><code>Str</code></a></td>
+<td><code>lib/core/Str.kop</code></td>
+<td>40</td>
+<td>Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks.…</td>
+</tr>
+<tr>
+<td><a href="api-core.html#time"><code>Time</code></a></td>
+<td><code>lib/core/Time.kop</code></td>
+<td>6</td>
+<td>Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.</td>
+</tr>
+</tbody></table></div>
+<h3 id="net-buka-referensi-api-net-md">Net — <a href="api-net.html">buka referensi</a><a class="anchor" href="#net-buka-referensi-api-net-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-net.html#auth"><code>Auth</code></a></td>
+<td><code>lib/net/Auth.kop</code></td>
+<td>8</td>
+<td>Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#dns"><code>Dns</code></a></td>
+<td><code>lib/net/Dns.kop</code></td>
+<td>6</td>
+<td>Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#http"><code>Http</code></a></td>
+<td><code>lib/net/Http.kop</code></td>
+<td>27</td>
+<td>Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#httpserver"><code>HttpServer</code></a></td>
+<td><code>lib/net/HttpServer.kop</code></td>
+<td>33</td>
+<td>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,…</td>
+</tr>
+<tr>
+<td><a href="api-net.html#jwt"><code>Jwt</code></a></td>
+<td><code>lib/net/Jwt.kop</code></td>
+<td>6</td>
+<td>JWT HS256: tanda tangan, verifikasi, ambil payload.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#mime"><code>Mime</code></a></td>
+<td><code>lib/net/Mime.kop</code></td>
+<td>1</td>
+<td>Pemetaan ekstensi file → header Content-Type.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#resolv"><code>Resolv</code></a></td>
+<td><code>lib/net/Resolv.kop</code></td>
+<td>5</td>
+<td>Resolver DNS UDP + pembaca <code>/etc/resolv.conf</code>, dengan timeout.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#rfc"><code>Rfc</code></a></td>
+<td><code>lib/net/Rfc.kop</code></td>
+<td>5</td>
+<td>Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#session"><code>Session</code></a></td>
+<td><code>lib/net/Session.kop</code></td>
+<td>6</td>
+<td>Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry).</td>
+</tr>
+<tr>
+<td><a href="api-net.html#static"><code>Static</code></a></td>
+<td><code>lib/net/Static.kop</code></td>
+<td>3</td>
+<td>Penyajian file statis + MIME; menolak path traversal <code>..</code>.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#tcp"><code>Tcp</code></a></td>
+<td><code>lib/net/Tcp.kop</code></td>
+<td>13</td>
+<td>Transport TCP di atas builtin <code>Net</code>: buka koneksi, kirim/terima buffer, shutdown, helper alamat.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#tls"><code>Tls</code></a></td>
+<td><code>lib/net/Tls.kop</code></td>
+<td>25</td>
+<td>Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#udp"><code>Udp</code></a></td>
+<td><code>lib/net/Udp.kop</code></td>
+<td>7</td>
+<td>Datagram UDP: bind, kirim/terima satu datagram, shutdown.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#url"><code>Url</code></a></td>
+<td><code>lib/net/Url.kop</code></td>
+<td>26</td>
+<td>URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#websocket"><code>WebSocket</code></a></td>
+<td><code>lib/net/WebSocket.kop</code></td>
+<td>12</td>
+<td>Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask.</td>
+</tr>
+</tbody></table></div>
+<h3 id="crypto-buka-referensi-api-crypto-md">Crypto — <a href="api-crypto.html">buka referensi</a><a class="anchor" href="#crypto-buka-referensi-api-crypto-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-crypto.html#aead"><code>Aead</code></a></td>
+<td><code>lib/crypto/Aead.kop</code></td>
+<td>7</td>
+<td>AEAD ChaCha20-Poly1305 (RFC 7539 §2.8): enkripsi + autentikasi untuk TLS.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#big"><code>Big</code></a></td>
+<td><code>lib/crypto/Big.kop</code></td>
+<td>20</td>
+<td>Aritmetika medan 2²⁵⁵−19 dengan 17 limb untuk X25519.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#chacha"><code>ChaCha</code></a></td>
+<td><code>lib/crypto/ChaCha.kop</code></td>
+<td>5</td>
+<td>ChaCha20 stream cipher (RFC 7539) untuk TLS record dan eksperimen.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#cipher"><code>Cipher</code></a></td>
+<td><code>lib/crypto/Cipher.kop</code></td>
+<td>11</td>
+<td>Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibilitas.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#crypto"><code>Crypto</code></a></td>
+<td><code>lib/crypto/Crypto.kop</code></td>
+<td>18</td>
+<td>Kumpulan utilitas bit/hash/cipher lama yang dipakai modul kripto lain (kompatibilitas v1).</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#der"><code>Der</code></a></td>
+<td><code>lib/crypto/Der.kop</code></td>
+<td>4</td>
+<td>Parser ASN.1 DER minimal untuk mengekstrak SubjectPublicKeyInfo (pin TLS).</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#hash"><code>Hash</code></a></td>
+<td><code>lib/crypto/Hash.kop</code></td>
+<td>8</td>
+<td>SHA-256, SHA-1, dan HMAC-SHA256 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#kdf"><code>Kdf</code></a></td>
+<td><code>lib/crypto/Kdf.kop</code></td>
+<td>8</td>
+<td>HKDF-SHA256 (RFC 5869) dan ExpandLabel TLS 1.3 (RFC 8446 §7.1).</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#pbkdf2"><code>Pbkdf2</code></a></td>
+<td><code>lib/crypto/Pbkdf2.kop</code></td>
+<td>1</td>
+<td>PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#poly"><code>Poly</code></a></td>
+<td><code>lib/crypto/Poly.kop</code></td>
+<td>10</td>
+<td>Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#rand"><code>Rand</code></a></td>
+<td><code>lib/crypto/Rand.kop</code></td>
+<td>1</td>
+<td>Byte acak kriptografis dari <code>/dev/urandom</code>.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#x25519"><code>X25519</code></a></td>
+<td><code>lib/crypto/X25519.kop</code></td>
+<td>2</td>
+<td>Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3.</td>
+</tr>
+</tbody></table></div>
+<h2 id="cara-menerapkan">Cara menerapkan<a class="anchor" href="#cara-menerapkan" aria-label="tautan">#</a></h2>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Kebutuhan</th>
+<th>Modul yang dipakai</th>
+<th>Pola singkat</th>
+</tr></thead><tbody>
+<tr>
+<td>CLI &amp; pengolah teks</td>
+<td><code>Str</code>, <code>File</code>, <code>Path</code>, <code>Arrays</code></td>
+<td>baca file → <code>Str.trim</code>/<code>splitAt</code> → cetak</td>
+</tr>
+<tr>
+<td>Matematika &amp; statistik</td>
+<td><code>Math</code>, <code>Digits</code>, <code>Stats</code>, <code>Matrix</code></td>
+<td>fungsi murni, hasil int/long</td>
+</tr>
+<tr>
+<td>Data terstruktur</td>
+<td><code>Json</code>, <code>Map</code>, <code>MapStr</code>, <code>Set</code>, <code>Deque</code></td>
+<td><code>Json.parse</code> / map untuk lookup</td>
+</tr>
+<tr>
+<td>Server HTTP</td>
+<td><code>Tcp</code>, <code>HttpServer</code>, <code>Static</code>, <code>Mime</code>, <code>Url</code></td>
+<td>accept → <code>readRequest</code> → route → response</td>
+</tr>
+<tr>
+<td>Banyak klien</td>
+<td><code>Net.pollfd</code> + <code>HttpServer</code></td>
+<td>event loop non-blocking (<code>ServerEvent</code>)</td>
+</tr>
+<tr>
+<td>WebSocket</td>
+<td><code>WebSocket</code>, <code>Hash</code>, <code>Cipher</code></td>
+<td>handshake → decode frame → balas</td>
+</tr>
+<tr>
+<td>Klien HTTP</td>
+<td><code>Http</code>, <code>Url</code>, <code>Resolv</code></td>
+<td><code>getFull</code>/<code>follow</code> → <code>payload</code></td>
+</tr>
+<tr>
+<td>Keamanan</td>
+<td><code>Pbkdf2</code>, <code>Jwt</code>, <code>Auth</code>, <code>Session</code>, <code>Rand</code></td>
+<td>hash password, token, cookie sesi</td>
+</tr>
+<tr>
+<td>TLS</td>
+<td><code>Tls</code>, <code>X25519</code>, <code>Aead</code>, <code>Der</code></td>
+<td>handshake pin SPKI → <code>writeApp</code>/<code>readApp</code></td>
+</tr>
+<tr>
+<td>Game realtime</td>
+<td><code>Udp</code>, <code>Math</code>, <code>Map</code></td>
+<td>loop tick + snapshot (lihat <code>examples/game</code>)</td>
+</tr>
+</tbody></table></div>
+<p><strong>Penting:</strong> modul jaringan memakai socket blocking kecuali Anda memasang <code>Net.setnonblock</code>/<code>Net.settimeout</code>; lihat <a href="04-server.html">04 — Server</a> untuk pola event loop dan batas.</p>
+<h2 id="builtin-net">Builtin <code>Net.*</code><a class="anchor" href="#builtin-net" aria-label="tautan">#</a></h2>
+<p>Fungsi bawaan bahasa (tanpa impor) — pembungkus syscall native.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>Net.socket(fd_type, proto)</code></td>
+<td>buat socket (TCP/UDP); deskriptor</td>
+</tr>
+<tr>
+<td><code>Net.connect(fd, ip, port)</code></td>
+<td>hubungkan ke alamat (oktet di int)</td>
+</tr>
+<tr>
+<td><code>Net.rdb(fd, buf)</code></td>
+<td>baca byte mentah ke buffer; jumlah terbaca</td>
+</tr>
+<tr>
+<td><code>Net.wrb(fd, buf)</code></td>
+<td>tulis byte mentah; jumlah tertulis</td>
+</tr>
+<tr>
+<td><code>Net.close(fd)</code></td>
+<td>tutup deskriptor</td>
+</tr>
+<tr>
+<td><code>Net.bytes("teks")</code></td>
+<td>literal string → array byte (saat kompilasi)</td>
+</tr>
+<tr>
+<td><code>Net.openr(path)</code></td>
+<td>buka file hanya-baca</td>
+</tr>
+<tr>
+<td><code>Net.recvb(fd, buf)</code></td>
+<td>baca dari koneksi (blocking/timeout)</td>
+</tr>
+<tr>
+<td><code>Net.sendb(fd, buf)</code></td>
+<td>kirim seluruh buffer ke koneksi</td>
+</tr>
+<tr>
+<td><code>Net.bind(fd, ip, port)</code></td>
+<td>ikat alamat/port</td>
+</tr>
+<tr>
+<td><code>Net.sendto(fd, ip, port, buf)</code></td>
+<td>kirim datagram UDP</td>
+</tr>
+<tr>
+<td><code>Net.recvfrom(fd, buf, from)</code></td>
+<td>terima datagram; from = int[2] (ip, port)</td>
+</tr>
+<tr>
+<td><code>Net.shutdown(fd, how)</code></td>
+<td>matikan satu/dua arah koneksi</td>
+</tr>
+<tr>
+<td><code>Net.listen(fd, backlog)</code></td>
+<td>jadikan socket server</td>
+</tr>
+<tr>
+<td><code>Net.accept4(fd)</code></td>
+<td>terima koneksi baru (syscall accept4, Android aman)</td>
+</tr>
+<tr>
+<td><code>Net.setsockopt(fd, level, opt, val)</code></td>
+<td>set opsi socket (SO_REUSEADDR, dll.)</td>
+</tr>
+<tr>
+<td><code>Net.memMark()</code></td>
+<td>tandai batas arena memori saat ini</td>
+</tr>
+<tr>
+<td><code>Net.memReset(mark)</code></td>
+<td>kembali ke tanda; byte &gt; mark bebas dipakai lagi</td>
+</tr>
+<tr>
+<td><code>Net.argc()</code></td>
+<td>jumlah argumen program</td>
+</tr>
+<tr>
+<td><code>Net.argv(i)</code></td>
+<td>argumen ke-i sebagai byte</td>
+</tr>
+<tr>
+<td><code>Net.getenv(name)</code></td>
+<td>nilai variabel lingkungan (byte kosong bila tidak ada)</td>
+</tr>
+<tr>
+<td><code>Net.recv1(fd, buf)</code></td>
+<td>satu panggilan read saja (tanpa loop)</td>
+</tr>
+<tr>
+<td><code>Net.setnonblock(fd)</code></td>
+<td>socket non-blocking</td>
+</tr>
+<tr>
+<td><code>Net.key()</code></td>
+<td>byte tombol stdin (mode raw)</td>
+</tr>
+<tr>
+<td><code>Net.ttyRaw(on)</code></td>
+<td>aktif/matikan mode raw terminal</td>
+</tr>
+<tr>
+<td><code>Net.localport(fd)</code></td>
+<td>port lokal socket terikat</td>
+</tr>
+<tr>
+<td><code>Net.settimeout(fd, ms)</code></td>
+<td>timeout operasi socket dalam ms</td>
+</tr>
+<tr>
+<td><code>Net.pollfd(fds, revents, ms)</code></td>
+<td>poll(2); revents[i] 0/1 siap baca/2 error</td>
+</tr>
+<tr>
+<td><code>Net.time()</code></td>
+<td>epoch detik (32-bit)</td>
+</tr>
+<tr>
+<td><code>Net.mono()</code></td>
+<td>waktu monotonic</td>
+</tr>
+<tr>
+<td><code>Net.sleep(ms)</code></td>
+<td>tidur dalam milidetik</td>
+</tr>
+<tr>
+<td><code>Net.exit(code)</code></td>
+<td>keluar program (buffer stdio tidak di-flush)</td>
+</tr>
+<tr>
+<td><code>Net.cat(a, b)</code></td>
+<td>gabung dua array byte</td>
+</tr>
+<tr>
+<td><code>Net.sequal(a, b)</code></td>
+<td>true bila isi dua array sama</td>
+</tr>
+<tr>
+<td><code>Net.sne(a, b)</code></td>
+<td>true bila isi berbeda</td>
+</tr>
+</tbody></table></div>
+<blockquote><code>System.out.println/print</code> juga builtin; <code>Net.bytes("teks")</code> mengubah string literal menjadi <code>int[]</code> byte saat kompilasi.</blockquote>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

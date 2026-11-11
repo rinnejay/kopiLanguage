@@ -1,0 +1,615 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi API — Crypto · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-api-crypto">Referensi API — Crypto<a class="anchor" href="#referensi-api-crypto" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li></ul></nav>
+<p>Hash, PBKDF2, cipher, X25519, AEAD, DER. Semua signature di bawah diekstrak langsung dari source <code>lib/crypto/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="aead">Aead<a class="anchor" href="#aead" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Aead.kop</code> · 7 fungsi</p>
+<p>AEAD ChaCha20-Poly1305 (RFC 7539 §2.8): enkripsi + autentikasi untuk TLS.</p>
+<pre><code class="language-java">import Aead;
+
+int[] ct = Aead.seal(key, nonce, aad, plain);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Nonce tidak boleh dipakai ulang dengan kunci yang sama.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] concat(int[] a, int[] b)</code></td>
+<td>gabungkan dua array</td>
+</tr>
+<tr>
+<td><code>static int[] pad16(int[] a)</code></td>
+<td>nol-kan sampai kelipatan 16 (RFC 7539 §2.8 pad16)</td>
+</tr>
+<tr>
+<td><code>static int[] le64(int n)</code></td>
+<td>panjang 64-bit little-endian (8 byte)</td>
+</tr>
+<tr>
+<td><code>static int[] otkPair(int[] key, int[] nonce)</code></td>
+<td>one-time poly key: 32 byte pertama blok counter-0</td>
+</tr>
+<tr>
+<td><code>static int[] ctOf(int[] key, int[] nonce, int[] msg)</code></td>
+<td>ciphertext ChaCha20-Poly1305</td>
+</tr>
+<tr>
+<td><code>static int[] tagOf(int[] key, int[] nonce, int[] aad, int[] ct)</code></td>
+<td>tag Poly1305 atas ciphertext + aad</td>
+</tr>
+<tr>
+<td><code>static int eq(int[] a, int[] b)</code></td>
+<td>perbandingan konstan dua array</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="big">Big<a class="anchor" href="#big" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Big.kop</code> · 20 fungsi</p>
+<p>Aritmetika medan 2²⁵⁵−19 dengan 17 limb untuk X25519.</p>
+<pre><code class="language-java">import Big;
+
+int[] f = Big.fromBytes(bytes32);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Dipakai internal TLS/X25519; bukan big-integer umum.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] pans()</code></td>
+<td>konstanta p = 2^255 - 19, 17 limb radiks 15-bit (limb0 = (-19 mod 2^15) = 32749 — silang-vektor dari python)</td>
+</tr>
+<tr>
+<td><code>static int[] zero()</code></td>
+<td>elemen medan nol</td>
+</tr>
+<tr>
+<td><code>static int[] ten(int n)</code></td>
+<td>(internal) 10^n dalam medan</td>
+</tr>
+<tr>
+<td><code>static int[] bigadd(int[] x, int[] y)</code></td>
+<td>kedua 17 limb; mengembalikan raw (limb bisa &gt; 2^15 sedikit)</td>
+</tr>
+<tr>
+<td><code>static int[] bigsubRaw(int[] x, int[] y)</code></td>
+<td>(internal) pengurangan limb mentah</td>
+</tr>
+<tr>
+<td><code>static int cmp(int[] x, int[] y)</code></td>
+<td>bandingkan dua magnitudo (semua limb &lt; 2^15): 1 x&gt;y, -1 x&lt;y, 0 sama</td>
+</tr>
+<tr>
+<td><code>static void reduce(int[] v)</code></td>
+<td>car + cap limb (nilai invarian &lt; 2^256), lalu csub 2x</td>
+</tr>
+<tr>
+<td><code>static void carPass(int[] v)</code></td>
+<td>(internal) normalisasi carry</td>
+</tr>
+<tr>
+<td><code>static void csub2(int[] v)</code></td>
+<td>(internal) kurangi dua kali (barrett kecil)</td>
+</tr>
+<tr>
+<td><code>static void copy(int[] s, int[] d)</code></td>
+<td>salinan (array baru)</td>
+</tr>
+<tr>
+<td><code>static int[] femul(int[] x, int[] y)</code></td>
+<td>perkalian medan penuh: 17x17 limbs → 34 → fold 2^255≡19 → reduce</td>
+</tr>
+<tr>
+<td><code>static int[] fsq(int[] x)</code></td>
+<td>kuadrat dalam medan</td>
+</tr>
+<tr>
+<td><code>static int[] feadd(int[] x, int[] y)</code></td>
+<td>(x + y) mod p</td>
+</tr>
+<tr>
+<td><code>static int[] fesub(int[] x, int[] y)</code></td>
+<td>(x - y) mod p: jalan (x + 2p) - y (y &lt; p)</td>
+</tr>
+<tr>
+<td><code>static void cswap17(int[] pair, int bx, int by, int swap)</code></td>
+<td>kondisional swap constant-time: 17 limb pada dua basis eksplisit</td>
+</tr>
+<tr>
+<td><code>static int bitOf(int[] v, int t)</code></td>
+<td>inventory bit de eksponen 17-limb</td>
+</tr>
+<tr>
+<td><code>static int[] feInv(int[] x)</code></td>
+<td>inverse via Fermat: x^(p-2)</td>
+</tr>
+<tr>
+<td><code>static int[] fromBytes(int[] b)</code></td>
+<td>byte-as-int little-endian 32 → elemen medan (bit 255 tergeser)</td>
+</tr>
+<tr>
+<td><code>static int[] toBytes(int[] x)</code></td>
+<td>elemen medan (&lt; p) → 32 byte little-endian</td>
+</tr>
+<tr>
+<td><code>static int[] scalarFromBytes(int[] b)</code></td>
+<td>scalar dari 32 byte, clamped (RFC 7748 §5): k0&amp;=248 k31&amp;=127 /64</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="chacha">ChaCha<a class="anchor" href="#chacha" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/ChaCha.kop</code> · 5 fungsi</p>
+<p>ChaCha20 stream cipher (RFC 7539) untuk TLS record dan eksperimen.</p>
+<pre><code class="language-java">import ChaCha;
+
+int[] ks = ChaCha.block(key, counter, nonce);</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int rotl(int x, int n)</code></td>
+<td>(internal) rotasi kiri n bit</td>
+</tr>
+<tr>
+<td><code>static void qr(int[] s, int a, int b, int c, int d)</code></td>
+<td>quarter round: operasi pada referensi array? Kopi tak punya pointer — inline 4-kata lewat indeks state s + offset 0/4/8/12</td>
+</tr>
+<tr>
+<td><code>static void roundTo(int[] x)</code></td>
+<td>(internal) satu ronde ChaCha pada state</td>
+</tr>
+<tr>
+<td><code>static int[] block(int[] init)</code></td>
+<td>satu blok: state inisial (16 kata) → keystream 64 byte</td>
+</tr>
+<tr>
+<td><code>static int[] xctr(int[] key, int[] nonce, int counter, int[] data)</code></td>
+<td>en/de-kript (keystream XOR): key 32 byte, nonce 12 byte, counter awal, data byte-as-int</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="cipher">Cipher<a class="anchor" href="#cipher" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Cipher.kop</code> · 11 fungsi</p>
+<p>Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibilitas.</p>
+<pre><code class="language-java">import Cipher;
+
+int[] b = Cipher.b64enc(Net.bytes("halo"));
+System.out.println(b);              // aGFsbw==
+System.out.println(Cipher.b64dec(b)); // halo</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Cipher klasik <strong>bukan</strong> untuk keamanan produksi.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] rc4(int[] data, int[] key)</code></td>
+<td>enc/dec bisa: fungsi sama (xor nirl). kunci: array byte-as-int (praktik umum: kunci 5..16 byte). hasil: array baru sepanjang data.</td>
+</tr>
+<tr>
+<td><code>static int[] vigenere(int[] txt, int[] key)</code></td>
+<td>enkripsi Vigenère (ASCII)</td>
+</tr>
+<tr>
+<td><code>static int[] unvigenere(int[] txt, int[] key)</code></td>
+<td>dekripsi Vigenère</td>
+</tr>
+<tr>
+<td><code>static int[] b64enc(int[] data)</code></td>
+<td>data byte-as-int → teks base64 (byte-as-int), padding '='</td>
+</tr>
+<tr>
+<td><code>static int[] b64dec(int[] txt)</code></td>
+<td>teks base64 → byte-as-int; '=' diabaikan, karakter asing → 0</td>
+</tr>
+<tr>
+<td><code>static int[] hexenc(int[] data)</code></td>
+<td>data → hex lowercase, 2 karakter per byte</td>
+</tr>
+<tr>
+<td><code>static int hexdig(int n)</code></td>
+<td>0..15 → '0'..'9','a'..'f'</td>
+</tr>
+<tr>
+<td><code>static int hexval(int c)</code></td>
+<td>nilai hex digit ASCII → 0..15, -1 bila bukan digit hex</td>
+</tr>
+<tr>
+<td><code>static int[] hexdec(int[] txt)</code></td>
+<td>teks hex (panjang ganjil dibatasi 0 di akhir) → byte-as-int</td>
+</tr>
+<tr>
+<td><code>static int crc16(int[] data)</code></td>
+<td>CRC-16-CCITT (poly 0x1021, init 0xFFFF) — vektor terkenal: "123456789" → 0x29B1</td>
+</tr>
+<tr>
+<td><code>static int adler32(int[] data)</code></td>
+<td>Adler-32 (RFC 1950): A=1, B=0, mod 65521 dan b·65536+a. Untuk masukan besar b bisa melewati 2^31 — cukup untuk deret kecil</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="crypto">Crypto<a class="anchor" href="#crypto" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Crypto.kop</code> · 18 fungsi</p>
+<p>Kumpulan utilitas bit/hash/cipher lama yang dipakai modul kripto lain (kompatibilitas v1).</p>
+<pre><code class="language-java">import Crypto;
+
+int h = Crypto.hashInt(123);   // hash integer deterministik</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Untuk kode baru pakai <code>Hash</code>/<code>Cipher</code> yang lebih jelas.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int bitxor(int a, int b)</code></td>
+<td>xor bit-demi-bit untuk nilai NONNEGATIF &lt; 2^31</td>
+</tr>
+<tr>
+<td><code>static int arrEq(int[] a, int[] b)</code></td>
+<td>banding dua array: 1 jika sama panjang &amp; tiap elemen sama</td>
+</tr>
+<tr>
+<td><code>static int abs_(int x)</code></td>
+<td>(internal) nilai absolut</td>
+</tr>
+<tr>
+<td><code>static int fnv1a(int[] data, int len)</code></td>
+<td>FNV-1a 32-bit darider array byte-as-int (len elemen pertama)</td>
+</tr>
+<tr>
+<td><code>static int nextRand(int x)</code></td>
+<td>Lehmer/LCG (Schrage) — perkiraan berpisah murni int, seed/mulai 1..2^31-2, hasil [0, M)</td>
+</tr>
+<tr>
+<td><code>static int randRange(int seed, int hi)</code></td>
+<td>(internal) acak LCG 0..hi-1 (bukan kripto)</td>
+</tr>
+<tr>
+<td><code>static int bitand(int a, int b)</code></td>
+<td>identitas aritmétika: A + B = (A⊕B) + 2·(A∧B) ⟹ ia juga A∧B = (A+B−A⊕B)/2 dan A∨B = A⊕B + A∧B — tanpa operator &amp; / ^</td>
+</tr>
+<tr>
+<td><code>static int bitor(int a, int b)</code></td>
+<td>(internal) bitwise OR</td>
+</tr>
+<tr>
+<td><code>static int bitnot(int x)</code></td>
+<td>komplemen 31-bit (pelengkap di dalam 0..2^31-1)</td>
+</tr>
+<tr>
+<td><code>static int pow31(int n)</code></td>
+<td>2^n untuk n 0..30 (n=31 membanjir tanda)</td>
+</tr>
+<tr>
+<td><code>static int mask31(int n)</code></td>
+<td>masker n bit terendah</td>
+</tr>
+<tr>
+<td><code>static int shl31(int x, int n)</code></td>
+<td>geser kiri, bit di atas 2^31 dibuang</td>
+</tr>
+<tr>
+<td><code>static int shr31(int x, int n)</code></td>
+<td>geser kanan logis (masukan positif)</td>
+</tr>
+<tr>
+<td><code>static int rotl31(int x, int n)</code></td>
+<td>rotasi kiri 31-bit (bit paling atas mengalirlah ke bawah)</td>
+</tr>
+<tr>
+<td><code>static int rotr31(int x, int n)</code></td>
+<td>rotasi kanan</td>
+</tr>
+<tr>
+<td><code>static int[] xorStream(int[] inp, int[] key)</code></td>
+<td>XOR stream: out[i] = in[i] ^ key[i % key.length] XOR nirl: pemanggilan kedua dengan key yang sama = dekripsi.</td>
+</tr>
+<tr>
+<td><code>static int[] caesar(int[] inp, int k)</code></td>
+<td>Caesar shift (+k mod 256) — disetara beserta 'uncaesar'</td>
+</tr>
+<tr>
+<td><code>static int[] uncaesar(int[] inp, int k)</code></td>
+<td>dekripsi Caesar (ASCII)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="der">Der<a class="anchor" href="#der" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Der.kop</code> · 4 fungsi</p>
+<p>Parser ASN.1 DER minimal untuk mengekstrak SubjectPublicKeyInfo (pin TLS).</p>
+<pre><code class="language-java">import Der;
+
+// dipakai Tls: pin SPKI = SHA-256 dari SubjectPublicKeyInfo</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Hanya struktur DER yang diperlukan TLS; bukan parser X.509 lengkap.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static void tlv(int[] x, int pos, int[] out)</code></td>
+<td>baca satu TLV dari pos. tulis hasil ke out (4 slot): out[0] = tag (atau -1 jika rusak), out[1] = panjang isi, out[2] = posisi isi, out[3] = posisi berikutnya.</td>
+</tr>
+<tr>
+<td><code>static int[] sliceOf(int[] x, int from, int len)</code></td>
+<td>(internal) potong array</td>
+</tr>
+<tr>
+<td><code>static int[] spkiOf(int[] x)</code></td>
+<td>SPKI (DER utuh) dari sertifikat leaf. kosong (panjang 0) bila gagal.</td>
+</tr>
+<tr>
+<td><code>static int[] spkiPin(int[] cert)</code></td>
+<td>fingerprint pin: SHA-256 dari DER SPKI</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="hash">Hash<a class="anchor" href="#hash" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Hash.kop</code> · 8 fungsi</p>
+<p>SHA-256, SHA-1, dan HMAC-SHA256 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.</p>
+<pre><code class="language-java">import Hash;
+import Cipher;
+
+System.out.println(Cipher.hexenc(Hash.sha256(Net.bytes("abc"))));
+System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>SHA-256/SHA-1 bekerja one-shot; pesan besar memakai memori O(panjang).</li>
+<li><code>hmac(key,msg)</code> mengembalikan 32 byte.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int uadd(int x, int y)</code></td>
+<td>penjumlahan modulo 2^32</td>
+</tr>
+<tr>
+<td><code>static int rotr(int x, int n)</code></td>
+<td>rotasi kanan 32-bit; count 0 aman</td>
+</tr>
+<tr>
+<td><code>static int[] sha256(int[] msg)</code></td>
+<td>satu-shot: pesan byte-as-int (0..255) → digest 32 byte-as-int</td>
+</tr>
+<tr>
+<td><code>static int[] hmac(int[] key, int[] msg)</code></td>
+<td>HMAC-SHA256 (RFC 2104); key &gt; 64 byte di-hash dulu</td>
+</tr>
+<tr>
+<td><code>static int[] toHex(int[] dig)</code></td>
+<td>digest → teks hex lowercase</td>
+</tr>
+<tr>
+<td><code>static int eq(int[] a, int[] b)</code></td>
+<td>perbandingan konstan dua digest</td>
+</tr>
+<tr>
+<td><code>static int rotl(int x, int n)</code></td>
+<td>(internal) rotasi kiri n bit</td>
+</tr>
+<tr>
+<td><code>static int[] sha1(int[] msg)</code></td>
+<td>satu-shot SHA-1: pesan byte-as-int → digest 20 byte-as-int</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="kdf">Kdf<a class="anchor" href="#kdf" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Kdf.kop</code> · 8 fungsi</p>
+<p>HKDF-SHA256 (RFC 5869) dan ExpandLabel TLS 1.3 (RFC 8446 §7.1).</p>
+<pre><code class="language-java">import Kdf;
+
+int[] okm = Kdf.hkdf(secret, salt, info, 32);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Dipakai TLS; untuk password gunakan <code>Pbkdf2</code>.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] extract(int[] salt, int[] ikm)</code></td>
+<td>HKDF-Extract: PRK = HMAC(salt, IKM)</td>
+</tr>
+<tr>
+<td><code>static int[] expand(int[] prk, int[] info, int len)</code></td>
+<td>HKDF-Expand: OKM = T(1) / T(2) / ... (L byte) T(i) = HMAC(PRK, T(i-1) / info / i) dengan i byte tunggal</td>
+</tr>
+<tr>
+<td><code>static int[] concat(int[] a, int[] b)</code></td>
+<td>gabungkan dua array</td>
+</tr>
+<tr>
+<td><code>static int[] concat3(int[] a, int[] b, int[] c)</code></td>
+<td>(internal) gabung tiga array</td>
+</tr>
+<tr>
+<td><code>static int[] u16(int v)</code></td>
+<td>uint16 big-endian dua byte</td>
+</tr>
+<tr>
+<td><code>static int[] tls13()</code></td>
+<td>"tls13 " — ukuran 6 byte tetap</td>
+</tr>
+<tr>
+<td><code>static int[] expandLabel(int[] secret, int[] label, int[] context, int len)</code></td>
+<td>HKDF-Expand-Label(Secret, Label, Context, Length): HkdfLabel = uint16(Length) / uint8(len("tls13 " + Label)) / "tls13 " / Label / uint8(Context.len) / Context (RFC 8446 §7.1)</td>
+</tr>
+<tr>
+<td><code>static int[] deriveSecret(int[] secret, int[] label, int[] msgs)</code></td>
+<td>Derive-Secret(Secret, Label, Messages) = ExpandLabel(Secret, Label, SHA256(messages), 32)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="pbkdf2">Pbkdf2<a class="anchor" href="#pbkdf2" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Pbkdf2.kop</code> · 1 fungsi</p>
+<p>PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi.</p>
+<pre><code class="language-java">import Pbkdf2;
+import Rand;
+
+int[] salt = Rand.bytes(16);
+int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Buffer sementara di-reset internal; aman untuk 100k+ iterasi.</li>
+<li>Simpan salt + hash; verifikasi dengan perbandingan konstan.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] sha256(int[] pass, int[] salt, int iter, int dkLen)</code></td>
+<td>derive key PBKDF2-HMAC-SHA256 (pass, salt, iterasi, panjang)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="poly">Poly<a class="anchor" href="#poly" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Poly.kop</code> · 10 fungsi</p>
+<p>Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit.</p>
+<pre><code class="language-java">import Poly;
+
+int[] tag = Poly.mac(msg, key);</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] plimbs()</code></td>
+<td>(internal) state limb awal</td>
+</tr>
+<tr>
+<td><code>static int[] maskLE()</code></td>
+<td>(internal) mask limb 130-bit</td>
+</tr>
+<tr>
+<td><code>static void addByte(int[] v, int pos, int val)</code></td>
+<td>tambah byte val pada posisi bit 8·pos (pos = indeks byte blok)</td>
+</tr>
+<tr>
+<td><code>static void carPass(int[] v)</code></td>
+<td>cari-angkut 9 slot; sisa ke slot 9 (kecil, tetap dipantau)</td>
+</tr>
+<tr>
+<td><code>static void fold9(int[] v)</code></td>
+<td>kuras slot 9 (koefisien 2^135): 2^135 ≡ 160 (mod p), jadi lipat v[9]·160 ke slot 0/1 lalu angkut ulang. Sisa carry bisa balik ke slot 9, ulangi sampai benar-benar nol (pasti cep…</td>
+</tr>
+<tr>
+<td><code>static void foldAll(int[] v)</code></td>
+<td>lipat slot 9..len-1: 2^(15k) → 160·2^(15(k-9)); k dari besar ke kecil agar k contributions hi dari slot besar ikut terserap di pass ini</td>
+</tr>
+<tr>
+<td><code>static void mulFold(int[] acc, int[] rsl)</code></td>
+<td>(acc + blok)·r: schoolbook 9×9 → 18 slot, lalu fold + carPass 3 kali. acc[0..8] masuk ternormalisasi (&lt; 2^15); keluar &lt; 2^135, slot 9 ~0</td>
+</tr>
+<tr>
+<td><code>static int cmpP(int[] v)</code></td>
+<td>v ternormalisasi (slot &lt; 2^15, slot 9 ≈ 0): bandingkan dengan p</td>
+</tr>
+<tr>
+<td><code>static void subP(int[] v)</code></td>
+<td>(internal) kurangi p bila &gt;= p</td>
+</tr>
+<tr>
+<td><code>static int[] mac(int[] r, int[] s, int[] msg)</code></td>
+<td>MAC: r 16 byte, s 16 byte, msg → tag 16 byte</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="rand">Rand<a class="anchor" href="#rand" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Rand.kop</code> · 1 fungsi</p>
+<p>Byte acak kriptografis dari <code>/dev/urandom</code>.</p>
+<pre><code class="language-java">import Rand;
+
+int[] k = Rand.bytes(32);   // kunci 256-bit</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] bytes(int n)</code></td>
+<td>n byte acak dari /dev/urandom</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="x25519">X25519<a class="anchor" href="#x25519" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/X25519.kop</code> · 2 fungsi</p>
+<p>Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3.</p>
+<pre><code class="language-java">import X25519;
+
+int[] shared = X25519.shared(mySecret, peerPublic);</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] x25519(int[] k32, int[] u32)</code></td>
+<td>X25519(k, u) — kedua arg byte-as-int 32 (scalar, u-coord)</td>
+</tr>
+<tr>
+<td><code>static int[] pub(int[] sk)</code></td>
+<td>kunci publik: u = 9 (little-endian: byte[0] = 9)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.11 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-crypto.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>
