@@ -1544,6 +1544,39 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tadd\tsp, sp, #16");
             return 0;
         }
+        if (e->ival == 40 || e->ival == 41) { /* mkstr(int[])→String | strbytes(String)→int[] */
+            /* fisik byte-per-slot (v1.17): keduanya salinan blok bernah-panjang */
+            gen_expr(m, e->a);
+            push_val(1);
+            emit("\tldr\tx10, [sp]");              /* sumber */
+            emit("\tldr\tw11, [x10]");             /* n byte */
+            emit("\tsxtw\tx12, w11");
+            emit("\tlsl\tx0, x12, #3");
+            emit("\tadd\tx0, x0, #8");
+            emit("\tbl\tkopalloc");
+            emit("\tstr\tx12, [x0]");              /* len */
+            emit("\tmov\tx13, #0");
+            emit(".LMK%dL:", ln);
+            emit("\tcmp\tx13, x12");
+            emit("\tb.hs\t.LMK%dD", ln);
+            emit("\tlsl\tx14, x13, #3");
+            emit("\tadd\tx14, x14, #8");
+            if (e->ival == 40) {
+                /* cek rentang byte 0..255 */
+                emit("\tldr\tx15, [x10, x14]");
+                emit("\tcmp\tx15, #255");
+                emit("\tb.hi\t.Kbnd");
+                emit("\tstr\tx15, [x0, x14]");
+            } else {
+                emit("\tldr\tx15, [x10, x14]");
+                emit("\tstr\tx15, [x0, x14]");
+            }
+            emit("\tadd\tx13, x13, #1");
+            emit("\tb\t.LMK%dL", ln);
+            emit(".LMK%dD:", ln);
+            emit("\tadd\tsp, sp, #16");
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -1823,6 +1856,15 @@ void gen_a64(const char *outpath) {
     emit("\tldr\tx9, [x9, :got_lo12:exit]");
     emit("\tblr\tx9");
 
+    emit(".Kbnd:");
+    emit("\tadrp\tx0, :got:.Lmsg_bnd");
+    emit("\tldr\tx0, [x0, :got_lo12:.Lmsg_bnd]");
+    emit("\tbl\tprintf");
+    emit("\tmov\tw0, #1");
+    emit("\tadrp\tx9, :got:exit");
+    emit("\tldr\tx9, [x9, :got_lo12:exit]");
+    emit("\tblr\tx9");
+
     emit(".Koom:");
     emit("\tadrp\tx0, :got:.Lmsg_oom");
     emit("\tldr\tx0, [x0, :got_lo12:.Lmsg_oom]");
@@ -1903,6 +1945,7 @@ void gen_a64(const char *outpath) {
     emit(".Lfmt_s: .asciz \"%s\"", "%s");
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
+    emit(".Lmsg_bnd: .asciz \"%s\"", "kopi: byte mkstr di luar 0..255\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");
     emit(".Lempty_str: .asciz \"%s\"", "");
     emit(".Lstty_raw: .asciz \"%s\"", "stty raw -echo 2>/dev/null");

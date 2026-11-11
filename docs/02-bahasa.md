@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.16.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.17.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
@@ -41,7 +41,7 @@ class Main {
 | `uint8/uint16/uint32/uint64` | unsigned | sufiks `U` (uint32), `UL` (uint64) |
 | `float` | 32-bit IEEE-754 | sufiks `f` |
 | `double` | 64-bit IEEE-754 | sufiks `d` opsional |
-| `String` | pointer byte-array | representasi sama dengan `int[]` |
+| `String` | pointer byte-array | tipe teks opaque (v1.17) |
 | `int[]` | array 64-bit-slot | elemen disimpan sign-extended |
 | `fn` | closure | lihat lambda |
 
@@ -182,8 +182,8 @@ findIndex sumBy copy reverse`.
 
 ## 8. String
 
-String adalah **tipe native** dengan representasi sama seperti `int[]`
-byte; literal `"..."` dan `'...'` adalah String (bukan char).
+String adalah **tipe teks native** (v1.17: opaque — tidak lagi sama dengan
+`int[]`); literal `"..."` dan `'...'` adalah String (bukan char).
 
 ```java
 String s = "Kopi";
@@ -195,6 +195,23 @@ System.out.println(s == "Kopi");    // perbandingan isi
 
 `+` untuk String hanya dengan String; untuk angka gunakan `Str.fromInt`
 atau template.
+
+Interop String ↔ byte buffer kini **eksplisit** (v1.17):
+
+```java
+int[] buf = Net.strbytes(s);   // teks → salinan byte
+String t = Net.mkstr(buf);     // byte → teks baru (materialisasi)
+```
+
+- `String → int[]` masih bebas (String adalah view byte, ala `[]byte(s)` di Go).
+- `int[] → String` **wajib** `Net.mkstr(...)` — buffer byte tidak lagi otomatis
+  dianggap teks; `int[] w = u;` (u String) ditolak compiler.
+- Fungsi pembangun teks (`Str.trim`, `Str.upper`, `Str.fromInt`,
+  `Str.fromLong`, `Str.fromDouble`, `Str.boolText`, `Str.repeat`,
+  `Str.padLeft`, `Str.splitAt`, ...) kini mengembalikan `String`.
+  `Str.substring` bernama `Str.sub` (kembalikan `String`);
+  `Str.slice` tetap `int[]` untuk buffer I/O.
+- `println(int[])` tetap mencetak buffer byte sebagai teks (debug).
 
 ### Metode instance (butuh `import Str;`)
 

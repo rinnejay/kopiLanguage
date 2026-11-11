@@ -52,6 +52,11 @@
 <td>array <code>long[]</code>/<code>String[]</code> pakai loop <code>for</code> biasa</td>
 </tr>
 <tr>
+<td>~~String = <code>int[]</code>~~ <strong>✅ v1.17</strong> (String opaque; interop eksplisit <code>Net.mkstr</code>/<code>Net.strbytes</code>)</td>
+<td>fisik masih byte-per-slot (8 byte/karakter)</td>
+<td>flip packed bytes (1 byte/karakter) = v1.18, blast radius kecil</td>
+</tr>
+<tr>
 <td><code>char</code> &amp; literal char</td>
 <td><code>'a'</code> adalah String</td>
 <td>pakai kode byte (<code>97</code>) atau <code>charAt</code></td>
@@ -254,7 +259,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>126/126</strong> (v1.16) — a64 + VM + sintaks x64 + dokumen HTML (136 PASS termasuk cek x64 yang tidak masuk counter).</li>
+<li>Suite: <strong>128/128</strong> (v1.17) — a64 + VM + sintaks x64 + dokumen HTML (139 PASS termasuk cek x64 yang tidak masuk counter).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>
@@ -281,7 +286,7 @@
 <li>Tulis batas di docs, bukan hanya di kepala.</li>
 </ul>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.16 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.17 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/06-batas-roadmap.md">Sunting halaman ini</a>
 </footer>
   </main>

@@ -444,9 +444,9 @@ class Main {
 
         String u = s + t;
         System.out.println(u.length);
-        String v = Net.bytes("bytes");
+        String v = Net.mkstr(Net.bytes("bytes"));
         System.out.println(v);
-        int[] w = u;
+        int[] w = Net.strbytes(u);
         System.out.println(w.length);
         System.out.println(Str.upper(s));
         System.out.println(pair("a", "b"));
@@ -1395,6 +1395,13 @@ check arrtest test/arrtest.kop
 ./kopicc test/arrtest.kop -t x64 -o "$T/kopi/arrtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/arrtest64.s" -o /dev/null \
     && echo "PASS  arrtest [x64]" || { echo "FAIL  arrtest [x64]"; FAIL=$((FAIL+1)); }
+
+# ─── fitur bahasa v1.17: String opaque — Net.mkstr/Net.strbytes ───
+cp test/mkstrtest.ref "$T/kopi/mkstrtest.ref"
+check mkstrtest test/mkstrtest.kop
+./kopicc test/mkstrtest.kop -t x64 -o "$T/kopi/mkstrtest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/mkstrtest64.s" -o /dev/null \
+    && echo "PASS  mkstrtest [x64]" || { echo "FAIL  mkstrtest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"

@@ -50,7 +50,7 @@ Dokumentasi ini dibagi menjadi jalur belajar dan jalur kontributor.
 
 ```sh
 make            # kopicc + kopivm
-make test       # 126 uji (a64, VM, sintaks x64, dokumen)
+make test       # 128 uji (a64, VM, sintaks x64, dokumen)
 ./kopicc --version
 ```
 

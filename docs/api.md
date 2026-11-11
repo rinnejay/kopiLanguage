@@ -27,7 +27,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Path`](api-core.md#path) | `lib/core/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
 | [`Set`](api-core.md#set) | `lib/core/Set.kop` | 8 | Himpunan int di atas Map: tambah/hapus/uji keanggotaan. |
 | [`Stats`](api-core.md#stats) | `lib/core/Stats.kop` | 14 | Statistik deskriptif sederhana untuk array int: mean, median, modus, variansi, standar deviasi. |
-| [`Str`](api-core.md#str) | `lib/core/Str.kop` | 40 | Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks.… |
+| [`Str`](api-core.md#str) | `lib/core/Str.kop` | 41 | Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks.… |
 | [`Time`](api-core.md#time) | `lib/core/Time.kop` | 6 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
 
 ### Net — [buka referensi](api-net.md)

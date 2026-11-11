@@ -609,7 +609,7 @@ System.out.println(Stats.median(a));    // 4
 
 ## Str
 
-`lib/core/Str.kop` · 40 fungsi
+`lib/core/Str.kop` · 41 fungsi
 
 Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks. Bekerja pada String maupun `int[]` byte.
 
@@ -641,31 +641,32 @@ System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007
 | `static boolean contains(int[] s, int[] ndl)` | true bila memuat substring |
 | `static boolean startsWith(int[] s, int[] p)` | true bila diawali ndl |
 | `static boolean endsWith(int[] s, int[] p)` | true bila diakhiri ndl |
-| `static int[] trimLeft(int[] s)` | buang whitespace di ujung kiri |
-| `static int[] trimRight(int[] s)` | buang whitespace di ujung kanan |
-| `static int[] trim(int[] s)` | buang spasi/tab/CR/LF di kedua ujung |
-| `static int[] upper(int[] s)` | huruf besar (ASCII) |
-| `static int[] lower(int[] s)` | huruf kecil (ASCII) |
-| `static int[] repeat(int[] s, int n)` | ulang string n kali |
-| `static int[] reverse(int[] s)` | salinan terbalik |
-| `static int[] replaceByte(int[] s, int from, int to)` | ganti semua byte from → to |
-| `static int[] replaceSeq(int[] s, int[] old, int[] nw)` | ganti semua kemunculan old → nw |
+| `static String trimLeft(int[] s)` | buang whitespace di ujung kiri |
+| `static String trimRight(int[] s)` | buang whitespace di ujung kanan |
+| `static String trim(int[] s)` | buang spasi/tab/CR/LF di kedua ujung |
+| `static String upper(int[] s)` | huruf besar (ASCII) |
+| `static String lower(int[] s)` | huruf kecil (ASCII) |
+| `static String repeat(int[] s, int n)` | ulang string n kali |
+| `static String reverse(int[] s)` | salinan terbalik |
+| `static String replaceByte(int[] s, int from, int to)` | ganti semua byte from → to |
+| `static String replaceSeq(int[] s, int[] old, int[] nw)` | ganti semua kemunculan old → nw |
 | `static int countByte(int[] s, int b)` | berapa kali byte b muncul |
 | `static int splitCount(int[] s, int sep)` | berapa banyak potongan dengan pemisah sep |
-| `static int[] splitAt(int[] s, int sep, int idx)` | potongan ke-idx dengan pemisah sep |
-| `static int[] padLeft(int[] s, int width, int pad)` | tambah byte pad di kiri sampai width |
-| `static int[] padRight(int[] s, int width, int pad)` | tambah byte pad di kanan sampai width |
-| `static int[] fromInt(int v)` | int → teks desimal |
+| `static String splitAt(int[] s, int sep, int idx)` | potongan ke-idx dengan pemisah sep |
+| `static String sub(int[] s, int from, int n)` | substring ala umum: potongan teks sebagai String (v1.17). Str.slice tetap int[] untuk buffer byte I/O. |
+| `static String padLeft(int[] s, int width, int pad)` | tambah byte pad di kiri sampai width |
+| `static String padRight(int[] s, int width, int pad)` | tambah byte pad di kanan sampai width |
+| `static String fromInt(int v)` | int → teks desimal |
 | `static int toInt(int[] s)` | parse desimal; 0 bila bukan angka |
 | `static boolean isDigits(int[] s)` | true bila seluruh isi digit desimal |
 | `static boolean equalsIgnoreCase(int[] a, int[] b)` | perbandingan isi tanpa peduli huruf besar/kecil |
 | `static int utf8Count(int[] s)` | jumlah karakter Unicode (bukan byte) |
 | `static int[] hex(int[] data)` | byte → teks hex lowercase |
-| `static int[] boolText(boolean b)` | boolean → "true"/"false" |
-| `static int[] fromUInt(int v)` | uint32 (nilai kanonik zero-extended di int) |
-| `static int[] fromLong(long v)` | long → teks desimal |
-| `static int[] fromULong(long v)` | uint64: divisi unsigned bit-per-bit |
-| `static int[] fromDouble(double d)` | double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang). Batas jujur: bukan algoritma pembulatan Java/printf. |
+| `static String boolText(boolean b)` | boolean → "true"/"false" |
+| `static String fromUInt(int v)` | uint32 (nilai kanonik zero-extended di int) |
+| `static String fromLong(long v)` | long → teks desimal |
+| `static String fromULong(long v)` | uint64: divisi unsigned bit-per-bit |
+| `static String fromDouble(double d)` | double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang). Batas jujur: bukan algoritma pembulatan Java/printf. |
 | `static void print(int[] s)` | tulis byte ke stdout tanpa newline |
 | `static void line(int[] s)` | tulis dengan newline |
 

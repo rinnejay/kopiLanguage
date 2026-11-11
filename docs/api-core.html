@@ -1431,7 +1431,7 @@ System.out.println(Stats.median(a));    // 4</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="str">Str<a class="anchor" href="#str" aria-label="tautan">#</a></h2>
-<p><code>lib/core/Str.kop</code> · 40 fungsi</p>
+<p><code>lib/core/Str.kop</code> · 41 fungsi</p>
 <p>Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks. Bekerja pada String maupun <code>int[]</code> byte.</p>
 <pre><code class="language-java">import Str;
 
@@ -1501,39 +1501,39 @@ System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007</code></pre>
 <td>true bila diakhiri ndl</td>
 </tr>
 <tr>
-<td><code>static int[] trimLeft(int[] s)</code></td>
+<td><code>static String trimLeft(int[] s)</code></td>
 <td>buang whitespace di ujung kiri</td>
 </tr>
 <tr>
-<td><code>static int[] trimRight(int[] s)</code></td>
+<td><code>static String trimRight(int[] s)</code></td>
 <td>buang whitespace di ujung kanan</td>
 </tr>
 <tr>
-<td><code>static int[] trim(int[] s)</code></td>
+<td><code>static String trim(int[] s)</code></td>
 <td>buang spasi/tab/CR/LF di kedua ujung</td>
 </tr>
 <tr>
-<td><code>static int[] upper(int[] s)</code></td>
+<td><code>static String upper(int[] s)</code></td>
 <td>huruf besar (ASCII)</td>
 </tr>
 <tr>
-<td><code>static int[] lower(int[] s)</code></td>
+<td><code>static String lower(int[] s)</code></td>
 <td>huruf kecil (ASCII)</td>
 </tr>
 <tr>
-<td><code>static int[] repeat(int[] s, int n)</code></td>
+<td><code>static String repeat(int[] s, int n)</code></td>
 <td>ulang string n kali</td>
 </tr>
 <tr>
-<td><code>static int[] reverse(int[] s)</code></td>
+<td><code>static String reverse(int[] s)</code></td>
 <td>salinan terbalik</td>
 </tr>
 <tr>
-<td><code>static int[] replaceByte(int[] s, int from, int to)</code></td>
+<td><code>static String replaceByte(int[] s, int from, int to)</code></td>
 <td>ganti semua byte from → to</td>
 </tr>
 <tr>
-<td><code>static int[] replaceSeq(int[] s, int[] old, int[] nw)</code></td>
+<td><code>static String replaceSeq(int[] s, int[] old, int[] nw)</code></td>
 <td>ganti semua kemunculan old → nw</td>
 </tr>
 <tr>
@@ -1545,19 +1545,23 @@ System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007</code></pre>
 <td>berapa banyak potongan dengan pemisah sep</td>
 </tr>
 <tr>
-<td><code>static int[] splitAt(int[] s, int sep, int idx)</code></td>
+<td><code>static String splitAt(int[] s, int sep, int idx)</code></td>
 <td>potongan ke-idx dengan pemisah sep</td>
 </tr>
 <tr>
-<td><code>static int[] padLeft(int[] s, int width, int pad)</code></td>
+<td><code>static String sub(int[] s, int from, int n)</code></td>
+<td>substring ala umum: potongan teks sebagai String (v1.17). Str.slice tetap int[] untuk buffer byte I/O.</td>
+</tr>
+<tr>
+<td><code>static String padLeft(int[] s, int width, int pad)</code></td>
 <td>tambah byte pad di kiri sampai width</td>
 </tr>
 <tr>
-<td><code>static int[] padRight(int[] s, int width, int pad)</code></td>
+<td><code>static String padRight(int[] s, int width, int pad)</code></td>
 <td>tambah byte pad di kanan sampai width</td>
 </tr>
 <tr>
-<td><code>static int[] fromInt(int v)</code></td>
+<td><code>static String fromInt(int v)</code></td>
 <td>int → teks desimal</td>
 </tr>
 <tr>
@@ -1581,23 +1585,23 @@ System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007</code></pre>
 <td>byte → teks hex lowercase</td>
 </tr>
 <tr>
-<td><code>static int[] boolText(boolean b)</code></td>
+<td><code>static String boolText(boolean b)</code></td>
 <td>boolean → "true"/"false"</td>
 </tr>
 <tr>
-<td><code>static int[] fromUInt(int v)</code></td>
+<td><code>static String fromUInt(int v)</code></td>
 <td>uint32 (nilai kanonik zero-extended di int)</td>
 </tr>
 <tr>
-<td><code>static int[] fromLong(long v)</code></td>
+<td><code>static String fromLong(long v)</code></td>
 <td>long → teks desimal</td>
 </tr>
 <tr>
-<td><code>static int[] fromULong(long v)</code></td>
+<td><code>static String fromULong(long v)</code></td>
 <td>uint64: divisi unsigned bit-per-bit</td>
 </tr>
 <tr>
-<td><code>static int[] fromDouble(double d)</code></td>
+<td><code>static String fromDouble(double d)</code></td>
 <td>double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang). Batas jujur: bukan algoritma pembulatan Java/printf.</td>
 </tr>
 <tr>
@@ -1654,7 +1658,7 @@ Time.sleepMs(10);</code></pre>
 </tbody></table></div>
 <hr>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.16 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.17 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-core.md">Sunting halaman ini</a>
 </footer>
   </main>

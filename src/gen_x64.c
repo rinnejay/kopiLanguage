@@ -1522,6 +1522,40 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmovl $0, %%eax");
             return 0;
         }
+        if (e->ival == 40 || e->ival == 41) {      /* mkstr(int[])→String | strbytes(String)→int[] */
+            /* fisik byte-per-slot (v1.17): keduanya salinan blok bernah-panjang */
+            gen_expr(m, e->a); spush();
+            emit("\tmovq (%%rsp), %%r10");         /* sumber */
+            emit("\tmovslq (%%r10), %%r12");       /* n byte */
+            emit("\tmovq %%r12, %%rdi");
+            emit("\tshlq $3, %%rdi");
+            emit("\taddq $8, %%rdi");
+            emit("\tcall kopalloc");
+            emit("\tmovq %%r12, (%%rax)");         /* len */
+            emit("\tmovq %%rax, %%r15");
+            emit("\txorl %%ecx, %%ecx");
+            int l1 = nlab++, l2 = nlab++;
+            emit(".LMKX%dA:", l1);
+            emit("\tcmpq %%r12, %%rcx");
+            emit("\tjge .LMKX%dB", l2);
+            emit("\tmovslq %%ecx, %%rax");
+            emit("\tshlq $3, %%rax");
+            if (e->ival == 40) {
+                emit("\tmovq 8(%%r10,%%rax), %%rdx");
+                emit("\tcmpq $255, %%rdx");
+                emit("\tja .Kbnd");
+                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
+            } else {
+                emit("\tmovq 8(%%r10,%%rax), %%rdx");
+                emit("\tmovq %%rdx, 8(%%r15,%%rax)");
+            }
+            emit("\tincl %%ecx");
+            emit("\tjmp .LMKX%dA", l1);
+            emit(".LMKX%dB:", l2);
+            emit("\taddq $16, %%rsp");
+            emit("\tmovq %%r15, %%rax");
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);
@@ -1806,6 +1840,15 @@ void gen_x64(const char *outpath) {
     emit("\tmovl $1, %%edi");
     emit("\tcall exit@PLT");
 
+    emit(".Kbnd:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tandq $-16, %%rsp");
+    emit("\tleaq .Lmsg_bnd(%%rip), %%rdi");
+    emit("\tcall printf@PLT");
+    emit("\tmovl $1, %%edi");
+    emit("\tcall exit@PLT");
+
     emit(".Koom:");
     emit("\tpushq %%rbp");
     emit("\tmovq %%rsp, %%rbp");
@@ -1862,6 +1905,7 @@ void gen_x64(const char *outpath) {
     emit(".Lstty_sane: .asciz \"%s\"", "stty sane 2>/dev/null");
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
+    emit(".Lmsg_bnd: .asciz \"%s\"", "kopi: byte mkstr di luar 0..255\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");
     for (int i = 0; i < prog.ncp; i++) {
         char esc[1200];

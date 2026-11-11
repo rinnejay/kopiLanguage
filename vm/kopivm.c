@@ -532,6 +532,32 @@ static void run(void) {
                 for (long i = 0; i < n; i++)
                     blk[1 + i] = (long)(unsigned char)s[i];
                 stackv[sp++] = (int64_t)blk;
+            } else if (bi == 40) {                /* Net.mkstr(int[] bytes) → String */
+                long *src = (long *)stackv[--sp];
+                if (!src || src < heap || src >= heap + HEAPLEN)
+                    dievm("Net.mkstr: sumber bukan array valid");
+                long n = src[0];
+                if (heap_used + n + 1 > HEAPLEN) dievm("arena penuh (Net.mkstr)");
+                long *blk = heap + heap_used;
+                heap_used += n + 1;
+                blk[0] = n;
+                for (long i = 0; i < n; i++) {
+                    long b = src[1 + i];
+                    if (b < 0 || b > 255) dievm2("Net.mkstr: byte di luar 0..255", b);
+                    blk[1 + i] = b;
+                }
+                stackv[sp++] = (int64_t)blk;
+            } else if (bi == 41) {                /* Net.strbytes(String) → int[] */
+                long *src = (long *)stackv[--sp];
+                if (!src || src < heap || src >= heap + HEAPLEN)
+                    dievm("Net.strbytes: sumber bukan string valid");
+                long n = src[0];
+                if (heap_used + n + 1 > HEAPLEN) dievm("arena penuh (Net.strbytes)");
+                long *blk = heap + heap_used;
+                heap_used += n + 1;
+                blk[0] = n;
+                for (long i = 0; i < n; i++) blk[1 + i] = src[1 + i];
+                stackv[sp++] = (int64_t)blk;
             } else if (bi == 6) {                 /* Net.openr("literal") → fd */
                 uint16_t cp16 = (uint16_t)m->code[f->pc] | ((uint16_t)m->code[f->pc + 1] << 8);
                 f->pc += 2;

@@ -93,55 +93,57 @@ class Str {
         return true;
     }
 
-    static int[] trimLeft(int[] s) {
+    /* v1.17: fungsi pembangun teks mengembalikan String (materialisasi
+     * eksplisit via Net.mkstr). int[] tetap khusus buffer byte I/O. */
+    static String trimLeft(int[] s) {
         int a = 0;
         while (a < s.length && (s[a] == 32 || s[a] == 9 || s[a] == 10 || s[a] == 13)) a++;
-        return slice(s, a, s.length - a);
+        return Net.mkstr(slice(s, a, s.length - a));
     }
 
-    static int[] trimRight(int[] s) {
+    static String trimRight(int[] s) {
         int b = s.length;
         while (b > 0 && (s[b - 1] == 32 || s[b - 1] == 9 || s[b - 1] == 10 || s[b - 1] == 13)) b--;
-        return slice(s, 0, b);
+        return Net.mkstr(slice(s, 0, b));
     }
 
-    static int[] trim(int[] s) { return trimRight(trimLeft(s)); }
+    static String trim(int[] s) { return trimRight(trimLeft(s)); }
 
-    static int[] upper(int[] s) {
+    static String upper(int[] s) {
         int[] o = copy(s);
         for (int i = 0; i < o.length; i++) if (o[i] >= 97 && o[i] <= 122) o[i] = o[i] - 32;
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int[] lower(int[] s) {
+    static String lower(int[] s) {
         int[] o = copy(s);
         for (int i = 0; i < o.length; i++) if (o[i] >= 65 && o[i] <= 90) o[i] = o[i] + 32;
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int[] repeat(int[] s, int n) {
-        if (n <= 0) return new int[0];
+    static String repeat(int[] s, int n) {
+        if (n <= 0) return Net.mkstr(new int[0]);
         int[] o = new int[s.length * n];
         int k = 0;
         for (int r = 0; r < n; r++)
             for (int i = 0; i < s.length; i++) { o[k] = s[i]; k++; }
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int[] reverse(int[] s) {
+    static String reverse(int[] s) {
         int[] o = new int[s.length];
         for (int i = 0; i < s.length; i++) o[i] = s[s.length - 1 - i];
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int[] replaceByte(int[] s, int from, int to) {
+    static String replaceByte(int[] s, int from, int to) {
         int[] o = copy(s);
         for (int i = 0; i < o.length; i++) if (o[i] == from) o[i] = to;
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int[] replaceSeq(int[] s, int[] old, int[] nw) {
-        if (old.length == 0) return copy(s);
+    static String replaceSeq(int[] s, int[] old, int[] nw) {
+        if (old.length == 0) return Net.mkstr(copy(s));
         int[] o = new int[0];
         int i = 0;
         while (i < s.length) {
@@ -155,7 +157,7 @@ class Str {
             o = cat(o, one);
             i++;
         }
-        return o;
+        return Net.mkstr(o);
     }
 
     static int countByte(int[] s, int b) {
@@ -171,7 +173,7 @@ class Str {
         return n;
     }
 
-    static int[] splitAt(int[] s, int sep, int idx) {
+    static String splitAt(int[] s, int sep, int idx) {
         int k = 0;
         int st = 0;
         for (int i = 0; i <= s.length; i++) {
@@ -179,32 +181,38 @@ class Str {
             boolean hit = false;
             if (!end && s[i] == sep) hit = true;
             if (end || hit) {
-                if (k == idx) return slice(s, st, i - st);
+                if (k == idx) return Net.mkstr(slice(s, st, i - st));
                 k++;
                 st = i + 1;
             }
         }
-        return new int[0];
+        return Net.mkstr(new int[0]);
     }
 
-    static int[] padLeft(int[] s, int width, int pad) {
-        if (s.length >= width) return copy(s);
+    /* substring ala umum: potongan teks sebagai String (v1.17).
+     * Str.slice tetap int[] untuk buffer byte I/O. */
+    static String sub(int[] s, int from, int n) {
+        return Net.mkstr(slice(s, from, n));
+    }
+
+    static String padLeft(int[] s, int width, int pad) {
+        if (s.length >= width) return Net.mkstr(copy(s));
         int[] o = new int[width];
         int fill = width - s.length;
         for (int i = 0; i < fill; i++) o[i] = pad;
         for (int i = 0; i < s.length; i++) o[fill + i] = s[i];
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int[] padRight(int[] s, int width, int pad) {
-        if (s.length >= width) return copy(s);
+    static String padRight(int[] s, int width, int pad) {
+        if (s.length >= width) return Net.mkstr(copy(s));
         int[] o = new int[width];
         for (int i = 0; i < s.length; i++) o[i] = s[i];
         for (int i = s.length; i < width; i++) o[i] = pad;
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int[] fromInt(int v) {
+    static String fromInt(int v) {
         boolean neg = v < 0;
         int n = v;
         if (neg) n = -n;
@@ -217,7 +225,7 @@ class Str {
         int[] o = new int[k + off];
         if (neg) o[0] = 45;
         for (int i = 0; i < k; i++) o[off + i] = tmp[k - 1 - i];
-        return o;
+        return Net.mkstr(o);
     }
 
     static int toInt(int[] s) {
@@ -280,19 +288,19 @@ class Str {
 
     /* ── konversi untuk template & umum (v1.7.1) ─────────────── */
 
-    static int[] boolText(boolean b) {
-        if (b) return Net.bytes("true");
-        return Net.bytes("false");
+    static String boolText(boolean b) {
+        if (b) return Net.mkstr(Net.bytes("true"));
+        return Net.mkstr(Net.bytes("false"));
     }
 
     /* uint32 (nilai kanonik zero-extended di int) */
-    static int[] fromUInt(int v) {
+    static String fromUInt(int v) {
         if (v >= 0) return fromInt(v);
         long u = ((long)v) & 4294967295L;
         return fromLong(u);
     }
 
-    static int[] fromLong(long v) {
+    static String fromLong(long v) {
         boolean neg = v < 0;
         long n = v;
         int[] tmp = new int[24];
@@ -310,11 +318,11 @@ class Str {
         int[] o = new int[k + off];
         if (neg) o[0] = 45;
         for (int i = 0; i < k; i++) o[off + i] = tmp[k - 1 - i];
-        return o;
+        return Net.mkstr(o);
     }
 
     /* uint64: divisi unsigned bit-per-bit */
-    static int[] fromULong(long v) {
+    static String fromULong(long v) {
         if (v >= 0) return fromLong(v);
         int[] tmp = new int[24];
         int k = 0;
@@ -334,23 +342,23 @@ class Str {
         if (k == 0) { tmp[0] = 48; k = 1; }
         int[] o = new int[k];
         for (int i = 0; i < k; i++) o[i] = tmp[k - 1 - i];
-        return o;
+        return Net.mkstr(o);
     }
 
     /* double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang).
      * Batas jujur: bukan algoritma pembulatan Java/printf. */
-    static int[] fromDouble(double d) {
+    static String fromDouble(double d) {
         boolean neg = d < 0.0;
         boolean isnan = d != d;
         double x = d;
         if (neg) x = -x;
-        if (isnan) return Net.bytes("nan");
+        if (isnan) return Net.mkstr(Net.bytes("nan"));
         if (x > 9000000000000000000.0) {
-            if (neg) return Net.bytes("-inf");
-            return Net.bytes("inf");
+            if (neg) return Net.mkstr(Net.bytes("-inf"));
+            return Net.mkstr(Net.bytes("inf"));
         }
         long ip = (long)x;
-        int[] o = fromLong(ip);
+        int[] o = Net.strbytes(fromLong(ip));
         double frac = x - (double)ip;
         if (frac > 0.0000005) {
             int[] fd = new int[6];
@@ -371,7 +379,7 @@ class Str {
             }
         }
         if (neg) o = cat(Net.bytes("-"), o);
-        return o;
+        return Net.mkstr(o);
     }
 
     static void print(int[] s) {

@@ -94,10 +94,10 @@ static inline Ty ty_promote(Ty a, Ty b) {
 /* boleh dikonversi implisit (pelebaran), selain itu butuh cast eksplisit */
 static inline int ty_can_implicit(Ty dst, Ty src) {
     if (dst == src) return 1;
-    /* String native dan int[] byte-array memakai representasi yang sama;
-     * keduanya boleh saling diberikan (interop perpustakaan). */
-    if ((dst == T_STR && src == T_ARI) || (dst == T_ARI && src == T_STR))
-        return 1;
+    /* String → int[] bebas: String adalah view byte (ala Go []byte(s));
+     * sebaliknya int[] → String WAJIB eksplisit Net.mkstr (materialisasi),
+     * v1.17. Buffer byte tidak lagi otomatis dianggap teks. */
+    if (dst == T_ARI && src == T_STR) return 1;
     if (!ty_is_num(dst) || !ty_is_num(src)) return 0;
     if (ty_is_float(dst)) {
         if (ty_is_float(src)) return ty_rank(dst) >= ty_rank(src);

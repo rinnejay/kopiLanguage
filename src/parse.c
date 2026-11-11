@@ -1435,7 +1435,7 @@ static int is_str_method(const char *n) {
 /* nama metode instance → fungsi Str.* */
 static const char *str_method_target(const char *n) {
     if (!strcmp(n, "charAt")) return "at";
-    if (!strcmp(n, "substring")) return "slice";
+    if (!strcmp(n, "substring")) return "sub";   /* v1.17: sub → String */
     if (!strcmp(n, "equals")) return "eq";
     return n;
 }
@@ -1819,6 +1819,8 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "localport")) { bi = 37; want = 1; }
             else if (!strcmp(fn, "settimeout")) { bi = 38; want = 2; }
             else if (!strcmp(fn, "pollfd"))   { bi = 39; want = 3; }
+            else if (!strcmp(fn, "mkstr"))    { bi = 40; want = 1; }
+            else if (!strcmp(fn, "strbytes")) { bi = 41; want = 1; }
             else die("baris %d: fungsi Net.%s tidak ada", e->line, fn);
 
             int narg = (int)e->ival;
@@ -1899,6 +1901,14 @@ static Ty type_expr_raw(Node *e) {
                         die("baris %d: Net.pollfd argumen %d harus int[]", e->line, i + 1);
                     if (i == 2 && t != T_INT)
                         die("baris %d: Net.pollfd timeout harus int", e->line);
+                } else if (bi == 40) {
+                    /* Net.mkstr(int[] bytes) → String (materialisasi eksplisit) */
+                    if (t != T_ARI)
+                        die("baris %d: Net.mkstr butuh int[] byte", e->line);
+                } else if (bi == 41) {
+                    /* Net.strbytes(String) → int[] salinan byte */
+                    if (t != T_STR)
+                        die("baris %d: Net.strbytes butuh String", e->line);
                 } else if (bi == 34 || bi == 36 || bi == 37 || bi == 38) {
                     if (t != T_INT)
                         die("baris %d: argumen Net.%s harus int", e->line, fn);
@@ -1911,8 +1921,9 @@ static Ty type_expr_raw(Node *e) {
             e->kind = EX_NET;
             e->ival = bi;
             if (bi == 19) { e->dty = (int)T_LONG; return T_LONG; }
-            if (bi == 22 || bi == 31 || bi == 32) { e->dty = (int)T_STR; return T_STR; }
+            if (bi == 22 || bi == 31 || bi == 32 || bi == 40) { e->dty = (int)T_STR; return T_STR; }
             if (bi == 23 || bi == 24) { e->dty = (int)T_BOOL; return T_BOOL; }
+            if (bi == 41) { e->dty = (int)T_ARI; return T_ARI; }
             e->dty = (int)T_INT;
             return T_INT;
         }

@@ -1,0 +1,31 @@
+// uji v1.17: String opaque — interop eksplisit Net.mkstr/Net.strbytes
+import Str;
+class Main {
+    public static void main(String[] args) {
+        String s = "  Kopi Bahasa  ";
+        String t = s.trim();
+        System.out.println(t);
+        System.out.println(t.upper());
+        System.out.println(t.substring(5, 6));
+
+        // teks → buffer byte (eksplisit)
+        int[] buf = Net.strbytes(t);
+        System.out.println(buf.length);
+        System.out.println(buf[0]);
+
+        // buffer → teks (materialisasi eksplisit)
+        String u = Net.mkstr(buf);
+        System.out.println(u);
+        System.out.println(u == t);            // isi sama
+
+        // angka → String lewat Str (kini String, bukan int[])
+        System.out.println(Str.fromInt(-42));
+        System.out.println(Str.fromLong(9000000000L));
+        System.out.println(Str.fromUInt(4000000000U));
+        System.out.println(Str.boolText(3 > 2));
+
+        // concat tetap bebas
+        String gab = Str.fromInt(7) + " " + t;
+        System.out.println(gab);
+    }
+}

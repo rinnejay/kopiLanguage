@@ -12,6 +12,7 @@ diuji, ditulis "belum".
 | ~~Instance class~~ **✅ v1.12–1.15** (field, `new`, method `this`, identitas referensi; field `long`/`String`/class; **constructor**) | sisa: tanpa inheritance/vtable; field `double`/`float` menyusul | dispatch statis; tanpa overload constructor |
 | GC / free | arena 32 MB; wajib `memMark/memReset` | reset per request/iterasi; hindari alokasi di loop panas |
 | ~~Array bertipe (`String[]`, `long[]`)~~ **✅ v1.16** (elemen 64-bit slot; identitas referensi berlaku) | sisa: `double[]`; metode fungsional masih khusus `int[]` | array `long[]`/`String[]` pakai loop `for` biasa |
+| ~~String = `int[]`~~ **✅ v1.17** (String opaque; interop eksplisit `Net.mkstr`/`Net.strbytes`) | fisik masih byte-per-slot (8 byte/karakter) | flip packed bytes (1 byte/karakter) = v1.18, blast radius kecil |
 | `char` & literal char | `'a'` adalah String | pakai kode byte (`97`) atau `charAt` |
 | Unicode/UTF-8 penuh | `length` = byte; `upper/lower` ASCII | `utf8Count`; batasi input ke ASCII |
 | `switch`, `try/catch`, `throw`, `assert`, `goto` | kontrol alur terbatas | `if/else`, kode error negatif |
@@ -98,8 +99,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **126/126** (v1.16) — a64 + VM + sintaks x64 + dokumen HTML
-  (136 PASS termasuk cek x64 yang tidak masuk counter).
+- Suite: **128/128** (v1.17) — a64 + VM + sintaks x64 + dokumen HTML
+  (139 PASS termasuk cek x64 yang tidak masuk counter).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal

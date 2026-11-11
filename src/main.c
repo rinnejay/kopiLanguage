@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[i], "a64") || !strcmp(argv[i], "x64") || !strcmp(argv[i], "vm"))
             { target = argv[i]; continue; }
         if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-V")) {
-            printf("kopicc 1.16.0 (Kopi) — target a64 | x64 | vm\n");
+            printf("kopicc 1.17.0 (Kopi) — target a64 | x64 | vm\n");
             return 0;
         }
         if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
