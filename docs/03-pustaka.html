@@ -46,7 +46,7 @@ import HttpServer;</code></pre>
 </tr>
 <tr>
 <td><code>lib/crypto/</code></td>
-<td><code>Crypto</code> <code>Cipher</code> <code>Hash</code> <code>Pbkdf2</code> <code>Kdf</code> <code>Big</code> <code>X25519</code> <code>ChaCha</code> <code>Poly</code> <code>Aead</code> <code>Rand</code> <code>Der</code></td>
+<td><code>Crypto</code> <code>Cipher</code> <code>Hash</code> <code>Aes</code> <code>Gcm</code> <code>Pbkdf2</code> <code>Kdf</code> <code>Big</code> <code>X25519</code> <code>ChaCha</code> <code>Poly</code> <code>Aead</code> <code>Rand</code> <code>Der</code></td>
 </tr>
 </tbody></table></div>
 <blockquote><strong>Referensi API lengkap</strong> (signature semua fungsi diekstrak langsung dari source): <a href="api.html">Referensi pustaka</a> → <a href="api-core.html">Core</a> · <a href="api-net.html">Net</a> · <a href="api-crypto.html">Crypto</a>. Halaman di bawah ini adalah turunan berisi modul yang paling sering dipakai dengan pola pemakaian.</blockquote>
@@ -389,6 +389,10 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></
 <tr>
 <td><code>Aead</code>, <code>ChaCha</code>, <code>Poly</code></td>
 <td>ChaCha20-Poly1305 (TLS record)</td>
+</tr>
+<tr>
+<td><code>Aes</code>, <code>Gcm</code></td>
+<td>AES-128/192/256 (FIPS-197) + AES-GCM (SP 800-38D)</td>
 </tr>
 <tr>
 <td><code>Big</code>, <code>X25519</code></td>

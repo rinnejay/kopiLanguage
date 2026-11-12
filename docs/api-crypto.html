@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-crypto">Referensi API — Crypto<a class="anchor" href="#referensi-api-crypto" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#aes">Aes</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#gcm">Gcm</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li></ul></nav>
 <p>Hash, PBKDF2, cipher, X25519, AEAD, DER. Semua signature di bawah diekstrak langsung dari source <code>lib/crypto/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="aead">Aead<a class="anchor" href="#aead" aria-label="tautan">#</a></h2>
@@ -71,6 +71,55 @@ int[] ct = Aead.seal(key, nonce, aad, plain);</code></pre>
 <tr>
 <td><code>static int eq(int[] a, int[] b)</code></td>
 <td>perbandingan konstan dua array</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="aes">Aes<a class="anchor" href="#aes" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Aes.kop</code> · 7 fungsi</p>
+<p>AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream.</p>
+<pre><code class="language-java">import Aes;
+import Cipher;
+
+int[] key = Net.bytes("kunci-16-byte-oke");
+int[] ct = Aes.encryptBlock(key, Net.bytes("0123456789abcdef"));
+System.out.println(Cipher.hexenc(ct));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Blok 16 byte; pesan panjang sebaiknya lewat <code>Aes.ctr</code> atau <code>Gcm</code>.</li>
+<li>ECB per blok tidak aman untuk data berulang.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int xtime(int a)</code></td>
+<td>kalikan dengan x di GF(2^8) (polinomial AES: x^8+x^4+x^3+x+1)</td>
+</tr>
+<tr>
+<td><code>static int gmul(int a, int b)</code></td>
+<td>perkalian GF(2^8) (bantu internal)</td>
+</tr>
+<tr>
+<td><code>static int[] expandKey(int[] key)</code></td>
+<td>ekspansi kunci → kunci putar (16*(Nr+1) byte)</td>
+</tr>
+<tr>
+<td><code>static int[] encryptBlock(int[] key, int[] block)</code></td>
+<td>enkripsi satu blok 16 byte (AES-128/192/256)</td>
+</tr>
+<tr>
+<td><code>static int[] decryptBlock(int[] key, int[] block)</code></td>
+<td>dekripsi satu blok 16 byte</td>
+</tr>
+<tr>
+<td><code>static int[] ctr(int[] key, int[] iv, int[] msg)</code></td>
+<td>mode CTR: keystream dari iv 16 byte di-XOR ke pesan</td>
+</tr>
+<tr>
+<td><code>static void inc32(int[] ctr)</code></td>
+<td>tambah 1 pada 32-bit terakhir counter (big-endian, modulo 2^32)</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -386,6 +435,68 @@ int h = Crypto.hashInt(123);   // hash integer deterministik</code></pre>
 <tr>
 <td><code>static int[] spkiPin(int[] cert)</code></td>
 <td>fingerprint pin: SHA-256 dari DER SPKI</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="gcm">Gcm<a class="anchor" href="#gcm" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Gcm.kop</code> · 10 fungsi</p>
+<p>AES-GCM (NIST SP 800-38D): enkripsi autentik dengan tag 16 byte.</p>
+<pre><code class="language-java">import Gcm;
+import Cipher;
+
+int[] key = Net.bytes("kunci-16-byte-oke");
+int[] nonce = Net.bytes("nonce-12-bytes");
+int[] sealed = Gcm.seal(key, nonce, Net.bytes(""), Net.bytes("rahasia"));
+System.out.println(Cipher.hexenc(sealed));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>seal</code> mengembalikan ciphertext || tag (16 byte terakhir).</li>
+<li><code>open</code> mengembalikan array kosong bila tag tidak cocok.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] concat(int[] a, int[] b)</code></td>
+<td>gabungkan dua array</td>
+</tr>
+<tr>
+<td><code>static int[] zeros(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] be64(long bits)</code></td>
+<td>panjang 64-bit big-endian (8 byte) — konvensi GHASH SP 800-38D</td>
+</tr>
+<tr>
+<td><code>static int[] pad16(int[] a)</code></td>
+<td>nol-kan sampai kelipatan 16</td>
+</tr>
+<tr>
+<td><code>static boolean eq(int[] a, int[] b)</code></td>
+<td>banding dua array byte</td>
+</tr>
+<tr>
+<td><code>static int[] gfMul(int[] x, int[] y)</code></td>
+<td>perkalian GF(2^128) — internal</td>
+</tr>
+<tr>
+<td><code>static int[] ghash(int[] h, int[] data)</code></td>
+<td>GHASH_H(data) — internal SP 800-38D</td>
+</tr>
+<tr>
+<td><code>static int[] gctr(int[] key, int[] icb, int[] data)</code></td>
+<td>GCTR: mode CTR internal GCM</td>
+</tr>
+<tr>
+<td><code>static int[] seal(int[] key, int[] nonce, int[] aad, int[] pt)</code></td>
+<td>enkripsi autentik: ciphertext // tag 16 byte</td>
+</tr>
+<tr>
+<td><code>static int[] open(int[] key, int[] nonce, int[] aad, int[] ctTag)</code></td>
+<td>dekripsi autentik; array kosong bila tag salah</td>
 </tr>
 </tbody></table></div>
 <hr>

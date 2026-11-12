@@ -1,0 +1,171 @@
+/* Gcm.kop — AES-GCM (NIST SP 800-38D) murni di bahasa Kopi (v1.25).
+ *
+ * Komposisi AES-GCM:
+ *   H      = E(K, 0^128)
+ *   J0     = IV || 0^31 || 1            (IV 12 byte)
+ *            = GHASH_H(IV || 0^s || [len(IV)]64)   (IV != 12 byte)
+ *   C      = GCTR(K, inc32(J0), P)
+ *   S      = GHASH_H(A || pad || C || pad || [len(A)]64 || [len(C)]64)
+ *   T      = MSB_128(GCTR(K, J0, S)) = E(K, J0) xor S
+ *
+ * Bergantung Aes.kop (blok AES) dan operator bitwise native.
+ *
+ * Fungsi:
+ *   seal(key, nonce, aad, pt)  → ciphertext || tag (16 byte terakhir)
+ *   open(key, nonce, aad, ctTag) → plaintext; array kosong bila tag salah
+ */
+
+import Aes;
+
+class Gcm {
+
+    /* ── utilitas byte ──────────────────────────────────────────── */
+
+    static int[] concat(int[] a, int[] b) {
+        int[] out = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) out[i] = a[i] & 255;
+        for (int i = 0; i < b.length; i++) out[a.length + i] = b[i] & 255;
+        return out;
+    }
+
+    static int[] zeros(int n) {
+        return new int[n];
+    }
+
+    /* panjang 64-bit big-endian (8 byte) — konvensi GHASH SP 800-38D */
+    static int[] be64(long bits) {
+        int[] b = new int[8];
+        for (int i = 0; i < 8; i++) {
+            b[i] = (int)((bits >>> (56 - i * 8)) & 255L);
+        }
+        return b;
+    }
+
+    /* nol-kan sampai kelipatan 16 */
+    static int[] pad16(int[] a) {
+        int rem = a.length % 16;
+        if (rem == 0) return a;
+        return concat(a, zeros(16 - rem));
+    }
+
+    /* banding dua array byte */
+    static boolean eq(int[] a, int[] b) {
+        if (a.length != b.length) return false;
+        for (int i = 0; i < a.length; i++) {
+            if ((a[i] & 255) != (b[i] & 255)) return false;
+        }
+        return true;
+    }
+
+    /* ── GHASH: perkalian GF(2^128) ─────────────────────────────── */
+
+    /* z = x · y di GF(2^128) (polinomial x^128+x^7+x^2+x+1), byte big-endian */
+    static int[] gfMul(int[] x, int[] y) {
+        int[] z = zeros(16);
+        int[] v = new int[16];
+        for (int i = 0; i < 16; i++) v[i] = y[i] & 255;
+        for (int i = 0; i < 128; i++) {
+            int bit = (x[i / 8] >>> (7 - (i % 8))) & 1;
+            if (bit == 1) {
+                for (int j = 0; j < 16; j++) z[j] = z[j] ^ v[j];
+            }
+            int lsb = v[15] & 1;
+            for (int j = 15; j > 0; j--) {
+                v[j] = ((v[j] >>> 1) | ((v[j - 1] & 1) << 7)) & 255;
+            }
+            v[0] = (v[0] >>> 1) & 255;
+            if (lsb == 1) v[0] = v[0] ^ 225;      /* 0xe1 */
+        }
+        return z;
+    }
+
+    /* GHASH_H(data); blok terakhir dinol-kan */
+    static int[] ghash(int[] h, int[] data) {
+        int[] y = zeros(16);
+        int off = 0;
+        while (off < data.length) {
+            int n = data.length - off;
+            if (n > 16) n = 16;
+            for (int i = 0; i < n; i++) y[i] = y[i] ^ (data[off + i] & 255);
+            y = gfMul(y, h);
+            off = off + 16;
+        }
+        return y;
+    }
+
+    /* ── mode GCTR ──────────────────────────────────────────────── */
+
+    /* keystream CTR dengan counter awal icb (counter naik tiap blok) */
+    static int[] gctr(int[] key, int[] icb, int[] data) {
+        int[] ctr = new int[16];
+        for (int i = 0; i < 16; i++) ctr[i] = icb[i] & 255;
+        int[] out = new int[data.length];
+        int off = 0;
+        while (off < data.length) {
+            Aes.inc32(ctr);
+            int[] ks = Aes.encryptBlock(key, ctr);
+            int n = data.length - off;
+            if (n > 16) n = 16;
+            for (int i = 0; i < n; i++) {
+                out[off + i] = (data[off + i] & 255) ^ (ks[i] & 255);
+            }
+            off = off + 16;
+        }
+        return out;
+    }
+
+    /* J0 untuk GCM */
+    private static int[] j0Of(int[] h, int[] nonce) {
+        if (nonce.length == 12) {
+            int[] j0 = new int[16];
+            for (int i = 0; i < 12; i++) j0[i] = nonce[i] & 255;
+            j0[15] = 1;
+            return j0;
+        }
+        int rem = nonce.length % 16;
+        int padLen = 0;
+        if (rem != 0) padLen = 16 - rem;
+        int[] data = concat(nonce, zeros(padLen));
+        data = concat(data, be64((long)nonce.length * 8L));
+        return ghash(h, data);
+    }
+
+    /* ── API ─────────────────────────────────────────────────────── */
+
+    /* enkripsi autentik: kembalikan ciphertext || tag(16) */
+    static int[] seal(int[] key, int[] nonce, int[] aad, int[] pt) {
+        int[] h = Aes.encryptBlock(key, zeros(16));
+        int[] j0 = j0Of(h, nonce);
+        int[] ct = gctr(key, j0, pt);
+        int[] s = ghash(h, concat(concat(pad16(aad), pad16(ct)),
+                                  concat(be64((long)aad.length * 8L),
+                                         be64((long)ct.length * 8L))));
+        int[] ek = Aes.encryptBlock(key, j0);
+        int[] tag = new int[16];
+        for (int i = 0; i < 16; i++) tag[i] = (s[i] & 255) ^ (ek[i] & 255);
+        return concat(ct, tag);
+    }
+
+    /* dekripsi autentik: ctTag = ciphertext || tag(16).
+     * kembalikan plaintext; array kosong (panjang 0) bila tag tidak cocok. */
+    static int[] open(int[] key, int[] nonce, int[] aad, int[] ctTag) {
+        if (ctTag.length < 16) return new int[0];
+        int[] h = Aes.encryptBlock(key, zeros(16));
+        int[] j0 = j0Of(h, nonce);
+        int n = ctTag.length - 16;
+        int[] ct = new int[n];
+        for (int i = 0; i < n; i++) ct[i] = ctTag[i] & 255;
+        int[] s = ghash(h, concat(concat(pad16(aad), pad16(ct)),
+                                  concat(be64((long)aad.length * 8L),
+                                         be64((long)ct.length * 8L))));
+        int[] ek = Aes.encryptBlock(key, j0);
+        int[] tag = new int[16];
+        for (int i = 0; i < 16; i++) tag[i] = (s[i] & 255) ^ (ek[i] & 255);
+        boolean ok = true;
+        for (int i = 0; i < 16; i++) {
+            if ((tag[i] & 255) != (ctTag[n + i] & 255)) ok = false;
+        }
+        if (!ok) return new int[0];
+        return gctr(key, j0, ct);
+    }
+}

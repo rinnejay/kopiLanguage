@@ -179,6 +179,18 @@ META = {
         "notes": ["stderr tidak di-buffer; aman untuk supervisor."],
     },
 
+    "Aes": {
+        "purpose": "AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream.",
+        "example": 'import Aes;\nimport Cipher;\n\nint[] key = Net.bytes("kunci-16-byte-oke");\nint[] ct = Aes.encryptBlock(key, Net.bytes("0123456789abcdef"));\nSystem.out.println(Cipher.hexenc(ct));',
+        "notes": ["Blok 16 byte; pesan panjang sebaiknya lewat `Aes.ctr` atau `Gcm`.",
+                  "ECB per blok tidak aman untuk data berulang."],
+    },
+    "Gcm": {
+        "purpose": "AES-GCM (NIST SP 800-38D): enkripsi autentik dengan tag 16 byte.",
+        "example": 'import Gcm;\nimport Cipher;\n\nint[] key = Net.bytes("kunci-16-byte-oke");\nint[] nonce = Net.bytes("nonce-12-bytes");\nint[] sealed = Gcm.seal(key, nonce, Net.bytes(""), Net.bytes("rahasia"));\nSystem.out.println(Cipher.hexenc(sealed));',
+        "notes": ["`seal` mengembalikan ciphertext || tag (16 byte terakhir).",
+                  "`open` mengembalikan array kosong bila tag tidak cocok."],
+    },
     "Hash": {
         "purpose": "SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.",
         "example": 'import Hash;\nimport Cipher;\n\nSystem.out.println(Cipher.hexenc(Hash.sha256(Net.bytes("abc"))));\nSystem.out.println(Cipher.hexenc(Hash.sha512(Net.bytes("abc"))));\nSystem.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));',
@@ -625,6 +637,20 @@ EXTRA = {
         "uncaesar": "dekripsi Caesar (ASCII)",
     }},
     "Der": {"descs": {"sliceOf": "(internal) potong array"}},
+    "Aes": {"descs": {
+        "encryptBlock": "enkripsi satu blok 16 byte (AES-128/192/256)",
+        "decryptBlock": "dekripsi satu blok 16 byte",
+        "ctr": "mode CTR: keystream dari iv 16 byte di-XOR ke pesan",
+        "gmul": "perkalian GF(2^8) (bantu internal)",
+        "expandKey": "ekspansi kunci → kunci putar (16*(Nr+1) byte)",
+    }},
+    "Gcm": {"descs": {
+        "seal": "enkripsi autentik: ciphertext || tag 16 byte",
+        "open": "dekripsi autentik; array kosong bila tag salah",
+        "ghash": "GHASH_H(data) — internal SP 800-38D",
+        "gfMul": "perkalian GF(2^128) — internal",
+        "gctr": "GCTR: mode CTR internal GCM",
+    }},
     "Hash": {"descs": {
         "sha512": "SHA-512 (FIPS 180-4): pesan byte-as-int → digest 64 byte",
         "sha384": "SHA-384 (FIPS 180-4): pesan byte-as-int → digest 48 byte",

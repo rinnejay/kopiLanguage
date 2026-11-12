@@ -47,7 +47,7 @@
 <tr>
 <td><strong>Crypto</strong></td>
 <td><code>lib/crypto/</code></td>
-<td><code>Aead</code>, <code>Big</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Poly</code>, <code>Rand</code>, <code>X25519</code></td>
+<td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Poly</code>, <code>Rand</code>, <code>X25519</code></td>
 </tr>
 </tbody></table></div>
 <h2 id="daftar-modul">Daftar modul<a class="anchor" href="#daftar-modul" aria-label="tautan">#</a></h2>
@@ -366,6 +366,12 @@
 <td>AEAD ChaCha20-Poly1305 (RFC 7539 §2.8): enkripsi + autentikasi untuk TLS.</td>
 </tr>
 <tr>
+<td><a href="api-crypto.html#aes"><code>Aes</code></a></td>
+<td><code>lib/crypto/Aes.kop</code></td>
+<td>7</td>
+<td>AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream.</td>
+</tr>
+<tr>
 <td><a href="api-crypto.html#big"><code>Big</code></a></td>
 <td><code>lib/crypto/Big.kop</code></td>
 <td>20</td>
@@ -394,6 +400,12 @@
 <td><code>lib/crypto/Der.kop</code></td>
 <td>4</td>
 <td>Parser ASN.1 DER minimal untuk mengekstrak SubjectPublicKeyInfo (pin TLS).</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#gcm"><code>Gcm</code></a></td>
+<td><code>lib/crypto/Gcm.kop</code></td>
+<td>10</td>
+<td>AES-GCM (NIST SP 800-38D): enkripsi autentik dengan tag 16 byte.</td>
 </tr>
 <tr>
 <td><a href="api-crypto.html#hash"><code>Hash</code></a></td>

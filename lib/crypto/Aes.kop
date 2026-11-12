@@ -1,0 +1,221 @@
+/* Aes.kop — AES (FIPS-197) + mode CTR, murni di bahasa Kopi (v1.25).
+ *
+ * Mendukung AES-128/192/256 (kunci 16/24/32 byte) untuk satu blok 16 byte.
+ * Bergantung operator bitwise native (& | ^ ~ >> >>>) seperti Hash.kop.
+ *
+ * Catatan: hanya blok yang dienkripsi/dekripsi; mode blok (ECB) TIDAK aman
+ * untuk pesan panjang — pakai Aes.ctr (atau Gcm) untuk data yang lebih dari
+ * satu blok.
+ *
+ * Fungsi:
+ *   encryptBlock(key, block)  blok 16 byte → blok 16 byte (cipher)
+ *   decryptBlock(key, block)  blok 16 byte → blok 16 byte (plain)
+ *   ctr(key, iv, msg)         mode CTR: iv 16 byte, pesan sembarang panjang
+ */
+
+class Aes {
+
+    /* ── tabel & aritmetika GF(2^8) ─────────────────────────────── */
+
+    /* Tabel S-box AES (FIPS-197 §5.1). */
+    private static int[] SBOX() {
+        int[] t = new int[256];
+        t[0] = 99; t[1] = 124; t[2] = 119; t[3] = 123; t[4] = 242; t[5] = 107; t[6] = 111; t[7] = 197;
+        t[8] = 48; t[9] = 1; t[10] = 103; t[11] = 43; t[12] = 254; t[13] = 215; t[14] = 171; t[15] = 118;
+        t[16] = 202; t[17] = 130; t[18] = 201; t[19] = 125; t[20] = 250; t[21] = 89; t[22] = 71; t[23] = 240;
+        t[24] = 173; t[25] = 212; t[26] = 162; t[27] = 175; t[28] = 156; t[29] = 164; t[30] = 114; t[31] = 192;
+        t[32] = 183; t[33] = 253; t[34] = 147; t[35] = 38; t[36] = 54; t[37] = 63; t[38] = 247; t[39] = 204;
+        t[40] = 52; t[41] = 165; t[42] = 229; t[43] = 241; t[44] = 113; t[45] = 216; t[46] = 49; t[47] = 21;
+        t[48] = 4; t[49] = 199; t[50] = 35; t[51] = 195; t[52] = 24; t[53] = 150; t[54] = 5; t[55] = 154;
+        t[56] = 7; t[57] = 18; t[58] = 128; t[59] = 226; t[60] = 235; t[61] = 39; t[62] = 178; t[63] = 117;
+        t[64] = 9; t[65] = 131; t[66] = 44; t[67] = 26; t[68] = 27; t[69] = 110; t[70] = 90; t[71] = 160;
+        t[72] = 82; t[73] = 59; t[74] = 214; t[75] = 179; t[76] = 41; t[77] = 227; t[78] = 47; t[79] = 132;
+        t[80] = 83; t[81] = 209; t[82] = 0; t[83] = 237; t[84] = 32; t[85] = 252; t[86] = 177; t[87] = 91;
+        t[88] = 106; t[89] = 203; t[90] = 190; t[91] = 57; t[92] = 74; t[93] = 76; t[94] = 88; t[95] = 207;
+        t[96] = 208; t[97] = 239; t[98] = 170; t[99] = 251; t[100] = 67; t[101] = 77; t[102] = 51; t[103] = 133;
+        t[104] = 69; t[105] = 249; t[106] = 2; t[107] = 127; t[108] = 80; t[109] = 60; t[110] = 159; t[111] = 168;
+        t[112] = 81; t[113] = 163; t[114] = 64; t[115] = 143; t[116] = 146; t[117] = 157; t[118] = 56; t[119] = 245;
+        t[120] = 188; t[121] = 182; t[122] = 218; t[123] = 33; t[124] = 16; t[125] = 255; t[126] = 243; t[127] = 210;
+        t[128] = 205; t[129] = 12; t[130] = 19; t[131] = 236; t[132] = 95; t[133] = 151; t[134] = 68; t[135] = 23;
+        t[136] = 196; t[137] = 167; t[138] = 126; t[139] = 61; t[140] = 100; t[141] = 93; t[142] = 25; t[143] = 115;
+        t[144] = 96; t[145] = 129; t[146] = 79; t[147] = 220; t[148] = 34; t[149] = 42; t[150] = 144; t[151] = 136;
+        t[152] = 70; t[153] = 238; t[154] = 184; t[155] = 20; t[156] = 222; t[157] = 94; t[158] = 11; t[159] = 219;
+        t[160] = 224; t[161] = 50; t[162] = 58; t[163] = 10; t[164] = 73; t[165] = 6; t[166] = 36; t[167] = 92;
+        t[168] = 194; t[169] = 211; t[170] = 172; t[171] = 98; t[172] = 145; t[173] = 149; t[174] = 228; t[175] = 121;
+        t[176] = 231; t[177] = 200; t[178] = 55; t[179] = 109; t[180] = 141; t[181] = 213; t[182] = 78; t[183] = 169;
+        t[184] = 108; t[185] = 86; t[186] = 244; t[187] = 234; t[188] = 101; t[189] = 122; t[190] = 174; t[191] = 8;
+        t[192] = 186; t[193] = 120; t[194] = 37; t[195] = 46; t[196] = 28; t[197] = 166; t[198] = 180; t[199] = 198;
+        t[200] = 232; t[201] = 221; t[202] = 116; t[203] = 31; t[204] = 75; t[205] = 189; t[206] = 139; t[207] = 138;
+        t[208] = 112; t[209] = 62; t[210] = 181; t[211] = 102; t[212] = 72; t[213] = 3; t[214] = 246; t[215] = 14;
+        t[216] = 97; t[217] = 53; t[218] = 87; t[219] = 185; t[220] = 134; t[221] = 193; t[222] = 29; t[223] = 158;
+        t[224] = 225; t[225] = 248; t[226] = 152; t[227] = 17; t[228] = 105; t[229] = 217; t[230] = 142; t[231] = 148;
+        t[232] = 155; t[233] = 30; t[234] = 135; t[235] = 233; t[236] = 206; t[237] = 85; t[238] = 40; t[239] = 223;
+        t[240] = 140; t[241] = 161; t[242] = 137; t[243] = 13; t[244] = 191; t[245] = 230; t[246] = 66; t[247] = 104;
+        t[248] = 65; t[249] = 153; t[250] = 45; t[251] = 15; t[252] = 176; t[253] = 84; t[254] = 187; t[255] = 22;
+        return t;
+    }
+
+    /* tabel invers S-box (dibangun dari S-box) */
+    private static int[] invBox() {
+        int[] s = SBOX();
+        int[] t = new int[256];
+        for (int i = 0; i < 256; i++) t[s[i]] = i;
+        return t;
+    }
+
+    /* kalikan dengan x di GF(2^8) (polinomial AES: x^8+x^4+x^3+x+1) */
+    static int xtime(int a) {
+        int r = a << 1;
+        if ((r & 256) != 0) r = (r ^ 27) & 255;
+        return r & 255;
+    }
+
+    /* perkalian GF(2^8) */
+    static int gmul(int a, int b) {
+        int r = 0;
+        int x = a & 255;
+        int y = b & 255;
+        for (int i = 0; i < 8; i++) {
+            if ((y & 1) != 0) r = r ^ x;
+            y = y >>> 1;
+            x = xtime(x);
+        }
+        return r & 255;
+    }
+
+    /* ── ekspansi kunci ─────────────────────────────────────────── */
+
+    /* kunci → kunci ekspansi (16*(Nr+1) byte, Nr = nk+6) */
+    static int[] expandKey(int[] key) {
+        int nk = key.length / 4;
+        int nr = nk + 6;
+        int words = 4 * (nr + 1);
+        int[] w = new int[words * 4];
+        for (int i = 0; i < key.length; i++) w[i] = key[i] & 255;
+        int[] rc = new int[16];
+        rc[0] = 1;
+        for (int i = 1; i < 16; i++) rc[i] = xtime(rc[i - 1]);
+        int[] s = SBOX();
+        for (int i = nk; i < words; i++) {
+            int t0 = w[4 * (i - 1)] & 255;
+            int t1 = w[4 * (i - 1) + 1] & 255;
+            int t2 = w[4 * (i - 1) + 2] & 255;
+            int t3 = w[4 * (i - 1) + 3] & 255;
+            int rem = i % nk;
+            if (rem == 0) {
+                int tmp = t0;
+                t0 = t1; t1 = t2; t2 = t3; t3 = tmp;
+                t0 = s[t0]; t1 = s[t1]; t2 = s[t2]; t3 = s[t3];
+                t0 = t0 ^ rc[i / nk - 1];
+            } else if (nk > 6 && rem == 4) {
+                t0 = s[t0]; t1 = s[t1]; t2 = s[t2]; t3 = s[t3];
+            }
+            w[4 * i] = (w[4 * (i - nk)] & 255) ^ t0;
+            w[4 * i + 1] = (w[4 * (i - nk) + 1] & 255) ^ t1;
+            w[4 * i + 2] = (w[4 * (i - nk) + 2] & 255) ^ t2;
+            w[4 * i + 3] = (w[4 * (i - nk) + 3] & 255) ^ t3;
+        }
+        return w;
+    }
+
+    /* jumlah ronde: 10/12/14 */
+    private static int roundsOf(int[] key) {
+        return key.length / 4 + 6;
+    }
+
+    /* ── satu blok ──────────────────────────────────────────────── */
+
+    /* enkripsi satu blok 16 byte */
+    static int[] encryptBlock(int[] key, int[] block) {
+        int[] w = expandKey(key);
+        int nr = roundsOf(key);
+        int[] s = SBOX();
+        int[] st = new int[16];
+        for (int i = 0; i < 16; i++) st[i] = block[i] & 255;
+        for (int i = 0; i < 16; i++) st[i] = st[i] ^ (w[i] & 255);
+        for (int rnd = 1; rnd <= nr; rnd++) {
+            for (int i = 0; i < 16; i++) st[i] = s[st[i]];
+            int[] t = new int[16];
+            for (int i = 0; i < 16; i++) t[i] = st[i];
+            for (int r = 0; r < 4; r++) {
+                for (int c = 0; c < 4; c++) {
+                    st[r + 4 * c] = t[r + 4 * ((c + r) % 4)];
+                }
+            }
+            if (rnd != nr) {
+                for (int c = 0; c < 4; c++) {
+                    int a0 = st[0 + 4 * c], a1 = st[1 + 4 * c];
+                    int a2 = st[2 + 4 * c], a3 = st[3 + 4 * c];
+                    st[0 + 4 * c] = gmul(a0, 2) ^ gmul(a1, 3) ^ a2 ^ a3;
+                    st[1 + 4 * c] = a0 ^ gmul(a1, 2) ^ gmul(a2, 3) ^ a3;
+                    st[2 + 4 * c] = a0 ^ a1 ^ gmul(a2, 2) ^ gmul(a3, 3);
+                    st[3 + 4 * c] = gmul(a0, 3) ^ a1 ^ a2 ^ gmul(a3, 2);
+                }
+            }
+            for (int i = 0; i < 16; i++) st[i] = st[i] ^ (w[16 * rnd + i] & 255);
+        }
+        return st;
+    }
+
+    /* dekripsi satu blok 16 byte */
+    static int[] decryptBlock(int[] key, int[] block) {
+        int[] w = expandKey(key);
+        int nr = roundsOf(key);
+        int[] s = invBox();
+        int[] st = new int[16];
+        for (int i = 0; i < 16; i++) st[i] = block[i] & 255;
+        for (int i = 0; i < 16; i++) st[i] = st[i] ^ (w[16 * nr + i] & 255);
+        for (int rnd = nr - 1; rnd >= 0; rnd--) {
+            int[] t = new int[16];
+            for (int i = 0; i < 16; i++) t[i] = st[i];
+            for (int r = 0; r < 4; r++) {
+                for (int c = 0; c < 4; c++) {
+                    st[r + 4 * c] = t[r + 4 * ((c - r + 4) % 4)];
+                }
+            }
+            for (int i = 0; i < 16; i++) st[i] = s[st[i]];
+            for (int i = 0; i < 16; i++) st[i] = st[i] ^ (w[16 * rnd + i] & 255);
+            if (rnd != 0) {
+                for (int c = 0; c < 4; c++) {
+                    int a0 = st[0 + 4 * c], a1 = st[1 + 4 * c];
+                    int a2 = st[2 + 4 * c], a3 = st[3 + 4 * c];
+                    st[0 + 4 * c] = gmul(a0, 14) ^ gmul(a1, 11) ^ gmul(a2, 13) ^ gmul(a3, 9);
+                    st[1 + 4 * c] = gmul(a0, 9) ^ gmul(a1, 14) ^ gmul(a2, 11) ^ gmul(a3, 13);
+                    st[2 + 4 * c] = gmul(a0, 13) ^ gmul(a1, 9) ^ gmul(a2, 14) ^ gmul(a3, 11);
+                    st[3 + 4 * c] = gmul(a0, 11) ^ gmul(a1, 13) ^ gmul(a2, 9) ^ gmul(a3, 14);
+                }
+            }
+        }
+        return st;
+    }
+
+    /* ── mode CTR (FIPS-198 / SP 800-38A) ───────────────────────── */
+
+    /* iv 16 byte; pesan di-XOR dengan keystream blok (counter mulai iv+1) */
+    static int[] ctr(int[] key, int[] iv, int[] msg) {
+        int[] ctr = new int[16];
+        for (int i = 0; i < 16; i++) ctr[i] = iv[i] & 255;
+        int[] out = new int[msg.length];
+        int off = 0;
+        while (off < msg.length) {
+            inc32(ctr);
+            int[] ks = encryptBlock(key, ctr);
+            int n = msg.length - off;
+            if (n > 16) n = 16;
+            for (int i = 0; i < n; i++) out[off + i] = (msg[off + i] & 255) ^ (ks[i] & 255);
+            off += 16;
+        }
+        return out;
+    }
+
+    /* tambah 1 pada 32-bit terakhir counter (big-endian, modulo 2^32) */
+    static void inc32(int[] ctr) {
+        int i = 15;
+        while (i >= 12) {
+            int v = (ctr[i] & 255) + 1;
+            ctr[i] = v & 255;
+            if (v < 256) return;
+            i = i - 1;
+        }
+    }
+}

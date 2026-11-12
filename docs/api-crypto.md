@@ -32,6 +32,38 @@ int[] ct = Aead.seal(key, nonce, aad, plain);
 
 ---
 
+## Aes
+
+`lib/crypto/Aes.kop` · 7 fungsi
+
+AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream.
+
+```java
+import Aes;
+import Cipher;
+
+int[] key = Net.bytes("kunci-16-byte-oke");
+int[] ct = Aes.encryptBlock(key, Net.bytes("0123456789abcdef"));
+System.out.println(Cipher.hexenc(ct));
+```
+
+**Catatan**
+
+- Blok 16 byte; pesan panjang sebaiknya lewat `Aes.ctr` atau `Gcm`.
+- ECB per blok tidak aman untuk data berulang.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int xtime(int a)` | kalikan dengan x di GF(2^8) (polinomial AES: x^8+x^4+x^3+x+1) |
+| `static int gmul(int a, int b)` | perkalian GF(2^8) (bantu internal) |
+| `static int[] expandKey(int[] key)` | ekspansi kunci → kunci putar (16*(Nr+1) byte) |
+| `static int[] encryptBlock(int[] key, int[] block)` | enkripsi satu blok 16 byte (AES-128/192/256) |
+| `static int[] decryptBlock(int[] key, int[] block)` | dekripsi satu blok 16 byte |
+| `static int[] ctr(int[] key, int[] iv, int[] msg)` | mode CTR: keystream dari iv 16 byte di-XOR ke pesan |
+| `static void inc32(int[] ctr)` | tambah 1 pada 32-bit terakhir counter (big-endian, modulo 2^32) |
+
+---
+
 ## Big
 
 `lib/crypto/Big.kop` · 20 fungsi
@@ -190,6 +222,42 @@ import Der;
 | `static int[] sliceOf(int[] x, int from, int len)` | (internal) potong array |
 | `static int[] spkiOf(int[] x)` | SPKI (DER utuh) dari sertifikat leaf. kosong (panjang 0) bila gagal. |
 | `static int[] spkiPin(int[] cert)` | fingerprint pin: SHA-256 dari DER SPKI |
+
+---
+
+## Gcm
+
+`lib/crypto/Gcm.kop` · 10 fungsi
+
+AES-GCM (NIST SP 800-38D): enkripsi autentik dengan tag 16 byte.
+
+```java
+import Gcm;
+import Cipher;
+
+int[] key = Net.bytes("kunci-16-byte-oke");
+int[] nonce = Net.bytes("nonce-12-bytes");
+int[] sealed = Gcm.seal(key, nonce, Net.bytes(""), Net.bytes("rahasia"));
+System.out.println(Cipher.hexenc(sealed));
+```
+
+**Catatan**
+
+- `seal` mengembalikan ciphertext || tag (16 byte terakhir).
+- `open` mengembalikan array kosong bila tag tidak cocok.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] concat(int[] a, int[] b)` | gabungkan dua array |
+| `static int[] zeros(int n)` | — |
+| `static int[] be64(long bits)` | panjang 64-bit big-endian (8 byte) — konvensi GHASH SP 800-38D |
+| `static int[] pad16(int[] a)` | nol-kan sampai kelipatan 16 |
+| `static boolean eq(int[] a, int[] b)` | banding dua array byte |
+| `static int[] gfMul(int[] x, int[] y)` | perkalian GF(2^128) — internal |
+| `static int[] ghash(int[] h, int[] data)` | GHASH_H(data) — internal SP 800-38D |
+| `static int[] gctr(int[] key, int[] icb, int[] data)` | GCTR: mode CTR internal GCM |
+| `static int[] seal(int[] key, int[] nonce, int[] aad, int[] pt)` | enkripsi autentik: ciphertext // tag 16 byte |
+| `static int[] open(int[] key, int[] nonce, int[] aad, int[] ctTag)` | dekripsi autentik; array kosong bila tag salah |
 
 ---
 

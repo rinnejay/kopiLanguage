@@ -6,7 +6,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|
 | **Core** | `lib/core/` | `Args`, `Arrays`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket`, `WsClient` |
-| **Crypto** | `lib/crypto/` | `Aead`, `Big`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Hash`, `Kdf`, `Pbkdf2`, `Poly`, `Rand`, `X25519` |
+| **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Poly`, `Rand`, `X25519` |
 
 ## Daftar modul
 
@@ -72,11 +72,13 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | Modul | File | Fungsi | Ringkasan |
 |---|---|---|---|
 | [`Aead`](api-crypto.md#aead) | `lib/crypto/Aead.kop` | 7 | AEAD ChaCha20-Poly1305 (RFC 7539 §2.8): enkripsi + autentikasi untuk TLS. |
+| [`Aes`](api-crypto.md#aes) | `lib/crypto/Aes.kop` | 7 | AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream. |
 | [`Big`](api-crypto.md#big) | `lib/crypto/Big.kop` | 20 | Aritmetika medan 2²⁵⁵−19 dengan 17 limb untuk X25519. |
 | [`ChaCha`](api-crypto.md#chacha) | `lib/crypto/ChaCha.kop` | 5 | ChaCha20 stream cipher (RFC 7539) untuk TLS record dan eksperimen. |
 | [`Cipher`](api-crypto.md#cipher) | `lib/crypto/Cipher.kop` | 11 | Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibilitas. |
 | [`Crypto`](api-crypto.md#crypto) | `lib/crypto/Crypto.kop` | 18 | Kumpulan utilitas bit/hash/cipher lama yang dipakai modul kripto lain (kompatibilitas v1). |
 | [`Der`](api-crypto.md#der) | `lib/crypto/Der.kop` | 4 | Parser ASN.1 DER minimal untuk mengekstrak SubjectPublicKeyInfo (pin TLS). |
+| [`Gcm`](api-crypto.md#gcm) | `lib/crypto/Gcm.kop` | 10 | AES-GCM (NIST SP 800-38D): enkripsi autentik dengan tag 16 byte. |
 | [`Hash`](api-crypto.md#hash) | `lib/crypto/Hash.kop` | 11 | SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS. |
 | [`Kdf`](api-crypto.md#kdf) | `lib/crypto/Kdf.kop` | 8 | HKDF-SHA256 (RFC 5869) dan ExpandLabel TLS 1.3 (RFC 8446 §7.1). |
 | [`Pbkdf2`](api-crypto.md#pbkdf2) | `lib/crypto/Pbkdf2.kop` | 1 | PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi. |
