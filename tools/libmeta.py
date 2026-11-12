@@ -210,6 +210,17 @@ META = {
         "example": 'import Csv;\n\nString[] row = Csv.parseRow("a,\"b,c\"");\nSystem.out.println(Csv.formatRow(row));',
         "notes": ["`parseRow` menangani satu baris; pakai `lines` untuk memisahkan baris."],
     },
+    "Blake2b": {
+        "purpose": "BLAKE2b (RFC 7693): digest 1..64 byte, opsional dengan kunci — fondasi Argon2/scrypt.",
+        "example": 'import Blake2b;\nimport Cipher;\n\nSystem.out.println(Cipher.hexenc(Blake2b.hash(Net.bytes("abc"), 64)));',
+        "notes": ["`hashKeyed` menerima kunci ≤ 64 byte."],
+    },
+    "Scrypt": {
+        "purpose": "scrypt (RFC 7914): KDF memory-hard untuk menyimpan kata sandi (Salsa20/8 + BlockMix + ROMix).",
+        "example": 'import Scrypt;\nimport Cipher;\n\nint[] dk = Scrypt.derive(Net.bytes("password"), Net.bytes("NaCl"), 16384, 8, 1, 32);\nSystem.out.println(Cipher.hexenc(dk));',
+        "notes": ["Parameter N (rongga, pangkat 2), r (blok), p (paralel).",
+                  "N*r*p menentukan penggunaan memori & waktu."],
+    },
     "Aes": {
         "purpose": "AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream.",
         "example": 'import Aes;\nimport Cipher;\n\nint[] key = Net.bytes("kunci-16-byte-oke");\nint[] ct = Aes.encryptBlock(key, Net.bytes("0123456789abcdef"));\nSystem.out.println(Cipher.hexenc(ct));',
@@ -728,6 +739,13 @@ EXTRA = {
         "lines": "pecah teks menjadi baris",
         "countRows": "jumlah baris dalam teks",
         "rowLengths": "jumlah field tiap baris",
+    }},
+    "Blake2b": {"descs": {
+        "hash": "digest BLAKE2b (1..64 byte)",
+        "hashKeyed": "digest BLAKE2b dengan kunci",
+    }},
+    "Scrypt": {"descs": {
+        "derive": "derive(pass, salt, N, r, p, dkLen) → kunci turunan scrypt",
     }},
     "Aes": {"descs": {
         "encryptBlock": "enkripsi satu blok 16 byte (AES-128/192/256)",

@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-crypto">Referensi API — Crypto<a class="anchor" href="#referensi-api-crypto" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#aes">Aes</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#gcm">Gcm</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#pem">Pem</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li><li class="toc-h2"><a href="#x509">X509</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#aes">Aes</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#blake2b">Blake2b</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#gcm">Gcm</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#pem">Pem</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#scrypt">Scrypt</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li><li class="toc-h2"><a href="#x509">X509</a></li></ul></nav>
 <p>Hash, PBKDF2, cipher, X25519, AEAD, DER. Semua signature di bawah diekstrak langsung dari source <code>lib/crypto/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="aead">Aead<a class="anchor" href="#aead" aria-label="tautan">#</a></h2>
@@ -217,6 +217,32 @@ int[] f = Big.fromBytes(bytes32);</code></pre>
 <tr>
 <td><code>static int[] scalarFromBytes(int[] b)</code></td>
 <td>scalar dari 32 byte, clamped (RFC 7748 §5): k0&amp;=248 k31&amp;=127 /64</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="blake2b">Blake2b<a class="anchor" href="#blake2b" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Blake2b.kop</code> · 2 fungsi</p>
+<p>BLAKE2b (RFC 7693): digest 1..64 byte, opsional dengan kunci — fondasi Argon2/scrypt.</p>
+<pre><code class="language-java">import Blake2b;
+import Cipher;
+
+System.out.println(Cipher.hexenc(Blake2b.hash(Net.bytes("abc"), 64)));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>hashKeyed</code> menerima kunci ≤ 64 byte.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] hash(int[] msg, int outLen)</code></td>
+<td>digest BLAKE2b (1..64 byte)</td>
+</tr>
+<tr>
+<td><code>static int[] hashKeyed(int[] msg, int[] key, int outLen)</code></td>
+<td>digest BLAKE2b dengan kunci</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -744,6 +770,30 @@ int[] k = Rand.bytes(32);   // kunci 256-bit</code></pre>
 <tr>
 <td><code>static int[] bytes(int n)</code></td>
 <td>n byte acak dari /dev/urandom</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="scrypt">Scrypt<a class="anchor" href="#scrypt" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Scrypt.kop</code> · 1 fungsi</p>
+<p>scrypt (RFC 7914): KDF memory-hard untuk menyimpan kata sandi (Salsa20/8 + BlockMix + ROMix).</p>
+<pre><code class="language-java">import Scrypt;
+import Cipher;
+
+int[] dk = Scrypt.derive(Net.bytes("password"), Net.bytes("NaCl"), 16384, 8, 1, 32);
+System.out.println(Cipher.hexenc(dk));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Parameter N (rongga, pangkat 2), r (blok), p (paralel).</li>
+<li>N<em>r</em>p menentukan penggunaan memori &amp; waktu.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] derive(int[] pass, int[] salt, int n, int r, int p, int dkLen)</code></td>
+<td>derive(pass, salt, N, r, p, dkLen) → kunci turunan scrypt</td>
 </tr>
 </tbody></table></div>
 <hr>

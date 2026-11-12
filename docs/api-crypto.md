@@ -105,6 +105,30 @@ int[] f = Big.fromBytes(bytes32);
 
 ---
 
+## Blake2b
+
+`lib/crypto/Blake2b.kop` · 2 fungsi
+
+BLAKE2b (RFC 7693): digest 1..64 byte, opsional dengan kunci — fondasi Argon2/scrypt.
+
+```java
+import Blake2b;
+import Cipher;
+
+System.out.println(Cipher.hexenc(Blake2b.hash(Net.bytes("abc"), 64)));
+```
+
+**Catatan**
+
+- `hashKeyed` menerima kunci ≤ 64 byte.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] hash(int[] msg, int outLen)` | digest BLAKE2b (1..64 byte) |
+| `static int[] hashKeyed(int[] msg, int[] key, int outLen)` | digest BLAKE2b dengan kunci |
+
+---
+
 ## ChaCha
 
 `lib/crypto/ChaCha.kop` · 5 fungsi
@@ -421,6 +445,31 @@ int[] k = Rand.bytes(32);   // kunci 256-bit
 | Fungsi | Keterangan |
 |---|---|
 | `static int[] bytes(int n)` | n byte acak dari /dev/urandom |
+
+---
+
+## Scrypt
+
+`lib/crypto/Scrypt.kop` · 1 fungsi
+
+scrypt (RFC 7914): KDF memory-hard untuk menyimpan kata sandi (Salsa20/8 + BlockMix + ROMix).
+
+```java
+import Scrypt;
+import Cipher;
+
+int[] dk = Scrypt.derive(Net.bytes("password"), Net.bytes("NaCl"), 16384, 8, 1, 32);
+System.out.println(Cipher.hexenc(dk));
+```
+
+**Catatan**
+
+- Parameter N (rongga, pangkat 2), r (blok), p (paralel).
+- N*r*p menentukan penggunaan memori & waktu.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] derive(int[] pass, int[] salt, int n, int r, int p, int dkLen)` | derive(pass, salt, N, r, p, dkLen) → kunci turunan scrypt |
 
 ---
 

@@ -1,0 +1,20 @@
+// blakevec.kop — uji BLAKE2b (RFC 7693) + Scrypt (RFC 7914).
+import Blake2b;
+import Scrypt;
+import Cipher;
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(Cipher.hexenc(Blake2b.hash(Net.bytes(""), 64)));
+        System.out.println(Cipher.hexenc(Blake2b.hash(Net.bytes("abc"), 64)));
+        System.out.println(Cipher.hexenc(Blake2b.hash(Net.bytes("abc"), 32)));
+        System.out.println(Cipher.hexenc(Blake2b.hashKeyed(Net.bytes("abc"), Net.bytes("kunci"), 64)));
+        int[] panjang = new int[200];
+        for (int i = 0; i < 200; i++) panjang[i] = 120;
+        System.out.println(Cipher.hexenc(Blake2b.hash(panjang, 64)));
+
+        System.out.println(Cipher.hexenc(Scrypt.derive(Net.bytes("password"), Net.bytes("NaCl"), 16, 8, 1, 32)));
+        System.out.println(Cipher.hexenc(Scrypt.derive(Net.bytes("password"), Net.bytes("NaCl"), 16, 8, 2, 32)));
+        System.out.println(Cipher.hexenc(Scrypt.derive(Net.bytes(""), Net.bytes(""), 16, 1, 1, 64)));
+    }
+}

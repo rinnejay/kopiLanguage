@@ -47,7 +47,7 @@
 <tr>
 <td><strong>Crypto</strong></td>
 <td><code>lib/crypto/</code></td>
-<td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Pem</code>, <code>Poly</code>, <code>Rand</code>, <code>X25519</code>, <code>X509</code></td>
+<td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>Blake2b</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Pem</code>, <code>Poly</code>, <code>Rand</code>, <code>Scrypt</code>, <code>X25519</code>, <code>X509</code></td>
 </tr>
 <tr>
 <td><strong>IO</strong></td>
@@ -395,6 +395,12 @@
 <td>Aritmetika medan 2²⁵⁵−19 dengan 17 limb untuk X25519.</td>
 </tr>
 <tr>
+<td><a href="api-crypto.html#blake2b"><code>Blake2b</code></a></td>
+<td><code>lib/crypto/Blake2b.kop</code></td>
+<td>2</td>
+<td>BLAKE2b (RFC 7693): digest 1..64 byte, opsional dengan kunci — fondasi Argon2/scrypt.</td>
+</tr>
+<tr>
 <td><a href="api-crypto.html#chacha"><code>ChaCha</code></a></td>
 <td><code>lib/crypto/ChaCha.kop</code></td>
 <td>5</td>
@@ -459,6 +465,12 @@
 <td><code>lib/crypto/Rand.kop</code></td>
 <td>1</td>
 <td>Byte acak kriptografis dari <code>/dev/urandom</code>.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#scrypt"><code>Scrypt</code></a></td>
+<td><code>lib/crypto/Scrypt.kop</code></td>
+<td>1</td>
+<td>scrypt (RFC 7914): KDF memory-hard untuk menyimpan kata sandi (Salsa20/8 + BlockMix + ROMix).</td>
 </tr>
 <tr>
 <td><a href="api-crypto.html#x25519"><code>X25519</code></a></td>

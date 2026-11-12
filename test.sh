@@ -51,6 +51,10 @@ python3 tools/gen_aesvec.py "$T/kopi/aesvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n' > "$T/kopi/aesvec.ref"
 check aesvec "$T/kopi/aesvec.kop"
 
+# ─── BLAKE2b + scrypt (RFC 7693 / RFC 7914 lewat vektor python) ──────────
+python3 tools/gen_blakevec.py > "$T/kopi/blakevec.ref"
+check blakevec test/blakevec.kop
+
 # ─── X.509: parse sertifikat (fixture openssl; oracle gen_x509vec.py) ─────
 python3 tools/gen_x509vec.py "$T/kopi/x509vec.kop" "$T/kopi/x509vec.ref" >/dev/null
 check x509vec "$T/kopi/x509vec.kop"

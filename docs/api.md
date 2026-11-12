@@ -6,7 +6,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|
 | **Core** | `lib/core/` | `Args`, `Arrays`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket`, `WsClient` |
-| **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `X25519`, `X509` |
+| **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
 
 ## Daftar modul
@@ -77,6 +77,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Aead`](api-crypto.md#aead) | `lib/crypto/Aead.kop` | 7 | AEAD ChaCha20-Poly1305 (RFC 7539 §2.8): enkripsi + autentikasi untuk TLS. |
 | [`Aes`](api-crypto.md#aes) | `lib/crypto/Aes.kop` | 7 | AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream. |
 | [`Big`](api-crypto.md#big) | `lib/crypto/Big.kop` | 20 | Aritmetika medan 2²⁵⁵−19 dengan 17 limb untuk X25519. |
+| [`Blake2b`](api-crypto.md#blake2b) | `lib/crypto/Blake2b.kop` | 2 | BLAKE2b (RFC 7693): digest 1..64 byte, opsional dengan kunci — fondasi Argon2/scrypt. |
 | [`ChaCha`](api-crypto.md#chacha) | `lib/crypto/ChaCha.kop` | 5 | ChaCha20 stream cipher (RFC 7539) untuk TLS record dan eksperimen. |
 | [`Cipher`](api-crypto.md#cipher) | `lib/crypto/Cipher.kop` | 11 | Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibilitas. |
 | [`Crypto`](api-crypto.md#crypto) | `lib/crypto/Crypto.kop` | 18 | Kumpulan utilitas bit/hash/cipher lama yang dipakai modul kripto lain (kompatibilitas v1). |
@@ -88,6 +89,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Pem`](api-crypto.md#pem) | `lib/crypto/Pem.kop` | 3 | Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner. |
 | [`Poly`](api-crypto.md#poly) | `lib/crypto/Poly.kop` | 10 | Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit. |
 | [`Rand`](api-crypto.md#rand) | `lib/crypto/Rand.kop` | 1 | Byte acak kriptografis dari `/dev/urandom`. |
+| [`Scrypt`](api-crypto.md#scrypt) | `lib/crypto/Scrypt.kop` | 1 | scrypt (RFC 7914): KDF memory-hard untuk menyimpan kata sandi (Salsa20/8 + BlockMix + ROMix). |
 | [`X25519`](api-crypto.md#x25519) | `lib/crypto/X25519.kop` | 2 | Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3. |
 | [`X509`](api-crypto.md#x509) | `lib/crypto/X509.kop` | 11 | Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik. |
 

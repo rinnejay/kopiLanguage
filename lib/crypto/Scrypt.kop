@@ -1,0 +1,163 @@
+/* Scrypt.kop — scrypt (RFC 7914) murni di bahasa Kopi (v1.30).
+ *
+ * KDF untuk menyimpan kata sandi. Komposisi:
+ *   B = PBKDF2-HMAC-SHA256(P, S, 1, p * 128 * r)
+ *   tiap p-chunk: ROMix (BlockMix + Salsa20/8)
+ *   DK = PBKDF2-HMAC-SHA256(P, B, 1, dkLen)
+ *
+ * Parameter: N (rongga, pangkat 2), r (ukuran blok), p (paralel).
+ * N*r*p harus cukup kecil agar cepat di perangkat kecil.
+ *
+ * Bergantung Pbkdf2.kop (PBKDF2-HMAC-SHA256) dan Bytes.kop.
+ */
+
+import Pbkdf2;
+import Bytes;
+
+class Scrypt {
+
+    /* rotasi kiri 32-bit */
+    private static int rotl(int x, int n) {
+        if (n == 0) return x;
+        return (x << n) | (x >>> (32 - n));
+    }
+
+    /*-load 4 kata 32-bit little-endian dari 16 byte pada pos */
+    private static void loadWords(int[] b, int pos, int[] w) {
+        for (int i = 0; i < 16; i++) {
+            int v = 0;
+            for (int j = 3; j >= 0; j--) {
+                v = (v << 8) | (b[pos + i * 4 + j] & 255);
+            }
+            w[i] = v;
+        }
+    }
+
+    /* simpan 16 kata 32-bit little-endian → 64 byte */
+    private static void storeWords(int[] w, int[] out, int pos) {
+        for (int i = 0; i < 16; i++) {
+            int v = w[i];
+            for (int j = 0; j < 4; j++) {
+                out[pos + i * 4 + j] = v & 255;
+                v = v >>> 8;
+            }
+        }
+    }
+
+    /* Salsa20/8 core pada 64 byte (blok 16 kata) */
+    private static void salsa8(int[] in, int pos, int[] out, int opos) {
+        int[] x = new int[16];
+        loadWords(in, pos, x);
+        int[] orig = new int[16];
+        for (int i = 0; i < 16; i++) orig[i] = x[i];
+        /* 4 double-round = 8 ronde */
+        for (int r = 0; r < 4; r++) {
+            x[4] = x[4] ^ rotl(x[0] + x[12], 7);
+            x[8] = x[8] ^ rotl(x[4] + x[0], 9);
+            x[12] = x[12] ^ rotl(x[8] + x[4], 13);
+            x[0] = x[0] ^ rotl(x[12] + x[8], 18);
+            x[9] = x[9] ^ rotl(x[5] + x[1], 7);
+            x[13] = x[13] ^ rotl(x[9] + x[5], 9);
+            x[1] = x[1] ^ rotl(x[13] + x[9], 13);
+            x[5] = x[5] ^ rotl(x[1] + x[13], 18);
+            x[14] = x[14] ^ rotl(x[10] + x[6], 7);
+            x[2] = x[2] ^ rotl(x[14] + x[10], 9);
+            x[6] = x[6] ^ rotl(x[2] + x[14], 13);
+            x[10] = x[10] ^ rotl(x[6] + x[2], 18);
+            x[3] = x[3] ^ rotl(x[15] + x[11], 7);
+            x[7] = x[7] ^ rotl(x[3] + x[15], 9);
+            x[11] = x[11] ^ rotl(x[7] + x[3], 13);
+            x[15] = x[15] ^ rotl(x[11] + x[7], 18);
+            x[1] = x[1] ^ rotl(x[0] + x[3], 7);
+            x[2] = x[2] ^ rotl(x[1] + x[0], 9);
+            x[3] = x[3] ^ rotl(x[2] + x[1], 13);
+            x[0] = x[0] ^ rotl(x[3] + x[2], 18);
+            x[6] = x[6] ^ rotl(x[5] + x[4], 7);
+            x[7] = x[7] ^ rotl(x[6] + x[5], 9);
+            x[4] = x[4] ^ rotl(x[7] + x[6], 13);
+            x[5] = x[5] ^ rotl(x[4] + x[7], 18);
+            x[11] = x[11] ^ rotl(x[10] + x[9], 7);
+            x[8] = x[8] ^ rotl(x[11] + x[10], 9);
+            x[9] = x[9] ^ rotl(x[8] + x[11], 13);
+            x[10] = x[10] ^ rotl(x[9] + x[8], 18);
+            x[12] = x[12] ^ rotl(x[15] + x[14], 7);
+            x[13] = x[13] ^ rotl(x[12] + x[15], 9);
+            x[14] = x[14] ^ rotl(x[13] + x[12], 13);
+            x[15] = x[15] ^ rotl(x[14] + x[13], 18);
+        }
+        for (int i = 0; i < 16; i++) x[i] = x[i] + orig[i];
+        storeWords(x, out, opos);
+    }
+
+    /* BlockMix: masuk 2r blok 64 byte, keluar dengan blok terakhir dipindah ke depan */
+    private static int[] blockMix(int[] b, int r) {
+        int[] x = new int[64];
+        int[] y = new int[128 * r];
+        int last = (2 * r - 1) * 64;
+        for (int i = 0; i < 64; i++) x[i] = b[last + i];
+        for (int i = 0; i < 2 * r; i++) {
+            int[] t = new int[64];
+            for (int j = 0; j < 64; j++) t[j] = x[j] ^ b[i * 64 + j];
+            salsa8(t, 0, y, i * 64);
+            for (int j = 0; j < 64; j++) x[j] = y[i * 64 + j];
+        }
+        int[] out = new int[b.length];
+        /* RFC 7914 §4: B' = (Y[0], Y[2], ..., Y[2r-2], Y[1], Y[3], ..., Y[2r-1]) */
+        for (int i = 0; i < 2 * r; i = i + 2) {
+            int k = i / 2;
+            for (int j = 0; j < 64; j++) out[k * 64 + j] = y[i * 64 + j];
+        }
+        for (int i = 1; i < 2 * r; i = i + 2) {
+            int k = r + (i - 1) / 2;
+            for (int j = 0; j < 64; j++) out[k * 64 + j] = y[i * 64 + j];
+        }
+        return out;
+    }
+
+    /* integerify: 8 byte pertama dari blok 64-byte terakhir (little-endian)
+     * sebagai unsigned 32-bit; dikembalikan sebagai long agar bisa
+     * dimodulo N tanpa tanda. */
+    private static long integerify(int[] b, int r) {
+        int pos = (2 * r - 1) * 64;
+        long v = 0;
+        for (int i = 7; i >= 0; i--) {
+            v = (v << 8) | (long)(b[pos + i] & 255);
+        }
+        return v & 4294967295L;
+    }
+
+    /* ROMix: N iterasi BlockMix dengan tabel V */
+    private static int[] romix(int[] b, int n, int r) {
+        int[] x = Bytes.copy(b);
+        int[] v = new int[n * 128 * r];
+        int chunk = 128 * r;
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < chunk; j++) v[i * chunk + j] = x[j];
+            x = blockMix(x, r);
+        }
+        for (int i = 0; i < n; i++) {
+            int j = (int)(integerify(x, r) % (long)n);
+            int[] t = new int[chunk];
+            for (int k = 0; k < chunk; k++) t[k] = x[k] ^ v[j * chunk + k];
+            x = blockMix(t, r);
+        }
+        return x;
+    }
+
+    /* derive(pass, salt, N, r, p, dkLen) → dkLen byte */
+    static int[] derive(int[] pass, int[] salt, int n, int r, int p, int dkLen) {
+        if (n < 2) n = 2;
+        if (r < 1) r = 1;
+        if (p < 1) p = 1;
+        if (dkLen < 1) dkLen = 1;
+        int chunk = 128 * r;
+        int[] b = Pbkdf2.sha256(pass, salt, 1, p * chunk);
+        for (int i = 0; i < p; i++) {
+            int[] part = new int[chunk];
+            for (int j = 0; j < chunk; j++) part[j] = b[i * chunk + j];
+            part = romix(part, n, r);
+            for (int j = 0; j < chunk; j++) b[i * chunk + j] = part[j];
+        }
+        return Pbkdf2.sha256(pass, b, 1, dkLen);
+    }
+}

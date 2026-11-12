@@ -259,6 +259,7 @@ server dan belum verifikasi ECDSA CertificateVerify.
 | `Rand` | `bytes(n)` dari `/dev/urandom` |
 | `Aead`, `ChaCha`, `Poly` | ChaCha20-Poly1305 (TLS record) |
 | `Aes`, `Gcm` | AES-128/192/256 (FIPS-197) + AES-GCM (SP 800-38D) |
+| `Blake2b`, `Scrypt` | BLAKE2b (RFC 7693) + scrypt KDF memory-hard (RFC 7914) |
 | `Pem`, `X509` | armor PEM + parsing sertifikat X.509 (RFC 5280) |
 | `Big`, `X25519` | aritmetika medan 2²⁵⁵−19 & X25519 |
 | `Der` | parser DER minimal + pin SPKI |
