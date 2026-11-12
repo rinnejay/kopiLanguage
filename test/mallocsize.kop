@@ -1,0 +1,85 @@
+// mallocsize.kop — ukuran arena per blok: malloc<64mb> { ... } (v1.21)
+// Tanpa ukuran = default 32 MB. Satuan: b, kb, mb, gb.
+// Blok dengan ukuran lebih kecil akan menolak alokasi yang melewati batas.
+import Str;
+
+class Main {
+    static int pakai(int n) {
+        int total = 0;
+        malloc<1mb> {
+            int[] a = new int[100000];       // 800 KB < 1 MB
+            a[0] = n;
+            a[99999] = n * 2;
+            total = a[0] + a[99999];
+            for (int i = 0; i < 10; i++) { break; }
+            if (n > 0) return total + 1;     // return nilai: arena dibebaskan
+        }
+        return total;
+    }
+
+    public static void main(String[] args) {
+        int total = 0;
+
+        // 1) default 32 MB (tanpa <...>)
+        malloc {
+            int[] a = new int[500000];       // 4 MB
+            a[0] = 11;
+            total = a[0];
+        }
+        System.out.println(total);           // 11
+
+        // 2) ukuran custom 1 MB, alokasi 800 KB
+        malloc<1mb> {
+            int[] b = new int[100000];
+            b[0] = 22;
+            b[99999] = 33;
+            total = total + b[0] + b[99999];
+        }
+        System.out.println(total);           // 66
+
+        // 3) satuan kb dan String di arena blok
+        malloc<512kb> {
+            int[] c = new int[60000];        // 480 KB
+            c[0] = 44;
+            total = total + c[0];
+            String s = Str.upper("kopi");
+            System.out.println(s);           // KOPI
+        }
+        System.out.println(total);           // 110
+
+        // 4) blok bersarang dengan ukuran berbeda
+        malloc<2mb> {
+            int[] luar = new int[100000];
+            luar[0] = 55;
+            malloc<1mb> {
+                int[] dalam = new int[100000];
+                dalam[0] = 66;
+                total = total + luar[0] + dalam[0];
+            }
+            total = total + luar[0];
+        }
+        System.out.println(total);           // 110 + 121 + 55 = 286
+
+        // 5) continue/break keluar blok custom tetap membebaskan arena
+        int r = 0;
+        for (int i = 0; i < 20; i++) {
+            malloc<1mb> {
+                int[] d = new int[100000];
+                d[0] = i;
+                r = r + d[0];
+                if (i == 3) continue;
+            }
+            malloc<1mb> {
+                int[] e = new int[100000];
+                r = r + 1;
+                if (i == 5) break;
+            }
+        }
+        System.out.println(r);               // 20
+
+        // 6) metode yang memakai blok custom + return
+        System.out.println(pakai(5));        // 16
+
+        System.out.println("selesai");
+    }
+}

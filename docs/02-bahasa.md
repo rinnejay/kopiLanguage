@@ -485,22 +485,44 @@ class Main {
 - Maksimum 8 entri per literal; untuk lebih banyak susun bertahap.
 - `Json.parse` untuk teks JSON dari luar; `Json.write` untuk serialisasi.
 
-## 14. Memori: `malloc { ... }`, arena 32 MB, tanpa GC
+## 14. Memori: `malloc<...> { ... }`, arena per blok, tanpa GC
 
 Semua alokasi dinamis (array, string hasil operasi) masuk **arena bump
-allocator** 32 MB. Tidak ada free per objek. Sejak **v1.20** compiler
-mengurus pembebasan secara otomatis lewat blok `malloc`:
+allocator**. Di luar blok `malloc`, arena global berukuran **32 MB**.
+Sejak **v1.20** compiler mengurus pembebasan otomatis lewat blok
+`malloc`; sejak **v1.21** setiap blok punya **arena sendiri** dan
+ukurannya bisa ditentukan:
 
 ```java
 malloc {
-    int[] sementara = new int[10000];   // hidup selama blok
+    int[] sementara = new int[10000];   // arena blok 32 MB (default)
     String tmp = Str.upper(text);
-    // ... pakai ...
 }                                      // arena blok dibebaskan OTOMATIS
+
+malloc<64mb> {
+    int[] besar = new int[4000000];     // arena blok 64 MB
+}
+
+malloc<512kb> {                         // satuan: b, kb, mb, gb
+    int[] kecil = new int[60000];       // 480 KB — muat
+}
 ```
 
-Compiler menyisipkan penanda arena saat masuk blok dan mengembalikan
-arena ke penanda itu di **semua jalur keluar**:
+Ukuran harus bilangan bulat lebih dari 0, minimal **1 kb**, maksimum
+**4096 MB**; tanpa satuan dianggap **MB** (`malloc<64>` = 64 MB).
+Bila alokasi di dalam blok melewati batasnya, program berhenti dengan
+error yang menyebut batasnya:
+
+```
+kopivm: error: arena malloc habis — batas 1 MB terlampaui (naikkan malloc<...>)
+```
+
+Native (a64/x64) mencetak `kopi: arena malloc habis — batas 1 MB
+terlampaui`. Blok bersarang boleh memakai ukuran berbeda; arena dalam
+dibebaskan lebih dulu, lalu arena luar dipulihkan.
+
+Compiler memasang arena baru saat masuk blok dan membebaskannya di
+**semua jalur keluar**:
 
 - akhir blok,
 - `break` / `continue` yang keluar dari blok (milik loop di luar blok),
@@ -563,7 +585,10 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark
 3. `new int[n]` selalu men-zero-kan elemen, termasuk memori daur ulang.
 4. Tanpa reset, program batch panjang bisa kehabisan arena; `malloc{}`
    atau reset per request/iterasi menghindarinya.
-5. Lebih dari 32 MB → `kopi: arena memori habis` + exit 1 (bukan crash).
+5. Melebihi batas arena (32 MB default atau ukuran `malloc<...>`) →
+   `arena malloc habis — batas N MB terlampaui` + exit 1 (bukan crash).
+6. `memMark`/`memReset` bekerja pada arena yang **sedang aktif**; di
+   dalam `malloc<...>`, mark/reset berlaku untuk arena blok itu.
 
 Contoh lengkap yang bisa dijalankan (diuji di suite): `examples/malloc.kop`.
 

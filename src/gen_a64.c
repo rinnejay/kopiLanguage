@@ -141,35 +141,31 @@ static void loc_load(long off, const char *reg) {
     emit("\tldr\t%s, [x27]", reg);
 }
 
-/* v1.20: malloc{} — simpan penanda arena ke slot lokal */
-static void emit_region_mark(int slot) {
-    emit("\tadrp\tx9, kop_arena_used");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
-    emit("\tldr\tw11, [x9]");
-    loc_store((slot + 1) * 8, "w11");
+/* muat konstanta 64-bit ke register (movz + movk) */
+static void emit_imm64(const char *reg, unsigned long v) {
+    emit("\tmovz\t%s, #%lu", reg, v & 0xffffUL);
+    for (int sh = 16; sh < 64; sh += 16) {
+        unsigned long p = (v >> sh) & 0xffffUL;
+        if (p) emit("\tmovk\t%s, #%lu, lsl #%d", reg, p, sh);
+    }
 }
 
-/* bebas arena ke penanda; hanya x9/x10/w11 — x0 (nilai balik) aman */
-static void emit_region_reset(int slot) {
-    int ln = nlab++;
-    loc_load((slot + 1) * 8, "w11");
-    emit("\tadrp\tx9, kop_arena_used");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
-    emit("\tcmp\tw11, #0");
-    emit("\tb.ge\t.LRG%dA", ln);
-    emit("\tmov\tw11, wzr");
-    emit(".LRG%dA:", ln);
-    emit("\tldr\tw10, [x9]");
-    emit("\tcmp\tw11, w10");
-    emit("\tb.le\t.LRG%dB", ln);
-    emit("\tmov\tw11, w10");
-    emit(".LRG%dB:", ln);
-    emit("\tstr\tw11, [x9]");
+/* v1.21: masuk arena blok — alokasi arena baru sebesar bytes, simpan handle */
+static void emit_region_enter(int slot, long bytes) {
+    emit_imm64("x0", (unsigned long)bytes);
+    emit("\tbl\tkop_arena_enter");
+    loc_store((slot + 1) * 8, "x1");
+}
+
+/* keluar arena blok — bebas arena dalam, pulihkan arena luar (x0 aman) */
+static void emit_region_leave(int slot) {
+    loc_load((slot + 1) * 8, "x1");
+    emit("\tbl\tkop_arena_leave");
 }
 
 static void emit_loop_exit_resets(void) {
     int base = brk_sp > 0 ? loop_rg[brk_sp - 1] : 0;
-    for (int i = rg_sp - 1; i >= base; i--) emit_region_reset(rg_slot[i]);
+    for (int i = rg_sp - 1; i >= base; i--) emit_region_leave(rg_slot[i]);
 }
 
 static void push_val(int is64) {
@@ -305,7 +301,7 @@ static void gen_stmt(Method *m, Node *s) {
         } else {
             emit("\tmov\tw0, wzr");
         }
-        for (int i = rg_sp - 1; i >= 0; i--) emit_region_reset(rg_slot[i]);
+        for (int i = rg_sp - 1; i >= 0; i--) emit_region_leave(rg_slot[i]);
         emit("\tb\t.Lret%d", cur_ret_label);
         break;
     }
@@ -418,11 +414,11 @@ static void gen_stmt(Method *m, Node *s) {
         break;
 
     case ST_REGION:              /* v1.20: malloc { ... } */
-        emit_region_mark((int)s->ival);
+        emit_region_enter((int)s->ival, s->cp);   /* v1.21: ukuran custom */
         rg_slot[rg_sp++] = (int)s->ival;
         gen_stmts(m, s->d);
         rg_sp--;
-        emit_region_reset((int)s->ival);
+        emit_region_leave((int)s->ival);
         break;
 
     default:
@@ -1783,10 +1779,13 @@ void gen_a64(const char *outpath) {
     emit("\tstr\tx11, [x9]");
     /* init arena: blok 32 MB sekali via malloc (X25519 ladder mengalokasi
      * ~2,5 MB per panggilan; 6 vektor RFC butuh ~15 MB) */
-    emit("\tmovz\tx0, #0x200, lsl #16");    /* 1<<25 bytes */
+    emit_imm64("x0", 32UL * 1024 * 1024);   /* arena global default 32 MB */
     emit("\tbl\tmalloc");
     emit("\tadrp\tx1, kop_arena_base");
     emit("\tstr\tx0, [x1, :lo12:kop_arena_base]");
+    emit_imm64("x9", 32UL * 1024 * 1024);
+    emit("\tadrp\tx1, kop_arena_cap");
+    emit("\tstr\tx9, [x1, :lo12:kop_arena_cap]");
     emit("\tmov\tw0, wzr");                 /* arg main (abaikan argc/argv) */
     emit("\tbl\t%s__%s", entry->cls, entry->name);   /* class main: ret balik */
     emit("\tmov\tw0, wzr");                 /* exit status 0 */
@@ -1823,8 +1822,21 @@ void gen_a64(const char *outpath) {
     emit("\tblr\tx9");
 
     emit(".Koom:");
+    emit("\tadrp\tx9, kop_arena_cap");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
+    emit("\tldr\tx1, [x9]");
+    emit("\tmovz\tx10, #0x10, lsl #16");     /* 1 MB */
+    emit("\tcmp\tx1, x10");
+    emit("\tb.hs\t.KoomMB");
+    emit("\tlsr\tx1, x1, #10");              /* < 1 MB → KB */
+    emit("\tadrp\tx0, :got:.Lmsg_oom_kb");
+    emit("\tldr\tx0, [x0, :got_lo12:.Lmsg_oom_kb]");
+    emit("\tb\t.KoomPrint");
+    emit(".KoomMB:");
+    emit("\tlsr\tx1, x1, #20");              /* ≥ 1 MB → MB */
     emit("\tadrp\tx0, :got:.Lmsg_oom");
     emit("\tldr\tx0, [x0, :got_lo12:.Lmsg_oom]");
+    emit(".KoomPrint:");
     emit("\tbl\tprintf");
     emit("\tmov\tw0, #1");
     emit("\tadrp\tx9, :got:exit");
@@ -1839,7 +1851,9 @@ void gen_a64(const char *outpath) {
     emit("\tadd\tx1, x1, :lo12:kop_arena_used");
     emit("\tldr\tx2, [x1]");
     emit("\tadd\tx2, x2, x0");
-    emit("\tmovz\tx3, #0x200, lsl #16");
+    emit("\tadrp\tx3, kop_arena_cap");
+    emit("\tadd\tx3, x3, :lo12:kop_arena_cap");
+    emit("\tldr\tx3, [x3]");
     emit("\tcmp\tx2, x3");
     emit("\tb.ge\t.Koom");
     emit("\tstr\tx2, [x1]");
@@ -1848,6 +1862,86 @@ void gen_a64(const char *outpath) {
     emit("\tadd\tx3, x3, :lo12:kop_arena_base");
     emit("\tldr\tx3, [x3]");
     emit("\tadd\tx0, x3, x2");
+    emit("\tret");
+
+    /* v1.21: kop_arena_enter(x0 = byte) -> x1 = handle arena baru.
+       Handle menyimpan (base, cap, used) arena luar; arena baru di-malloc
+       dan dibebaskan oleh kop_arena_leave. */
+    emit(".text");
+    emit("\t.globl kop_arena_enter");
+    emit("kop_arena_enter:");
+    emit("\tstp\tx29, x30, [sp, #-32]!");
+    emit("\tmov\tx29, sp");
+    emit("\tstp\tx19, x20, [sp, #16]");
+    emit("\tmov\tx19, x0");                    /* ukuran byte */
+    emit("\tmov\tx0, #32");
+    emit("\tbl\tmalloc");
+    emit("\tcbz\tx0, .Koom");                  /* gagal alokasi handle */
+    emit("\tmov\tx20, x0");
+    emit("\tadrp\tx9, kop_arena_base");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
+    emit("\tldr\tx10, [x9]");
+    emit("\tstr\tx10, [x20, #0]");
+    emit("\tadrp\tx9, kop_arena_cap");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
+    emit("\tldr\tx10, [x9]");
+    emit("\tstr\tx10, [x20, #8]");
+    emit("\tadrp\tx9, kop_arena_used");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
+    emit("\tldr\tx10, [x9]");
+    emit("\tstr\tx10, [x20, #16]");
+    emit("\tmov\tx0, x19");
+    emit("\tbl\tmalloc");
+    emit("\tcbz\tx0, .KenterOom");
+    emit("\tadrp\tx9, kop_arena_base");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
+    emit("\tstr\tx0, [x9]");
+    emit("\tadrp\tx9, kop_arena_cap");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
+    emit("\tstr\tx19, [x9]");
+    emit("\tadrp\tx9, kop_arena_used");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
+    emit("\tstr\txzr, [x9]");
+    emit("\tmov\tx1, x20");
+    emit("\tldp\tx19, x20, [sp, #16]");
+    emit("\tldp\tx29, x30, [sp], #32");
+    emit("\tret");
+    emit(".KenterOom:");
+    emit("\tmov\tx0, x20");
+    emit("\tbl\tfree");
+    emit("\tb\t.Koom");
+
+    /* v1.21: kop_arena_leave(x1 = handle) — bebas arena blok, pulihkan
+       arena luar; x0 (nilai balik) dipertahankan. */
+    emit(".text");
+    emit("\t.globl kop_arena_leave");
+    emit("kop_arena_leave:");
+    emit("\tstp\tx29, x30, [sp, #-32]!");
+    emit("\tmov\tx29, sp");
+    emit("\tstp\tx19, x20, [sp, #16]");
+    emit("\tmov\tx19, x0");                    /* simpan nilai balik */
+    emit("\tmov\tx20, x1");                    /* handle */
+    emit("\tadrp\tx9, kop_arena_base");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
+    emit("\tldr\tx0, [x9]");
+    emit("\tbl\tfree");
+    emit("\tldr\tx9, [x20, #0]");
+    emit("\tadrp\tx10, kop_arena_base");
+    emit("\tadd\tx10, x10, :lo12:kop_arena_base");
+    emit("\tstr\tx9, [x10]");
+    emit("\tldr\tx9, [x20, #8]");
+    emit("\tadrp\tx10, kop_arena_cap");
+    emit("\tadd\tx10, x10, :lo12:kop_arena_cap");
+    emit("\tstr\tx9, [x10]");
+    emit("\tldr\tx9, [x20, #16]");
+    emit("\tadrp\tx10, kop_arena_used");
+    emit("\tadd\tx10, x10, :lo12:kop_arena_used");
+    emit("\tstr\tx9, [x10]");
+    emit("\tmov\tx0, x20");
+    emit("\tbl\tfree");
+    emit("\tmov\tx0, x19");
+    emit("\tldp\tx19, x20, [sp, #16]");
+    emit("\tldp\tx29, x30, [sp], #32");
     emit("\tret");
 
     /* x0 = char* C → x0 = String packed (v1.18: 8 byte per slot) */
@@ -2110,6 +2204,7 @@ void gen_a64(const char *outpath) {
     emit("\t.section .data");
     emit("\t.align 3");
     emit("kop_arena_base: .quad 0");
+    emit("kop_arena_cap: .quad 0");
     emit("kop_arena_used: .quad 0");
     emit("kop_argc: .quad 0");
     emit("kop_argv: .quad 0");
@@ -2122,7 +2217,8 @@ void gen_a64(const char *outpath) {
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah)\\n");
     emit(".Lmsg_bnd: .asciz \"%s\"", "kopi: byte mkstr di luar 0..255\\n");
-    emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena memori habis\\n");
+    emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena malloc habis — batas %ld MB terlampaui\\n");
+    emit(".Lmsg_oom_kb: .asciz \"%s\"", "kopi: arena malloc habis — batas %ld KB terlampaui\\n");
     emit(".Lempty_str: .asciz \"%s\"", "");
     emit(".Lstty_raw: .asciz \"%s\"", "stty raw -echo 2>/dev/null");
     emit(".Lstty_sane: .asciz \"%s\"", "stty sane 2>/dev/null");

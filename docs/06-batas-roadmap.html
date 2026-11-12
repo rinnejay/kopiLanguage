@@ -43,8 +43,8 @@
 </tr>
 <tr>
 <td>GC / free</td>
-<td>arena 32 MB; <code>malloc { ... }</code> membebaskan otomatis (v1.20); <code>memMark/memReset</code> manual opsional</td>
-<td>region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler)</td>
+<td>arena global 32 MB; <code>malloc&lt;...&gt; { ... }</code> memberi arena per blok (default 32 MB, custom <code>b/kb/mb/gb</code>, v1.21) dan membebaskan otomatis; <code>memMark/memReset</code> manual opsional</td>
+<td>region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler); batas blok dicek runtime</td>
 </tr>
 <tr>
 <td>~~Array bertipe (<code>String[]</code>, <code>long[]</code>)~~ <strong>✅ v1.16</strong> (elemen 64-bit slot; identitas referensi berlaku)</td>
@@ -147,7 +147,7 @@
 </tr>
 <tr>
 <td>Arena</td>
-<td>32 MB (a64/x64/VM), tanpa GC</td>
+<td>global 32 MB (a64/x64/VM), arena blok <code>malloc&lt;...&gt;</code> bisa 1 kb–4096 MB; tanpa GC</td>
 </tr>
 <tr>
 <td>Cross-compile</td>
@@ -259,7 +259,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>138/138</strong> (v1.20) — a64 + VM + sintaks x64 + dokumen HTML (150 PASS termasuk cek x64 yang tidak masuk counter).</li>
+<li>Suite: <strong>145/145</strong> (v1.21) — a64 + VM + sintaks x64 + dokumen HTML (150 PASS termasuk cek x64 yang tidak masuk counter).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>

@@ -28,7 +28,8 @@ enum {
     OP_CONV, OP_NORM, OP_PRINTNUM, OP_PRINTBUF,
     OP_LINE, OP_SRCFILE,            /* v1.13: baris sumber utk stack trace */
     OP_IDXB, OP_PRINTSTR,           /* v1.18: String packed */
-    OP_MARK, OP_MRESET              /* v1.20: region malloc{} */
+    OP_MARK, OP_MRESET,             /* v1.20: memMark/memReset manual */
+    OP_RENTER, OP_RLEAVE            /* v1.21: arena blok malloc<...> */
 };
 
 typedef struct {
@@ -63,16 +64,16 @@ static void emit_conv(Ty from, Ty to) {
 }
 static void emit_norm(Ty t) { em8(OP_NORM); em8((int)t); }
 
-/* bebas arena kembali ke penanda di slot (tanpa mendorong nilai balik) */
-static void emit_region_reset(int slot) {
-    em8(OP_ILOAD); em16(slot);
-    em8(OP_MRESET);
+/* keluar arena blok: bebaskan arena dalam, pulihkan arena luar */
+static void emit_region_leave(int slot) {
+    (void)slot;                       /* VM menyimpan konteks di stack internal */
+    em8(OP_RLEAVE);
 }
 /* reset semua region yang dilompati break/continue: yang dibuka SETELAH
  * loop terdekat (kalau ada) */
 static void emit_loop_exit_resets(void) {
     int base = brk_sp > 0 ? loop_rg[brk_sp - 1] : 0;
-    for (int i = rg_sp - 1; i >= base; i--) emit_region_reset(rg_slot[i]);
+    for (int i = rg_sp - 1; i >= base; i--) emit_region_leave(rg_slot[i]);
 }
 
 static int newlab(void) { return cx.nlab++; }
@@ -173,7 +174,7 @@ static void gen_stmt(Node *s) {
         } else {
             em8(OP_ICONST); em32(0);
         }
-        for (int i = rg_sp - 1; i >= 0; i--) emit_region_reset(rg_slot[i]);
+        for (int i = rg_sp - 1; i >= 0; i--) emit_region_leave(rg_slot[i]);
         em8(OP_RET);
         break;
     case ST_PRINT:
@@ -201,12 +202,12 @@ static void gen_stmt(Node *s) {
         break;
 
     case ST_REGION:              /* v1.20: malloc { ... } */
-        em8(OP_MARK);
-        em8(OP_ISTORE); em16((int)s->ival);
+        em8(OP_RENTER);          /* v1.21: arena baru sebesar s->cp byte */
+        em32(s->cp);
         rg_slot[rg_sp++] = (int)s->ival;
         gen_stmts(s->d);
         rg_sp--;
-        emit_region_reset((int)s->ival);
+        emit_region_leave((int)s->ival);
         break;
 
     case ST_IDXASG:

@@ -127,8 +127,8 @@ import Http;</code></pre>
 <td>versi lama; v1.11+ mendukung ternary</td>
 </tr>
 <tr>
-<td><code>arena memori habis</code></td>
-<td>alokasi &gt;32 MB tanpa <code>Net.memReset</code> (lihat 02 &amp; 06)</td>
+<td><code>arena malloc habis</code></td>
+<td>alokasi melewati batas blok (<code>malloc&lt;...&gt;</code>) atau arena global 32 MB; lihat 02 &amp; 06</td>
 </tr>
 <tr>
 <td><code>array tidak valid</code></td>

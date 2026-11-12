@@ -45,7 +45,9 @@ enum {
     OP_IDXB,        /* v1.18: byte ke-i dari String packed */
     OP_PRINTSTR,    /* 1 byte: newline; tulis String packed ke fd 1 */
     OP_MARK,        /* v1.20: dorong penanda arena ke stack */
-    OP_MRESET       /* v1.20: tarik penanda & bebaskan arena ke situ */
+    OP_MRESET,      /* v1.20: tarik penanda & bebaskan arena ke situ */
+    OP_RENTER,      /* v1.21: 4 byte ukuran; masuk arena blok malloc<...> */
+    OP_RLEAVE       /* v1.21: keluar arena blok & bebaskan */
 };
 
 #define MAXM 4096
@@ -70,13 +72,27 @@ static int ncp;
 static void dievm(const char *m);
 static void dievm2(const char *m, long v);
 
-/* heap untuk closure & array (bump arena; GC belum ada) */
 /* heap untuk closure & array (bump arena; GC belum ada).
- * 1 << 22 long = 32 MB: cukup untuk beberapa X25519 penuh (ladder meng-
- * alokasi ~0,3 MB long per panggilan tanpa GC) */
-#define HEAPLEN (1 << 22)
+ * Arena global 32 MB; setiap blok malloc<...> mendapat arena sendiri
+ * (default 32 MB), dibebaskan saat blok selesai. */
+#define HEAPLEN (1 << 22)          /* slot long (32 MB) */
 static long *heap;
+static long heap_cap;              /* kapasitas arena aktif, satuan slot */
 static long heap_used;
+
+/* tumpukan konteks arena untuk malloc{} bersarang */
+typedef struct { long *base; long cap; long used; } ArenaCtx;
+#define MAXARENA 64
+static ArenaCtx astk[MAXARENA];
+static int asp;
+
+/* pointer berasal dari arena aktif atau salah satu arena luar (nested) */
+static int in_heap(const long *p) {
+    if (p >= heap && p < heap + heap_cap) return 1;
+    for (int i = asp - 1; i >= 0; i--)
+        if (p >= astk[i].base && p < astk[i].base + astk[i].cap) return 1;
+    return 0;
+}
 
 static void dievm2(const char *m, long v);
 
@@ -221,11 +237,26 @@ static char *pack_cpath(long *a, size_t maxlen) {
 static int vargc;
 static char **vargv;
 
+/* error saat batas arena aktif (default 32 MB / malloc<...>) terlampaui */
+static void oom_arena(void) {
+    char buf[192];
+    long bytes = heap_cap * 8;
+    if (bytes >= (1L << 20))
+        snprintf(buf, sizeof buf,
+            "arena malloc habis — batas %ld MB terlampaui (naikkan malloc<...>)",
+            bytes >> 20);
+    else
+        snprintf(buf, sizeof buf,
+            "arena malloc habis — batas %ld KB terlampaui (naikkan malloc<...>)",
+            bytes >> 10);
+    dievm(buf);
+}
+
 static int64_t mk_str_arr(const char *s) {
     size_t n = s ? strlen(s) : 0;
     /* v1.18: String packed — 8 byte per slot 64-bit, little-endian */
     long slots = ((long)n + 7) >> 3;
-    if (heap_used + slots + 1 > HEAPLEN) dievm("arena penuh (string)");
+    if (heap_used + slots + 1 > heap_cap) oom_arena();
     long *blk = heap + heap_used;
     heap_used += slots + 1;
     blk[0] = (long)n;
@@ -253,6 +284,7 @@ static void run(void) {
 
     heap = malloc(sizeof(long) * (size_t)HEAPLEN);
     if (!heap) dievm("heap closure gagal dialokasi");
+    heap_cap = HEAPLEN;
     heap_used = 0;
 
     nframes = 1;
@@ -404,7 +436,7 @@ static void run(void) {
             Meth *mm = &meths[cm];
             if (mm->nargs == 0) dievm("closure: metode tanpa env");
             long nv = 3 + cn;
-            if (heap_used + nv > HEAPLEN) dievm("heap penuh — GC belum ada (lambda dibangun dalam loop?)");
+            if (heap_used + nv > heap_cap) oom_arena();
             if (mm->nlocals >= MAXLOC) dievm("terlalu banyak local (lambda)");
             long *blk = heap + heap_used;
             heap_used += nv;
@@ -427,7 +459,7 @@ static void run(void) {
             if (sp < 1) dievm("stack korup (CALLIND)");
             long clo = stackv[--sp];
             long *blk = (long *)clo;
-            if (clo == 0 || blk < heap || blk >= heap + HEAPLEN)
+            if (clo == 0 || !in_heap(blk))
                 dievm("nilai lambda tidak valid (env di luar heap)");
             long cm = blk[0];
             if (cm >= nmeths) dievm("closure korup (index metode)");
@@ -456,7 +488,7 @@ static void run(void) {
             f->pc += 2;
             long clo = localsv[nframes - 1][0];
             long *blk = (long *)clo;
-            if (clo == 0 || blk < heap || blk >= heap + HEAPLEN)
+            if (clo == 0 || !in_heap(blk))
                 dievm("env lambda tidak valid");
             long ncap = blk[1];
             if ((long)cj >= ncap) dievm("capture korup");
@@ -467,8 +499,7 @@ static void run(void) {
         case OP_NEWARR: {
             int64_t n = stackv[--sp];
             if (n < 0) dievm2("ukuran array negatif", (long)n);
-            if (heap_used + n + 1 > HEAPLEN)
-                dievm("arena penuh — GC belum ada; reset arena per request"); 
+            if (heap_used + n + 1 > heap_cap) oom_arena();
             long *blk = heap + heap_used;
             heap_used += n + 1;
             blk[0] = (long)n;
@@ -480,7 +511,7 @@ static void run(void) {
         case OP_IDXR: {
             int64_t idx = stackv[--sp];
             long *blk = (long *)stackv[--sp];
-            if ((long *)0 == blk || blk < heap || blk >= heap + HEAPLEN)
+            if (!blk || !in_heap(blk))
                 dievm("array tidak valid (di luar arena)");
             if (idx < 0 || blk[0] <= idx)
                 dievm2("indeks array di luar batas", (long)idx);
@@ -491,7 +522,7 @@ static void run(void) {
             int64_t idx = stackv[--sp];
             long *blk = (long *)stackv[--sp];
             int64_t val = stackv[--sp];
-            if ((long *)0 == blk || blk < heap || blk >= heap + HEAPLEN)
+            if (!blk || !in_heap(blk))
                 dievm("array tidak valid (di luar arena)");
             if (idx < 0 || blk[0] <= idx)
                 dievm2("indeks array di luar batas", (long)idx);
@@ -501,7 +532,7 @@ static void run(void) {
         case OP_IDXB: {                       /* v1.18: byte ke-i String packed */
             int64_t idx = stackv[--sp];
             long *blk = (long *)stackv[--sp];
-            if ((long *)0 == blk || blk < heap || blk >= heap + HEAPLEN)
+            if (!blk || !in_heap(blk))
                 dievm("string tidak valid (di luar arena)");
             if (idx < 0 || blk[0] <= idx)
                 dievm2("indeks string di luar batas", (long)idx);
@@ -553,11 +584,11 @@ static void run(void) {
                 stackv[sp++] = mk_str_arr(cpool[cp16]);
             } else if (bi == 40) {                /* Net.mkstr(int[] bytes) → String packed */
                 long *src = (long *)stackv[--sp];
-                if (!src || src < heap || src >= heap + HEAPLEN)
+                if (!src || !in_heap(src))
                     dievm("Net.mkstr: sumber bukan array valid");
                 long n = src[0];
                 long slots = (n + 7) >> 3;
-                if (heap_used + slots + 1 > HEAPLEN) dievm("arena penuh (Net.mkstr)");
+                if (heap_used + slots + 1 > heap_cap) oom_arena();
                 long *blk = heap + heap_used;
                 heap_used += slots + 1;
                 blk[0] = n;
@@ -570,10 +601,10 @@ static void run(void) {
                 stackv[sp++] = (int64_t)blk;
             } else if (bi == 41) {                /* Net.strbytes(String) → int[] */
                 long *src = (long *)stackv[--sp];
-                if (!src || src < heap || src >= heap + HEAPLEN)
+                if (!src || !in_heap(src))
                     dievm("Net.strbytes: sumber bukan string valid");
                 long n = src[0];
-                if (heap_used + n + 1 > HEAPLEN) dievm("arena penuh (Net.strbytes)");
+                if (heap_used + n + 1 > heap_cap) oom_arena();
                 long *blk = heap + heap_used;
                 heap_used += n + 1;
                 blk[0] = n;
@@ -718,7 +749,7 @@ static void run(void) {
                 long la = a[0], lb = b[0];
                 long total = la + lb;
                 long slots = (total + 7) >> 3;
-                if (heap_used + slots + 1 > HEAPLEN) dievm("arena penuh (cat)");
+                if (heap_used + slots + 1 > heap_cap) oom_arena();
                 long *blk = heap + heap_used;
                 heap_used += slots + 1;
                 blk[0] = total;
@@ -1000,10 +1031,42 @@ static void run(void) {
             if (ln) fputc(10, stdout);
             break;
         }
-        case OP_MARK:                          /* v1.20: malloc{} */
+        case OP_RENTER: {                      /* v1.21: arena blok malloc<...> */
+            uint32_t bytes = (uint32_t)m->code[f->pc] |
+                             ((uint32_t)m->code[f->pc + 1] << 8) |
+                             ((uint32_t)m->code[f->pc + 2] << 16) |
+                             ((uint32_t)m->code[f->pc + 3] << 24);
+            f->pc += 4;
+            if (asp >= MAXARENA) dievm("terlalu banyak malloc{} bersarang");
+            long slots = ((long)bytes + 7) / 8;
+            long *nb = (long *)malloc((size_t)slots * sizeof(long));
+            if (!nb) {
+                char buf[192];
+                snprintf(buf, sizeof buf,
+                    "gagal mengalokasikan arena malloc %ld MB", (long)bytes >> 20);
+                dievm(buf);
+            }
+            astk[asp].base = heap;
+            astk[asp].cap = heap_cap;
+            astk[asp].used = heap_used;
+            asp++;
+            heap = nb;
+            heap_cap = slots;
+            heap_used = 0;
+            break;
+        }
+        case OP_RLEAVE:                        /* v1.21: keluar blok malloc */
+            if (asp <= 0) dievm("internal: keluar arena tanpa masuk");
+            asp--;
+            free(heap);
+            heap = astk[asp].base;
+            heap_cap = astk[asp].cap;
+            heap_used = astk[asp].used;
+            break;
+        case OP_MARK:                          /* v1.20: memMark manual */
             stackv[sp++] = (int64_t)heap_used;
             break;
-        case OP_MRESET: {
+        case OP_MRESET: {                      /* v1.20: memReset manual */
             int64_t mark = stackv[--sp];
             if (mark < 0) mark = 0;
             if (mark > heap_used) mark = heap_used;

@@ -10,7 +10,7 @@ diuji, ditulis "belum".
 | Belum ada | Dampak | Workaround sekarang |
 |---|---|---|
 | ~~Instance class~~ **✅ v1.12–1.15** (field, `new`, method `this`, identitas referensi; field `long`/`String`/class; **constructor**) | sisa: tanpa inheritance/vtable; field `double`/`float` menyusul | dispatch statis; tanpa overload constructor |
-| GC / free | arena 32 MB; `malloc { ... }` membebaskan otomatis (v1.20); `memMark/memReset` manual opsional | region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler) |
+| GC / free | arena global 32 MB; `malloc<...> { ... }` memberi arena per blok (default 32 MB, custom `b/kb/mb/gb`, v1.21) dan membebaskan otomatis; `memMark/memReset` manual opsional | region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler); batas blok dicek runtime |
 | ~~Array bertipe (`String[]`, `long[]`)~~ **✅ v1.16** (elemen 64-bit slot; identitas referensi berlaku) | sisa: `double[]`; metode fungsional masih khusus `int[]` | array `long[]`/`String[]` pakai loop `for` biasa |
 | ~~String = `int[]`~~ **✅ v1.17** (String opaque; interop eksplisit `Net.mkstr`/`Net.strbytes`) | ~~byte-per-slot~~ **✅ v1.18 packed** (1 byte/karakter; konversi otomatis compiler di batas) | alokasi String besar 5× lebih hemat; tidak ada perubahan semantik sumber |
 | `char` & literal char | `'a'` adalah String | pakai kode byte (`97`) atau `charAt` |
@@ -42,7 +42,7 @@ Batas teknis lain:
 | Thread / fork / async | tidak ada; server single-thread |
 | Signal handler / graceful shutdown | tidak ada |
 | Diagnostik runtime | pesan tanpa nomor baris/stack trace |
-| Arena | 32 MB (a64/x64/VM), tanpa GC |
+| Arena | global 32 MB (a64/x64/VM), arena blok `malloc<...>` bisa 1 kb–4096 MB; tanpa GC |
 | Cross-compile | a64 hanya di ARM; x64 hanya di x86-64 |
 
 Konsekuensi: service CPU-bound memblokir semua klien; satu request
@@ -99,7 +99,7 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **138/138** (v1.20) — a64 + VM + sintaks x64 + dokumen HTML
+- Suite: **145/145** (v1.21) — a64 + VM + sintaks x64 + dokumen HTML
   (150 PASS termasuk cek x64 yang tidak masuk counter).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.

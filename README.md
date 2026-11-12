@@ -25,8 +25,8 @@ assembly/binary sendiri — tanpa JVM, tanpa bytecode vendor lain.
 
 ```sh
 make                 # kopicc + kopivm
-make test            # 138 uji lintas backend
-./kopicc --version   # kopicc 1.20.0 (Kopi) — target a64 | x64 | vm
+make test            # 145 uji lintas backend
+./kopicc --version   # kopicc 1.21.0 (Kopi) — target a64 | x64 | vm
 
 # binary asli (aarch64)
 ./kopicc examples/hello.kop -t a64 -o hello.s
@@ -59,8 +59,9 @@ class Main {
 - Kontrol alir: `if/else`, `while`, `do/while`, `for`, `break`,
   `continue`, ternary, **`switch`** tanpa fall-through.
 - Lambda/closure sejati (`fn`), capture by-value.
-- **`malloc { ... }`** — region arena otomatis, dibebaskan di semua
-  jalur keluar blok.
+- **`malloc<64mb> { ... }`** — arena per blok (default 32 MB, ukuran
+  custom `b/kb/mb/gb`), dibebaskan di semua jalur keluar blok; alokasi
+  melewati batas menghasilkan error yang menyebut batasnya.
 - JSON literal `json {...}` + pustaka `Json` (parse/write/get/put).
 - Diagnostik runtime: nomor baris + stack trace saat error.
 - Multi-file: `import Nama;` mencari `lib/<kategori>/Nama.kop`.
@@ -121,7 +122,7 @@ test.sh     suite lintas backend
 
 ## Status
 
-`v1.20.0` — **138 pass, 0 fail**. Riwayat versi lengkap:
+`v1.21.0` — **145 pass, 0 fail**. Riwayat versi lengkap:
 [`CHANGELOG.md`](CHANGELOG.md). Batas jujur & rencana:
 [docs/06-batas-roadmap.md](docs/06-batas-roadmap.md).
 

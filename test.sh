@@ -1458,6 +1458,52 @@ else
     echo "FAIL  region return escape [err]"; FAIL=$((FAIL+1))
 fi
 
+# ─── v1.21: ukuran arena per blok malloc<64mb> { ... } ───
+cp test/mallocsize.ref "$T/kopi/mallocsize.ref"
+check mallocsize test/mallocsize.kop
+./kopicc test/mallocsize.kop -t x64 -o "$T/kopi/mallocsize64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/mallocsize64.s" -o /dev/null \
+    && echo "PASS  mallocsize [x64]" || { echo "FAIL  mallocsize [x64]"; FAIL=$((FAIL+1)); }
+
+# diagnostik ukuran: nol, terlalu besar, satuan salah
+for spec in "0mb:lebih besar dari 0" "5000mb:maksimum 4096 MB" "64xb:tidak dikenal"; do
+    sz=${spec%%:*}; msg=${spec#*:}
+    sed "s/malloc<1mb>/malloc<$sz>/" test/mallocsize.kop > "$T/kopi/msbad.kop"
+    if ./kopicc "$T/kopi/msbad.kop" -t vm -o /dev/null 2>&1 | grep -q "$msg"; then
+        echo "PASS  malloc<$sz> [err]"; PASS=$((PASS+1))
+    else
+        echo "FAIL  malloc<$sz> [err]"; FAIL=$((FAIL+1))
+    fi
+done
+
+# runtime: alokasi melewati batas blok harus error dengan ukuran batasnya
+cat > "$T/kopi/moom.kop" <<'EOF'
+class Main {
+    public static void main(String[] args) {
+        malloc<1mb> {
+            int[] a = new int[200000];     // 1,6 MB > 1 MB
+            a[0] = 1;
+            System.out.println(a[0]);
+        }
+    }
+}
+EOF
+./kopicc "$T/kopi/moom.kop" -t vm -o "$T/kopi/moom.kbc" \
+    && ./kopivm "$T/kopi/moom.kbc" > "$T/kopi/moom.out" 2>&1
+if [ $? -ne 0 ] && grep -q "batas 1 MB terlampaui" "$T/kopi/moom.out"; then
+    echo "PASS  malloc limit [vm]"; PASS=$((PASS+1))
+else
+    echo "FAIL  malloc limit [vm]"; FAIL=$((FAIL+1)); head -3 "$T/kopi/moom.out"
+fi
+./kopicc "$T/kopi/moom.kop" -t a64 -o "$T/kopi/moom.s" \
+    && cc "$T/kopi/moom.s" -o "$T/kopi/moom.bin" \
+    && "$T/kopi/moom.bin" > "$T/kopi/moom.out" 2>&1
+if [ $? -ne 0 ] && grep -q "batas 1 MB terlampaui" "$T/kopi/moom.out"; then
+    echo "PASS  malloc limit [a64]"; PASS=$((PASS+1))
+else
+    echo "FAIL  malloc limit [a64]"; FAIL=$((FAIL+1)); head -3 "$T/kopi/moom.out"
+fi
+
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
 check urltest test/urltest.kop

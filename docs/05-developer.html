@@ -102,7 +102,8 @@ cc (link libc)  atau  kopivm</code></pre>
 <li>Label unik: pakai <code>nlab++</code> (jangan hardcode <code>.L1</code>).</li>
 <li><code>brk_lab/cont_lab</code> menangani <code>break</code>/<code>continue</code> bersarang.</li>
 <li>Panggilan libc (<code>getenv</code>, <code>system</code>, <code>poll</code>) memakai <code>bl</code>; simpan register caller-saved yang masih dibutuhkan setelah panggilan.</li>
-<li>Entry <code>main</code>: alokasi arena 32 MB via <code>malloc</code>, simpan argc/argv, lalu panggil <code>main</code> Kopi.</li>
+<li>Entry <code>main</code>: alokasi arena global 32 MB via <code>malloc</code>, simpan argc/argv, lalu panggil <code>main</code> Kopi.</li>
+<li>Blok <code>malloc&lt;...&gt;</code> memakai helper <code>kop_arena_enter</code>/<code>kop_arena_leave</code>: handler menyimpan (base, cap, used) arena luar, mengalokasi arena baru, lalu memulihkannya (dan <code>free</code>) saat blok selesai. <code>kopalloc</code> membaca batas dari <code>kop_arena_cap</code>, bukan konstanta 32 MB.</li>
 </ul>
 <h3 id="x86-64-gen-x64-c">x86-64 (<code>gen_x64.c</code>)<a class="anchor" href="#x86-64-gen-x64-c" aria-label="tautan">#</a></h3>
 <ul>
@@ -116,7 +117,7 @@ cc (link libc)  atau  kopivm</code></pre>
 <li>Mesin stack; opcode di <code>vm/kopivm.c</code> (<code>OP_*</code>).</li>
 <li>Nilai selalu 64-bit; operasi int32 harus dinormalisasi (<code>OP_NORM</code>) agar semantik sama dengan native.</li>
 <li><code>OP_NET</code> + field <code>bi</code> memetakan builtin <code>Net.*</code> ke syscall host.</li>
-<li>Heap 32 MB (<code>HEAPLEN</code> = 4M elemen 64-bit); <code>new</code> men-zero-kan.</li>
+<li>Heap global 32 MB (<code>HEAPLEN</code> = 4M elemen 64-bit); <code>new</code> men-zero-kan. Blok <code>malloc&lt;...&gt;</code> mengalokasi heap sendiri (<code>OP_RENTER</code>) dan membebaskannya (<code>OP_RLEAVE</code>); <code>heap_cap</code> menyesuaikan batas aktif.</li>
 <li>Label = indeks instruksi (<code>newlab/mark</code>), bukan string.</li>
 </ul>
 <h2 id="7-menambah-fitur-bahasa-checklist">7. Menambah fitur bahasa (checklist)<a class="anchor" href="#7-menambah-fitur-bahasa-checklist" aria-label="tautan">#</a></h2>

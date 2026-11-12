@@ -223,15 +223,67 @@ static Node *parse_switch(int line) {
     return wrap;
 }
 
-/* ── malloc { ... } (v1.20): region memori otomatis ────────────────
- * Compiler menyisipkan penanda arena di masuk blok dan membebaskan
- * semua alokasi blok di SEMUA jalur keluar: akhir blok, break/continue
- * yang keluar dari blok (lihat gen_*), dan return (lihat gen_*). */
+/* v1.21: satuan ukuran arena malloc<...> (tanpa satuan = MB) */
+static int ieq(const char *a, const char *b) {
+    while (*a && *b) {
+        int ca = *a, cb = *b;
+        if (ca >= 'A' && ca <= 'Z') ca += 32;
+        if (cb >= 'A' && cb <= 'Z') cb += 32;
+        if (ca != cb) return 0;
+        a++; b++;
+    }
+    return *a == 0 && *b == 0;
+}
+
+/* ── malloc[<ukuran>] { ... } (v1.20, ukuran v1.21) ─────────────────
+ * malloc { ... }        → arena blok 32 MB (default)
+ * malloc<64mb> { ... }  → arena blok 64 MB
+ * malloc<512kb> { ... } → satuan b, kb, mb, gb (tanpa satuan = mb)
+ * Compiler memasang arena baru saat masuk blok dan membebaskannya di
+ * SEMUA jalur keluar: akhir blok, break/continue yang keluar dari blok
+ * (lihat gen_*), dan return (lihat gen_*). Nilai > 0; maks 4096 MB. */
+static long parse_malloc_size(int line) {
+    if (!at('<')) return 0;          /* 0 = pakai default 32 MB */
+    advance();
+    if (!at(T_NUM))
+        die("baris %d: malloc<...> butuh angka ukuran (contoh: malloc<64mb>)", line);
+    Tok *t = peek();
+    if (t->numty != T_INT && t->numty != T_LONG &&
+        t->numty != T_UINT32 && t->numty != T_UINT64)
+        die("baris %d: ukuran malloc harus bilangan bulat", line);
+    if (t->num < 0)
+        die("baris %d: ukuran malloc tidak boleh negatif", line);
+    long n = t->num;
+    advance();
+    long mul = 1024L * 1024L;        /* default MB */
+    if (at(T_ID)) {
+        Tok *u = peek();
+        if (ieq(u->text, "b"))       mul = 1;
+        else if (ieq(u->text, "kb")) mul = 1024L;
+        else if (ieq(u->text, "mb")) mul = 1024L * 1024L;
+        else if (ieq(u->text, "gb")) mul = 1024L * 1024L * 1024L;
+        else
+            die("baris %d: satuan '%s' tidak dikenal (pakai b, kb, mb, gb)",
+                line, u->text);
+        advance();
+    }
+    expect('>', "'>' penutup ukuran malloc");
+    if (n == 0)
+        die("baris %d: ukuran malloc harus lebih besar dari 0", line);
+    if (n > (4096L * 1024 * 1024) / mul)
+        die("baris %d: ukuran malloc maksimum 4096 MB", line);
+    long bytes = n * mul;
+    if (bytes < 1024)
+        die("baris %d: ukuran malloc minimal 1 kb", line);
+    return bytes;
+}
+
 static Node *parse_malloc(int line) {
     Node *n = newnode(ST_REGION, line);
     advance();                       /* kata 'malloc' */
+    n->cp = parse_malloc_size(line); /* bytes; 0 = default 32 MB */
     if (!at('{'))
-        die("baris %d: 'malloc' harus diikuti '{'", peek()->line);
+        die("baris %d: 'malloc' atau 'malloc<...>' harus diikuti '{'", peek()->line);
     n->d = block();
     return n;
 }
@@ -2574,12 +2626,14 @@ static void resolve_stmt(Node *s) {
         break;
     }
     case ST_REGION: {
-        /* v1.20: malloc { ... } — scope sendiri + penanda arena otomatis */
+        /* v1.20: malloc { ... } — scope sendiri + arena blok otomatis.
+         * v1.21: ukuran arena (s->cp, byte) dari malloc<64mb>; 0 = default. */
         if (reg_sp >= 32)
             die("baris %d: terlalu banyak malloc{} bersarang (maks 32)", s->line);
         int mks = nscope, mksl = nextslot;
         if (nextslot >= 1020) die("terlalu banyak variabel lokal");
-        s->ival = nextslot++;      /* slot penanda arena (disembunyikan) */
+        if (s->cp == 0) s->cp = 32L * 1024 * 1024;   /* default 32 MB */
+        s->ival = nextslot++;      /* slot handle arena (disembunyikan) */
         s->dty = (int)T_INT;
         reg_base[reg_sp] = mks;
         reg_slot[reg_sp] = mksl;

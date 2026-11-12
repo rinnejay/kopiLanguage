@@ -1,9 +1,16 @@
-// malloc.kop — contoh pemakaian blok `malloc { ... }` (v1.20).
+// malloc.kop — contoh pemakaian blok `malloc { ... }` (v1.20–v1.21).
 //
 // Prinsip: semua yang dialokasikan di dalam blok (new int[], String hasil
-// operasi, dll.) hidup HANYA selama blok itu. Compiler memasang penanda
-// arena saat masuk dan membebaskannya lagi di akhir blok — juga saat
-// break, continue, dan return. Jadi tidak perlu Net.memMark/memReset.
+// operasi, dll.) hidup HANYA selama blok itu. Compiler memasang arena baru
+// saat masuk dan membebaskannya lagi di akhir blok — juga saat break,
+// continue, dan return. Jadi tidak perlu Net.memMark/memReset.
+//
+// Ukuran arena per blok (v1.21):
+//   malloc { ... }         → 32 MB (default)
+//   malloc<64mb> { ... }   → 64 MB
+//   malloc<512kb> { ... }  → 512 KB
+// Satuan: b, kb, mb, gb (tanpa satuan = MB). Alokasi yang melewati batas
+// blok menghentikan program dengan error yang menyebut batasnya.
 //
 // Kompilasi & jalankan:
 //   ./kopicc examples/malloc.kop -t a64 -o /tmp/malloc.s && cc /tmp/malloc.s -o /tmp/malloc && /tmp/malloc

@@ -145,7 +145,7 @@ source .kop ──lex/parse/type──> AST ──gen──> .s (a64/x64) ──
 | `variabel lokal wajib diinisialisasi` | `int x;` tidak boleh; tulis `int x = 0;` |
 | `metode String 'trim' butuh 'import Str;'` | tambahkan `import Str;` |
 | `karakter tidak dikenal '?'` | versi lama; v1.11+ mendukung ternary |
-| `arena memori habis` | alokasi >32 MB tanpa `Net.memReset` (lihat 02 & 06) |
+| `arena malloc habis` | alokasi melewati batas blok (`malloc<...>`) atau arena global 32 MB; lihat 02 & 06 |
 | `array tidak valid` | indeks negatif / ≥ panjang; cek `.length` |
 
 Lanjut ke [02 — Bahasa](02-bahasa.md).

@@ -111,8 +111,12 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
 - `brk_lab/cont_lab` menangani `break`/`continue` bersarang.
 - Panggilan libc (`getenv`, `system`, `poll`) memakai `bl`; simpan
   register caller-saved yang masih dibutuhkan setelah panggilan.
-- Entry `main`: alokasi arena 32 MB via `malloc`, simpan argc/argv,
+- Entry `main`: alokasi arena global 32 MB via `malloc`, simpan argc/argv,
   lalu panggil `main` Kopi.
+- Blok `malloc<...>` memakai helper `kop_arena_enter`/`kop_arena_leave`:
+  handler menyimpan (base, cap, used) arena luar, mengalokasi arena baru,
+  lalu memulihkannya (dan `free`) saat blok selesai. `kopalloc` membaca
+  batas dari `kop_arena_cap`, bukan konstanta 32 MB.
 
 ### x86-64 (`gen_x64.c`)
 
@@ -130,7 +134,9 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
 - Nilai selalu 64-bit; operasi int32 harus dinormalisasi (`OP_NORM`)
   agar semantik sama dengan native.
 - `OP_NET` + field `bi` memetakan builtin `Net.*` ke syscall host.
-- Heap 32 MB (`HEAPLEN` = 4M elemen 64-bit); `new` men-zero-kan.
+- Heap global 32 MB (`HEAPLEN` = 4M elemen 64-bit); `new` men-zero-kan.
+  Blok `malloc<...>` mengalokasi heap sendiri (`OP_RENTER`) dan
+  membebaskannya (`OP_RLEAVE`); `heap_cap` menyesuaikan batas aktif.
 - Label = indeks instruksi (`newlab/mark`), bukan string.
 
 ## 7. Menambah fitur bahasa (checklist)
