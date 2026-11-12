@@ -7,6 +7,7 @@ android/build/
 android/dist/
 android/jniLibs/
 android/app/res/
+android/app/assets/kopilib.zip
 android/debug.keystore
 *.apk
 *.idsig

@@ -30,6 +30,7 @@ server, tidak butuh internet.
 | `.../KopiProject/<nama>/build/` | berkas antara |
 | `.../KopiProject/<nama>/out/` | bytecode `.kbc` + hasil |
 | `/data/data/com.rinnejay.kopiide/files/lib/` | **biner compiler & VM** (dipisah dari proyek) |
+| `.../files/lib/lib/` | modul bahasa (`core/Str.kop`, `net/*.kop`, …) diekstrak dari `assets/kopilib.zip` |
 | `/data/data/com.rinnejay.kopiide/files/tmp/` | scratch eksekusi (`TMPDIR`) |
 
 Tombol **＋** membuat proyek baru lengkap dengan `src/Main.kop` contoh.
@@ -48,6 +49,11 @@ Bila PackageManager tidak mengekstrak `jniLibs`, bridge mengambil biner
 langsung dari dalam APK (`lib/arm64-v8a/lib*.so`) lalu menaruhnya di
 `files/lib`. Jadi tidak bergantung pada `extractNativeLibs`.
 
+Modul bahasa (`lib/core/Str.kop`, `lib/net/Net.kop`, …) ikut dibundel
+sebagai `assets/kopilib.zip` dan diekstrak ke `files/lib/lib`. `kopicc`
+dijalankan dengan `KOPPATH=files/lib/lib`, sehingga `import Str;` dan
+kawan-kawan menemukan berkas modulnya di perangkat.
+
 ## Build
 
 Prasyarat (Termux): `openjdk-17`, `aapt` (bukan `aapt2`), `dx`,
@@ -62,6 +68,7 @@ sh android/build_apk.sh              # → android/dist/KopiIDE-1.0.0.apk
 `build_apk.sh` otomatis:
 1. mengunduh `android/sdk/android.jar` (API 30, sekali, ±21 MB, tidak di-commit);
 2. membuat ikon mipmap (`tools/gen_icon.py`);
+2b. membungkus seluruh `lib/*.kop` menjadi `assets/kopilib.zip` (`tools/mklibzip.py`) — **wajib**, karena `import Str;`/`Net;`/… mencari berkas modul, bukan builtin;
 3. `aapt package` (manifest + res + assets);
 4. `javac` + `dx` → `classes.dex`;
 5. menambahkan dex + `lib/arm64-v8a/*.so` (`tools/addzip.py`, karena `zip` tidak ada);
@@ -80,8 +87,11 @@ sh android/build_apk.sh              # → android/dist/KopiIDE-1.0.0.apk
 3. Kalau folder proyek belum bisa ditulis, IDE menampilkan panel masalah.
 
 Diagnostik: tombol **Tes biner** di bawah sidebar menjalankan
-`kopicc --version` dan `kopivm`, lalu menulis hasil + `targetSdk` +
-`nativeLibraryDir` ke panel Output. Ini cara tercepat memastikan biner
+`kopicc --version`, `kopivm`, dan **uji end-to-end** (compile + run
+program kecil ber-`import Str;`), lalu menulis hasil + `targetSdk` +
+`nativeLibraryDir` + jumlah modul ke panel Output. Kalau build gagal,
+log compiler lengkap kini ditampilkan di tab **Masalah** (bukan lagi
+hanya “gagal”). Ini cara tercepat memastikan biner
 bisa dieksekusi di perangkat.
 
 ## Fitur IDE

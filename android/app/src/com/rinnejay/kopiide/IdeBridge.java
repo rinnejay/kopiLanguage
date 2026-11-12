@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
 /**
  * Jembatan JS ↔ Android.
@@ -48,7 +49,7 @@ import java.util.zip.ZipFile;
  */
 public class IdeBridge {
 
-    private static final String VERSION = "1.0.1";
+    private static final String VERSION = "1.0.3";
     private static final String DEFAULT_PROJECTS = "/storage/emulated/0/KopiProject";
 
     private final Activity act;
@@ -71,6 +72,7 @@ public class IdeBridge {
         projectsRoot.mkdirs();
         syncLib("kopicc");
         syncLib("kopivm");
+        syncKopLib();
     }
 
     /* ───────────────────────── util ───────────────────────── */
@@ -98,6 +100,7 @@ public class IdeBridge {
         try {
             JSONObject o = new JSONObject();
             o.put("ok", false);
+            o.put("err", true);
             o.put("msg", msg);
             return o.toString();
         } catch (Exception e) {
@@ -166,6 +169,64 @@ public class IdeBridge {
         return false;
     }
 
+    /**
+     * Ekstrak modul bahasa (lib/core/*.kop, lib/net/*.kop, ...) dari
+     * assets/kopilib.zip ke files/lib/lib. kopicc mencari import di
+     * <dir biner>/lib; dengan biner di files/lib, hasilnya files/lib/lib.
+     */
+    private void syncKopLib() {
+        File dest = new File(libDir, "lib");
+        File marker = new File(dest, ".kopilib");
+        try {
+            String have = "";
+            if (marker.isFile()) {
+                byte[] b = new byte[(int) marker.length()];
+                FileInputStream in = new FileInputStream(marker);
+                int off = 0, n;
+                while (off < b.length && (n = in.read(b, off, b.length - off)) > 0) off += n;
+                in.close();
+                have = new String(b, 0, off, StandardCharsets.UTF_8).trim();
+            }
+            if (have.equals(VERSION)) return;
+
+            rmrf(dest);
+            dest.mkdirs();
+            String base = dest.getCanonicalPath() + File.separator;
+
+            ZipInputStream zin = new ZipInputStream(act.getAssets().open("kopilib.zip"));
+            ZipEntry e;
+            byte[] buf = new byte[65536];
+            while ((e = zin.getNextEntry()) != null) {
+                if (e.isDirectory()) continue;
+                File out = new File(dest, e.getName());
+                if (!out.getCanonicalPath().startsWith(base)) continue;
+                out.getParentFile().mkdirs();
+                FileOutputStream fo = new FileOutputStream(out);
+                int n;
+                while ((n = zin.read(buf)) > 0) fo.write(buf, 0, n);
+                fo.close();
+            }
+            zin.close();
+
+            FileOutputStream mo = new FileOutputStream(marker);
+            mo.write(VERSION.getBytes(StandardCharsets.UTF_8));
+            mo.close();
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** jumlah modul .kop yang berhasil diekstrak (untuk info/diagnostik) */
+    private int countKop(File dir) {
+        int n = 0;
+        File kids[] = dir.listFiles();
+        if (kids == null) return 0;
+        for (File f : kids) {
+            if (f.isDirectory()) n += countKop(f);
+            else if (f.getName().endsWith(".kop")) n++;
+        }
+        return n;
+    }
+
     /** salinan biner di files/lib */
     private String fileLib(String name) {
         return new File(libDir, "lib" + name + ".so").getAbsolutePath();
@@ -223,6 +284,8 @@ public class IdeBridge {
             o.put("sdk", Build.VERSION.SDK_INT);
             o.put("targetSdk", targetSdk());
             o.put("nativeDir", act.getApplicationInfo().nativeLibraryDir);
+            o.put("kopLib", new File(libDir, "lib").getAbsolutePath());
+            o.put("kopModules", countKop(new File(libDir, "lib")));
             JSONArray libs = new JSONArray();
             String names[] = {"kopicc", "kopivm"};
             for (String n : names) {
@@ -274,6 +337,42 @@ public class IdeBridge {
                 arr.put(l);
             }
             o.put("libs", arr);
+            o.put("kopLib", new File(libDir, "lib").getAbsolutePath());
+            o.put("kopModules", countKop(new File(libDir, "lib")));
+
+            /* uji end-to-end: import Str; (butuh lib/core/Str.kop) lalu run */
+            JSONObject e2e = new JSONObject();
+            try {
+                File src = new File(tmpDir, "selftest.kop");
+                File kbc = new File(tmpDir, "selftest.kbc");
+                String code = "import Str;\n\nclass Main {\n"
+                        + "    public static void main(String[] args) {\n"
+                        + "        System.out.println(`selftest {2 + 3}`);\n"
+                        + "    }\n}\n";
+                FileOutputStream fo = new FileOutputStream(src);
+                fo.write(code.getBytes(StandardCharsets.UTF_8));
+                fo.close();
+                Process p = startIn(tmpDir, "kopicc", Arrays.asList(
+                        src.getAbsolutePath(), "-t", "vm", "-o", kbc.getAbsolutePath()));
+                String blog = slurp(p).trim();
+                int bcode = p.waitFor();
+                e2e.put("buildCode", bcode);
+                e2e.put("buildLog", blog.length() > 800 ? blog.substring(0, 800) : blog);
+                boolean ok = bcode == 0 && kbc.isFile();
+                if (ok) {
+                    Process q = startIn(tmpDir, "kopivm", Arrays.asList(kbc.getAbsolutePath()));
+                    String rlog = slurp(q).trim();
+                    int rcode = q.waitFor();
+                    e2e.put("runCode", rcode);
+                    e2e.put("runLog", rlog.length() > 400 ? rlog.substring(0, 400) : rlog);
+                    ok = rcode == 0 && rlog.contains("selftest 5");
+                }
+                e2e.put("ok", ok);
+            } catch (Exception e) {
+                e2e.put("ok", false);
+                e2e.put("runLog", String.valueOf(e.getMessage()));
+            }
+            o.put("e2e", e2e);
             return o.toString();
         } catch (Exception e) {
             return err("self-test gagal: " + e.getMessage());
@@ -518,6 +617,8 @@ public class IdeBridge {
         pb.redirectErrorStream(true);
         pb.environment().put("TMPDIR", tmpDir.getAbsolutePath());
         pb.environment().put("HOME", filesDir.getAbsolutePath());
+        // kopicc memakai KOPPATH lebih dulu untuk mencari import
+        pb.environment().put("KOPPATH", new File(libDir, "lib").getAbsolutePath());
         return pb;
     }
 

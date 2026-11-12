@@ -30,10 +30,15 @@ function base(p) { const i = p.lastIndexOf('/'); return i >= 0 ? p.slice(i + 1) 
 function dirname(p) { const i = p.lastIndexOf('/'); return i > 0 ? p.slice(0, i) : '/'; }
 function isErr(s) {
   if (typeof s !== 'string') return false;
-  if (s.length > 4000) return false;
   const t = s.trim();
   if (!t.startsWith('{')) return false;
-  try { const o = JSON.parse(t); return o && o.ok === false; } catch (e) { return false; }
+  try {
+    const o = JSON.parse(t);
+    if (!o) return false;
+    if (o.err === true) return true;
+    // kompatibilitas: error bridge lama selalu {ok:false,msg:...} tanpa code/log
+    return o.ok === false && o.msg != null && o.code === undefined && o.log === undefined;
+  } catch (e) { return false; }
 }
 function errMsg(s) { try { return JSON.parse(s).msg || 'gagal'; } catch (e) { return 'gagal'; } }
 
@@ -357,6 +362,8 @@ function openFile(path) {
   refreshEditor();
   updateStatus();
   ed().scrollTop = 0;
+  ed().scrollLeft = 0;
+  syncScroll();
   hideComplete();
 }
 
@@ -435,7 +442,7 @@ function build() {
   const rel = S.openPath.slice(proj.length + 1);
   openPanel();
   setTab('out');
-  appendLog('\n▸ Build ' + rel + '\n', 'meta');
+  appendLog('\n▸ Build ' + rel + '  ·  kopicc -t vm\n', 'meta');
   const r = K().compile(proj, rel);
   if (isErr(r)) { appendLog('✗ ' + errMsg(r) + '\n', 'e'); return; }
   let o;
@@ -449,6 +456,7 @@ function build() {
   } else {
     parseProblems(o.log || '');
     appendLog('✗ build gagal (kode ' + o.code + ')\n', 'e');
+    if (!o.log) appendLog('  ((compiler tidak menulis pesan; sumber: ' + o.src + ')\n', 'w');
     setTab('prob');
   }
 }
@@ -513,10 +521,20 @@ function testBinaries() {
   try { o = JSON.parse(r); } catch (e) { appendLog('✗ jawaban rusak\n', 'e'); return; }
   appendLog('  targetSdk ' + o.targetSdk + ' · Android SDK ' + o.sdk + '\n', 'meta');
   appendLog('  nativeLibraryDir: ' + o.nativeDir + '\n', 'meta');
+  appendLog('  modul Kopi: ' + o.kopModules + ' .kop di ' + o.kopLib + '\n', 'meta');
   for (const l of (o.libs || [])) {
     appendLog((l.ok ? '✓ ' : '✗ ') + l.name + (l.code != null ? ' (kode ' + l.code + ')' : '') + '\n',
       l.ok ? 's' : 'e');
     if (l.out) appendLog('  ' + String(l.out).split('\n').join('\n  ') + '\n', l.ok ? '' : 'e');
+  }
+  const e = o.e2e;
+  if (e) {
+    appendLog((e.ok ? '✓ ' : '✗ ') + 'uji end-to-end (import Str; compile + run)\n',
+      e.ok ? 's' : 'e');
+    if (e.buildLog) appendLog('  ' + String(e.buildLog).split('\n').join('\n  ') + '\n', e.ok ? '' : 'e');
+    if (e.runLog) appendLog('  ' + String(e.runLog).split('\n').join('\n  ') + '\n', e.ok ? '' : 'e');
+    if (e.buildCode != null) appendLog('  kode build ' + e.buildCode +
+      (e.runCode != null ? ', kode run ' + e.runCode : '') + '\n', 'meta');
   }
 }
 
@@ -534,7 +552,7 @@ function init() {
   S.root = (info && info.projects) || '/storage/emulated/0/KopiProject';
   $('sideInfo').textContent = info && info.libs
     ? info.libs.map((l) => l.name + (l.exists ? ' ✓' : ' ✗')).join(' · ') +
-      ' · SDK ' + info.sdk + ' · tsdk ' + info.targetSdk
+      ' · modul ' + (info.kopModules || 0) + ' · SDK ' + info.sdk + ' · tsdk ' + info.targetSdk
     : '';
   if (info && !info.storage) $('storagebar').classList.remove('hidden');
 

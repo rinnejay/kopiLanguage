@@ -12,7 +12,7 @@ SDK="$APP/sdk"
 BUILD="$APP/build"
 DIST="$APP/dist"
 JAR="$SDK/android.jar"
-VER="1.0.1"
+VER="1.0.3"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "butuh $1 di PATH" >&2; exit 1; }; }
 need aapt; need javac; need dx; need zipalign; need apksigner; need keytool
@@ -33,6 +33,9 @@ if [ -x ./kopivm ]; then cp -f ./kopivm "$APP/jniLibs/arm64-v8a/libkopivm.so"; f
 
 echo "→ ikon"
 python3 "$APP/tools/gen_icon.py" "$APP/app/res"
+
+echo "→ pustaka Kopi (lib/*.kop → assets/kopilib.zip)"
+python3 "$APP/tools/mklibzip.py" "$PWD/lib" "$APP/app/assets/kopilib.zip"
 
 echo "→ bersihkan build lama"
 rm -rf "$BUILD" "$DIST"
