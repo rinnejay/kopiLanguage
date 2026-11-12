@@ -62,7 +62,7 @@ Prasyarat (Termux): `openjdk-17`, `aapt` (bukan `aapt2`), `dx`,
 ```sh
 cd ~/kopi
 rm -f kopicc kopivm && make          # biner compiler + VM (aarch64)
-sh android/build_apk.sh              # → android/dist/KopiIDE-1.0.0.apk
+sh android/build_apk.sh              # → android/dist/KopiIDE-1.0.4.apk
 ```
 
 `build_apk.sh` otomatis:
@@ -98,8 +98,17 @@ bisa dieksekusi di perangkat.
 
 - **Sidebar file** (geser dari kiri): pohon folder, buka/rename/hapus
   (tekan lama), tombol proyek baru, status biner.
+- **Tab berkas** (ala VS Code): beberapa berkas terbuka sekaligus,
+  ketuk tab untuk pindah, `×` untuk menutup. Buffer tiap tab
+  (teks, posisi kursor, scroll, status belum tersimpan) disimpan di
+  memori, jadi editan tidak hilang saat berpindah tab. Tab bertanda
+  `●` bila belum disimpan; menutup tab otomatis menyimpannya. Daftar
+  tab dipulihkan saat aplikasi dibuka lagi, dan berkas aktif ditandai
+  di sidebar.
 - **Editor**: line numbers, highlight Kopi, pinch zoom 10–30 px,
-  auto-indent, Tab = 4 spasi, status Ln/Col + zoom.
+  auto-indent, Tab = 4 spasi, status Ln/Col + zoom. Setiap berkas
+  punya hasil build (`.kbc`) sendiri, jadi ▶ selalu menjalankan
+  berkas yang sedang aktif.
 - **Autocomplete**: saran keyword/tipe/modul/anggota (`System.out.`,
   `Str.`, `Net.`, `String`), kata dari berkas aktif, snippet
   `System.out.println`. Muncul saat mengetik; pilih dengan ketuk atau

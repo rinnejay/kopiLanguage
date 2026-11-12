@@ -49,7 +49,7 @@ import java.util.zip.ZipInputStream;
  */
 public class IdeBridge {
 
-    private static final String VERSION = "1.0.3";
+    private static final String VERSION = "1.0.4";
     private static final String DEFAULT_PROJECTS = "/storage/emulated/0/KopiProject";
 
     private final Activity act;

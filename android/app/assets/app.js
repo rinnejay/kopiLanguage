@@ -12,6 +12,9 @@ const S = {
   fontSize: 13,
   running: false,
   lastKbc: null,
+  tabs: [],
+  buffers: new Map(),
+  kbc: new Map(),
   problems: [],
   info: null,
   openDirs: new Set(),
@@ -207,7 +210,7 @@ function acceptComplete(i) {
   const caret = it.caret == null ? ins.length : it.caret;
   ta.value = ta.value.slice(0, COMP.start) + ins + ta.value.slice(end);
   ta.selectionStart = ta.selectionEnd = COMP.start + caret;
-  S.dirty = true;
+  markDirty();
   hideComplete();
   refreshEditor();
   updateStatus();
@@ -234,7 +237,7 @@ function insertText(txt) {
   const a = ta.selectionStart, b = ta.selectionEnd;
   ta.value = ta.value.slice(0, a) + txt + ta.value.slice(b);
   ta.selectionStart = ta.selectionEnd = a + txt.length;
-  S.dirty = true;
+  markDirty();
   refreshEditor();
   updateStatus();
 }
@@ -262,7 +265,7 @@ function listDir(path) {
 
 function makeRow(it, depth) {
   const row = document.createElement('div');
-  row.className = 'row' + (it.d ? ' dir' : '');
+  row.className = 'row' + (it.d ? ' dir' : '') + (!it.d && it.p === S.openPath ? ' active' : '');
   row.style.paddingLeft = (10 + depth * 14) + 'px';
   const arrow = document.createElement('span');
   arrow.className = 'arrow';
@@ -305,7 +308,7 @@ async function rowMenu(it) {
     if (!(await askYes('Hapus?', it.p))) return;
     const r = K().delete(it.p);
     if (isErr(r)) { toast(errMsg(r)); return; }
-    if (S.openPath === it.p) { S.openPath = null; ed().value = ''; refreshEditor(); }
+    closeTabForce(it.p);
     renderTree();
     toast('terhapus');
   } else if (a === 'rename' || a === 'ubah') {
@@ -314,10 +317,34 @@ async function rowMenu(it) {
     const dst = dirname(it.p) + '/' + nm;
     const r = K().rename(it.p, dst);
     if (isErr(r)) { toast(errMsg(r)); return; }
-    if (S.openPath === it.p) S.openPath = dst;
+    const ti = S.tabs.indexOf(it.p);
+    if (ti >= 0) {
+      const b = S.buffers.get(it.p);
+      S.buffers.delete(it.p);
+      S.buffers.set(dst, b || { text: '', dirty: false, sel: 0 });
+      S.tabs[ti] = dst;
+      if (S.openPath === it.p) S.openPath = dst;
+      renderTabs();
+      saveTabsState();
+    }
     renderTree();
     toast('nama diubah');
   }
+}
+
+function closeTabForce(path) {
+  const idx = S.tabs.indexOf(path);
+  if (idx < 0) return;
+  S.tabs.splice(idx, 1);
+  S.buffers.delete(path);
+  S.kbc.delete(path);
+  if (S.openPath === path) {
+    const next = S.tabs[Math.min(idx, S.tabs.length - 1)];
+    S.openPath = null;
+    if (next) activateTab(next); else clearEditor();
+  }
+  renderTabs();
+  saveTabsState();
 }
 
 function renderTree() {
@@ -340,6 +367,131 @@ function renderTree() {
 function openSidebar() { $('sidebar').classList.add('open'); $('scrim').classList.remove('hidden'); }
 function closeSidebar() { $('sidebar').classList.remove('open'); $('scrim').classList.add('hidden'); }
 
+/* ───────────── tab berkas ───────────── */
+function saveTabsState() {
+  try {
+    localStorage.setItem('kopi.tabs', JSON.stringify(S.tabs));
+    localStorage.setItem('kopi.last', S.openPath || '');
+  } catch (e) {}
+}
+
+function stashBuffer() {
+  if (!S.openPath) return;
+  const ta = ed();
+  S.buffers.set(S.openPath, {
+    text: ta.value,
+    dirty: S.dirty,
+    sel: ta.selectionStart,
+    scrollTop: ta.scrollTop,
+    scrollLeft: ta.scrollLeft,
+  });
+}
+
+function markDirty() {
+  S.dirty = true;
+  const b = S.buffers.get(S.openPath);
+  if (b) { b.dirty = true; b.text = ed().value; }
+}
+
+function renderTabs() {
+  const bar = $('tabs');
+  bar.innerHTML = '';
+  for (const p of S.tabs) {
+    const b = S.buffers.get(p) || {};
+    const t = document.createElement('div');
+    t.className = 'ftab' + (p === S.openPath ? ' active' : '');
+    t.title = p;
+    const nm = document.createElement('span');
+    nm.className = 'tn';
+    nm.textContent = (b.dirty ? '● ' : '') + base(p);
+    const x = document.createElement('button');
+    x.className = 'tx';
+    x.textContent = '×';
+    x.setAttribute('aria-label', 'Tutup ' + base(p));
+    x.addEventListener('click', (e) => { e.stopPropagation(); closeTab(p); });
+    t.append(nm, x);
+    t.addEventListener('click', () => activateTab(p));
+    bar.appendChild(t);
+  }
+  // geser bar tab secukupnya agar tab aktif terlihat (tanpa scroll halaman)
+  const act = bar.querySelector('.ftab.active');
+  if (act) {
+    const left = act.offsetLeft;
+    const right = left + act.offsetWidth;
+    if (left < bar.scrollLeft) bar.scrollLeft = left;
+    else if (right > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = right - bar.clientWidth;
+  }
+}
+
+function clearEditor() {
+  S.openPath = null;
+  S.projectDir = null;
+  S.dirty = false;
+  ed().value = '';
+  $('projName').textContent = 'Kopi IDE';
+  refreshEditor();
+  updateStatus();
+  hideComplete();
+  renderTabs();
+}
+
+function activateTab(path) {
+  if (path === S.openPath) { renderTabs(); return; }
+  stashBuffer();
+  if (S.tabs.indexOf(path) < 0) S.tabs.push(path);
+  let b = S.buffers.get(path);
+  if (!b) {
+    const txt = K().readFile(path);
+    if (isErr(txt)) {
+      toast(errMsg(txt));
+      S.tabs = S.tabs.filter((x) => x !== path);
+      renderTabs();
+      return;
+    }
+    b = { text: txt, dirty: false, sel: 0, scrollTop: 0, scrollLeft: 0 };
+    S.buffers.set(path, b);
+  }
+  S.openPath = path;
+  S.projectDir = projectOf(path);
+  S.problems = [];
+  renderProblems();
+  $('projName').textContent = base(S.projectDir);
+  const ta = ed();
+  ta.value = b.text;
+  S.dirty = !!b.dirty;
+  refreshEditor();
+  updateStatus();
+  ta.selectionStart = ta.selectionEnd = Math.min(b.sel || 0, ta.value.length);
+  ta.scrollTop = b.scrollTop || 0;
+  ta.scrollLeft = b.scrollLeft || 0;
+  syncScroll();
+  hideComplete();
+  renderTabs();
+  renderTree();
+  saveTabsState();
+}
+
+function closeTab(path) {
+  if (path === S.openPath) stashBuffer();
+  const b = S.buffers.get(path);
+  if (b && b.dirty) {
+    const r = K().writeFile(path, b.text);
+    if (isErr(r)) { toast(errMsg(r)); return; }
+  }
+  const idx = S.tabs.indexOf(path);
+  S.tabs = S.tabs.filter((p) => p !== path);
+  S.buffers.delete(path);
+  S.kbc.delete(path);
+  if (S.openPath === path) {
+    const next = S.tabs[Math.min(idx, S.tabs.length - 1)];
+    S.openPath = null;
+    if (next) activateTab(next); else clearEditor();
+  }
+  renderTabs();
+  saveTabsState();
+  renderTree();
+}
+
 /* ───────────── buka / simpan ───────────── */
 function projectOf(path) {
   const i = path.indexOf('/src/');
@@ -348,23 +500,14 @@ function projectOf(path) {
 }
 
 function openFile(path) {
+  if (S.tabs.indexOf(path) >= 0) { activateTab(path); return; }
   const txt = K().readFile(path);
   if (isErr(txt)) { toast(errMsg(txt)); return; }
-  S.openPath = path;
-  S.projectDir = projectOf(path);
-  S.lastKbc = null;
-  S.problems = [];
-  renderProblems();
-  ed().value = txt;
-  S.dirty = false;
-  $('projName').textContent = base(S.projectDir);
-  try { localStorage.setItem('kopi.last', path); } catch (e) {}
-  refreshEditor();
-  updateStatus();
-  ed().scrollTop = 0;
-  ed().scrollLeft = 0;
-  syncScroll();
-  hideComplete();
+  stashBuffer();
+  S.tabs.push(path);
+  S.buffers.set(path, { text: txt, dirty: false, sel: 0, scrollTop: 0, scrollLeft: 0 });
+  S.openPath = null;
+  activateTab(path);
 }
 
 function saveFile(showToast) {
@@ -372,6 +515,9 @@ function saveFile(showToast) {
   const r = K().writeFile(S.openPath, ed().value);
   if (isErr(r)) { toast(errMsg(r)); return false; }
   S.dirty = false;
+  const b = S.buffers.get(S.openPath);
+  if (b) { b.dirty = false; b.text = ed().value; }
+  renderTabs();
   updateStatus();
   if (showToast) toast('tersimpan');
   return true;
@@ -440,6 +586,7 @@ function build() {
   if (!saveFile(false)) return;
   const proj = projectOf(S.openPath);
   const rel = S.openPath.slice(proj.length + 1);
+  S.kbc.delete(S.openPath);
   openPanel();
   setTab('out');
   appendLog('\n▸ Build ' + rel + '  ·  kopicc -t vm\n', 'meta');
@@ -450,6 +597,7 @@ function build() {
   if (o.log) appendLog(o.log);
   if (o.ok) {
     S.lastKbc = o.kbc;
+    S.kbc.set(S.openPath, o.kbc);
     S.problems = [];
     renderProblems();
     appendLog('✓ build sukses (' + o.ms + ' ms) → out/' + base(o.kbc) + '\n', 's');
@@ -464,12 +612,16 @@ function build() {
 function run() {
   if (S.running) { K().stop(); return; }
   if (!S.openPath) { toast('Buka berkas .kop dulu'); return; }
-  if (!S.lastKbc || S.lastKbc.indexOf(base(S.openPath).replace(/\.kop$/, '')) < 0) build();
-  if (!S.lastKbc) return;
+  let kbc = S.kbc.get(S.openPath);
+  if (!kbc || kbc.indexOf(base(S.openPath).replace(/\.kop$/, '')) < 0) {
+    build();
+    kbc = S.kbc.get(S.openPath);
+  }
+  if (!kbc) return;
   const proj = projectOf(S.openPath);
   openPanel();
   setTab('out');
-  const r = K().run(proj, S.lastKbc);
+  const r = K().run(proj, kbc);
   if (isErr(r)) { appendLog('✗ ' + errMsg(r) + '\n', 'e'); return; }
   S.running = true;
   $('btnRun').textContent = '■';
@@ -551,7 +703,8 @@ function init() {
   S.info = info;
   S.root = (info && info.projects) || '/storage/emulated/0/KopiProject';
   $('sideInfo').textContent = info && info.libs
-    ? info.libs.map((l) => l.name + (l.exists ? ' ✓' : ' ✗')).join(' · ') +
+    ? 'v' + (info.version || '?') + ' · ' +
+      info.libs.map((l) => l.name + (l.exists ? ' ✓' : ' ✗')).join(' · ') +
       ' · modul ' + (info.kopModules || 0) + ' · SDK ' + info.sdk + ' · tsdk ' + info.targetSdk
     : '';
   if (info && !info.storage) $('storagebar').classList.remove('hidden');
@@ -566,14 +719,23 @@ function init() {
   refreshEditor();
   updateStatus();
 
-  // buka berkas terakhir bila masih ada
-  try {
-    const last = localStorage.getItem('kopi.last');
-    if (last) {
-      const t = K().readFile(last);
-      if (!isErr(t)) openFile(last);
-    }
-  } catch (e) {}
+  // pulihkan tab berkas dari sesi sebelumnya
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem('kopi.tabs') || '[]'); } catch (e) { saved = []; }
+  if (!Array.isArray(saved)) saved = [];
+  for (const p of saved) {
+    if (typeof p !== 'string' || S.tabs.indexOf(p) >= 0) continue;
+    const t = K().readFile(p);
+    if (isErr(t)) continue;
+    S.tabs.push(p);
+    S.buffers.set(p, { text: t, dirty: false, sel: 0, scrollTop: 0, scrollLeft: 0 });
+  }
+  let last = null;
+  try { last = localStorage.getItem('kopi.last'); } catch (e) {}
+  const target = (last && S.tabs.indexOf(last) >= 0) ? last : S.tabs[S.tabs.length - 1];
+  S.openPath = null;
+  if (target) activateTab(target);
+  else { renderTabs(); refreshEditor(); updateStatus(); }
 }
 
 /* ───────────── event binding ───────────── */
@@ -602,11 +764,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const ta = ed();
   let raf = 0;
   ta.addEventListener('input', () => {
-    S.dirty = true;
+    markDirty();
     if (!raf) raf = requestAnimationFrame(() => {
       raf = 0;
       refreshEditor();
       updateStatus();
+      renderTabs();
       updateComplete();
     });
   });
