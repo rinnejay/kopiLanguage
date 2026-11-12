@@ -62,7 +62,7 @@ Prasyarat (Termux): `openjdk-17`, `aapt` (bukan `aapt2`), `dx`,
 ```sh
 cd ~/kopi
 rm -f kopicc kopivm && make          # biner compiler + VM (aarch64)
-sh android/build_apk.sh              # → android/dist/KopiIDE-1.0.4.apk
+sh android/build_apk.sh              # → android/dist/KopiIDE-1.0.6.apk
 ```
 
 `build_apk.sh` otomatis:

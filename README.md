@@ -83,7 +83,7 @@ terhadap vektor RFC/oracle Python.
 APK standalone VM-only: editor + tab berkas + autocomplete + build/run,
 tanpa Termux.
 
-**Unduh:** [Kopi IDE 1.0.5](https://github.com/rinnejay/kopiLanguage/releases/latest)
+**Unduh:** [Kopi IDE 1.0.6](https://github.com/rinnejay/kopiLanguage/releases/latest)
 
 - Tab multi-file, penanda belum tersimpan, auto-save, restore tab.
 - Kelola berkas: buat/rename/hapus berkas & folder, salin/cut/tempel,
