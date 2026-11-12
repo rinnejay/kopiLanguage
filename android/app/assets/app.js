@@ -18,6 +18,9 @@ const S = {
   problems: [],
   info: null,
   openDirs: new Set(),
+  selPath: null,
+  selDir: true,
+  clip: null,
   busy: false,
 };
 
@@ -265,7 +268,10 @@ function listDir(path) {
 
 function makeRow(it, depth) {
   const row = document.createElement('div');
-  row.className = 'row' + (it.d ? ' dir' : '') + (!it.d && it.p === S.openPath ? ' active' : '');
+  const cut = S.clip && S.clip.mode === 'cut' && it.p === S.clip.path;
+  row.className = 'row' + (it.d ? ' dir' : '') +
+    (!it.d && it.p === S.openPath ? ' active' : '') +
+    (it.p === S.selPath ? ' sel' : '') + (cut ? ' cut' : '');
   row.style.paddingLeft = (10 + depth * 14) + 'px';
   const arrow = document.createElement('span');
   arrow.className = 'arrow';
@@ -276,18 +282,33 @@ function makeRow(it, depth) {
   const nm = document.createElement('span');
   nm.className = 'nm';
   nm.textContent = it.n;
-  row.append(arrow, ic, nm);
+  const more = document.createElement('button');
+  more.className = 'rowmenu';
+  more.textContent = '⋯';
+  more.title = 'Menu berkas';
+  row.append(arrow, ic, nm, more);
 
   let timer = null, long = false;
+  const openMenu = () => {
+    clearTimeout(timer);
+    long = true;
+    selectRow(it);
+    fileMenu(it);
+  };
+  more.addEventListener('click', (e) => { e.stopPropagation(); openMenu(); });
+
   row.addEventListener('touchstart', () => {
     long = false;
-    timer = setTimeout(() => { long = true; rowMenu(it); }, 620);
+    timer = setTimeout(openMenu, 620);
   }, { passive: true });
   row.addEventListener('touchend', () => { clearTimeout(timer); }, { passive: true });
+  row.addEventListener('touchcancel', () => { clearTimeout(timer); }, { passive: true });
   row.addEventListener('touchmove', () => { clearTimeout(timer); }, { passive: true });
+  row.addEventListener('contextmenu', (e) => { e.preventDefault(); openMenu(); });
 
   row.addEventListener('click', () => {
     if (long) { long = false; return; }
+    selectRow(it, false);
     if (it.d) {
       if (S.openDirs.has(it.p)) S.openDirs.delete(it.p);
       else S.openDirs.add(it.p);
@@ -300,49 +321,254 @@ function makeRow(it, depth) {
   return row;
 }
 
-async function rowMenu(it) {
-  const act = await ask(it.n, '', 'ketik: rename / hapus / batal');
-  if (!act) return;
-  const a = act.trim().toLowerCase();
-  if (a === 'hapus' || a === 'delete') {
-    if (!(await askYes('Hapus?', it.p))) return;
-    const r = K().delete(it.p);
-    if (isErr(r)) { toast(errMsg(r)); return; }
-    closeTabForce(it.p);
-    renderTree();
-    toast('terhapus');
-  } else if (a === 'rename' || a === 'ubah') {
-    const nm = await ask('Nama baru', it.n);
-    if (!nm) return;
-    const dst = dirname(it.p) + '/' + nm;
-    const r = K().rename(it.p, dst);
-    if (isErr(r)) { toast(errMsg(r)); return; }
-    const ti = S.tabs.indexOf(it.p);
-    if (ti >= 0) {
-      const b = S.buffers.get(it.p);
-      S.buffers.delete(it.p);
-      S.buffers.set(dst, b || { text: '', dirty: false, sel: 0 });
-      S.tabs[ti] = dst;
-      if (S.openPath === it.p) S.openPath = dst;
-      renderTabs();
-      saveTabsState();
-    }
-    renderTree();
-    toast('nama diubah');
-  }
+function selectRow(it, rerender) {
+  S.selPath = it.p;
+  S.selDir = !!it.d;
+  if (rerender !== false) renderTree();
 }
 
-function closeTabForce(path) {
-  const idx = S.tabs.indexOf(path);
-  if (idx < 0) return;
-  S.tabs.splice(idx, 1);
-  S.buffers.delete(path);
-  S.kbc.delete(path);
-  if (S.openPath === path) {
-    const next = S.tabs[Math.min(idx, S.tabs.length - 1)];
+function insidePath(p, root) {
+  return !!p && !!root && (p === root || p.indexOf(root + '/') === 0);
+}
+
+function currentDir() {
+  if (!S.selPath) return S.root;
+  return S.selDir ? S.selPath : dirname(S.selPath);
+}
+
+function validName(n) {
+  return !!n && n !== '.' && n !== '..' &&
+    n.indexOf('/') < 0 && n.indexOf('\\') < 0 && n.indexOf('\0') < 0;
+}
+
+function fmtSize(n) {
+  n = Number(n) || 0;
+  if (n < 1024) return n + ' B';
+  const u = ['KB', 'MB', 'GB', 'TB'];
+  let i = -1;
+  do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
+  return n.toFixed(1) + ' ' + u[i];
+}
+
+function fmtTime(ms) {
+  const n = Number(ms) || 0;
+  if (!n) return '—';
+  const d = new Date(n);
+  try { return d.toLocaleString('id-ID'); } catch (e) { return d.toString(); }
+}
+
+function fmtPerm(o) {
+  return (o.r ? 'r' : '-') + (o.w ? 'w' : '-') + (o.x ? 'x' : '-');
+}
+
+/* ── bottom sheet aksi ── */
+function closeSheet() {
+  $('sheet').classList.add('hidden');
+  $('sdetail').classList.add('hidden');
+  $('sdetail').textContent = '';
+  $('slist').innerHTML = '';
+}
+
+function sheet(title, items, detail) {
+  $('stitle').textContent = title;
+  const box = $('slist');
+  box.innerHTML = '';
+  const pre = $('sdetail');
+  if (detail) { pre.textContent = detail; pre.classList.remove('hidden'); }
+  else { pre.textContent = ''; pre.classList.add('hidden'); }
+  for (const it of (items || [])) {
+    const b = document.createElement('button');
+    b.className = 'sitem' + (it.danger ? ' danger' : '') + (it.disabled ? ' off' : '');
+    b.disabled = !!it.disabled;
+    const i = document.createElement('span');
+    i.className = 'si';
+    i.textContent = it.icon || '';
+    const l = document.createElement('span');
+    l.className = 'sl';
+    l.textContent = it.label;
+    b.append(i, l);
+    b.addEventListener('click', () => {
+      closeSheet();
+      try { const r = it.run(); if (r && r.catch) r.catch((e) => toast(String(e))); }
+      catch (e) { toast(String(e)); }
+    });
+    box.appendChild(b);
+  }
+  $('sheet').classList.remove('hidden');
+}
+
+function fileMenu(it) {
+  const items = [];
+  const isRoot = it.p === S.root;
+  if (it.d) {
+    items.push({ icon: '📄', label: 'Berkas baru', run: () => newFile(it.p) });
+    items.push({ icon: '📁', label: 'Folder baru', run: () => newFolder(it.p) });
+  }
+  if (!isRoot) {
+    items.push({ icon: '✏️', label: 'Ganti nama', run: () => renameItem(it) });
+    items.push({ icon: '📋', label: 'Salin', run: () => setClip(it.p, 'copy', !!it.d) });
+    items.push({ icon: '✂️', label: 'Pindah (cut)', run: () => setClip(it.p, 'cut', !!it.d) });
+  }
+  items.push({
+    icon: '📥',
+    label: S.clip ? 'Tempel: ' + base(S.clip.path) : 'Tempel',
+    disabled: !S.clip,
+    run: () => pasteInto(it.d ? it.p : dirname(it.p))
+  });
+  items.push({ icon: 'ℹ️', label: 'Detail', run: () => showDetails(it.p) });
+  if (it.p !== S.root) {
+    items.push({ icon: '🗑️', label: 'Hapus', danger: true, run: () => deleteItem(it) });
+  }
+  sheet(it.n, items);
+}
+
+async function newFile(dir) {
+  let nm = await ask('Berkas baru', 'Baru.kop', 'dibuat di ' + base(dir));
+  if (nm == null) return;
+  nm = nm.trim();
+  if (!validName(nm)) { toast('nama berkas tidak valid'); return; }
+  if (nm.indexOf('.') < 0) nm += '.kop';
+  const path = dir + '/' + nm;
+  const r = K().createFile(path);
+  if (isErr(r)) { toast(errMsg(r)); return; }
+  S.openDirs.add(dir);
+  S.selPath = path;
+  S.selDir = false;
+  renderTree();
+  if (nm.endsWith('.kop')) openFile(path);
+  toast('dibuat: ' + nm);
+}
+
+async function newFolder(dir) {
+  let nm = await ask('Folder baru', 'Folder', 'dibuat di ' + base(dir));
+  if (nm == null) return;
+  nm = nm.trim();
+  if (!validName(nm)) { toast('nama folder tidak valid'); return; }
+  const path = dir + '/' + nm;
+  const r = K().mkdirs(path);
+  if (isErr(r)) { toast(errMsg(r)); return; }
+  S.openDirs.add(dir);
+  S.selPath = path;
+  S.selDir = true;
+  renderTree();
+  toast('folder dibuat: ' + nm);
+}
+
+async function renameItem(it) {
+  const nm = await ask('Ganti nama', it.n, it.d ? 'nama folder' : 'nama berkas');
+  if (nm == null || nm.trim() === it.n) return;
+  if (!validName(nm.trim())) { toast('nama tidak valid'); return; }
+  const dst = dirname(it.p) + '/' + nm.trim();
+  const r = K().rename(it.p, dst);
+  if (isErr(r)) { toast(errMsg(r)); return; }
+  retargetTabs(it.p, dst);
+  S.selPath = dst;
+  S.selDir = !!it.d;
+  renderTree();
+  toast('nama diubah');
+}
+
+async function deleteItem(it) {
+  const msg = it.d ? 'Folder beserta seluruh isinya akan dihapus.' : 'Berkas akan dihapus.';
+  if (!(await askYes('Hapus ' + it.n + '?', msg + '\n' + it.p))) return;
+  const r = K().delete(it.p);
+  if (isErr(r)) { toast(errMsg(r)); return; }
+  dropTabsUnder(it.p);
+  if (S.clip && insidePath(S.clip.path, it.p)) S.clip = null;
+  if (insidePath(S.selPath, it.p)) { S.selPath = null; S.selDir = true; }
+  renderTree();
+  toast('terhapus: ' + it.n);
+}
+
+function setClip(path, mode, isDir) {
+  S.clip = { path: path, mode: mode, dir: !!isDir };
+  renderTree();
+  toast(mode === 'cut'
+    ? '✂️ siap dipindah: ' + base(path) + ' — pilih folder lalu Tempel'
+    : '📋 disalin: ' + base(path) + ' — pilih folder lalu Tempel', 3400);
+}
+
+async function pasteInto(dir) {
+  if (!S.clip) { toast('clipboard kosong'); return; }
+  const c = S.clip;
+  if (dirname(c.path) === dir) { toast('sudah berada di folder itu'); return; }
+  if (c.dir && insidePath(dir, c.path)) { toast('tidak bisa menempel ke dalam folder itu'); return; }
+  const r = c.mode === 'cut' ? K().moveTo(c.path, dir) : K().copyTo(c.path, dir);
+  if (isErr(r)) { toast(errMsg(r)); return; }
+  let o;
+  try { o = JSON.parse(r); } catch (e) { toast('jawaban rusak'); return; }
+  const dst = o.path || (dir + '/' + base(c.path));
+  const wasDir = c.dir;
+  if (c.mode === 'cut') {
+    retargetTabs(c.path, dst);
+    S.clip = null;
+  }
+  S.openDirs.add(dir);
+  S.selPath = dst;
+  S.selDir = wasDir;
+  renderTree();
+  toast((c.mode === 'cut' ? 'dipindah' : 'disalin') + ': ' + base(dst));
+}
+
+function showDetails(path) {
+  const r = K().stat(path);
+  if (isErr(r)) { toast(errMsg(r)); return; }
+  let o;
+  try { o = JSON.parse(r); } catch (e) { toast('detail rusak'); return; }
+  const lines = [
+    'Nama    : ' + o.n,
+    'Tipe    : ' + (o.d ? 'Folder' : 'Berkas'),
+    'Ukuran  : ' + (o.d ? fmtSize(o.s) + ' \u00b7 ' + o.count + ' item'
+                       : fmtSize(o.s) + ' (' + o.s + ' byte)'),
+    'Diubah  : ' + fmtTime(o.mtime),
+    'Izin    : ' + fmtPerm(o),
+    '',
+    'Jalur   :',
+    o.p
+  ];
+  sheet('Detail', [{ icon: '✖', label: 'Tutup', run: () => {} }], lines.join('\n'));
+}
+
+function dropTabsUnder(path) {
+  const kill = S.tabs.filter((p) => insidePath(p, path));
+  if (!kill.length) return;
+  const wasOpen = S.openPath && insidePath(S.openPath, path);
+  for (const p of kill) { S.buffers.delete(p); S.kbc.delete(p); }
+  S.tabs = S.tabs.filter((p) => !insidePath(p, path));
+  if (wasOpen) {
+    const next = S.tabs[S.tabs.length - 1];
     S.openPath = null;
     if (next) activateTab(next); else clearEditor();
   }
+  renderTabs();
+  saveTabsState();
+}
+
+function retargetTabs(oldPath, newPath) {
+  const map = (p) => {
+    if (!p) return p;
+    if (p === oldPath) return newPath;
+    if (p.indexOf(oldPath + '/') === 0) return newPath + p.slice(oldPath.length);
+    return p;
+  };
+  const nb = new Map();
+  S.buffers.forEach((b, p) => nb.set(map(p), b));
+  S.buffers = nb;
+  const nk = new Map();
+  S.kbc.forEach((k, p) => nk.set(map(p), k));
+  S.kbc = nk;
+  S.tabs = S.tabs.map(map);
+  const op = map(S.openPath);
+  if (op !== S.openPath) {
+    S.openPath = op;
+    S.projectDir = projectOf(op);
+    $('projName').textContent = base(S.projectDir);
+  }
+  const nd = new Set();
+  S.openDirs.forEach((d) => nd.add(map(d)));
+  S.openDirs = nd;
+  if (S.clip) S.clip.path = map(S.clip.path);
+  S.selPath = map(S.selPath);
   renderTabs();
   saveTabsState();
 }
@@ -640,6 +866,7 @@ window.IDE = {
     appendLog((stopped ? '■ dihentikan' : '— keluar (kode ' + code + ')') + '\n', code === 0 || stopped ? 'meta' : 'e');
   },
   handleBack() {
+    if (!$('sheet').classList.contains('hidden')) { closeSheet(); return true; }
     if ($('sidebar').classList.contains('open')) { closeSidebar(); return true; }
     if (!$('panel').classList.contains('closed')) { togglePanel(); return true; }
     if (K() && K().exitApp) K().exitApp();
@@ -687,6 +914,13 @@ function testBinaries() {
     if (e.runLog) appendLog('  ' + String(e.runLog).split('\n').join('\n  ') + '\n', e.ok ? '' : 'e');
     if (e.buildCode != null) appendLog('  kode build ' + e.buildCode +
       (e.runCode != null ? ', kode run ' + e.runCode : '') + '\n', 'meta');
+  }
+  const fs = o.fs;
+  if (fs) {
+    appendLog((fs.ok ? '✓ ' : '✗ ') + 'uji berkas (buat/salin/pindah/detail/hapus)\n',
+      fs.ok ? 's' : 'e');
+    if (fs.unique) appendLog('  nama bentrok → ' + fs.unique + '\n', 'meta');
+    if (fs.msg) appendLog('  ' + String(fs.msg) + '\n', 'e');
   }
 }
 
@@ -745,6 +979,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('scrim').addEventListener('click', closeSidebar);
   $('btnRefresh').addEventListener('click', () => { renderTree(); toast('dimuat ulang'); });
+  $('btnNewFile').addEventListener('click', () => newFile(currentDir()));
+  $('btnNewFolder').addEventListener('click', () => newFolder(currentDir()));
+  $('scancel').addEventListener('click', closeSheet);
+  $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet')) closeSheet(); });
   $('btnNew').addEventListener('click', newProject);
   $('btnNew2').addEventListener('click', newProject);
   $('btnSave').addEventListener('click', () => saveFile(true));

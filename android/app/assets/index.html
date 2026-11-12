@@ -29,11 +29,14 @@
       <span class="side-title">PROYEK</span>
       <span class="grow"></span>
       <button id="btnRefresh" class="ibtn sm" title="Muat ulang">⟳</button>
+      <button id="btnNewFile" class="ibtn sm" title="Berkas baru">📄</button>
+      <button id="btnNewFolder" class="ibtn sm" title="Folder baru">📁</button>
       <button id="btnNew2" class="ibtn sm" title="Proyek baru">＋</button>
     </div>
     <div id="tree" class="tree"></div>
     <div class="side-foot">
       <div id="sidePath" class="mono small ellipsis"></div>
+      <div class="small dim">tekan ⋯ pada berkas untuk menu</div>
       <div id="sideInfo" class="small dim"></div>
       <button id="btnTest" class="testbtn">Tes biner</button>
     </div>
@@ -77,6 +80,15 @@
 </section>
 
 <div id="toast" class="hidden"></div>
+
+<div id="sheet" class="hidden">
+  <div class="scard">
+    <div id="stitle">Menu</div>
+    <pre id="sdetail" class="hidden"></pre>
+    <div id="slist"></div>
+    <button id="scancel">Batal</button>
+  </div>
+</div>
 
 <div id="modal" class="hidden">
   <div class="mcard">

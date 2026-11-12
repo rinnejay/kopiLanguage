@@ -84,22 +84,101 @@ const requestAnimationFrame = (f) => { rafQueue.push(f); return rafQueue.length;
 const getComputedStyle = () => ({ fontFamily: 'mono', fontSize: '13px', fontWeight: '400', fontStyle: 'normal', lineHeight: '19px', letterSpacing: '0px', tabSize: '4', padding: '8px' });
 
 /* berkas maya */
+const ROOT = '/storage/emulated/0/KopiProject';
+const PROJ = ROOT + '/P';
+const SRC = PROJ + '/src';
 const disk = {
-  '/storage/emulated/0/KopiProject/P/src/A.kop': 'class A { }\n',
-  '/storage/emulated/0/KopiProject/P/src/B.kop': 'class B {\n  // b\n}\n',
-  '/storage/emulated/0/KopiProject/P/src/C.kop': 'class C { }\n',
+  [SRC + '/A.kop']: 'class A { }\n',
+  [SRC + '/B.kop']: 'class B {\n  // b\n}\n',
+  [SRC + '/C.kop']: 'class C { }\n',
 };
+const dirs = new Set([ROOT, PROJ, SRC]);
+
+function exists(p) { return disk[p] != null || dirs.has(p); }
+function isDir(p) { return dirs.has(p); }
+function keysUnder(p) {
+  return Object.keys(disk).filter((k) => k === p || k.indexOf(p + '/') === 0);
+}
+function rmKey(p) {
+  for (const k of keysUnder(p)) delete disk[k];
+  for (const d of Array.from(dirs)) if (d === p || d.indexOf(p + '/') === 0) dirs.delete(d);
+}
+function unique(p) {
+  if (!exists(p)) return p;
+  const dot = p.lastIndexOf('.');
+  const slash = p.lastIndexOf('/');
+  const base = dot > slash ? p.slice(0, dot) : p;
+  const ext = dot > slash ? p.slice(dot) : '';
+  for (let i = 2; i < 100; i++) if (!exists(base + '-' + i + ext)) return base + '-' + i + ext;
+  return p + '-' + Date.now();
+}
 const K = {
   info: () => JSON.stringify({ projects: '/storage/emulated/0/KopiProject', libs: [], sdk: 33, targetSdk: 28, kopModules: 42, storage: true }),
   listDir: () => JSON.stringify([]),
   readFile: (p) => (disk[p] != null ? disk[p] : JSON.stringify({ ok: false, err: true, msg: 'tidak ada' })),
   writeFile: (p, t) => { disk[p] = t; return JSON.stringify({ ok: true }); },
+  listDir: (p) => JSON.stringify([]),
+  stat: (p) => {
+    if (!exists(p)) return JSON.stringify({ ok: false, err: true, msg: 'tidak ada' });
+    const d = isDir(p) ? 1 : 0;
+    return JSON.stringify({ n: p.slice(p.lastIndexOf('/') + 1), p: p, d: d,
+      s: d ? 0 : disk[p].length, mtime: 1700000000000, r: true, w: true, x: false, count: 0 });
+  },
+  createFile: (p) => {
+    if (exists(p)) return JSON.stringify({ ok: false, err: true, msg: 'sudah ada' });
+    disk[p] = '';
+    return JSON.stringify({ ok: true, msg: 'dibuat' });
+  },
+  mkdirs: (p) => { dirs.add(p); return JSON.stringify({ ok: true, msg: 'ok' }); },
+  copyTo: (from, toDir) => {
+    const dst = unique(toDir + '/' + from.slice(from.lastIndexOf('/') + 1));
+    if (isDir(from)) {
+      dirs.add(dst);
+      for (const k of keysUnder(from)) {
+        const nk = dst + k.slice(from.length);
+        if (disk[k] != null) disk[nk] = disk[k];
+      }
+    } else {
+      disk[dst] = disk[from];
+    }
+    return JSON.stringify({ ok: true, msg: 'disalin', path: dst });
+  },
+  moveTo: (from, toDir) => {
+    const dst = toDir + '/' + from.slice(from.lastIndexOf('/') + 1);
+    if (exists(dst)) return JSON.stringify({ ok: false, err: true, msg: 'sudah ada' });
+    if (isDir(from)) {
+      dirs.add(dst);
+      for (const k of keysUnder(from)) {
+        const nk = dst + k.slice(from.length);
+        if (disk[k] != null) disk[nk] = disk[k];
+      }
+      rmKey(from);
+    } else {
+      disk[dst] = disk[from];
+      delete disk[from];
+    }
+    return JSON.stringify({ ok: true, msg: 'dipindah', path: dst });
+  },
+  delete: (p) => { rmKey(p); return JSON.stringify({ ok: true, msg: 'terhapus' }); },
+  rename: (a, b) => {
+    if (isDir(a)) {
+      dirs.delete(a);
+      dirs.add(b);
+      for (const k of keysUnder(a)) {
+        const nk = b + k.slice(a.length);
+        disk[nk] = disk[k];
+        delete disk[k];
+      }
+    } else {
+      disk[b] = disk[a];
+      delete disk[a];
+    }
+    return JSON.stringify({ ok: true, msg: 'diubah nama' });
+  },
   compile: () => JSON.stringify({ ok: true, kbc: '/storage/emulated/0/KopiProject/P/out/A.kbc', ms: 3 }),
   run: () => JSON.stringify({ ok: true }),
   stop: () => {},
   selfTest: () => JSON.stringify({ libs: [], e2e: { ok: true } }),
-  delete: () => JSON.stringify({ ok: true }),
-  rename: () => JSON.stringify({ ok: true }),
   requestStorage: () => {},
   exitApp: () => {},
 };
@@ -115,10 +194,13 @@ global.getComputedStyle = getComputedStyle;
 /* muat app.js */
 const src = fs.readFileSync(path.join(ASSETS, 'highlight.js'), 'utf8') + '\n' +
             fs.readFileSync(path.join(ASSETS, 'app.js'), 'utf8');
-const sandbox = new Function('window', 'document', 'localStorage', 'requestAnimationFrame', 'getComputedStyle', 'navigator', 'location', src + '\n;return {S, openFile, activateTab, closeTab, saveFile, renderTabs, build, run, init};');
+const sandbox = new Function('window', 'document', 'localStorage', 'requestAnimationFrame', 'getComputedStyle', 'navigator', 'location', src + '\n;return {S, openFile, activateTab, closeTab, saveFile, renderTabs, build, run, init,' +
+  'newFile, newFolder, renameItem, deleteItem, setClip, pasteInto, showDetails,' +
+  'currentDir, retargetTabs, dropTabsUnder, insidePath, selectRow, fileMenu};');
 const api = sandbox(global.window, global.document, global.localStorage, global.requestAnimationFrame, global.getComputedStyle, { userAgent: 'node' }, { href: 'file:///app/index.html' });
 
 const { S, openFile, activateTab, closeTab, saveFile } = api;
+const $ = (id) => document.getElementById(id);
 
 function check(name, cond, extra) {
   console.log((cond ? 'PASS ' : 'FAIL ') + name + (cond ? '' : '  ' + (extra || '')));
@@ -195,4 +277,96 @@ api.build();
 check('build menyimpan kbc per tab', S.kbc.get('/storage/emulated/0/KopiProject/P/src/A.kop') != null,
   String(S.kbc.get('/storage/emulated/0/KopiProject/P/src/A.kop')));
 
-console.log('--- selesai ---');
+/* ── operasi berkas: tambah, rename, copy/cut/paste, detail, hapus ── */
+async function fileOps() {
+  function modalOk(value) {
+    $('minput').value = value;
+    $('mok').onclick();
+  }
+
+  /* tambah berkas */
+  let p = api.newFile(SRC);
+  modalOk('D.kop');
+  await p;
+  check('berkas baru dibuat', disk[SRC + '/D.kop'] === '', JSON.stringify(Object.keys(disk)));
+  check('berkas baru langsung dibuka', S.openPath === SRC + '/D.kop' && S.tabs.indexOf(SRC + '/D.kop') >= 0,
+    String(S.openPath));
+
+  /* tambah folder */
+  p = api.newFolder(SRC);
+  modalOk('Sub');
+  await p;
+  check('folder baru dibuat', dirs.has(SRC + '/Sub'));
+  check('folder baru terpilih', S.selPath === SRC + '/Sub' && S.selDir === true);
+
+  /* berkas di dalam folder, lalu rename folder → tab ikut pindah */
+  p = api.newFile(SRC + '/Sub');
+  modalOk('F.kop');
+  await p;
+  check('berkas dalam subfolder terbuka', S.openPath === SRC + '/Sub/F.kop');
+
+  const sub = { n: 'Sub', d: 1, p: SRC + '/Sub' };
+  p = api.renameItem(sub);
+  modalOk('Sub2');
+  await p;
+  check('folder di-rename di disk', dirs.has(SRC + '/Sub2') && !dirs.has(SRC + '/Sub'));
+  check('tab berkas dalam folder ikut di-rename',
+    S.openPath === SRC + '/Sub2/F.kop' && S.tabs.indexOf(SRC + '/Sub2/F.kop') >= 0,
+    JSON.stringify(S.tabs));
+  check('buffer & kbc ikut di-rename', S.buffers.has(SRC + '/Sub2/F.kop'));
+
+  /* copy → paste */
+  api.setClip(SRC + '/D.kop', 'copy', false);
+  check('clipboard copy', S.clip && S.clip.mode === 'copy');
+  await api.pasteInto(SRC + '/Sub2');
+  check('hasil copy ada di folder tujuan', disk[SRC + '/Sub2/D.kop'] === '');
+  check('copy tidak memindahkan asal', disk[SRC + '/D.kop'] === '');
+  check('clipboard copy tetap ada', S.clip && S.clip.mode === 'copy');
+
+  /* cut → paste: tab & path ikut pindah (dari subfolder ke src) */
+  const before = S.openPath;
+  api.setClip(before, 'cut', false);
+  await api.pasteInto(SRC);
+  const moved = SRC + '/F.kop';
+  check('cut memindahkan berkas', disk[moved] === '' && disk[before] == null,
+    JSON.stringify({ before, moved, keys: Object.keys(disk) }));
+  check('tab mengikuti hasil cut', S.openPath === moved && S.tabs.indexOf(moved) >= 0,
+    String(S.openPath));
+  check('clipboard cut dikosongkan', S.clip === null);
+
+  /* detail berkas */
+  api.showDetails(SRC + '/D.kop');
+  const detail = $('sdetail').textContent;
+  check('detail menampilkan nama/tipe/izin',
+    detail.indexOf('D.kop') >= 0 && detail.indexOf('Berkas') >= 0 && detail.indexOf('Izin') >= 0,
+    detail.slice(0, 120));
+  check('detail tidak tersembunyi', !$('sdetail').classList.contains('hidden'));
+
+  /* detail folder */
+  api.showDetails(SRC + '/Sub2');
+  check('detail folder', $('sdetail').textContent.indexOf('Folder') >= 0);
+
+  /* hapus folder → tab di dalamnya ikut ditutup */
+  openFile(SRC + '/A.kop');
+  const openInside = SRC + '/Sub2/D.kop';
+  openFile(openInside);
+  check('dua tab sebelum hapus folder', S.tabs.length >= 2, JSON.stringify(S.tabs));
+  const del = api.deleteItem({ n: 'Sub2', d: 1, p: SRC + '/Sub2' });
+  $('mok').onclick();
+  await del;
+  check('folder terhapus dari disk', !dirs.has(SRC + '/Sub2') && disk[openInside] == null);
+  check('tab di dalam folder tertutup',
+    S.tabs.indexOf(openInside) < 0 && S.openPath !== openInside, JSON.stringify(S.tabs));
+  check('masih ada tab lain', !!S.openPath && S.openPath !== openInside && S.tabs.length >= 2,
+    String(S.openPath) + ' ' + JSON.stringify(S.tabs));
+
+  /* nama tidak valid ditolak */
+  p = api.newFile(SRC);
+  modalOk('../jahat.kop');
+  await p;
+  check('nama dengan / ditolak', !disk[PROJ + '/jahat.kop'] && disk[SRC + '/../jahat.kop'] == null);
+
+  console.log('--- selesai ---');
+}
+
+fileOps().catch((e) => { console.log('FAIL fileOps: ' + e.stack); process.exitCode = 1; });

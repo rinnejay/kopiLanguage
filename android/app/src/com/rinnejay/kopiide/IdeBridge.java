@@ -49,7 +49,7 @@ import java.util.zip.ZipInputStream;
  */
 public class IdeBridge {
 
-    private static final String VERSION = "1.0.4";
+    private static final String VERSION = "1.0.5";
     private static final String DEFAULT_PROJECTS = "/storage/emulated/0/KopiProject";
 
     private final Activity act;
@@ -373,6 +373,49 @@ public class IdeBridge {
                 e2e.put("runLog", String.valueOf(e.getMessage()));
             }
             o.put("e2e", e2e);
+
+            /* uji operasi berkas: buat, salin, nama bentrok, pindah, detail, hapus */
+            JSONObject fs = new JSONObject();
+            try {
+                File base = new File(tmpDir, "fstest");
+                rmrf(base);
+                base.mkdirs();
+                File dir = new File(base, "dir");
+                dir.mkdirs();
+                File a = new File(base, "a.txt");
+                FileOutputStream fo2 = new FileOutputStream(a);
+                fo2.write("kopi".getBytes(StandardCharsets.UTF_8));
+                fo2.close();
+
+                JSONObject c1 = new JSONObject(copyTo(a.getAbsolutePath(), dir.getAbsolutePath()));
+                File copied = new File(c1.getString("path"));
+                boolean ok = copied.isFile() && copied.length() == 4;
+
+                JSONObject c2 = new JSONObject(copyTo(a.getAbsolutePath(), dir.getAbsolutePath()));
+                File dup = new File(c2.getString("path"));
+                ok = ok && dup.isFile() && dup.getName().startsWith("a-");
+                fs.put("unique", dup.getName());
+
+                JSONObject mv = new JSONObject(moveTo(dup.getAbsolutePath(), base.getAbsolutePath()));
+                File moved = new File(mv.getString("path"));
+                ok = ok && moved.isFile() && !dup.exists() && moved.length() == 4;
+                fs.put("move", moved.isFile() && !dup.exists());
+
+                JSONObject st = new JSONObject(stat(moved.getAbsolutePath()));
+                ok = ok && st.getLong("s") == 4 && st.getInt("d") == 0;
+                fs.put("stat", st.getLong("s") == 4);
+
+                boolean del = rmrf(dir) && !dir.exists();
+                fs.put("delete", del);
+                ok = ok && del;
+
+                rmrf(base);
+                fs.put("ok", ok && !base.exists());
+            } catch (Exception e) {
+                fs.put("ok", false);
+                fs.put("msg", String.valueOf(e.getMessage()));
+            }
+            o.put("fs", fs);
             return o.toString();
         } catch (Exception e) {
             return err("self-test gagal: " + e.getMessage());
@@ -523,6 +566,144 @@ public class IdeBridge {
             File a = resolve(from), b = resolve(to);
             b.getParentFile().mkdirs();
             return a.renameTo(b) ? ok("diubah nama") : err("gagal mengubah nama");
+        } catch (Exception e) {
+            return err(e.getMessage());
+        }
+    }
+
+    /** Detail satu berkas/folder (ukuran, waktu ubah, izin, jumlah anak). */
+    @JavascriptInterface
+    public String stat(String path) {
+        try {
+            File f = resolve(path);
+            if (!f.exists()) return err("tidak ada: " + path);
+            JSONObject o = new JSONObject();
+            o.put("n", f.getName());
+            o.put("p", f.getAbsolutePath());
+            o.put("d", f.isDirectory() ? 1 : 0);
+            o.put("s", f.isDirectory() ? dirSize(f) : f.length());
+            o.put("mtime", f.lastModified());
+            o.put("r", f.canRead());
+            o.put("w", f.canWrite());
+            o.put("x", f.canExecute());
+            if (f.isDirectory()) {
+                File kids[] = f.listFiles();
+                o.put("count", kids == null ? 0 : kids.length);
+            }
+            return o.toString();
+        } catch (Exception e) {
+            return err(e.getMessage());
+        }
+    }
+
+    private long dirSize(File f) {
+        long n = 0;
+        File kids[] = f.listFiles();
+        if (kids == null) return 0;
+        for (File k : kids) {
+            if (k.isDirectory()) n += dirSize(k);
+            else n += k.length();
+        }
+        return n;
+    }
+
+    /** Buat berkas kosong; gagal bila sudah ada. */
+    @JavascriptInterface
+    public String createFile(String path) {
+        try {
+            File f = resolve(path);
+            if (f.exists()) return err("sudah ada: " + f.getName());
+            File p = f.getParentFile();
+            if (p != null) p.mkdirs();
+            return f.createNewFile() ? ok("dibuat") : err("gagal membuat berkas");
+        } catch (Exception e) {
+            return err(e.getMessage());
+        }
+    }
+
+    /** Nama unik di folder tujuan: nama, nama-2, nama-3, ... */
+    private File uniqueDest(File dir, String name) {
+        File f = new File(dir, name);
+        if (!f.exists()) return f;
+        String base = name, ext = "";
+        int dot = name.lastIndexOf('.');
+        if (dot > 0) { base = name.substring(0, dot); ext = name.substring(dot); }
+        for (int i = 2; i < 10000; i++) {
+            f = new File(dir, base + "-" + i + ext);
+            if (!f.exists()) return f;
+        }
+        return new File(dir, base + "-" + System.currentTimeMillis() + ext);
+    }
+
+    private boolean copyRec(File src, File dst) throws IOException {
+        if (src.isDirectory()) {
+            if (!dst.mkdirs() && !dst.isDirectory()) return false;
+            File kids[] = src.listFiles();
+            if (kids != null) {
+                for (File k : kids) {
+                    if (!copyRec(k, new File(dst, k.getName()))) return false;
+                }
+            }
+            return true;
+        }
+        File p = dst.getParentFile();
+        if (p != null) p.mkdirs();
+        InputStream in = new FileInputStream(src);
+        OutputStream out = new FileOutputStream(dst);
+        copyStream(in, out);
+        return true;
+    }
+
+    private boolean inside(File child, File parent) {
+        try {
+            String c = child.getCanonicalPath();
+            String p = parent.getCanonicalPath();
+            return c.equals(p) || c.startsWith(p + File.separator);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Salin berkas/folder ke dalam folder tujuan. */
+    @JavascriptInterface
+    public String copyTo(String from, String toDir) {
+        try {
+            File src = resolve(from);
+            File dir = resolve(toDir);
+            if (!src.exists()) return err("tidak ada: " + from);
+            if (!dir.isDirectory()) return err("tujuan bukan folder: " + toDir);
+            if (src.isDirectory() && inside(dir, src)) return err("tidak bisa menyalin folder ke dalam dirinya");
+            File dst = uniqueDest(dir, src.getName());
+            if (!copyRec(src, dst)) return err("gagal menyalin");
+            JSONObject o = new JSONObject();
+            o.put("ok", true);
+            o.put("msg", "disalin");
+            o.put("path", dst.getAbsolutePath());
+            return o.toString();
+        } catch (Exception e) {
+            return err(e.getMessage());
+        }
+    }
+
+    /** Pindahkan berkas/folder ke dalam folder tujuan (rename atau salin+hapus). */
+    @JavascriptInterface
+    public String moveTo(String from, String toDir) {
+        try {
+            File src = resolve(from);
+            File dir = resolve(toDir);
+            if (!src.exists()) return err("tidak ada: " + from);
+            if (!dir.isDirectory()) return err("tujuan bukan folder: " + toDir);
+            if (inside(dir, src)) return err("tidak bisa memindahkan folder ke dalam dirinya");
+            File dst = uniqueDest(dir, src.getName());
+            if (!src.renameTo(dst)) {
+                if (!copyRec(src, dst)) return err("gagal memindahkan");
+                rmrf(src);
+            }
+            JSONObject o = new JSONObject();
+            o.put("ok", true);
+            o.put("msg", "dipindah");
+            o.put("path", dst.getAbsolutePath());
+            return o.toString();
         } catch (Exception e) {
             return err(e.getMessage());
         }

@@ -82,9 +82,11 @@ terhadap vektor RFC/oracle Python.
 APK standalone VM-only: editor + tab berkas + autocomplete + build/run,
 tanpa Termux.
 
-**Unduh:** [Kopi IDE 1.0.4](https://github.com/rinnejay/kopiLanguage/releases/latest)
+**Unduh:** [Kopi IDE 1.0.5](https://github.com/rinnejay/kopiLanguage/releases/latest)
 
 - Tab multi-file, penanda belum tersimpan, auto-save, restore tab.
+- Kelola berkas: buat/rename/hapus berkas & folder, salin/cut/tempel,
+  dan detail ukuran/izin/waktu ubah.
 - Autocomplete `System.out.`, `Str.`, `Net.`, `String`, snippet.
 - Build `kopicc -t vm` → run `kopivm`, output streaming.
 - 42 modul bahasa ikut dibundel; arm64-v8a, Android 7+.

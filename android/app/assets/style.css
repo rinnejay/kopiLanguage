@@ -241,3 +241,52 @@ body{
 }
 .ftab .tx:active{background:#ffffff18;color:var(--fg)}
 .tree .row.active{background:#ffffff0e;color:var(--accent)}
+
+/* ── menu aksi berkas (bottom sheet) ── */
+#sheet{
+  position:fixed;inset:0;z-index:80;background:#000a;
+  display:flex;align-items:flex-end;
+}
+.scard{
+  width:100%;max-height:76vh;overflow:auto;background:var(--bg2);
+  border-top:1px solid var(--line);border-radius:16px 16px 0 0;
+  padding:12px 12px calc(12px + env(safe-area-inset-bottom));
+  box-shadow:0 -14px 40px #000b;
+}
+#stitle{
+  font:600 13px var(--mono);color:var(--dim);padding:4px 8px 9px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#scancel{
+  width:100%;margin-top:8px;background:var(--bg3);border:1px solid var(--line);
+  color:var(--fg);padding:11px;border-radius:10px;font-size:13.5px;font-weight:600;
+}
+#scancel:active{background:#3a3f4b}
+#slist{display:flex;flex-direction:column;gap:2px}
+.sitem{
+  display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+  background:transparent;border:0;color:var(--fg);
+  padding:11px 9px;border-radius:9px;font-size:14px;
+}
+.sitem:active{background:#ffffff14}
+.sitem.off{opacity:.38}
+.sitem.danger{color:#e88b8b}
+.sitem .si{width:22px;flex:none;text-align:center;font-size:16px}
+.sitem .sl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sdetail{
+  margin:0 8px 8px;padding:10px;background:var(--bg);border:1px solid var(--line);
+  border-radius:9px;font:11.5px/1.55 var(--mono);color:var(--dim);
+  white-space:pre-wrap;word-break:break-all;max-height:32vh;overflow:auto;
+}
+
+/* baris pohon: tombol menu + status pilih/cut */
+.tree .row{position:relative}
+.tree .row.sel{background:#ffffff18}
+.tree .row.cut .nm{opacity:.45;text-decoration:line-through}
+.rowmenu{
+  margin-left:auto;flex:none;background:transparent;border:0;color:var(--dim);
+  font-size:16px;line-height:1;padding:2px 4px 4px 8px;border-radius:5px;
+}
+.rowmenu:active{background:#ffffff1c;color:var(--fg)}
+.tree .row .nm{flex:1;min-width:0}
+.tree{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}

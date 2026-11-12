@@ -12,7 +12,7 @@ SDK="$APP/sdk"
 BUILD="$APP/build"
 DIST="$APP/dist"
 JAR="$SDK/android.jar"
-VER="1.0.4"
+VER="1.0.5"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "butuh $1 di PATH" >&2; exit 1; }; }
 need aapt; need javac; need dx; need zipalign; need apksigner; need keytool

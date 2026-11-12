@@ -96,8 +96,21 @@ bisa dieksekusi di perangkat.
 
 ## Fitur IDE
 
-- **Sidebar file** (geser dari kiri): pohon folder, buka/rename/hapus
-  (tekan lama), tombol proyek baru, status biner.
+- **Sidebar file** (geser dari kiri): pohon folder, tombol proyek baru,
+  status biner. Setiap baris punya tombol **⋯** (atau tekan lama) untuk
+  menu: berkas/folder baru, ganti nama, salin, pindah (cut), tempel,
+  detail, dan hapus.
+- **Kelola berkas**:
+  - **Berkas baru** / **Folder baru** lewat tombol header atau menu ⋯;
+    target mengikuti folder yang dipilih (berkas → foldernya).
+  - **Ganti nama** berkas maupun folder; tab yang terbuka di dalam
+    folder ikut diperbarui.
+  - **Salin / pindah (cut) / tempel**: clipboard berkas di dalam IDE,
+    menempel ke folder tujuan; nama bentrok otomatis menjadi `nama-2`.
+  - **Detail**: ukuran (total untuk folder), jumlah item, waktu ubah,
+    izin `rwx`, dan jalur lengkap.
+  - **Hapus**: berkas/folder beserta isinya; tab di dalamnya ditutup
+    tanpa menyimpan. Folder akar proyek dilindungi.
 - **Tab berkas** (ala VS Code): beberapa berkas terbuka sekaligus,
   ketuk tab untuk pindah, `×` untuk menutup. Buffer tiap tab
   (teks, posisi kursor, scroll, status belum tersimpan) disimpan di
