@@ -77,7 +77,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Cipher`](api-crypto.md#cipher) | `lib/crypto/Cipher.kop` | 11 | Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibilitas. |
 | [`Crypto`](api-crypto.md#crypto) | `lib/crypto/Crypto.kop` | 18 | Kumpulan utilitas bit/hash/cipher lama yang dipakai modul kripto lain (kompatibilitas v1). |
 | [`Der`](api-crypto.md#der) | `lib/crypto/Der.kop` | 4 | Parser ASN.1 DER minimal untuk mengekstrak SubjectPublicKeyInfo (pin TLS). |
-| [`Hash`](api-crypto.md#hash) | `lib/crypto/Hash.kop` | 8 | SHA-256, SHA-1, dan HMAC-SHA256 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS. |
+| [`Hash`](api-crypto.md#hash) | `lib/crypto/Hash.kop` | 11 | SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS. |
 | [`Kdf`](api-crypto.md#kdf) | `lib/crypto/Kdf.kop` | 8 | HKDF-SHA256 (RFC 5869) dan ExpandLabel TLS 1.3 (RFC 8446 §7.1). |
 | [`Pbkdf2`](api-crypto.md#pbkdf2) | `lib/crypto/Pbkdf2.kop` | 1 | PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi. |
 | [`Poly`](api-crypto.md#poly) | `lib/crypto/Poly.kop` | 10 | Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit. |

@@ -195,22 +195,24 @@ import Der;
 
 ## Hash
 
-`lib/crypto/Hash.kop` · 8 fungsi
+`lib/crypto/Hash.kop` · 11 fungsi
 
-SHA-256, SHA-1, dan HMAC-SHA256 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.
+SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.
 
 ```java
 import Hash;
 import Cipher;
 
 System.out.println(Cipher.hexenc(Hash.sha256(Net.bytes("abc"))));
+System.out.println(Cipher.hexenc(Hash.sha512(Net.bytes("abc"))));
 System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));
 ```
 
 **Catatan**
 
-- SHA-256/SHA-1 bekerja one-shot; pesan besar memakai memori O(panjang).
-- `hmac(key,msg)` mengembalikan 32 byte.
+- Semua varian bekerja one-shot; pesan besar memakai memori O(panjang).
+- `hmac(key,msg)` mengembalikan 32 byte; `hmacSha512` 64 byte.
+- SHA-512/384 memakai 80 ronde, blok 128 byte.
 
 | Fungsi | Keterangan |
 |---|---|
@@ -218,6 +220,9 @@ System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));
 | `static int rotr(int x, int n)` | rotasi kanan 32-bit; count 0 aman |
 | `static int[] sha256(int[] msg)` | satu-shot: pesan byte-as-int (0..255) → digest 32 byte-as-int |
 | `static int[] hmac(int[] key, int[] msg)` | HMAC-SHA256 (RFC 2104); key > 64 byte di-hash dulu |
+| `static int[] sha512(int[] msg)` | SHA-512 (FIPS 180-4): pesan byte-as-int → digest 64 byte |
+| `static int[] sha384(int[] msg)` | SHA-384 (FIPS 180-4): pesan byte-as-int → digest 48 byte |
+| `static int[] hmacSha512(int[] key, int[] msg)` | HMAC-SHA512 (RFC 2104); kunci > 128 byte di-hash dulu |
 | `static int[] toHex(int[] dig)` | digest → teks hex lowercase |
 | `static int eq(int[] a, int[] b)` | perbandingan konstan dua digest |
 | `static int rotl(int x, int n)` | (internal) rotasi kiri n bit |

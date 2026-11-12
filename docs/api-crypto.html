@@ -390,17 +390,19 @@ int h = Crypto.hashInt(123);   // hash integer deterministik</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="hash">Hash<a class="anchor" href="#hash" aria-label="tautan">#</a></h2>
-<p><code>lib/crypto/Hash.kop</code> · 8 fungsi</p>
-<p>SHA-256, SHA-1, dan HMAC-SHA256 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.</p>
+<p><code>lib/crypto/Hash.kop</code> · 11 fungsi</p>
+<p>SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.</p>
 <pre><code class="language-java">import Hash;
 import Cipher;
 
 System.out.println(Cipher.hexenc(Hash.sha256(Net.bytes("abc"))));
+System.out.println(Cipher.hexenc(Hash.sha512(Net.bytes("abc"))));
 System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
-<li>SHA-256/SHA-1 bekerja one-shot; pesan besar memakai memori O(panjang).</li>
-<li><code>hmac(key,msg)</code> mengembalikan 32 byte.</li>
+<li>Semua varian bekerja one-shot; pesan besar memakai memori O(panjang).</li>
+<li><code>hmac(key,msg)</code> mengembalikan 32 byte; <code>hmacSha512</code> 64 byte.</li>
+<li>SHA-512/384 memakai 80 ronde, blok 128 byte.</li>
 </ul>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -422,6 +424,18 @@ System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));</code></pre>
 <tr>
 <td><code>static int[] hmac(int[] key, int[] msg)</code></td>
 <td>HMAC-SHA256 (RFC 2104); key &gt; 64 byte di-hash dulu</td>
+</tr>
+<tr>
+<td><code>static int[] sha512(int[] msg)</code></td>
+<td>SHA-512 (FIPS 180-4): pesan byte-as-int → digest 64 byte</td>
+</tr>
+<tr>
+<td><code>static int[] sha384(int[] msg)</code></td>
+<td>SHA-384 (FIPS 180-4): pesan byte-as-int → digest 48 byte</td>
+</tr>
+<tr>
+<td><code>static int[] hmacSha512(int[] key, int[] msg)</code></td>
+<td>HMAC-SHA512 (RFC 2104); kunci &gt; 128 byte di-hash dulu</td>
 </tr>
 <tr>
 <td><code>static int[] toHex(int[] dig)</code></td>

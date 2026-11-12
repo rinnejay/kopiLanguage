@@ -251,7 +251,7 @@ server dan belum verifikasi ECDSA CertificateVerify.
 
 | Modul | Isi |
 |---|---|
-| `Hash` | `sha256 hmac sha1 eq toHex` |
+| `Hash` | `sha256 sha512 sha384 hmac hmacSha512 sha1 eq toHex` |
 | `Pbkdf2` | `sha256(pass,salt,iter,dkLen)` |
 | `Cipher` | `b64enc b64dec hexenc hexdec rc4 vigenere` |
 | `Kdf` | HKDF + ExpandLabel TLS |

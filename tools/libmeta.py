@@ -180,10 +180,11 @@ META = {
     },
 
     "Hash": {
-        "purpose": "SHA-256, SHA-1, dan HMAC-SHA256 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.",
-        "example": 'import Hash;\nimport Cipher;\n\nSystem.out.println(Cipher.hexenc(Hash.sha256(Net.bytes("abc"))));\nSystem.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));',
-        "notes": ["SHA-256/SHA-1 bekerja one-shot; pesan besar memakai memori O(panjang).",
-                  "`hmac(key,msg)` mengembalikan 32 byte."],
+        "purpose": "SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.",
+        "example": 'import Hash;\nimport Cipher;\n\nSystem.out.println(Cipher.hexenc(Hash.sha256(Net.bytes("abc"))));\nSystem.out.println(Cipher.hexenc(Hash.sha512(Net.bytes("abc"))));\nSystem.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));',
+        "notes": ["Semua varian bekerja one-shot; pesan besar memakai memori O(panjang).",
+                  "`hmac(key,msg)` mengembalikan 32 byte; `hmacSha512` 64 byte.",
+                  "SHA-512/384 memakai 80 ronde, blok 128 byte."],
     },
     "Pbkdf2": {
         "purpose": "PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi.",
@@ -625,6 +626,9 @@ EXTRA = {
     }},
     "Der": {"descs": {"sliceOf": "(internal) potong array"}},
     "Hash": {"descs": {
+        "sha512": "SHA-512 (FIPS 180-4): pesan byte-as-int → digest 64 byte",
+        "sha384": "SHA-384 (FIPS 180-4): pesan byte-as-int → digest 48 byte",
+        "hmacSha512": "HMAC-SHA512 (RFC 2104); kunci > 128 byte di-hash dulu",
         "toHex": "digest → teks hex lowercase",
         "eq": "perbandingan konstan dua digest",
         "rotl": "(internal) rotasi kiri n bit",

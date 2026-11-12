@@ -190,6 +190,216 @@ class Hash {
         return sha256(omsg);
     }
 
+    /* ── SHA-512 (FIPS 180-4) ─────────────────────────────────── */
+
+    private static long rotr64(long x, int n) {
+        if (n == 0) return x;
+        return (x >>> n) | (x << (64 - n));
+    }
+
+    private static long bigSigma0(long x) { return rotr64(x, 28) ^ rotr64(x, 34) ^ rotr64(x, 39); }
+    private static long bigSigma1(long x) { return rotr64(x, 14) ^ rotr64(x, 18) ^ rotr64(x, 41); }
+    private static long smallSigma0(long x) { return rotr64(x, 1) ^ rotr64(x, 8) ^ (x >>> 7); }
+    private static long smallSigma1(long x) { return rotr64(x, 19) ^ rotr64(x, 61) ^ (x >>> 6); }
+    private static long ch64(long x, long y, long z) { return (x & y) ^ (~x & z); }
+    private static long maj64(long x, long y, long z) { return (x & y) ^ (x & z) ^ (y & z); }
+
+    private static int[] shaCore(long[] init, long[] k, int[] msg, int outLen) {
+        int L = msg.length;
+        int total = L + 9;
+        int nblk = (total + 127) / 128;
+        int nsz = nblk * 128;
+        int[] m = new int[nsz];
+        int i = 0;
+        while (i < L) { m[i] = msg[i]; i++; }
+        m[L] = 128;
+        long bitlen = L * 8L;
+        for (int j = 0; j < 8; j++) {
+            int shift = 56 - j * 8;
+            long part = (bitlen >>> shift) & 255L;
+            m[nsz - 8 + j] = (int)part;
+        }
+        long[] h = new long[8];
+        for (i = 0; i < 8; i++) h[i] = init[i];
+        long[] w = new long[80];
+        for (int blk = 0; blk < nblk; blk++) {
+            int base = blk * 128;
+            for (i = 0; i < 16; i++) {
+                int t = base + i * 8;
+                long wv = 0;
+                for (int j = 0; j < 8; j++) wv = (wv << 8) | (long)(m[t + j] & 255);
+                w[i] = wv;
+            }
+            for (i = 16; i < 80; i++) {
+                long s0 = smallSigma0(w[i - 15]);
+                long s1 = smallSigma1(w[i - 2]);
+                w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+            }
+            long a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+            for (i = 0; i < 80; i++) {
+                long t1 = hh + bigSigma1(e) + ch64(e, f, g) + k[i] + w[i];
+                long t2 = bigSigma0(a) + maj64(a, b, c);
+                hh = g; g = f; f = e;
+                e = d + t1;
+                d = c; c = b; b = a;
+                a = t1 + t2;
+            }
+            h[0] = h[0] + a;
+            h[1] = h[1] + b;
+            h[2] = h[2] + c;
+            h[3] = h[3] + d;
+            h[4] = h[4] + e;
+            h[5] = h[5] + f;
+            h[6] = h[6] + g;
+            h[7] = h[7] + hh;
+        }
+        int[] out = new int[outLen];
+        for (i = 0; i < 8; i++) {
+            long v = h[i];
+            for (int j = 0; j < 8; j++) {
+                int idx = i * 8 + j;
+                if (idx < outLen) {
+                    int shift = 56 - j * 8;
+                    out[idx] = (int)((v >>> shift) & 255L);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static long[] K80() {
+        long[] k = new long[80];
+        k[0] = 4794697086780616226L;
+        k[1] = 8158064640168781261L;
+        k[2] = -5349999486874862801L;
+        k[3] = -1606136188198331460L;
+        k[4] = 4131703408338449720L;
+        k[5] = 6480981068601479193L;
+        k[6] = -7908458776815382629L;
+        k[7] = -6116909921290321640L;
+        k[8] = -2880145864133508542L;
+        k[9] = 1334009975649890238L;
+        k[10] = 2608012711638119052L;
+        k[11] = 6128411473006802146L;
+        k[12] = 8268148722764581231L;
+        k[13] = -9160688886553864527L;
+        k[14] = -7215885187991268811L;
+        k[15] = -4495734319001033068L;
+        k[16] = -1973867731355612462L;
+        k[17] = -1171420211273849373L;
+        k[18] = 1135362057144423861L;
+        k[19] = 2597628984639134821L;
+        k[20] = 3308224258029322869L;
+        k[21] = 5365058923640841347L;
+        k[22] = 6679025012923562964L;
+        k[23] = 8573033837759648693L;
+        k[24] = -7476448914759557205L;
+        k[25] = -6327057829258317296L;
+        k[26] = -5763719355590565569L;
+        k[27] = -4658551843659510044L;
+        k[28] = -4116276920077217854L;
+        k[29] = -3051310485924567259L;
+        k[30] = 489312712824947311L;
+        k[31] = 1452737877330783856L;
+        k[32] = 2861767655752347644L;
+        k[33] = 3322285676063803686L;
+        k[34] = 5560940570517711597L;
+        k[35] = 5996557281743188959L;
+        k[36] = 7280758554555802590L;
+        k[37] = 8532644243296465576L;
+        k[38] = -9096487096722542874L;
+        k[39] = -7894198246740708037L;
+        k[40] = -6719396339535248540L;
+        k[41] = -6333637450476146687L;
+        k[42] = -4446306890439682159L;
+        k[43] = -4076793802049405392L;
+        k[44] = -3345356375505022440L;
+        k[45] = -2983346525034927856L;
+        k[46] = -860691631967231958L;
+        k[47] = 1182934255886127544L;
+        k[48] = 1847814050463011016L;
+        k[49] = 2177327727835720531L;
+        k[50] = 2830643537854262169L;
+        k[51] = 3796741975233480872L;
+        k[52] = 4115178125766777443L;
+        k[53] = 5681478168544905931L;
+        k[54] = 6601373596472566643L;
+        k[55] = 7507060721942968483L;
+        k[56] = 8399075790359081724L;
+        k[57] = 8693463985226723168L;
+        k[58] = -8878714635349349518L;
+        k[59] = -8302665154208450068L;
+        k[60] = -8016688836872298968L;
+        k[61] = -6606660893046293015L;
+        k[62] = -4685533653050689259L;
+        k[63] = -4147400797238176981L;
+        k[64] = -3880063495543823972L;
+        k[65] = -3348786107499101689L;
+        k[66] = -1523767162380948706L;
+        k[67] = -757361751448694408L;
+        k[68] = 500013540394364858L;
+        k[69] = 748580250866718886L;
+        k[70] = 1242879168328830382L;
+        k[71] = 1977374033974150939L;
+        k[72] = 2944078676154940804L;
+        k[73] = 3659926193048069267L;
+        k[74] = 4368137639120453308L;
+        k[75] = 4836135668995329356L;
+        k[76] = 5532061633213252278L;
+        k[77] = 6448918945643986474L;
+        k[78] = 6902733635092675308L;
+        k[79] = 7801388544844847127L;
+        return k;
+    }
+
+    static int[] sha512(int[] msg) {
+        long[] init = new long[8];
+        init[0] = 7640891576956012808L;
+        init[1] = -4942790177534073029L;
+        init[2] = 4354685564936845355L;
+        init[3] = -6534734903238641935L;
+        init[4] = 5840696475078001361L;
+        init[5] = -7276294671716946913L;
+        init[6] = 2270897969802886507L;
+        init[7] = 6620516959819538809L;
+        return shaCore(init, K80(), msg, 64);
+    }
+
+    static int[] sha384(int[] msg) {
+        long[] init = new long[8];
+        init[0] = -3766243637369397544L;
+        init[1] = 7105036623409894663L;
+        init[2] = -7973340178411365097L;
+        init[3] = 1526699215303891257L;
+        init[4] = 7436329637833083697L;
+        init[5] = -8163818279084223215L;
+        init[6] = -2662702644619276377L;
+        init[7] = 5167115440072839076L;
+        return shaCore(init, K80(), msg, 48);
+    }
+
+    static int[] hmacSha512(int[] key, int[] msg) {
+        int[] k = key;
+        int block = 128;
+        if (k.length > block) k = sha512(k);
+        int[] ki = new int[block];
+        int[] ko = new int[block];
+        for (int i = 0; i < block; i++) {
+            int v = 0;
+            if (i < k.length) v = k[i];
+            ki[i] = v ^ 54;
+            ko[i] = v ^ 92;
+        }
+        int[] imsg = new int[block + msg.length];
+        for (int i = 0; i < block; i++) imsg[i] = ki[i];
+        for (int i = 0; i < msg.length; i++) imsg[block + i] = msg[i];
+        int[] ih = sha512(imsg);
+        int[] omsg = new int[block + 64];
+        for (int i = 0; i < block; i++) omsg[i] = ko[i];
+        for (int i = 0; i < 64; i++) omsg[block + i] = ih[i];
+        return sha512(omsg);
+    }
+
     static int[] toHex(int[] dig) {
         int[] out = new int[dig.length * 2];
         int o = 0;

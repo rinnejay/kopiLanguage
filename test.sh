@@ -41,9 +41,9 @@ check demo examples/demo.kop
 printf '34\n119\n85\n-103\n48\n6\n-4\n15\n15\n3\n1024\n11\n10\n186\n48\n60\n195\n780\n48\n15\n1\n1\n42\n7\n5\n' > "$T/kopi/bitops.ref"
 check bitops test/bitops.kop
 
-# ─── hash: SHA-256 + HMAC (vektor FIPS 180-4 / RFC 4231 via vektor python) ─
+# ─── hash: SHA-256/384/512 + HMAC-SHA256/512 (vektor FIPS 180-4 / RFC 4231) ─
 python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
-printf '1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"
+printf '1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"
 check hashvec "$T/kopi/hashvec.kop"
 
 # ─── Big: smoke + field penuh (ground truth python; gen_febig.py) ────────
