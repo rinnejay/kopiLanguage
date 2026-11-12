@@ -223,6 +223,19 @@ static Node *parse_switch(int line) {
     return wrap;
 }
 
+/* ── malloc { ... } (v1.20): region memori otomatis ────────────────
+ * Compiler menyisipkan penanda arena di masuk blok dan membebaskan
+ * semua alokasi blok di SEMUA jalur keluar: akhir blok, break/continue
+ * yang keluar dari blok (lihat gen_*), dan return (lihat gen_*). */
+static Node *parse_malloc(int line) {
+    Node *n = newnode(ST_REGION, line);
+    advance();                       /* kata 'malloc' */
+    if (!at('{'))
+        die("baris %d: 'malloc' harus diikuti '{'", peek()->line);
+    n->d = block();
+    return n;
+}
+
 static Node *parse_assignment(int line, int eat_semi) {
     Node *n = newnode(ST_ASSIGN, line);
     n->str = xs(peek()->text);
@@ -433,6 +446,7 @@ static Node *stmt_single(void) {
     case KW_BREAK: { advance(); expect(';', "';'"); Node *n = newnode(ST_BRK, line); return n; }
     case KW_CONTINUE: { advance(); expect(';', "';'"); Node *n = newnode(ST_CONT, line); return n; }
     case KW_SWITCH: return parse_switch(line);   /* v1.19 */
+    case KW_MALLOC: return parse_malloc(line);   /* v1.20 */
     case '{': {
         Node *n = newnode(ST_BLOCK, line);
         n->d = block();
@@ -1499,6 +1513,14 @@ static int nextslot;
 static int framebase;      /* batas frame metode aktif; scope di bawah ini
                               milik metode luar → ambil jadi capture */
 
+/* v1.20: malloc{...} — batas scope & slot saat masuk region, untuk
+ * menolak rujukan (String/array/objek) yang bocor keluar blok. */
+static int reg_base[32], reg_slot[32], reg_sp;
+
+static int is_ref_ty(Ty t) {
+    return t == T_STR || t == T_FN || ty_is_arr(t);
+}
+
 static void scope_push(const char *name, int slot, Ty ty, const char *cls) {
     for (int i = framebase; i < nscope; i++)
         if (!strcmp(scope[i].name, name))
@@ -2396,6 +2418,11 @@ static void resolve_stmt(Node *s) {
         /* v1.18: konversi representasi String ↔ buffer otomatis */
         if (v->ty == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
         else if (v->ty == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
+        /* v1.20: rujukan tidak boleh lari ke variabel di luar malloc{} */
+        if (reg_sp && is_ref_ty((Ty)v->ty) && is_ref_ty(et) &&
+            (int)(v - scope) < reg_base[reg_sp - 1])
+            die("baris %d: nilai rujukan tidak boleh disimpan ke '%s' yang hidup di luar malloc{} (arena blok dibebaskan di akhirnya)",
+                s->line, s->str);
         if (!ty_can_implicit(v->ty, et) &&
             !(compound && ty_is_int(v->ty) && ty_is_int(et)) &&
             !fits_literal(v->ty, s->a))
@@ -2455,6 +2482,10 @@ static void resolve_stmt(Node *s) {
             /* v1.18: konversi representasi String ↔ buffer otomatis */
             if (cur_method->ret == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
             else if (cur_method->ret == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
+            /* v1.20: nilai rujukan akan dibebaskan bila keluar lewat malloc{} */
+            if (reg_sp && is_ref_ty(et))
+                die("baris %d: return bertipe rujukan dari dalam malloc{} belum didukung — hitung di dalam blok lalu return setelah blok (arena blok dibebaskan)",
+                    s->line);
             if (!ty_can_implicit(cur_method->ret, et) &&
                 !fits_literal(cur_method->ret, s->a))
                 die("baris %d: return tidak cocok dengan tipe metode (butuh cast)", s->line);
@@ -2504,6 +2535,11 @@ static void resolve_stmt(Node *s) {
         if (!ok)
             die("baris %d: penugasan '%s' tidak cocok tipe (butuh cast)",
                 s->line, s->str);
+        /* v1.20: rujukan tidak boleh disimpan ke field objek luar malloc{} */
+        if (reg_sp && is_ref_ty(et) && s->a->kind == EX_VAR &&
+            s->a->ival < reg_slot[reg_sp - 1])
+            die("baris %d: nilai rujukan tidak boleh disimpan ke field '%s' objek di luar malloc{} (arena blok dibebaskan di akhirnya)",
+                s->line, s->str);
         Node *idx = newnode(EX_INT, s->line);
         idx->ival = f->idx;
         idx->dty = (int)T_INT;
@@ -2526,6 +2562,27 @@ static void resolve_stmt(Node *s) {
         if (at != T_STRARR && !ty_is_int(et))
             die("baris %d: elemen %s harus integer (perlu cast eksplisit)",
                 s->line, at == T_LNGARR ? "long[]" : "int[]");
+        /* v1.20: rujukan tidak boleh disimpan ke array milik luar malloc{} */
+        if (reg_sp && is_ref_ty(et) && s->a->kind == EX_VAR &&
+            s->a->ival < reg_slot[reg_sp - 1])
+            die("baris %d: nilai rujukan tidak boleh disimpan ke elemen array '%s' yang hidup di luar malloc{} (arena blok dibebaskan di akhirnya)",
+                s->line, s->a->str);
+        break;
+    }
+    case ST_REGION: {
+        /* v1.20: malloc { ... } — scope sendiri + penanda arena otomatis */
+        if (reg_sp >= 32)
+            die("baris %d: terlalu banyak malloc{} bersarang (maks 32)", s->line);
+        int mks = nscope, mksl = nextslot;
+        if (nextslot >= 1020) die("terlalu banyak variabel lokal");
+        s->ival = nextslot++;      /* slot penanda arena (disembunyikan) */
+        s->dty = (int)T_INT;
+        reg_base[reg_sp] = mks;
+        reg_slot[reg_sp] = mksl;
+        reg_sp++;
+        resolve_stmts(s->d);
+        reg_sp--;
+        nscope = mks;              /* slot tidak direset → watermark tetap */
         break;
     }
     default:

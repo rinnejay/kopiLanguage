@@ -8,6 +8,8 @@
 static FILE *out;
 static int nlab;
 static int brk_lab[64], cont_lab[64], brk_sp;
+/* v1.20: malloc{} — slot penanda arena aktif + rg_sp saat loop masuk */
+static int rg_slot[64], rg_sp, loop_rg[64];
 static int par;   /* parity stack: 1 saat rsp%16==8, 0 saat rk%16==0 */
 
 static void emit(const char *fmt, ...) {
@@ -153,6 +155,33 @@ static void pack_path_bytes_x64(int ln, char tag, long base) {
     emit(".LPKX%d%cc:", ln, tag);
 }
 
+/* v1.20: malloc{} — simpan penanda arena ke slot lokal */
+static void emit_region_mark(int slot) {
+    emit("\tmovl kop_arena_used(%%rip), %%r11d");
+    emit("\tmovl %%r11d, -%ld(%%rbp)", (long)(slot + 1) * 8);
+}
+
+/* bebas arena ke penanda; hanya r9/r10/r11 — rax (nilai balik) aman */
+static void emit_region_reset(int slot) {
+    int ln = nlab++;
+    emit("\tmovl -%ld(%%rbp), %%r11d", (long)(slot + 1) * 8);
+    emit("\tcmpl $0, %%r11d");
+    emit("\tjge .LRGX%dA", ln);
+    emit("\txorl %%r11d, %%r11d");
+    emit(".LRGX%dA:", ln);
+    emit("\tmovl kop_arena_used(%%rip), %%r10d");
+    emit("\tcmpl %%r10d, %%r11d");
+    emit("\tjle .LRGX%dB", ln);
+    emit("\tmovl %%r10d, %%r11d");
+    emit(".LRGX%dB:", ln);
+    emit("\tmovl %%r11d, kop_arena_used(%%rip)");
+}
+
+static void emit_loop_exit_resets(void) {
+    int base = brk_sp > 0 ? loop_rg[brk_sp - 1] : 0;
+    for (int i = rg_sp - 1; i >= base; i--) emit_region_reset(rg_slot[i]);
+}
+
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
@@ -198,6 +227,7 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_WHILE: {
         int ltop = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = ltop; brk_sp++;
         emit(".L%d:", ltop);
         gen_expr(m, s->a);
@@ -212,6 +242,7 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_DO: {
         int ltop = nlab++, lcont = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
         gen_stmts(m, s->b);
@@ -227,6 +258,7 @@ static void gen_stmt(Method *m, Node *s) {
         if (s->a) gen_stmt(m, s->a);
         int ltop = nlab++, lend = nlab++, lcont = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
         if (s->b) {
@@ -242,8 +274,8 @@ static void gen_stmt(Method *m, Node *s) {
         brk_sp--; brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
-    case ST_BRK: emit("\tjmp .L%d", brk_lab[brk_sp - 1]); break;
-    case ST_CONT: emit("\tjmp .L%d", cont_lab[brk_sp - 1]); break;
+    case ST_BRK: emit_loop_exit_resets(); emit("\tjmp .L%d", brk_lab[brk_sp - 1]); break;
+    case ST_CONT: emit_loop_exit_resets(); emit("\tjmp .L%d", cont_lab[brk_sp - 1]); break;
     case ST_RETURN: {
         if (s->a) {
             gen_expr(m, s->a);
@@ -252,6 +284,7 @@ static void gen_stmt(Method *m, Node *s) {
         } else {
             emit("\tmovl $0, %%eax");
         }
+        for (int i = rg_sp - 1; i >= 0; i--) emit_region_reset(rg_slot[i]);
         emit("\tjmp .Lret%d", cur_ret_label);
         break;
     }
@@ -338,6 +371,14 @@ static void gen_stmt(Method *m, Node *s) {
         break;
     case ST_BLOCK:
         gen_stmts(m, s->d);
+        break;
+
+    case ST_REGION:              /* v1.20: malloc { ... } */
+        emit_region_mark((int)s->ival);
+        rg_slot[rg_sp++] = (int)s->ival;
+        gen_stmts(m, s->d);
+        rg_sp--;
+        emit_region_reset((int)s->ival);
         break;
 
     default:
@@ -1962,6 +2003,7 @@ void gen_x64(const char *outpath) {
             }
         }
         brk_sp = 0;
+        rg_sp = 0;
         cur_ret_label = nlab++;
         gen_stmts(m, m->body);
         emit("\tmovl $0, %%eax");        /* kembalian default jalur jatuh */

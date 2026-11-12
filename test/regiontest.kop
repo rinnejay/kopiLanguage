@@ -1,0 +1,121 @@
+// regiontest.kop — malloc { ... } (v1.20): region arena otomatis.
+// Compiler menyisipkan penanda di masuk blok dan membebaskan semua alokasi
+// blok di akhir blok / saat break, continue, dan return.
+import Str;
+
+class Main {
+    static int jumlahKotak(int n) {
+        int total = 0;
+        malloc {
+            int[] kotak = new int[1024];
+            for (int i = 0; i < 1024; i++) kotak[i] = i;
+            for (int i = 0; i < 1024; i++) total = total + kotak[i];
+            String t = Str.fromInt(n);
+            total = total + t.length;
+        }
+        return total;
+    }
+
+    static int nilaiAtau(int n) {
+        malloc {
+            int[] t = new int[4096];
+            t[0] = n * 3;
+            if (t[0] > 0) return t[0];     // return nilai: arena dibebaskan
+        }
+        return -1;
+    }
+
+    static long nilaiBesar(long n) {
+        malloc {
+            int[] t = new int[50000];
+            return n + t.length;
+        }
+    }
+
+    public static void main(String[] args) {
+        // 1) 60 × 700 KB melebihi arena 32 MB → hanya lolos bila blok dibebaskan
+        int buang = 0;
+        for (int k = 0; k < 60; k++) {
+            malloc {
+                int[] buf = new int[175000];      // 1,4 MB
+                buf[0] = k;
+                buang = buang + (buf[0] - buf[0] + 1);
+                String s = Str.fromInt(buf[174999]);
+                if (s.length > 50) System.out.println("mustahil");
+            }
+        }
+        System.out.println(buang);                 // 60
+
+        // 2) break/continue keluar region juga membebaskan arena
+        int n = 0;
+        for (int i = 0; i < 100; i++) {
+            malloc {
+                int[] big = new int[250000];       // 2 MB
+                big[0] = i;
+                n = n + big[0];
+                if (i == 3) continue;              // keluar region
+            }
+            malloc {
+                int[] big = new int[250000];
+                n = n + 1;
+                if (i == 5) break;                 // keluar region + loop
+            }
+        }
+        System.out.println(n);                     // 0+1+2+3+1+4+1+5+1 = 20
+
+        // 3) break/continue milik loop DI DALAM region tidak membebaskan apa pun
+        malloc {
+            int[] keep = new int[8];
+            keep[0] = 7;
+            for (int i = 0; i < 10; i++) { break; }
+            System.out.println(keep[0]);           // 7
+            int j = 0;
+            while (j < 10) { j++; if (j == 3) continue; }
+            System.out.println(keep[0]);           // 7
+            int k = 0;
+            do { k++; if (k < 5) continue; } while (k < 5);
+            System.out.println(keep[0]);           // 7
+        }
+
+        // 4) region bersarang
+        malloc {
+            malloc {
+                int[] a = new int[100000];
+                a[0] = 70;
+                System.out.println(a[0]);          // 70
+            }
+            int[] b = new int[100000];
+            b[0] = 80;
+            System.out.println(b[0]);              // 80
+        }
+
+        // 5) membaca rujukan luar & menulis NILAI ke wadah luar: boleh
+        String luar = "kopi";
+        int[] hasil = new int[4];
+        malloc {
+            String s = Str.upper(luar);
+            System.out.println(s);                 // KOPI
+            int[] tmp = new int[16];
+            tmp[0] = luar.length;
+            hasil[0] = tmp[0];
+        }
+        System.out.println(luar);                  // kopi
+        System.out.println(hasil[0]);              // 4
+
+        // 6) return nilai dari dalam region
+        int s = 0;
+        for (int i = 0; i < 300; i++) s = s + nilaiAtau(i + 1);
+        System.out.println(s);                     // 3 × (1+..+300) = 135450
+        System.out.println(nilaiAtau(-5));         // -1
+        System.out.println(nilaiBesar(1000000000000L)); // 1000000050000
+        System.out.println(jumlahKotak(12345));    // 523776 + 5
+
+        // 7) blok biasa (tanpa malloc) tetap seperti dulu
+        {
+            int[] q = new int[4];
+            q[0] = 5;
+            System.out.println(q[0]);              // 5
+        }
+        System.out.println("selesai");
+    }
+}

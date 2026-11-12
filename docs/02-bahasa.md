@@ -1,6 +1,6 @@
 # 02 — Bahasa Kopi: tutorial lengkap
 
-Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.19.
+Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.20.
 Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).
 
 ---
@@ -485,10 +485,70 @@ class Main {
 - Maksimum 8 entri per literal; untuk lebih banyak susun bertahap.
 - `Json.parse` untuk teks JSON dari luar; `Json.write` untuk serialisasi.
 
-## 14. Memori: arena 32 MB, tanpa GC
+## 14. Memori: `malloc { ... }`, arena 32 MB, tanpa GC
 
 Semua alokasi dinamis (array, string hasil operasi) masuk **arena bump
-allocator** 32 MB. Tidak ada free per objek.
+allocator** 32 MB. Tidak ada free per objek. Sejak **v1.20** compiler
+mengurus pembebasan secara otomatis lewat blok `malloc`:
+
+```java
+malloc {
+    int[] sementara = new int[10000];   // hidup selama blok
+    String tmp = Str.upper(text);
+    // ... pakai ...
+}                                      // arena blok dibebaskan OTOMATIS
+```
+
+Compiler menyisipkan penanda arena saat masuk blok dan mengembalikan
+arena ke penanda itu di **semua jalur keluar**:
+
+- akhir blok,
+- `break` / `continue` yang keluar dari blok (milik loop di luar blok),
+- `return` dari dalam blok.
+
+Contoh aman di loop panas tanpa memanggil reset manual:
+
+```java
+for (int i = 0; i < 1000000; i++) {
+    malloc {
+        int[] buf = new int[100000];   // 800 KB, dibebaskan tiap iterasi
+        proses(buf);
+    }
+}
+```
+
+### Aturan keamanan
+
+Rujukan (String, array, objek) **tidak boleh keluar** dari blok — isinya
+dibebaskan di akhir blok. Compiler menolaknya saat kompilasi:
+
+```java
+String luar;
+malloc { luar = Str.upper("x"); }        // ditolak: rujukan keluar blok
+malloc { return Str.upper("x"); }        // ditolak: return rujukan
+malloc { hasilArr[0] = "x"; }            // ditolak: String ke array luar
+malloc { obj.nama = "x"; }               // ditolak: String ke field luar
+```
+
+Yang **boleh** (dan lazim): menulis **nilai** (int/long/bool/double) ke
+variabel/array/field luar, serta **membaca** rujukan luar di dalam blok:
+
+```java
+int[] hasil = new int[4];
+malloc {
+    int[] tmp = new int[16];
+    tmp[0] = luar.length;    // baca String luar: boleh
+    hasil[0] = tmp[0];       // tulis NILAI ke array luar: boleh
+}
+```
+
+Bila butuh rujukan hasil, salin keluar lewat nilai (mis. panjang, isi
+byte) atau alokasikan hasilnya di luar blok.
+
+### `memMark` / `memReset` manual (opsional)
+
+Masih tersedia untuk kendali halus (mis. reset per request di server
+yang membangun struktur jangka panjang):
 
 ```java
 int mark = Net.memMark();
@@ -497,15 +557,18 @@ int[] sementara = new int[10000];
 Net.memReset(mark);       // buang semua alokasi SETELAH mark
 ```
 
-Aturan penting:
-
 1. Alokasikan data yang harus hidup **sebelum** `memMark`.
 2. `memReset(mark)` membebaskan **semua** alokasi setelah mark — jangan
    menyimpan pointer hasil alokasi setelah mark lalu memakainya lagi.
 3. `new int[n]` selalu men-zero-kan elemen, termasuk memori daur ulang.
-4. Tanpa reset, program batch panjang bisa kehabisan arena; server wajib
-   reset per request/iterasi.
+4. Tanpa reset, program batch panjang bisa kehabisan arena; `malloc{}`
+   atau reset per request/iterasi menghindarinya.
 5. Lebih dari 32 MB → `kopi: arena memori habis` + exit 1 (bukan crash).
+
+Catatan jujur: `malloc{}` adalah **region scope**, bukan GC. Rujukan
+yang diselundupkan lewat jalur yang tak terlihat compiler (mis. method
+lain menyimpan parameter ke variabel global) tetap tanggung jawab
+programmer; pola itu belum dijaga pemeriksa.
 
 ## 15. Keluar & kode status
 

@@ -1417,6 +1417,40 @@ check switchtest test/switchtest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/switchtest64.s" -o /dev/null \
     && echo "PASS  switchtest [x64]" || { echo "FAIL  switchtest [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── fitur bahasa v1.20: malloc { ... } region arena otomatis ───
+cp test/regiontest.ref "$T/kopi/regiontest.ref"
+check regiontest test/regiontest.kop
+./kopicc test/regiontest.kop -t x64 -o "$T/kopi/regiontest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/regiontest64.s" -o /dev/null \
+    && echo "PASS  regiontest [x64]" || { echo "FAIL  regiontest [x64]"; FAIL=$((FAIL+1)); }
+# diagnostik escape: rujukan tidak boleh keluar malloc{}
+cat > "$T/kopi/rgesc.kop" <<'EOF'
+class Main {
+    public static void main(String[] args) {
+        String luar = "awal";
+        malloc { String s = "dalam"; luar = s; }
+    }
+}
+EOF
+if ./kopicc "$T/kopi/rgesc.kop" -t vm -o /dev/null 2>&1 | grep -q "hidup di luar malloc{}"; then
+    echo "PASS  region escape [err]"; PASS=$((PASS+1))
+else
+    echo "FAIL  region escape [err]"; FAIL=$((FAIL+1))
+fi
+cat > "$T/kopi/rgres.kop" <<'EOF'
+class Main {
+    static String f() {
+        malloc { return "dalam"; }
+    }
+    public static void main(String[] args) { System.out.println(f()); }
+}
+EOF
+if ./kopicc "$T/kopi/rgres.kop" -t vm -o /dev/null 2>&1 | grep -q "return bertipe rujukan dari dalam malloc{}"; then
+    echo "PASS  region return escape [err]"; PASS=$((PASS+1))
+else
+    echo "FAIL  region return escape [err]"; FAIL=$((FAIL+1))
+fi
+
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
 check urltest test/urltest.kop

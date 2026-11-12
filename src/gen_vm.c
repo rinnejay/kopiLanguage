@@ -27,7 +27,8 @@ enum {
     OP_FLT, OP_FGT, OP_FLE, OP_FGE, OP_FEQ, OP_FNE,
     OP_CONV, OP_NORM, OP_PRINTNUM, OP_PRINTBUF,
     OP_LINE, OP_SRCFILE,            /* v1.13: baris sumber utk stack trace */
-    OP_IDXB, OP_PRINTSTR            /* v1.18: String packed */
+    OP_IDXB, OP_PRINTSTR,           /* v1.18: String packed */
+    OP_MARK, OP_MRESET              /* v1.20: region malloc{} */
 };
 
 typedef struct {
@@ -42,6 +43,9 @@ typedef struct {
 static Ctx cx;
 static Method *cur_meth;
 static int brk_lab[64], cont_lab[64], brk_sp, last_line;
+/* v1.20: malloc{} — slot penanda arena aktif + rg_sp saat loop masuk */
+static int rg_slot[64], rg_sp, loop_rg[64];
+
 static const char *last_file;
 
 int cp_intern(const char *s);    /* parse.c — intern nama file ke cpool */
@@ -58,6 +62,18 @@ static void emit_conv(Ty from, Ty to) {
     em8(OP_CONV); em8((int)from); em8((int)to);
 }
 static void emit_norm(Ty t) { em8(OP_NORM); em8((int)t); }
+
+/* bebas arena kembali ke penanda di slot (tanpa mendorong nilai balik) */
+static void emit_region_reset(int slot) {
+    em8(OP_ILOAD); em16(slot);
+    em8(OP_MRESET);
+}
+/* reset semua region yang dilompati break/continue: yang dibuka SETELAH
+ * loop terdekat (kalau ada) */
+static void emit_loop_exit_resets(void) {
+    int base = brk_sp > 0 ? loop_rg[brk_sp - 1] : 0;
+    for (int i = rg_sp - 1; i >= base; i--) emit_region_reset(rg_slot[i]);
+}
 
 static int newlab(void) { return cx.nlab++; }
 static void mark(int lab) { cx.labpos[lab] = cx.len; }
@@ -104,6 +120,7 @@ static void gen_stmt(Node *s) {
     case ST_WHILE: {
         int ltop = newlab(), lend = newlab();
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = ltop; brk_sp++;
         mark(ltop);
         gen_expr(s->a);
@@ -118,6 +135,7 @@ static void gen_stmt(Node *s) {
     case ST_DO: {
         int ltop = newlab(), lcont = newlab(), lend = newlab();
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         mark(ltop);
         gen_stmts(s->b);
@@ -133,6 +151,7 @@ static void gen_stmt(Node *s) {
         if (s->a) gen_stmt(s->a);       /* init (ST_VAR / ST_ASSIGN) */
         int ltop = newlab(), lend = newlab(), lcont = newlab();
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         mark(ltop);
         if (s->b) { gen_expr(s->b); jmp(OP_JMPF, lend); }
@@ -145,8 +164,8 @@ static void gen_stmt(Node *s) {
         brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
-    case ST_BRK: jmp(OP_JMP, brk_lab[brk_sp - 1]); break;
-    case ST_CONT: jmp(OP_JMP, cont_lab[brk_sp - 1]); break;
+    case ST_BRK: emit_loop_exit_resets(); jmp(OP_JMP, brk_lab[brk_sp - 1]); break;
+    case ST_CONT: emit_loop_exit_resets(); jmp(OP_JMP, cont_lab[brk_sp - 1]); break;
     case ST_RETURN:
         if (s->a) {
             gen_expr(s->a);
@@ -154,6 +173,7 @@ static void gen_stmt(Node *s) {
         } else {
             em8(OP_ICONST); em32(0);
         }
+        for (int i = rg_sp - 1; i >= 0; i--) emit_region_reset(rg_slot[i]);
         em8(OP_RET);
         break;
     case ST_PRINT:
@@ -178,6 +198,15 @@ static void gen_stmt(Node *s) {
         break;
     case ST_BLOCK:
         gen_stmts(s->d);
+        break;
+
+    case ST_REGION:              /* v1.20: malloc { ... } */
+        em8(OP_MARK);
+        em8(OP_ISTORE); em16((int)s->ival);
+        rg_slot[rg_sp++] = (int)s->ival;
+        gen_stmts(s->d);
+        rg_sp--;
+        emit_region_reset((int)s->ival);
         break;
 
     case ST_IDXASG:

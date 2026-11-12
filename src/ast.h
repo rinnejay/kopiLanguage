@@ -137,6 +137,7 @@ enum {
     ST_IDXASG,     /* a[i] = v : a=array expr, b=index expr, c=value expr */
     ST_FLDASG,     /* obj.field = v : a=objek, str=field, c=value expr    */
     ST_BLOCK,      /* blok { ... } : d=statement list (scope sendiri)      */
+    ST_REGION,     /* malloc { ... } : d=isi; ival=slot penanda arena      */
 };
 
 typedef struct Node {

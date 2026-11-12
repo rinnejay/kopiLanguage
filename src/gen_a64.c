@@ -9,6 +9,8 @@
 static FILE *out;
 static int nlab;
 static int brk_lab[64], cont_lab[64], brk_sp;
+/* v1.20: malloc{} — slot penanda arena aktif + rg_sp saat loop masuk */
+static int rg_slot[64], rg_sp, loop_rg[64];
 
 static void emit(const char *fmt, ...) {
     va_list ap;
@@ -139,6 +141,37 @@ static void loc_load(long off, const char *reg) {
     emit("\tldr\t%s, [x27]", reg);
 }
 
+/* v1.20: malloc{} — simpan penanda arena ke slot lokal */
+static void emit_region_mark(int slot) {
+    emit("\tadrp\tx9, kop_arena_used");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
+    emit("\tldr\tw11, [x9]");
+    loc_store((slot + 1) * 8, "w11");
+}
+
+/* bebas arena ke penanda; hanya x9/x10/w11 — x0 (nilai balik) aman */
+static void emit_region_reset(int slot) {
+    int ln = nlab++;
+    loc_load((slot + 1) * 8, "w11");
+    emit("\tadrp\tx9, kop_arena_used");
+    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
+    emit("\tcmp\tw11, #0");
+    emit("\tb.ge\t.LRG%dA", ln);
+    emit("\tmov\tw11, wzr");
+    emit(".LRG%dA:", ln);
+    emit("\tldr\tw10, [x9]");
+    emit("\tcmp\tw11, w10");
+    emit("\tb.le\t.LRG%dB", ln);
+    emit("\tmov\tw11, w10");
+    emit(".LRG%dB:", ln);
+    emit("\tstr\tw11, [x9]");
+}
+
+static void emit_loop_exit_resets(void) {
+    int base = brk_sp > 0 ? loop_rg[brk_sp - 1] : 0;
+    for (int i = rg_sp - 1; i >= base; i--) emit_region_reset(rg_slot[i]);
+}
+
 static void push_val(int is64) {
     if (is64) emit("\tstr\tx0, [sp, #-16]!");
     else emit("\tstr\tw0, [sp, #-16]!");
@@ -221,6 +254,7 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_WHILE: {
         int ltop = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = ltop; brk_sp++;
         emit(".L%d:", ltop);
         gen_expr(m, s->a);
@@ -234,6 +268,7 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_DO: {
         int ltop = nlab++, lcont = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
         gen_stmts(m, s->b);
@@ -248,6 +283,7 @@ static void gen_stmt(Method *m, Node *s) {
         if (s->a) gen_stmt(m, s->a);
         int ltop = nlab++, lend = nlab++, lcont = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
+        loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
         if (s->b) { gen_expr(m, s->b); emit("\tcbz\tw0, .L%d", lend); }
@@ -259,8 +295,8 @@ static void gen_stmt(Method *m, Node *s) {
         brk_sp--; brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
-    case ST_BRK: emit("\tb\t.L%d", brk_lab[brk_sp - 1]); break;
-    case ST_CONT: emit("\tb\t.L%d", cont_lab[brk_sp - 1]); break;
+    case ST_BRK: emit_loop_exit_resets(); emit("\tb\t.L%d", brk_lab[brk_sp - 1]); break;
+    case ST_CONT: emit_loop_exit_resets(); emit("\tb\t.L%d", cont_lab[brk_sp - 1]); break;
     case ST_RETURN: {
         if (s->a) {
             gen_expr(m, s->a);
@@ -269,6 +305,7 @@ static void gen_stmt(Method *m, Node *s) {
         } else {
             emit("\tmov\tw0, wzr");
         }
+        for (int i = rg_sp - 1; i >= 0; i--) emit_region_reset(rg_slot[i]);
         emit("\tb\t.Lret%d", cur_ret_label);
         break;
     }
@@ -378,6 +415,14 @@ static void gen_stmt(Method *m, Node *s) {
         break;
     case ST_BLOCK:
         gen_stmts(m, s->d);
+        break;
+
+    case ST_REGION:              /* v1.20: malloc { ... } */
+        emit_region_mark((int)s->ival);
+        rg_slot[rg_sp++] = (int)s->ival;
+        gen_stmts(m, s->d);
+        rg_sp--;
+        emit_region_reset((int)s->ival);
         break;
 
     default:
@@ -1702,6 +1747,7 @@ void gen_a64(const char *outpath) {
             }
         }
         brk_sp = 0;
+        rg_sp = 0;
         cur_ret_label = nlab++;
         gen_stmts(m, m->body);
         emit("\tmov\tw0, wzr");          /* kembalian default jalur jatuh */

@@ -43,8 +43,8 @@
 </tr>
 <tr>
 <td>GC / free</td>
-<td>arena 32 MB; wajib <code>memMark/memReset</code></td>
-<td>reset per request/iterasi; hindari alokasi di loop panas</td>
+<td>arena 32 MB; <code>malloc { ... }</code> membebaskan otomatis (v1.20); <code>memMark/memReset</code> manual opsional</td>
+<td>region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler)</td>
 </tr>
 <tr>
 <td>~~Array bertipe (<code>String[]</code>, <code>long[]</code>)~~ <strong>✅ v1.16</strong> (elemen 64-bit slot; identitas referensi berlaku)</td>
@@ -259,7 +259,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>132/132</strong> (v1.19) — a64 + VM + sintaks x64 + dokumen HTML (144 PASS termasuk cek x64 yang tidak masuk counter).</li>
+<li>Suite: <strong>136/136</strong> (v1.20) — a64 + VM + sintaks x64 + dokumen HTML (148 PASS termasuk cek x64 yang tidak masuk counter).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>
@@ -286,7 +286,7 @@
 <li>Tulis batas di docs, bukan hanya di kepala.</li>
 </ul>
 <footer class="foot">
-  <span>Dokumentasi Kopi v1.19 · lisensi MIT</span>
+  <span>Dokumentasi Kopi v1.20 · lisensi MIT</span>
   <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/06-batas-roadmap.md">Sunting halaman ini</a>
 </footer>
   </main>

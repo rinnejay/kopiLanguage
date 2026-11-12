@@ -15,6 +15,7 @@ enum {
     KW_IF, KW_ELSE, KW_WHILE, KW_FOR, KW_RETURN, KW_DO,
     KW_TRUE, KW_FALSE, KW_BREAK, KW_CONTINUE, KW_IMPORT, KW_FN, KW_JSON,
     KW_SWITCH, KW_CASE, KW_DEFAULT,          /* v1.19 */
+    KW_MALLOC,                               /* v1.20 */
 
     T_PP, T_MM, T_ADDEQ, T_SUBEQ, T_MULEQ, T_DIVEQ, T_MODEQ,
     T_ARROW,       /* => */

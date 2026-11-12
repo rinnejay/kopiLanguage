@@ -43,7 +43,9 @@ enum {
     OP_LINE,        /* 2 byte: nomor baris sumber — stack trace */
     OP_SRCFILE,     /* 2 byte: index cpool nama file sumber */
     OP_IDXB,        /* v1.18: byte ke-i dari String packed */
-    OP_PRINTSTR     /* 1 byte: newline; tulis String packed ke fd 1 */
+    OP_PRINTSTR,    /* 1 byte: newline; tulis String packed ke fd 1 */
+    OP_MARK,        /* v1.20: dorong penanda arena ke stack */
+    OP_MRESET       /* v1.20: tarik penanda & bebaskan arena ke situ */
 };
 
 #define MAXM 4096
@@ -996,6 +998,16 @@ static void run(void) {
             long len = blk[0];
             for (long i = 0; i < len; i++) fputc((int)getb(blk, i), stdout);
             if (ln) fputc(10, stdout);
+            break;
+        }
+        case OP_MARK:                          /* v1.20: malloc{} */
+            stackv[sp++] = (int64_t)heap_used;
+            break;
+        case OP_MRESET: {
+            int64_t mark = stackv[--sp];
+            if (mark < 0) mark = 0;
+            if (mark > heap_used) mark = heap_used;
+            heap_used = (long)mark;
             break;
         }
         case OP_HALT:
