@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
@@ -402,6 +402,60 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));</code></pre>
 <tr>
 <td><code>static void line(int[] s)</code></td>
 <td>tulis dengan newline</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="cbor">Cbor<a class="anchor" href="#cbor" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Cbor.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] one(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encNil()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBool(int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encInt(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBin(int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encStr(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arrHead(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] mapHead(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encArr(int[] items, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encMap(int[] pairs, int n)</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -2274,6 +2328,60 @@ System.out.println(Matrix.trace(m));   // 3</code></pre>
 <tr>
 <td><code>static boolean isIdentity(int n, int[] a)</code></td>
 <td>apakah matriks identitas</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="messagepack">MessagePack<a class="anchor" href="#messagepack" aria-label="tautan">#</a></h2>
+<p><code>lib/core/MessagePack.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] one(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encNil()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBool(int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encInt(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBin(int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encStr(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arrHead(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encArr(int[] items, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encMap(int[] pairs, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] mapHead(int n)</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>

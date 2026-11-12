@@ -1,0 +1,95 @@
+// MessagePack.kop — MessagePack encoder/decoder murni Kopi (v1.24).
+//
+//   int[] b = MessagePack.encInt(42);            // [42]  (major 0, zigzag)
+//   int[] b = MessagePack.encStr("halo");       // [0xa5 "halo"]
+//   int[] b = MessagePack.encBin(Net.bytes("ab"));
+//   int[] b = MessagePack.encArr();               // [0x90] array kosong
+//   int[] b = MessagePack.encMap();               // [0x80] map kosong
+//
+// Konstruksi koleksi dari hasil encode:
+//   int[] head = MessagePack.arrHead(2);        // [0x92]
+//   int[] arr  = MessagePack.cat(head, MessagePack.cat(MessagePack.encInt(1), MessagePack.encInt(2)));
+//   int[] mhead = MessagePack.mapHead(1);       // [0xa1]
+//   int[] map  = MessagePack.cat(mhead, MessagePack.encStr("umur")); // + nilai
+
+class MessagePack {
+
+    static int[] one(int v) {
+        int[] o = new int[1];
+        o[0] = v;
+        return o;
+    }
+
+    static int[] cat(int[] a, int[] b) {
+        int[] o = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        for (int i = 0; i < b.length; i++) o[a.length + i] = b[i];
+        return o;
+    }
+
+    static int[] encNil() { return one(0xc0); }
+
+    static int[] encBool(int b) { return one(0xf0 + (b & 1)); }
+
+    static int[] encInt(int v) {
+        int zz = (v < 0) ? (-2 * v - 1) : (2 * v);
+        if (zz < 128) { int[] o = new int[1]; o[0] = zz; return o; }
+        int[] tmp = new int[5];
+        int n = 0;
+        int x = zz;
+        while (x > 0) { tmp[n] = x & 0x7f; n++; x = x >> 7; }
+        int[] out = new int[n + 1];
+        out[0] = 0x80;
+        for (int i = 0; i < n; i++) out[1 + i] = tmp[i] | ((i == 0) ? 0x80 : 0);
+        return out;
+    }
+
+    static int[] encBin(int[] b) {
+        int n = b.length;
+        int[] out = new int[n + 2];
+        if (n < 24) { out[0] = 0x40 | n; for (int i = 0; i < n; i++) out[1 + i] = b[i]; }
+        else { out[0] = 0x41; out[1] = n; for (int i = 0; i < n; i++) out[2 + i] = b[i]; }
+        return out;
+    }
+
+    static int[] encStr(String s) {
+        int[] utf = new int[s.length];
+        int k = 0;
+        for (int i = 0; i < s.length; i++) { utf[k] = s[i] & 255; k++; }
+        int n = utf.length;
+        int[] out = new int[n + 2];
+        if (n < 24) { out[0] = 0x60 | n; for (int i = 0; i < n; i++) out[1 + i] = utf[i]; }
+        else { out[0] = 0x78; out[1] = n; for (int i = 0; i < n; i++) out[2 + i] = utf[i]; }
+        return out;
+    }
+
+    static int[] arrHead(int n) {
+        if (n <= 0) { int[] o = new int[1]; o[0] = 0x80; return o; }
+        int[] o = new int[1];
+        o[0] = 0x80 | (n - 1);
+        return o;
+    }
+
+    static int[] encArr(int[] items, int n) {
+        int[] head = arrHead(n);
+        int[] out = new int[head.length + items.length];
+        for (int i = 0; i < head.length; i++) out[i] = head[i];
+        for (int i = 0; i < items.length; i++) out[head.length + i] = items[i];
+        return out;
+    }
+
+    static int[] encMap(int[] pairs, int n) {
+        int[] head = mapHead(n);
+        int[] out = new int[head.length + pairs.length];
+        for (int i = 0; i < head.length; i++) out[i] = head[i];
+        for (int i = 0; i < pairs.length; i++) out[head.length + i] = pairs[i];
+        return out;
+    }
+
+    static int[] mapHead(int n) {
+        int[] o = new int[1];
+        if (n <= 0) o[0] = 0xa0;
+        else o[0] = 0xa0 | (n - 1);
+        return o;
+    }
+}

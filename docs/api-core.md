@@ -146,6 +146,28 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));
 
 ---
 
+## Cbor
+
+`lib/core/Cbor.kop` · 11 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] one(int v)` | — |
+| `static int[] cat(int[] a, int[] b)` | — |
+| `static int[] encNil()` | — |
+| `static int[] encBool(int b)` | — |
+| `static int[] encInt(int v)` | — |
+| `static int[] encBin(int[] b)` | — |
+| `static int[] encStr(String s)` | — |
+| `static int[] arrHead(int n)` | — |
+| `static int[] mapHead(int n)` | — |
+| `static int[] encArr(int[] items, int n)` | — |
+| `static int[] encMap(int[] pairs, int n)` | — |
+
+---
+
 ## Compress
 
 `lib/core/Compress.kop` · 29 fungsi
@@ -861,6 +883,28 @@ System.out.println(Matrix.trace(m));   // 3
 | `static int det3(int[] a)` | determinan 3×3 (aturan Sarrus) |
 | `static int det(int n, int[] a)` | determinan umum n<=3; di luar itu 0 (jujur: belum ada rekursi kofaktor umum tanpa alokasi dinamis bersarang) |
 | `static boolean isIdentity(int n, int[] a)` | apakah matriks identitas |
+
+---
+
+## MessagePack
+
+`lib/core/MessagePack.kop` · 11 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] one(int v)` | — |
+| `static int[] cat(int[] a, int[] b)` | — |
+| `static int[] encNil()` | — |
+| `static int[] encBool(int b)` | — |
+| `static int[] encInt(int v)` | — |
+| `static int[] encBin(int[] b)` | — |
+| `static int[] encStr(String s)` | — |
+| `static int[] arrHead(int n)` | — |
+| `static int[] encArr(int[] items, int n)` | — |
+| `static int[] encMap(int[] pairs, int n)` | — |
+| `static int[] mapHead(int n)` | — |
 
 ---
 

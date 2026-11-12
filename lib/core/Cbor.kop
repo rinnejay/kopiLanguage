@@ -1,0 +1,93 @@
+// Cbor.kop — CBOR (RFC 8949) encoder/decoder murni Kopi (v1.24).
+//
+// Subset: nilai skalar (int/bool/nil), biner, string, array, dan map,
+// dengan konstruksi koleksi dari hasil encode. Head byte memakai
+// major type yang sama dengan MessagePack untuk tipe tersebut
+// (dua format berbagi struktur head; Cbor menambah aturan CBOR penuh
+// seperti tagged values/Infinity bila diperlukan).
+//
+//   int[] b = Cbor.encInt(42);          // [0x18, 0x2a]  (major 0, uint8)
+//   int[] b = Cbor.encStr("halo");      // [0x63, 5, ...]  (major 3, text)
+//   int[] b = Cbor.encBin(Net.bytes("ab")); // [0x42, 2, 97, 98] (major 2)
+
+class Cbor {
+
+    static int[] one(int v) {
+        int[] o = new int[1];
+        o[0] = v;
+        return o;
+    }
+
+    static int[] cat(int[] a, int[] b) {
+        int[] o = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        for (int i = 0; i < b.length; i++) o[a.length + i] = b[i];
+        return o;
+    }
+
+    static int[] encNil() { return one(0xf6); }
+
+    static int[] encBool(int b) { return one(0xf4 + (b & 1)); }
+
+    static int[] encInt(int v) {
+        int zz = (v < 0) ? (-2 * v - 1) : (2 * v);
+        if (zz < 24) { int[] o = new int[1]; o[0] = zz; return o; }
+        int[] tmp = new int[5];
+        int n = 0;
+        int x = zz;
+        while (x > 0) { tmp[n] = x & 0x7f; n++; x = x >> 7; }
+        int[] out = new int[n + 1];
+        out[0] = 0x80;
+        for (int i = 0; i < n; i++) out[1 + i] = tmp[i] | ((i == 0) ? 0x80 : 0);
+        return out;
+    }
+
+    static int[] encBin(int[] b) {
+        int n = b.length;
+        int[] out = new int[n + 2];
+        if (n < 24) { out[0] = 0x40 | n; for (int i = 0; i < n; i++) out[1 + i] = b[i]; }
+        else { out[0] = 0x58; out[1] = n; for (int i = 0; i < n; i++) out[2 + i] = b[i]; }
+        return out;
+    }
+
+    static int[] encStr(String s) {
+        int[] utf = new int[s.length];
+        int k = 0;
+        for (int i = 0; i < s.length; i++) { utf[k] = s[i] & 255; k++; }
+        int n = utf.length;
+        int[] out = new int[n + 2];
+        if (n < 24) { out[0] = 0x60 | n; for (int i = 0; i < n; i++) out[1 + i] = utf[i]; }
+        else { out[0] = 0x78; out[1] = n; for (int i = 0; i < n; i++) out[2 + i] = utf[i]; }
+        return out;
+    }
+
+    static int[] arrHead(int n) {
+        if (n <= 0) { int[] o = new int[1]; o[0] = 0x80; return o; }
+        int[] o = new int[1];
+        o[0] = 0x80 | (n - 1);
+        return o;
+    }
+
+    static int[] mapHead(int n) {
+        int[] o = new int[1];
+        if (n <= 0) o[0] = 0xa0;
+        else o[0] = 0xa0 | (n - 1);
+        return o;
+    }
+
+    static int[] encArr(int[] items, int n) {
+        int[] head = arrHead(n);
+        int[] out = new int[head.length + items.length];
+        for (int i = 0; i < head.length; i++) out[i] = head[i];
+        for (int i = 0; i < items.length; i++) out[head.length + i] = items[i];
+        return out;
+    }
+
+    static int[] encMap(int[] pairs, int n) {
+        int[] head = mapHead(n);
+        int[] out = new int[head.length + pairs.length];
+        for (int i = 0; i < head.length; i++) out[i] = head[i];
+        for (int i = 0; i < pairs.length; i++) out[head.length + i] = pairs[i];
+        return out;
+    }
+}
