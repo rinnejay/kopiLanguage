@@ -2,12 +2,12 @@ import Json;
 
 class JsonX {
     static int[] config(int port, int workers) {
-        return Json.obj4(Net.bytes("app"), Json.str(Net.bytes("KopiMart")),
-                         Net.bytes("port"), Json.num(Conv.itoa(port)),
-                         Net.bytes("workers"), Json.num(Conv.itoa(workers)),
-                         Net.bytes("debug"), Json.boolV(0));
+        return Json.obj4("app", Json.str("KopiMart"),
+                         "port", Json.num(Net.mkstr(Conv.itoa(port))),
+                         "workers", Json.num(Net.mkstr(Conv.itoa(workers))),
+                         "debug", Json.boolV(0));
     }
-    static int getInt(int[] j, int[] key) {
+    static int getInt(int[] j, String key) {
         return Json.asInt(Json.get(j, key));
     }
     static String write(int[] j) { return Json.write(j); }

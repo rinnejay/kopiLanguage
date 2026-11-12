@@ -1,18 +1,18 @@
 // Static.kop — penyajian file statis minimal di atas File (v1.9.2).
 import File;
 import Path;
-import Str;
+import Bytes;
 import HttpServer;
 import Mime;
 
 class Static {
 
     /* kompatibilitas: dulu ada di Static, kini delegasi ke Mime */
-    static int[] mime(int[] path) { return Mime.of(path); }
+    static String mime(String path) { return Mime.of(path); }
 
     /* sajikan file; tolak path traversal "..". */
-    static int[] serve(int[] path) {
-        if (Str.contains(path, Net.bytes(".."))) return HttpServer.forbidden();
+    static int[] serve(String path) {
+        if (Bytes.contains(path, Net.bytes(".."))) return HttpServer.forbidden();
         int fd = File.openRead(path);
         if (fd < 0) return HttpServer.notFound();
         int sz = File.size(fd);
@@ -22,19 +22,19 @@ class Static {
         if (sz > 0) n = File.readInto(fd, body);
         File.close(fd);
         if (n < 0) n = 0;
-        if (n != sz) body = Str.slice(body, 0, n);
+        if (n != sz) body = Bytes.slice(body, 0, n);
         return HttpServer.response(200, Mime.of(path), body);
     }
 
     /* varian keep-alive */
-    static int[] serveKA(int[] path, int keep) {
-        if (Str.contains(path, Net.bytes(".."))) {
-            return HttpServer.responseKA(403, Net.bytes("text/plain; charset=utf-8"),
+    static int[] serveKA(String path, int keep) {
+        if (Bytes.contains(path, Net.bytes(".."))) {
+            return HttpServer.responseKA(403, "text/plain; charset=utf-8",
                                          Net.bytes("forbidden\n"), keep);
         }
         int fd = File.openRead(path);
         if (fd < 0) {
-            return HttpServer.responseKA(404, Net.bytes("text/plain; charset=utf-8"),
+            return HttpServer.responseKA(404, "text/plain; charset=utf-8",
                                          Net.bytes("not found\n"), keep);
         }
         int sz = File.size(fd);
@@ -44,7 +44,7 @@ class Static {
         if (sz > 0) n = File.readInto(fd, body);
         File.close(fd);
         if (n < 0) n = 0;
-        if (n != sz) body = Str.slice(body, 0, n);
+        if (n != sz) body = Bytes.slice(body, 0, n);
         return HttpServer.responseKA(200, Mime.of(path), body, keep);
     }
 }

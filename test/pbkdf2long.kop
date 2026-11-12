@@ -1,0 +1,13 @@
+// pbkdf2long.kop — v1.22: PBKDF2 di arena sempit (2 MB) harus tetap jalan.
+// Regresi: buffer HMAC dibebaskan tiap iterasi, bukan menumpuk sampai blok habis.
+import Cipher;
+import Pbkdf2;
+
+class Main {
+    public static void main(String[] args) {
+        malloc<2mb> {
+            int[] h = Pbkdf2.sha256(Net.bytes("password"), Net.bytes("salt"), 1000, 32);
+            System.out.println(Cipher.hexenc(h));
+        }
+    }
+}

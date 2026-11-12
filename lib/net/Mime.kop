@@ -1,38 +1,38 @@
-// Mime.kop — pemetaan ekstensi → Content-Type (v1.9.2).
+// Mime.kop — pemetaan ekstensi → Content-Type (v1.23).
 // Dipakai Static.kop dan bisa dipakai server lain.
 
-import Path;
 import Str;
+import Path;
 
 class Mime {
 
-    static int[] of(int[] path) {
-        int[] e = Path.ext(path);
-        if (Str.equalsIgnoreCase(e, Net.bytes("html"))) return Net.bytes("text/html; charset=utf-8");
-        if (Str.equalsIgnoreCase(e, Net.bytes("htm")))  return Net.bytes("text/html; charset=utf-8");
-        if (Str.equalsIgnoreCase(e, Net.bytes("css")))  return Net.bytes("text/css; charset=utf-8");
-        if (Str.equalsIgnoreCase(e, Net.bytes("js")))   return Net.bytes("application/javascript");
-        if (Str.equalsIgnoreCase(e, Net.bytes("mjs")))  return Net.bytes("application/javascript");
-        if (Str.equalsIgnoreCase(e, Net.bytes("json"))) return Net.bytes("application/json");
-        if (Str.equalsIgnoreCase(e, Net.bytes("xml")))  return Net.bytes("application/xml");
-        if (Str.equalsIgnoreCase(e, Net.bytes("txt")))  return Net.bytes("text/plain; charset=utf-8");
-        if (Str.equalsIgnoreCase(e, Net.bytes("md")))   return Net.bytes("text/markdown; charset=utf-8");
-        if (Str.equalsIgnoreCase(e, Net.bytes("csv")))  return Net.bytes("text/csv; charset=utf-8");
-        if (Str.equalsIgnoreCase(e, Net.bytes("svg")))  return Net.bytes("image/svg+xml");
-        if (Str.equalsIgnoreCase(e, Net.bytes("png")))  return Net.bytes("image/png");
-        if (Str.equalsIgnoreCase(e, Net.bytes("jpg")))  return Net.bytes("image/jpeg");
-        if (Str.equalsIgnoreCase(e, Net.bytes("jpeg"))) return Net.bytes("image/jpeg");
-        if (Str.equalsIgnoreCase(e, Net.bytes("gif")))  return Net.bytes("image/gif");
-        if (Str.equalsIgnoreCase(e, Net.bytes("webp"))) return Net.bytes("image/webp");
-        if (Str.equalsIgnoreCase(e, Net.bytes("ico")))  return Net.bytes("image/x-icon");
-        if (Str.equalsIgnoreCase(e, Net.bytes("woff"))) return Net.bytes("font/woff");
-        if (Str.equalsIgnoreCase(e, Net.bytes("woff2")))return Net.bytes("font/woff2");
-        if (Str.equalsIgnoreCase(e, Net.bytes("ttf")))  return Net.bytes("font/ttf");
-        if (Str.equalsIgnoreCase(e, Net.bytes("wasm"))) return Net.bytes("application/wasm");
-        if (Str.equalsIgnoreCase(e, Net.bytes("pdf")))  return Net.bytes("application/pdf");
-        if (Str.equalsIgnoreCase(e, Net.bytes("mp3")))  return Net.bytes("audio/mpeg");
-        if (Str.equalsIgnoreCase(e, Net.bytes("mp4")))  return Net.bytes("video/mp4");
-        if (Str.equalsIgnoreCase(e, Net.bytes("zip")))  return Net.bytes("application/zip");
-        return Net.bytes("application/octet-stream");
+    static String of(String path) {
+        String e = Path.ext(path);
+        if (Str.equalsIgnoreCase(e, "html")) return "text/html; charset=utf-8";
+        if (Str.equalsIgnoreCase(e, "htm"))  return "text/html; charset=utf-8";
+        if (Str.equalsIgnoreCase(e, "css"))  return "text/css; charset=utf-8";
+        if (Str.equalsIgnoreCase(e, "js"))   return "application/javascript";
+        if (Str.equalsIgnoreCase(e, "mjs"))  return "application/javascript";
+        if (Str.equalsIgnoreCase(e, "json")) return "application/json";
+        if (Str.equalsIgnoreCase(e, "xml"))  return "application/xml";
+        if (Str.equalsIgnoreCase(e, "txt"))  return "text/plain; charset=utf-8";
+        if (Str.equalsIgnoreCase(e, "md"))   return "text/markdown; charset=utf-8";
+        if (Str.equalsIgnoreCase(e, "csv"))  return "text/csv; charset=utf-8";
+        if (Str.equalsIgnoreCase(e, "svg"))  return "image/svg+xml";
+        if (Str.equalsIgnoreCase(e, "png"))  return "image/png";
+        if (Str.equalsIgnoreCase(e, "jpg"))  return "image/jpeg";
+        if (Str.equalsIgnoreCase(e, "jpeg")) return "image/jpeg";
+        if (Str.equalsIgnoreCase(e, "gif"))  return "image/gif";
+        if (Str.equalsIgnoreCase(e, "webp")) return "image/webp";
+        if (Str.equalsIgnoreCase(e, "ico"))  return "image/x-icon";
+        if (Str.equalsIgnoreCase(e, "woff")) return "font/woff";
+        if (Str.equalsIgnoreCase(e, "woff2"))return "font/woff2";
+        if (Str.equalsIgnoreCase(e, "ttf"))  return "font/ttf";
+        if (Str.equalsIgnoreCase(e, "wasm")) return "application/wasm";
+        if (Str.equalsIgnoreCase(e, "pdf"))  return "application/pdf";
+        if (Str.equalsIgnoreCase(e, "mp3"))  return "audio/mpeg";
+        if (Str.equalsIgnoreCase(e, "mp4"))  return "video/mp4";
+        if (Str.equalsIgnoreCase(e, "zip"))  return "application/zip";
+        return "application/octet-stream";
     }
 }

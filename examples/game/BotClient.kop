@@ -5,20 +5,20 @@
 // untuk membuktikan jalur klien (join, input, snapshot, gerak, quit) jalan
 // di backend a64 maupun VM.
 
-import Str;
+import Bytes;
 import Wire;
 
 class Main {
 
     static void fail(int[] msg) {
-        System.out.println(Str.cat(Net.bytes("GAGAL: "), msg));
+        System.out.println(Bytes.cat(Net.bytes("GAGAL: "), msg));
         Net.exit(1);
     }
 
     public static void main(String[] args) {
         int port = 9999;
         if (Net.argc() > 0) {
-            int p = Str.toInt(Net.argv(0));
+            int p = Bytes.toInt(Net.argv(0));
             if (p > 0) port = p;
         }
         int[] hostArg = new int[0];

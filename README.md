@@ -25,8 +25,8 @@ assembly/binary sendiri — tanpa JVM, tanpa bytecode vendor lain.
 
 ```sh
 make                 # kopicc + kopivm
-make test            # 145 uji lintas backend
-./kopicc --version   # kopicc 1.21.0 (Kopi) — target a64 | x64 | vm
+make test            # 155 uji lintas backend
+./kopicc --version   # kopicc 1.23.0 (Kopi) — target a64 | x64 | vm
 
 # binary asli (aarch64)
 ./kopicc examples/hello.kop -t a64 -o hello.s
@@ -53,17 +53,24 @@ class Main {
   `boolean`, `String`; cast, literal hex/biner, promosi campuran.
 - Array `int[]`, `long[]`, `String[]`; bounds check runtime, zero-init,
   `length`, helper `Arrays` + `.forEach/.map/.filter/.reduce`.
-- `String` native (1 byte/karakter, packed) + metode instance
-  (`trim`, `upper`, `substring`, `indexOf`, …) + **template string**
-  dengan backtick.
+- `String` native (1 byte/karakter, packed) + pustaka **`Str`** khusus
+  teks (`trim`, `split/join`, `replace`, `pad`, `to*/from*` semua tipe
+  skalar, hex, UTF-8) + metode instance + **template string** backtick.
+- **`Bytes`** untuk buffer `int[]` (I/O biner, jaringan, kriptografi);
+  konversi eksplisit `Net.strbytes`/`Net.mkstr`.
+- Pustaka teks ikut `String`: `File`, `Path`, `Time.format`, `Log`, `Url`,
+  `Mime`, `Http` (teks request), `Dns`, `Resolv`, `Auth`, `Jwt`, `Session`,
+  `Json`, dan kunci `MapStr`; buffer respons/payload tetap `int[]`.
 - Kontrol alir: `if/else`, `while`, `do/while`, `for`, `break`,
   `continue`, ternary, **`switch`** tanpa fall-through.
 - Lambda/closure sejati (`fn`), capture by-value.
-- **`malloc<64mb> { ... }`** — arena per blok (default 32 MB, ukuran
-  custom `b/kb/mb/gb`), dibebaskan di semua jalur keluar blok; alokasi
-  melewati batas menghasilkan error yang menyebut batasnya.
+- **`malloc { ... }` otomatis** — arena sampai 4096 MB (RAM sesuai
+  kebutuhan), tanpa menebak ukuran; `malloc<64mb>` untuk batas keras
+  (`b/kb/mb/gb`), dibebaskan di semua jalur keluar blok.
+- **Diagnostik compiler pintar** — baris sumber + penunjuk kolom +
+  `saran:` perbaikan (mis. lupa `import Str;`, cast, batas malloc).
 - JSON literal `json {...}` + pustaka `Json` (parse/write/get/put).
-- Diagnostik runtime: nomor baris + stack trace saat error.
+- Diagnostik runtime: nomor baris + stack trace + saran saat error.
 - Multi-file: `import Nama;` mencari `lib/<kategori>/Nama.kop`.
 
 ## Pustaka standar (42 modul, ditulis dengan Kopi)
@@ -122,7 +129,7 @@ test.sh     suite lintas backend
 
 ## Status
 
-`v1.21.0` — **145 pass, 0 fail**. Riwayat versi lengkap:
+`v1.23.0` — **155 pass, 0 fail**. Riwayat versi lengkap:
 [`CHANGELOG.md`](CHANGELOG.md). Batas jujur & rencana:
 [docs/06-batas-roadmap.md](docs/06-batas-roadmap.md).
 

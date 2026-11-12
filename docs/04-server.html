@@ -238,10 +238,10 @@ if (ctx.length &gt; 0) {
 }</code></pre>
 <p>Yang <strong>belum</strong>: TLS server, verifikasi ECDSA CertificateVerify, validasi rantai/PKI, hostname, masa berlaku, session resumption.</p>
 <h2 id="7-auth-session-jwt-di-server">7. Auth, session, JWT di server<a class="anchor" href="#7-auth-session-jwt-di-server" aria-label="tautan">#</a></h2>
-<pre><code class="language-java">int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
+<pre><code class="language-java">String h = HttpServer.headerValue(req, "Authorization");
 if (!Auth.checkBasic(h, user, pass)) {
     int[] r = HttpServer.respond(401, ctype,
-                  Net.bytes("unauthorized\n"), Auth.challenge(Net.bytes("admin")), keep);
+                  "unauthorized\n", Auth.challenge("admin"), keep);
     HttpServer.send(c, r);
     continue;
 }</code></pre>
@@ -249,10 +249,10 @@ if (!Auth.checkBasic(h, user, pass)) {
 <pre><code class="language-java">int[] ids  = MapStr.make(256, 8192);
 int[] exps = MapStr.make(256, 8192);
 // login:
-int[] sid = Session.create(ids, exps, uid, 3600);
-int[] extra = HttpServer.setCookie(Net.bytes("sid"), sid, Net.bytes("/"), 3600);
+String sid = Session.create(ids, exps, uid, 3600);
+String extra = HttpServer.setCookie("sid", sid, "/", 3600);
 // request berikutnya:
-int uid = Session.get(ids, exps, HttpServer.cookie(req, Net.bytes("sid")), Net.time());</code></pre>
+int uid = Session.get(ids, exps, HttpServer.cookie(req, "sid"), Net.time());</code></pre>
 <p>JWT:</p>
 <pre><code class="language-java">int[] out = new int[256];
 if (Jwt.verify(token, secret, out) != 1) { /* 401 */ }</code></pre>

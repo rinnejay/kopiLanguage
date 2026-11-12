@@ -21,7 +21,7 @@ class Dns {
 
     /* nama "kopi.test" (byte-as-int, pemisah titik ASCII 46)
      * → QNAME: panjang·oktet ... lalu terminator 0 */
-    static int[] qname(int[] dotted) {
+    static int[] qname(String dotted) {
         int[] tmp = new int[dotted.length + 2];
         int o = 0;
         int start = 0;
@@ -40,7 +40,7 @@ class Dns {
     }
 
     /* permintaan penuh: header + QNAME + QTYPE + QCLASS=1 (IN) */
-    static int[] query(int[] dottedName, int qtype) {
+    static int[] query(String dottedName, int qtype) {
         int[] n = qname(dottedName);
         int[] h = new int[12 + n.length + 4];
         h[0] = 0; h[1] = 0;               /* ID = 0 (uji; acak dijadwal) */
@@ -107,7 +107,7 @@ class Dns {
      *   hasil[0] = RCODE (0 = NOERROR, 3 = NXDOMAIN, ...),
      *   hasil[1..4] = oktet IPv4 jawaban A pertama (atau -1 bila kosong)
      * kembali: 0 sukses / negatif galat jaringan / -9 = balas salah bentuk */
-    static int lookup(int addr, int port, int[] dottedName, int[] hasil, int cap) {
+    static int lookup(int addr, int port, String dottedName, int[] hasil, int cap) {
         hasil[0] = -1; hasil[1] = -1; hasil[2] = -1; hasil[3] = -1; hasil[4] = -1;
         int fd = Tcp.open(addr, port);
         if (fd < 0) return fd;

@@ -12,7 +12,7 @@
 //   koin ke-k (k<NCOIN), basis CBASE + k*CSTRIDE:
 //     +0 aktif  +1 x  +2 y  +3 cadangan
 
-import Str;
+import Bytes;
 import Wire;
 
 class Arena {
@@ -171,6 +171,6 @@ class Arena {
             k = Wire.put16(b, k, w[c(j, 1)]);
             k = Wire.put16(b, k, w[c(j, 2)]);
         }
-        return Str.slice(b, 0, k);
+        return Bytes.slice(b, 0, k);
     }
 }

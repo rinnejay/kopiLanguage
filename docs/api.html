@@ -37,7 +37,7 @@
 <tr>
 <td><strong>Core</strong></td>
 <td><code>lib/core/</code></td>
-<td><code>Arrays</code>, <code>Deque</code>, <code>Digits</code>, <code>File</code>, <code>Json</code>, <code>Log</code>, <code>Map</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>Path</code>, <code>Set</code>, <code>Stats</code>, <code>Str</code>, <code>Time</code></td>
+<td><code>Arrays</code>, <code>Bytes</code>, <code>Deque</code>, <code>Digits</code>, <code>File</code>, <code>Json</code>, <code>Log</code>, <code>Map</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>Path</code>, <code>Set</code>, <code>Stats</code>, <code>Str</code>, <code>Time</code></td>
 </tr>
 <tr>
 <td><strong>Net</strong></td>
@@ -64,6 +64,12 @@
 <td><code>lib/core/Arrays.kop</code></td>
 <td>23</td>
 <td>Operasi array <code>int[]</code>: agregat, potong/gabung, sort, pencarian, dan gaya fungsional (lambda).</td>
+</tr>
+<tr>
+<td><a href="api-core.html#bytes"><code>Bytes</code></a></td>
+<td><code>lib/core/Bytes.kop</code></td>
+<td>48</td>
+<td>Utilitas buffer byte <code>int[]</code>: I/O biner, jaringan, kriptografi. Untuk teks gunakan <code>Str</code>.</td>
 </tr>
 <tr>
 <td><a href="api-core.html#deque"><code>Deque</code></a></td>
@@ -104,7 +110,7 @@
 <tr>
 <td><a href="api-core.html#mapstr"><code>MapStr</code></a></td>
 <td><code>lib/core/MapStr.kop</code></td>
-<td>17</td>
+<td>13</td>
 <td>Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan…</td>
 </tr>
 <tr>
@@ -140,8 +146,8 @@
 <tr>
 <td><a href="api-core.html#str"><code>Str</code></a></td>
 <td><code>lib/core/Str.kop</code></td>
-<td>41</td>
-<td>Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks.…</td>
+<td>109</td>
+<td>Utilitas teks native <code>String</code>: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding,…</td>
 </tr>
 <tr>
 <td><a href="api-core.html#time"><code>Time</code></a></td>
@@ -179,7 +185,7 @@
 <tr>
 <td><a href="api-net.html#httpserver"><code>HttpServer</code></a></td>
 <td><code>lib/net/HttpServer.kop</code></td>
-<td>33</td>
+<td>34</td>
 <td>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,…</td>
 </tr>
 <tr>

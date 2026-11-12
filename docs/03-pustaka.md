@@ -11,7 +11,7 @@ import HttpServer;
 
 | Folder | Modul |
 |---|---|
-| `lib/core/` | `Str` `Math` `Digits` `Stats` `Matrix` `Arrays` `Json` `Map` `MapStr` `Set` `Deque` `File` `Path` `Time` `Log` |
+| `lib/core/` | `Str` `Bytes` `Math` `Digits` `Stats` `Matrix` `Arrays` `Json` `Map` `MapStr` `Set` `Deque` `File` `Path` `Time` `Log` |
 | `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` |
 | `lib/crypto/` | `Crypto` `Cipher` `Hash` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
 
@@ -22,26 +22,48 @@ import HttpServer;
 
 ---
 
-## 1. `Str` — teks & konversi
+## 1. `Str` — teks native `String`
 
-`String` dan `int[]` byte kompatibel; hampir semua fungsi `Str` menerima
-keduanya.
+Sejak **v1.23** `Str` hanya memakai `String`: parameter dan hasil teks
+tidak lagi berupa `int[]`. Buffer byte ada di modul terpisah `Bytes`.
 
 | Fungsi | Guna |
 |---|---|
-| `len(s) isEmpty(s)` | panjang byte / kosong |
-| `eq(a,b) cmp(a,b) equalsIgnoreCase(a,b)` | perbandingan isi |
-| `copy(s) cat(a,b) slice(s,from,n) at(s,i)` | salin, gabung, potong, indeks |
-| `indexOf(s,ndl,from) lastIndexOf(s,ndl) contains startsWith endsWith` | pencarian |
-| `trim trimLeft trimRight upper lower reverse repeat(n)` | transformasi |
-| `replaceByte(from,to) replaceSeq(old,new)` | ganti byte / substring |
-| `countByte(b) splitCount(sep) splitAt(sep,idx)` | hitung/pisah |
-| `padLeft(s,w,pad) padRight(...)` | padding dengan byte `pad` |
-| `fromInt fromUInt fromLong fromULong fromDouble boolText` | angka → teks |
-| `toInt isDigits utf8Count hex(data)` | parsing / utilitas |
-| `print(s) line(s)` | tulis byte ke stdout (tanpa/dengan newline) |
+| `len isEmpty isBlank eq/equals cmp compare equalsIgnoreCase` | dasar & perbandingan |
+| `cat(a,b) join(parts,sep) copy` | gabung / salinan nilai |
+| `sub/slice(from,n) left(n) right(n) before/after beforeLast/afterLast between` | potong teks |
+| `indexOf(s,ndl,from) lastIndexOf contains startsWith endsWith count` | pencarian |
+| `trim trimLeft trimRight strip upper lower capitalize uncapitalize swapCase` | trim & huruf |
+| `replace(old,new) replaceSeq replaceByte repeat reverse` | ubah teks |
+| `split(s,sep) splitChar(s,sepByte) splitAt splitCount lines words` | pisah / baris / kata |
+| `padLeft(s,w,pad) padRight center truncate ellipsis` | padding & batas |
+| `fromInt/Long/Short/Byte/UInt8..64/Float/Double/Bool/Char` | skalar → teks |
+| `toInt/Long/Short/Byte/UInt8..64/Float/Double/Bool` | teks → skalar |
+| `parseInt/parseLong(s,radix) isDigits isNumber isHex` | parsing basis & validasi |
+| `toHex fromHex` | hex ↔ teks byte |
+| `utf8Count utf8Valid utf8Offset utf8Slice utf8CodeAt utf8Reverse` | utilitas UTF-8 |
+| `print(s) line(s)` | tulis teks ke stdout |
 
-`padLeft(Str.fromInt(7), 3, 48)` → `"007"`.
+`Str.padLeft(Str.fromInt(7), 3, 48)` → `"007"`.
+`Str.join(Str.split("a,b,c", ","), "|")` → `"a|b|c"`.
+
+## 1b. `Bytes` — buffer `int[]`
+
+Untuk I/O biner, jaringan, dan kriptografi. Konversi eksplisit:
+`Net.strbytes(teks)` → `int[]`, `Net.mkstr(buf)` → `String`
+(atau `Bytes.of` / `Bytes.text`).
+
+| Fungsi | Guna |
+|---|---|
+| `len isEmpty eq cmp copy cat cat3` | dasar |
+| `slice/sub(from,n) at first last` | potong & indeks |
+| `find(byte,from) indexOf lastIndexOf contains startsWith endsWith count` | cari |
+| `trim trimLeft trimRight upper lower equalsIgnoreCase` | trim & case |
+| `repeat reverse replaceByte replaceSeq padLeft padRight fill zero` | ubah buffer |
+| `splitCount(sepByte) splitAt(sepByte,idx)` | pisah |
+| `fromInt fromLong toInt isDigits` | angka ↔ byte |
+| `of(text) text(buf) hex(data)` | konversi representasi & hex |
+| `print(buf) line(buf)` | tulis buffer ke stdout |
 
 ## 2. `Arrays` — array `int[]`
 
@@ -139,7 +161,7 @@ per blok.
 
 ```java
 import Log;
-Log.info(Net.bytes("boot"), Net.bytes("siap"));
+Log.info("boot", "siap");
 Log.warn(...); Log.error(...);
 ```
 
@@ -186,7 +208,7 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port
 authority host portOf path query fragment ip4 normalize resolve`.
 
 ```java
-int[] u = Url.resolve("http://a/b/c/d;p?q", "../g");  // http://a/b/g
+String u = Url.resolve("http://a/b/c/d;p?q", "../g");  // http://a/b/g
 ```
 
 ### `Http` (klien)
@@ -243,17 +265,17 @@ server dan belum verifikasi ECDSA CertificateVerify.
 ```java
 import Pbkdf2; import Jwt; import Session; import Auth; import MapStr;
 
-int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);
-int[] token = Jwt.sign(payloadJson, secret);
-int valid = Jwt.verify(token, secret, out);      // 1 sah, 0 salah, -1 bentuk
+int[] hash  = Pbkdf2.sha256(pass, salt, 100000, 32);   // hash tetap biner
+String token = Jwt.sign(payloadJson, secret);           // JWT = teks
+int valid = Jwt.verify(token, secret, out);             // 1 sah, 0 salah, -1 bentuk
 
 int[] ids  = MapStr.make(256, 8192);
 int[] exps = MapStr.make(256, 8192);
-int[] sid  = Session.create(ids, exps, uid, 3600);
+String sid = Session.create(ids, exps, uid, 3600);
 int uid2   = Session.get(ids, exps, sid, Net.time());
 
-int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
-Auth.checkBasic(h, Net.bytes("budi"), Net.bytes("rahasia"));
+String h = HttpServer.headerValue(req, "Authorization");
+Auth.checkBasic(h, "budi", "rahasia");
 Auth.bearer(h);
 ```
 

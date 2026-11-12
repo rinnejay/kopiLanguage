@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#time">Time</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#time">Time</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="arrays">Arrays<a class="anchor" href="#arrays" aria-label="tautan">#</a></h2>
@@ -139,6 +139,219 @@ int[] s = Arrays.sort(a);                    // [1,2,3,4]</code></pre>
 <tr>
 <td><code>static int sumBy(int[] xs, fn f)</code></td>
 <td>jumlah hasil pemetaan</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="bytes">Bytes<a class="anchor" href="#bytes" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Bytes.kop</code> · 48 fungsi</p>
+<p>Utilitas buffer byte <code>int[]</code>: I/O biner, jaringan, kriptografi. Untuk teks gunakan <code>Str</code>.</p>
+<pre><code class="language-java">import Bytes;
+
+int[] b = Net.strbytes("  Kopi  ");
+System.out.println(Net.mkstr(Bytes.trim(b))); // Kopi
+String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Semua parameter/hasil byte memakai <code>int[]</code>.</li>
+<li><code>String → int[]</code> implisit; <code>int[] → String</code> lewat <code>Net.mkstr</code>/<code>Bytes.text</code>.</li>
+<li>Gula <code>buf.trim()</code> didesugar ke <code>Bytes.trim(buf)</code> (butuh <code>import Bytes;</code>).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int len(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isEmpty(int[] s)</code></td>
+<td>true bila kosong</td>
+</tr>
+<tr>
+<td><code>static boolean eq(int[] a, int[] b)</code></td>
+<td>true bila isi kedua buffer sama</td>
+</tr>
+<tr>
+<td><code>static int cmp(int[] a, int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] copy(int[] a)</code></td>
+<td>salinan (array baru)</td>
+</tr>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>gabung dua buffer menjadi buffer baru</td>
+</tr>
+<tr>
+<td><code>static int[] cat3(int[] a, int[] b, int[] c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] slice(int[] s, int from, int n)</code></td>
+<td>potong <code>n</code> byte mulai <code>from</code> (di-clamp)</td>
+</tr>
+<tr>
+<td><code>static int[] sub(int[] s, int from, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int at(int[] s, int i)</code></td>
+<td>byte pada indeks, -1 di luar batas</td>
+</tr>
+<tr>
+<td><code>static int first(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int last(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int find(int[] s, int b, int from)</code></td>
+<td>indeks elemen, -1 bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int indexOf(int[] s, int[] ndl, int from)</code></td>
+<td>indeks kemunculan pertama dari <code>from</code>, -1 bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int lastIndexOf(int[] s, int[] ndl)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean contains(int[] s, int[] ndl)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean startsWith(int[] s, int[] p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean endsWith(int[] s, int[] p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int utf8Count(int[] s)</code></td>
+<td>jumlah code point UTF-8 (byte non-continuation)</td>
+</tr>
+<tr>
+<td><code>static int countByte(int[] s, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int count(int[] s, int[] ndl)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isSpace(int c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] trimLeft(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] trimRight(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] trim(int[] s)</code></td>
+<td>buang spasi/tab/CR/LF di kedua ujung</td>
+</tr>
+<tr>
+<td><code>static int[] upper(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] lower(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean equalsIgnoreCase(int[] a, int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] repeat(int[] s, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] reverse(int[] s)</code></td>
+<td>salinan terbalik</td>
+</tr>
+<tr>
+<td><code>static int[] replaceByte(int[] s, int from, int to)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] replaceSeq(int[] s, int[] old, int[] nw)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] padLeft(int[] s, int width, int pad)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] padRight(int[] s, int width, int pad)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void fill(int[] s, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void zero(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int splitCount(int[] s, int sep)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] splitAt(int[] s, int sep, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] fromInt(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] fromLong(long v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int toInt(int[] s)</code></td>
+<td>parse desimal dari buffer</td>
+</tr>
+<tr>
+<td><code>static boolean isDigits(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] of(String s)</code></td>
+<td>String → salinan byte</td>
+</tr>
+<tr>
+<td><code>static String text(int[] s)</code></td>
+<td>buffer → String (materialisasi)</td>
+</tr>
+<tr>
+<td><code>static int[] hex(int[] data)</code></td>
+<td>byte → teks hex lowercase (int[])</td>
+</tr>
+<tr>
+<td><code>static int hexChar(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void print(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void line(int[] s)</code></td>
+<td>tulis dengan newline</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -289,15 +502,15 @@ File.close(r);</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int openRead(int[] path)</code></td>
+<td><code>static int openRead(String path)</code></td>
 <td>buka file hanya-baca; -1 bila gagal</td>
 </tr>
 <tr>
-<td><code>static int create(int[] path)</code></td>
+<td><code>static int create(String path)</code></td>
 <td>buat/buka file</td>
 </tr>
 <tr>
-<td><code>static int append(int[] path)</code></td>
+<td><code>static int append(String path)</code></td>
 <td>buka untuk menambah di akhir</td>
 </tr>
 <tr>
@@ -329,15 +542,15 @@ File.close(r);</code></pre>
 <td>jumlah elemen saat ini</td>
 </tr>
 <tr>
-<td><code>static int remove(int[] path)</code></td>
+<td><code>static int remove(String path)</code></td>
 <td>hapus elemen</td>
 </tr>
 <tr>
-<td><code>static int renameTo(int[] oldp, int[] newp)</code></td>
+<td><code>static int renameTo(String oldp, String newp)</code></td>
 <td>ganti nama file/direktori</td>
 </tr>
 <tr>
-<td><code>static int mkdir(int[] path)</code></td>
+<td><code>static int mkdir(String path)</code></td>
 <td>buat direktori</td>
 </tr>
 <tr>
@@ -425,11 +638,11 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <td>nilai JSON boolean</td>
 </tr>
 <tr>
-<td><code>static int[] num(int[] text)</code></td>
+<td><code>static int[] num(String text)</code></td>
 <td>nilai JSON angka dari teks desimal</td>
 </tr>
 <tr>
-<td><code>static int[] str(int[] s)</code></td>
+<td><code>static int[] str(String s)</code></td>
 <td>nilai JSON string (di-escape)</td>
 </tr>
 <tr>
@@ -477,7 +690,7 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <td>boolean nilai (0/1)</td>
 </tr>
 <tr>
-<td><code>static int[] asText(int[] v)</code></td>
+<td><code>static String asText(int[] v)</code></td>
 <td>teks mentah untuk number/string</td>
 </tr>
 <tr>
@@ -489,23 +702,23 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <td>elemen array pada indeks (null di luar rentang)</td>
 </tr>
 <tr>
-<td><code>static boolean keyEq(int[] t, int at, int len, int[] key)</code></td>
+<td><code>static boolean keyEq(int[] t, int at, int len, String key)</code></td>
 <td>(internal) bandingkan kunci pada tape</td>
 </tr>
 <tr>
-<td><code>static int[] get(int[] obj, int[] key)</code></td>
+<td><code>static int[] get(int[] obj, String key)</code></td>
 <td>ambil nilai</td>
 </tr>
 <tr>
-<td><code>static boolean has(int[] obj, int[] key)</code></td>
+<td><code>static boolean has(int[] obj, String key)</code></td>
 <td>true bila elemen/kunci ada</td>
 </tr>
 <tr>
-<td><code>static int[] put(int[] obj, int[] key, int[] val)</code></td>
+<td><code>static int[] put(int[] obj, String key, int[] val)</code></td>
 <td>objek baru dengan key diganti/ditambah (immutable)</td>
 </tr>
 <tr>
-<td><code>static int[] del(int[] obj, int[] key)</code></td>
+<td><code>static int[] del(int[] obj, String key)</code></td>
 <td>objek tanpa kunci key (tape baru)</td>
 </tr>
 <tr>
@@ -545,19 +758,19 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <td>array JSON 8 elemen</td>
 </tr>
 <tr>
-<td><code>static int[] obj1(int[] k1, int[] v1)</code></td>
+<td><code>static int[] obj1(String k1, int[] v1)</code></td>
 <td>objek JSON 1 pasangan</td>
 </tr>
 <tr>
-<td><code>static int[] obj2(int[] k1, int[] v1, int[] k2, int[] v2)</code></td>
+<td><code>static int[] obj2(String k1, int[] v1, String k2, int[] v2)</code></td>
 <td>objek JSON 2 pasangan</td>
 </tr>
 <tr>
-<td><code>static int[] obj3(int[] k1, int[] v1, int[] k2, int[] v2, int[] k3, int[] v3)</code></td>
+<td><code>static int[] obj3(String k1, int[] v1, String k2, int[] v2, String k3, int[] v3)</code></td>
 <td>objek JSON 3 pasangan</td>
 </tr>
 <tr>
-<td><code>static int[] obj4(int[] k1, int[] v1, int[] k2, int[] v2, int[] k3, int[] v3, int[] k4, int[] v4)</code></td>
+<td><code>static int[] obj4(String k1, int[] v1, String k2, int[] v2, String k3, int[] v3, String k4, int[] v4)</code></td>
 <td>objek JSON 4 pasangan</td>
 </tr>
 <tr>
@@ -593,7 +806,7 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <td>(internal) parse satu nilai dari posisi</td>
 </tr>
 <tr>
-<td><code>static int[] parse(int[] text)</code></td>
+<td><code>static int[] parse(String text)</code></td>
 <td>parse teks JSON menjadi tape (null bila rusak)</td>
 </tr>
 <tr>
@@ -666,8 +879,8 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <p>Logging ke stderr dengan timestamp UTC dan level.</p>
 <pre><code class="language-java">import Log;
 
-Log.info(Net.bytes("boot"), Net.bytes("server siap"));
-Log.error(Net.bytes("db"), Net.bytes("gagal konek"));</code></pre>
+Log.info("boot", "server siap");
+Log.error("db", "gagal konek");</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
 <li>stderr tidak di-buffer; aman untuk supervisor.</li>
@@ -678,19 +891,19 @@ Log.error(Net.bytes("db"), Net.bytes("gagal konek"));</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static void emit(int[] level, int[] tag, int[] msg)</code></td>
+<td><code>static void emit(String level, String tag, String msg)</code></td>
 <td>(internal) tulis baris level + pesan ke stderr</td>
 </tr>
 <tr>
-<td><code>static void info(int[] tag, int[] msg)</code></td>
+<td><code>static void info(String tag, String msg)</code></td>
 <td>log INFO</td>
 </tr>
 <tr>
-<td><code>static void warn(int[] tag, int[] msg)</code></td>
+<td><code>static void warn(String tag, String msg)</code></td>
 <td>log WARN</td>
 </tr>
 <tr>
-<td><code>static void error(int[] tag, int[] msg)</code></td>
+<td><code>static void error(String tag, String msg)</code></td>
 <td>log ERROR</td>
 </tr>
 </tbody></table></div>
@@ -784,7 +997,7 @@ System.out.println(Map.size(m));      // 1</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="mapstr">MapStr<a class="anchor" href="#mapstr" aria-label="tautan">#</a></h2>
-<p><code>lib/core/MapStr.kop</code> · 17 fungsi</p>
+<p><code>lib/core/MapStr.kop</code> · 13 fungsi</p>
 <p>Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan tabel kecil.</p>
 <pre><code class="language-java">import MapStr;
 
@@ -818,39 +1031,23 @@ System.out.println(MapStr.get(m, "Content-Type")); // 1</code></pre>
 <td>byte pool kunci yang sudah terpakai</td>
 </tr>
 <tr>
-<td><code>static int hash(int[] k)</code></td>
-<td>(internal) hash FNV kunci</td>
-</tr>
-<tr>
-<td><code>static boolean same(int[] m, int slot, int[] key, int h)</code></td>
-<td>bandingkan dua nilai</td>
-</tr>
-<tr>
-<td><code>static int find(int[] m, int[] key)</code></td>
-<td>indeks elemen, -1 bila tidak ada</td>
-</tr>
-<tr>
-<td><code>static boolean has(int[] m, int[] key)</code></td>
+<td><code>static boolean has(int[] m, String key)</code></td>
 <td>true bila elemen/kunci ada</td>
 </tr>
 <tr>
-<td><code>static int get(int[] m, int[] key)</code></td>
+<td><code>static int get(int[] m, String key)</code></td>
 <td>ambil nilai</td>
 </tr>
 <tr>
-<td><code>static int getOr(int[] m, int[] key, int def)</code></td>
+<td><code>static int getOr(int[] m, String key, int def)</code></td>
 <td>ambil nilai atau default bila tidak ada</td>
 </tr>
 <tr>
-<td><code>static boolean place(int[] m, int at, int[] key, int h, int v)</code></td>
-<td>(internal) tulis pasangan pada slot</td>
-</tr>
-<tr>
-<td><code>static boolean put(int[] m, int[] key, int v)</code></td>
+<td><code>static boolean put(int[] m, String keyStr, int v)</code></td>
 <td>simpan pasangan</td>
 </tr>
 <tr>
-<td><code>static boolean remove(int[] m, int[] key)</code></td>
+<td><code>static boolean remove(int[] m, String key)</code></td>
 <td>hapus elemen</td>
 </tr>
 <tr>
@@ -866,7 +1063,7 @@ System.out.println(MapStr.get(m, "Content-Type")); // 1</code></pre>
 <td>(internal) nilai pada slot i</td>
 </tr>
 <tr>
-<td><code>static int[] keyAtSlot(int[] m, int i)</code></td>
+<td><code>static String keyAtSlot(int[] m, int i)</code></td>
 <td>(internal) kunci pada slot i</td>
 </tr>
 </tbody></table></div>
@@ -1283,27 +1480,27 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] sep()</code></td>
+<td><code>static String sep()</code></td>
 <td>string pemisah path (/)</td>
 </tr>
 <tr>
-<td><code>static int[] join(int[] a, int[] b)</code></td>
+<td><code>static String join(String a, String b)</code></td>
 <td>gabung dua path dengan pemisah</td>
 </tr>
 <tr>
-<td><code>static int[] base(int[] p)</code></td>
+<td><code>static String base(String p)</code></td>
 <td>nama file terakhir tanpa direktori</td>
 </tr>
 <tr>
-<td><code>static int[] dir(int[] p)</code></td>
+<td><code>static String dir(String p)</code></td>
 <td>bagian direktori (tanpa nama file)</td>
 </tr>
 <tr>
-<td><code>static int[] ext(int[] p)</code></td>
+<td><code>static String ext(String p)</code></td>
 <td>ekstensi tanpa titik</td>
 </tr>
 <tr>
-<td><code>static boolean isAbsolute(int[] p)</code></td>
+<td><code>static boolean isAbsolute(String p)</code></td>
 <td>true bila path absolut</td>
 </tr>
 </tbody></table></div>
@@ -1439,17 +1636,19 @@ System.out.println(Stats.median(a));    // 4</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="str">Str<a class="anchor" href="#str" aria-label="tautan">#</a></h2>
-<p><code>lib/core/Str.kop</code> · 41 fungsi</p>
-<p>Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks. Bekerja pada String maupun <code>int[]</code> byte.</p>
+<p><code>lib/core/Str.kop</code> · 109 fungsi</p>
+<p>Utilitas teks native <code>String</code>: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding, konversi semua tipe skalar, hex, dan UTF-8. Tidak memakai <code>int[]</code>.</p>
 <pre><code class="language-java">import Str;
 
 String s = "  Kopi  ";
-System.out.println(Str.trim(s));              // Kopi
-System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007</code></pre>
+System.out.println(Str.trim(s));                        // Kopi
+System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007
+System.out.println(Str.join(Str.split("a,b", ","), "|")); // a|b</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
 <li><code>length</code> adalah jumlah byte, bukan karakter Unicode.</li>
 <li><code>fromDouble</code> maksimum 6 digit pecahan; format specifier belum ada.</li>
+<li>Buffer byte ada di modul <code>Bytes</code>; konversi <code>Net.strbytes</code>/<code>Net.mkstr</code>.</li>
 </ul>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -1457,148 +1656,272 @@ System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int len(int[] s)</code></td>
+<td><code>static int len(String s)</code></td>
 <td>panjang byte</td>
 </tr>
 <tr>
-<td><code>static boolean isEmpty(int[] s)</code></td>
+<td><code>static boolean isEmpty(String s)</code></td>
 <td>true bila kosong</td>
 </tr>
 <tr>
-<td><code>static boolean eq(int[] a, int[] b)</code></td>
+<td><code>static boolean isSpace(int c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isBlank(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean eq(String a, String b)</code></td>
 <td>true bila isi kedua teks sama</td>
 </tr>
 <tr>
-<td><code>static int cmp(int[] a, int[] b)</code></td>
+<td><code>static boolean equals(String a, String b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int cmp(String a, String b)</code></td>
 <td>perbandingan leksikografis (-1/0/1)</td>
 </tr>
 <tr>
-<td><code>static int[] copy(int[] a)</code></td>
-<td>salinan (array baru)</td>
+<td><code>static int compare(String a, String b)</code></td>
+<td>—</td>
 </tr>
 <tr>
-<td><code>static int[] cat(int[] a, int[] b)</code></td>
-<td>gabung dua array menjadi array baru</td>
+<td><code>static int compareIgnoreCase(String a, String b)</code></td>
+<td>—</td>
 </tr>
 <tr>
-<td><code>static int[] slice(int[] s, int from, int n)</code></td>
+<td><code>static boolean equalsIgnoreCase(String a, String b)</code></td>
+<td>perbandingan isi tanpa peduli huruf besar/kecil</td>
+</tr>
+<tr>
+<td><code>static String copy(String s)</code></td>
+<td>String immutable: salinan aman dipakai sebagai nilai baru</td>
+</tr>
+<tr>
+<td><code>static String cat(String a, String b)</code></td>
+<td>gabung dua teks</td>
+</tr>
+<tr>
+<td><code>static String join(String[] parts, String sep)</code></td>
+<td>gabung String[] dengan pemisah</td>
+</tr>
+<tr>
+<td><code>static String sub(String s, int from, int n)</code></td>
 <td>potong <code>n</code> byte mulai <code>from</code> (di-clamp)</td>
 </tr>
 <tr>
-<td><code>static int at(int[] s, int i)</code></td>
-<td>byte pada indeks (0..255)</td>
+<td><code>static String slice(String s, int from, int n)</code></td>
+<td>alias <code>sub</code> untuk String</td>
 </tr>
 <tr>
-<td><code>static int indexOf(int[] s, int[] ndl, int from)</code></td>
+<td><code>static String left(String s, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String right(String s, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String dropLeft(String s, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String dropRight(String s, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String before(String s, String sep)</code></td>
+<td>potongan sebelum/sesudah pemisah pertama ("" bila tidak ada)</td>
+</tr>
+<tr>
+<td><code>static String after(String s, String sep)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String beforeLast(String s, String sep)</code></td>
+<td>potongan sebelum/sesudah pemisah terakhir</td>
+</tr>
+<tr>
+<td><code>static String afterLast(String s, String sep)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String between(String s, String open, String close)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int at(String s, int i)</code></td>
+<td>byte pada indeks (0..255), -1 di luar batas</td>
+</tr>
+<tr>
+<td><code>static int charAt(String s, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int first(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int last(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String removePrefix(String s, String p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String removeSuffix(String s, String p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int indexOf(String s, String ndl, int from)</code></td>
 <td>indeks kemunculan pertama dari <code>from</code>, -1 bila tidak ada</td>
 </tr>
 <tr>
-<td><code>static int lastIndexOf(int[] s, int[] ndl)</code></td>
+<td><code>static int lastIndexOf(String s, String ndl)</code></td>
 <td>indeks kemunculan terakhir, -1 bila tidak ada</td>
 </tr>
 <tr>
-<td><code>static boolean contains(int[] s, int[] ndl)</code></td>
+<td><code>static boolean contains(String s, String ndl)</code></td>
 <td>true bila memuat substring</td>
 </tr>
 <tr>
-<td><code>static boolean startsWith(int[] s, int[] p)</code></td>
+<td><code>static boolean startsWith(String s, String p)</code></td>
 <td>true bila diawali ndl</td>
 </tr>
 <tr>
-<td><code>static boolean endsWith(int[] s, int[] p)</code></td>
+<td><code>static boolean endsWith(String s, String p)</code></td>
 <td>true bila diakhiri ndl</td>
 </tr>
 <tr>
-<td><code>static String trimLeft(int[] s)</code></td>
-<td>buang whitespace di ujung kiri</td>
+<td><code>static int count(String s, String ndl)</code></td>
+<td>jumlah kemunculan tidak tumpang tindih</td>
 </tr>
 <tr>
-<td><code>static String trimRight(int[] s)</code></td>
-<td>buang whitespace di ujung kanan</td>
-</tr>
-<tr>
-<td><code>static String trim(int[] s)</code></td>
-<td>buang spasi/tab/CR/LF di kedua ujung</td>
-</tr>
-<tr>
-<td><code>static String upper(int[] s)</code></td>
-<td>huruf besar (ASCII)</td>
-</tr>
-<tr>
-<td><code>static String lower(int[] s)</code></td>
-<td>huruf kecil (ASCII)</td>
-</tr>
-<tr>
-<td><code>static String repeat(int[] s, int n)</code></td>
-<td>ulang string n kali</td>
-</tr>
-<tr>
-<td><code>static String reverse(int[] s)</code></td>
-<td>salinan terbalik</td>
-</tr>
-<tr>
-<td><code>static String replaceByte(int[] s, int from, int to)</code></td>
-<td>ganti semua byte from → to</td>
-</tr>
-<tr>
-<td><code>static String replaceSeq(int[] s, int[] old, int[] nw)</code></td>
-<td>ganti semua kemunculan old → nw</td>
-</tr>
-<tr>
-<td><code>static int countByte(int[] s, int b)</code></td>
+<td><code>static int countByte(String s, int b)</code></td>
 <td>berapa kali byte b muncul</td>
 </tr>
 <tr>
-<td><code>static int splitCount(int[] s, int sep)</code></td>
-<td>berapa banyak potongan dengan pemisah sep</td>
+<td><code>static String trimLeft(String s)</code></td>
+<td>buang whitespace di ujung kiri</td>
 </tr>
 <tr>
-<td><code>static String splitAt(int[] s, int sep, int idx)</code></td>
-<td>potongan ke-idx dengan pemisah sep</td>
+<td><code>static String trimRight(String s)</code></td>
+<td>buang whitespace di ujung kanan</td>
 </tr>
 <tr>
-<td><code>static String sub(int[] s, int from, int n)</code></td>
-<td>substring ala umum: potongan teks sebagai String (v1.17). Str.slice tetap int[] untuk buffer byte I/O.</td>
+<td><code>static String trim(String s)</code></td>
+<td>buang spasi/tab/CR/LF di kedua ujung</td>
 </tr>
 <tr>
-<td><code>static String padLeft(int[] s, int width, int pad)</code></td>
+<td><code>static String strip(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String capitalize(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String uncapitalize(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String upper(String s)</code></td>
+<td>huruf besar (ASCII)</td>
+</tr>
+<tr>
+<td><code>static String lower(String s)</code></td>
+<td>huruf kecil (ASCII)</td>
+</tr>
+<tr>
+<td><code>static int lowerByte(int c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String swapCase(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String repeat(String s, int n)</code></td>
+<td>ulang string n kali</td>
+</tr>
+<tr>
+<td><code>static String reverse(String s)</code></td>
+<td>balik byte (ASCII). Untuk UTF-8 gunakan utf8Slice/utf8Reverse.</td>
+</tr>
+<tr>
+<td><code>static String replaceSeq(String s, String old, String nw)</code></td>
+<td>ganti semua kemunculan old → nw</td>
+</tr>
+<tr>
+<td><code>static String replace(String s, String old, String nw)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String replaceByte(String s, int from, int to)</code></td>
+<td>ganti semua byte from → to</td>
+</tr>
+<tr>
+<td><code>static String padLeft(String s, int width, int pad)</code></td>
 <td>tambah byte pad di kiri sampai width</td>
 </tr>
 <tr>
-<td><code>static String padRight(int[] s, int width, int pad)</code></td>
+<td><code>static String padRight(String s, int width, int pad)</code></td>
 <td>tambah byte pad di kanan sampai width</td>
+</tr>
+<tr>
+<td><code>static String center(String s, int width, int pad)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String truncate(String s, int max)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String ellipsis(String s, int max)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int splitCountChar(String s, int sep)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String splitAtChar(String s, int sep, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String[] splitChar(String s, int sep)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int splitCount(String s, String sep)</code></td>
+<td>berapa banyak potongan dengan pemisah sep</td>
+</tr>
+<tr>
+<td><code>static String splitAt(String s, String sep, int idx)</code></td>
+<td>potongan ke-idx dengan pemisah sep</td>
+</tr>
+<tr>
+<td><code>static String[] split(String s, String sep)</code></td>
+<td>pecah teks dengan pemisah String menjadi String[]</td>
+</tr>
+<tr>
+<td><code>static String[] lines(String s)</code></td>
+<td>baris: pemisah \n, \r di ujung tiap baris dibuang</td>
+</tr>
+<tr>
+<td><code>static String[] words(String s)</code></td>
+<td>kata: pemisah spasi/tab/CR/LF, pemisah berurutan dilewati</td>
 </tr>
 <tr>
 <td><code>static String fromInt(int v)</code></td>
 <td>int → teks desimal</td>
 </tr>
 <tr>
-<td><code>static int toInt(int[] s)</code></td>
-<td>parse desimal; 0 bila bukan angka</td>
-</tr>
-<tr>
-<td><code>static boolean isDigits(int[] s)</code></td>
-<td>true bila seluruh isi digit desimal</td>
-</tr>
-<tr>
-<td><code>static boolean equalsIgnoreCase(int[] a, int[] b)</code></td>
-<td>perbandingan isi tanpa peduli huruf besar/kecil</td>
-</tr>
-<tr>
-<td><code>static int utf8Count(int[] s)</code></td>
-<td>jumlah karakter Unicode (bukan byte)</td>
-</tr>
-<tr>
-<td><code>static int[] hex(int[] data)</code></td>
-<td>byte → teks hex lowercase</td>
-</tr>
-<tr>
-<td><code>static String boolText(boolean b)</code></td>
-<td>boolean → "true"/"false"</td>
-</tr>
-<tr>
 <td><code>static String fromUInt(int v)</code></td>
-<td>uint32 (nilai kanonik zero-extended di int)</td>
+<td>uint32 dalam nilai kanonik int (zero-extended)</td>
 </tr>
 <tr>
 <td><code>static String fromLong(long v)</code></td>
@@ -1609,15 +1932,163 @@ System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007</code></pre>
 <td>uint64: divisi unsigned bit-per-bit</td>
 </tr>
 <tr>
+<td><code>static String boolText(boolean b)</code></td>
+<td>boolean → "true"/"false"</td>
+</tr>
+<tr>
+<td><code>static String fromBool(boolean b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromByte(byte v)</code></td>
+<td>varian skalar: tidak ada overloading di Kopi, jadi nama eksplisit</td>
+</tr>
+<tr>
+<td><code>static String fromShort(short v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromUInt8(uint8 v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromUInt16(uint16 v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromUInt32(uint32 v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromUInt64(uint64 v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromFloat(float v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromChar(int c)</code></td>
+<td>satu code point (0..255) menjadi teks</td>
+</tr>
+<tr>
 <td><code>static String fromDouble(double d)</code></td>
-<td>double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang). Batas jujur: bukan algoritma pembulatan Java/printf.</td>
+<td>double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang)</td>
 </tr>
 <tr>
-<td><code>static void print(int[] s)</code></td>
-<td>tulis byte ke stdout tanpa newline</td>
+<td><code>static int toInt(String s)</code></td>
+<td>parse desimal; 0 bila bukan angka</td>
 </tr>
 <tr>
-<td><code>static void line(int[] s)</code></td>
+<td><code>static int toIntOr(String s, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long toLong(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int parseInt(String s, int radix)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long parseLong(String s, int radix)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int digitValue(int c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static double toDouble(String s)</code></td>
+<td>double sederhana: [-]digit[.digit][e[+-]digit]</td>
+</tr>
+<tr>
+<td><code>static byte toByte(String s)</code></td>
+<td>varian skalar hasil parsing</td>
+</tr>
+<tr>
+<td><code>static short toShort(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static uint8 toUInt8(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static uint16 toUInt16(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static uint32 toUInt32(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static uint64 toUInt64(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static float toFloat(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean toBool(String s)</code></td>
+<td>true: "true", "1", "yes", "on" (tanpa beda huruf besar/kecil)</td>
+</tr>
+<tr>
+<td><code>static boolean isDigits(String s)</code></td>
+<td>true bila seluruh isi digit desimal</td>
+</tr>
+<tr>
+<td><code>static boolean isNumber(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isHex(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String toHex(String s)</code></td>
+<td>byte teks → hex lowercase</td>
+</tr>
+<tr>
+<td><code>static int hexChar(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String fromHex(String s)</code></td>
+<td>hex → teks byte</td>
+</tr>
+<tr>
+<td><code>static int utf8Count(String s)</code></td>
+<td>jumlah code point UTF-8</td>
+</tr>
+<tr>
+<td><code>static boolean utf8Valid(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int utf8Offset(String s, int cp)</code></td>
+<td>offset byte untuk indeks code point ke-cp (0..utf8Count)</td>
+</tr>
+<tr>
+<td><code>static String utf8Slice(String s, int from, int n)</code></td>
+<td>potong n code point mulai code point from (bukan byte)</td>
+</tr>
+<tr>
+<td><code>static int utf8CodeAt(String s, int i)</code></td>
+<td>code point pertama pada byte offset i (-1 bila tidak valid)</td>
+</tr>
+<tr>
+<td><code>static String utf8Reverse(String s)</code></td>
+<td>balik per code point (UTF-8 aman untuk teks valid)</td>
+</tr>
+<tr>
+<td><code>static void print(String s)</code></td>
+<td>tulis teks ke stdout tanpa newline</td>
+</tr>
+<tr>
+<td><code>static void line(String s)</code></td>
 <td>tulis dengan newline</td>
 </tr>
 </tbody></table></div>
@@ -1660,7 +2131,7 @@ Time.sleepMs(10);</code></pre>
 <td>nama hari dari epoch detik</td>
 </tr>
 <tr>
-<td><code>static int[] format(int sec)</code></td>
+<td><code>static String format(int sec)</code></td>
 <td>format "YYYY-MM-DD HH:MM:SS" UTC</td>
 </tr>
 </tbody></table></div>

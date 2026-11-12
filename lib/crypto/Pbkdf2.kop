@@ -4,7 +4,7 @@
 // iterasi, 32). Verifikasi dengan membandingkan hasil secara konstan.
 
 import Hash;
-import Str;
+import Bytes;
 
 class Pbkdf2 {
 
@@ -13,8 +13,8 @@ class Pbkdf2 {
         if (dkLen < 1) dkLen = 1;
         /* semua buffer hasil dialokasikan SEBELUM mark; HMAC sementara
          * dibebaskan tiap iterasi supaya 100k iterasi tidak OOM. */
-        int[] pass2 = Str.copy(pass);
-        int[] salt2 = Str.copy(salt);
+        int[] pass2 = Bytes.copy(pass);
+        int[] salt2 = Bytes.copy(salt);
         int[] t = new int[32];
         int[] ucur = new int[32];
         int[] out = new int[dkLen];
@@ -34,6 +34,10 @@ class Pbkdf2 {
             for (int n = 1; n < iter; n++) {
                 u = Hash.hmac(pass2, ucur);
                 for (int i = 0; i < 32; i++) { ucur[i] = u[i]; t[i] = t[i] ^ u[i]; }
+                /* v1.22: bebaskan buffer HMAC tiap iterasi (bukan tiap blok).
+                 * Iterasi besar (10k+) sebelumnya menumpuk alokasi sampai
+                 * arena 32 MB habis. t/ucur/out aman: dialokasikan sebelum mark. */
+                Net.memReset(mark);
             }
             for (int i = 0; i < 32 && o < dkLen; i++) { out[o] = t[i]; o++; }
             Net.memReset(mark);

@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="05-arsitektur-compiler-panduan-kontribusi">05 — Arsitektur compiler &amp; panduan kontribusi<a class="anchor" href="#05-arsitektur-compiler-panduan-kontribusi" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-peta-repositori">1. Peta repositori</a></li><li class="toc-h2"><a href="#2-pipeline">2. Pipeline</a></li><li class="toc-h2"><a href="#3-struktur-data-inti-ast-h">3. Struktur data inti (ast.h)</a></li><li class="toc-h2"><a href="#4-lexer">4. Lexer</a></li><li class="toc-h2"><a href="#5-parser-resolusi">5. Parser &amp; resolusi</a></li><li class="toc-h2"><a href="#6-konvensi-backend">6. Konvensi backend</a></li><li class="toc-h3"><a href="#aarch64-gen-a64-c">aarch64 (gena64.c)</a></li><li class="toc-h3"><a href="#x86-64-gen-x64-c">x86-64 (genx64.c)</a></li><li class="toc-h3"><a href="#vm-gen-vm-c-vm-kopivm-c">VM (genvm.c + vm/kopivm.c)</a></li><li class="toc-h2"><a href="#7-menambah-fitur-bahasa-checklist">7. Menambah fitur bahasa (checklist)</a></li><li class="toc-h2"><a href="#8-menambah-builtin-net-checklist">8. Menambah builtin Net. (checklist)</a></li><li class="toc-h2"><a href="#9-menambah-pustaka-kop">9. Menambah pustaka .kop</a></li><li class="toc-h2"><a href="#10-uji-kualitas">10. Uji &amp; kualitas</a></li><li class="toc-h2"><a href="#11-debugging">11. Debugging</a></li><li class="toc-h2"><a href="#12-gaya-kode-c">12. Gaya kode C</a></li><li class="toc-h2"><a href="#13-alur-rilis">13. Alur rilis</a></li><li class="toc-h2"><a href="#14-ide-kontribusi-berikutnya">14. Ide kontribusi berikutnya</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-peta-repositori">1. Peta repositori</a></li><li class="toc-h2"><a href="#2-pipeline">2. Pipeline</a></li><li class="toc-h2"><a href="#3-struktur-data-inti-ast-h">3. Struktur data inti (ast.h)</a></li><li class="toc-h2"><a href="#4-lexer">4. Lexer</a></li><li class="toc-h2"><a href="#5-parser-resolusi">5. Parser &amp; resolusi</a></li><li class="toc-h2"><a href="#6-konvensi-backend">6. Konvensi backend</a></li><li class="toc-h3"><a href="#aarch64-gen-a64-c">aarch64 (gena64.c)</a></li><li class="toc-h3"><a href="#x86-64-gen-x64-c">x86-64 (genx64.c)</a></li><li class="toc-h3"><a href="#vm-gen-vm-c-vm-kopivm-c">VM (genvm.c + vm/kopivm.c)</a></li><li class="toc-h3"><a href="#struktur-berkas-v1-22">Struktur berkas (v1.22)</a></li><li class="toc-h2"><a href="#7-menambah-fitur-bahasa-checklist">7. Menambah fitur bahasa (checklist)</a></li><li class="toc-h2"><a href="#8-menambah-builtin-net-checklist">8. Menambah builtin Net. (checklist)</a></li><li class="toc-h3"><a href="#pustaka-teks-vs-buffer-v1-23">Pustaka teks vs buffer (v1.23)</a></li><li class="toc-h2"><a href="#9-menambah-pustaka-kop">9. Menambah pustaka .kop</a></li><li class="toc-h2"><a href="#10-uji-kualitas">10. Uji &amp; kualitas</a></li><li class="toc-h2"><a href="#11-debugging">11. Debugging</a></li><li class="toc-h2"><a href="#12-gaya-kode-c">12. Gaya kode C</a></li><li class="toc-h2"><a href="#13-alur-rilis">13. Alur rilis</a></li><li class="toc-h2"><a href="#14-ide-kontribusi-berikutnya">14. Ide kontribusi berikutnya</a></li></ul></nav>
 <p>Dokumen ini untuk siapa pun yang ingin mengubah compiler, runtime, atau pustaka Kopi. Prinsipnya: <strong>satu unit compile, tiga backend, satu suite uji</strong>.</p>
 <hr>
 <h2 id="1-peta-repositori">1. Peta repositori<a class="anchor" href="#1-peta-repositori" aria-label="tautan">#</a></h2>
@@ -86,7 +86,7 @@ cc (link libc)  atau  kopivm</code></pre>
 <ul>
 <li><code>units.c</code> menyisipkan token file impor; file sama hanya sekali.</li>
 <li><code>parse.c</code>: <code>expr()</code> (ternary di paling atas, <code>||</code>), lalu <code>and → bitor → bitxor → bitand → eq → rel → shift → add → mul → unary → postfix → primary</code>.</li>
-<li>Pemanggilan <code>a.m(args)</code> dibuat oleh <code>call_node()</code> menjadi <code>EX_CALL</code> dengan <code>str="a.m"</code>. Untuk ekspresi berbentuk lain, <code>postfix()</code> menulis ulang menjadi <code>Arrays.m(receiver,args)</code>; <strong>type_expr</strong> kemudian membelokkan ke <code>Str.*</code> bila receiver String (lihat <code>is_str_method</code>/<code>str_method_target</code>).</li>
+<li>Pemanggilan <code>a.m(args)</code> dibuat oleh <code>call_node()</code> menjadi <code>EX_CALL</code> dengan <code>str="a.m"</code>. Untuk ekspresi berbentuk lain, <code>postfix()</code> menulis ulang menjadi <code>Arrays.m(receiver,args)</code>; <strong>type_expr</strong> kemudian membelokkan ke <code>Str.*</code> bila receiver <code>String</code>, atau <code>Bytes.*</code> bila receiver <code>int[]</code> (lihat <code>is_str_method</code>/<code>str_method_target</code>).</li>
 <li>Scope: array <code>scope[1024]</code>, <code>nextslot</code>; tiap blok menyimpan/memulihkan <code>nscope</code>. Variabel lokal wajib punya inisialisasi.</li>
 <li><code>resolve_stmt</code> menetapkan <code>s-&gt;ival</code> = slot, <code>s-&gt;dty</code>; <code>type_expr</code> menetapkan <code>e-&gt;dty</code> dan <code>e-&gt;typed</code>.</li>
 <li>Batas yang disengaja: maks 8 parameter metode, tidak ada overloading (nama metode unik per unit), <code>main</code> 0/1 parameter.</li>
@@ -103,7 +103,7 @@ cc (link libc)  atau  kopivm</code></pre>
 <li><code>brk_lab/cont_lab</code> menangani <code>break</code>/<code>continue</code> bersarang.</li>
 <li>Panggilan libc (<code>getenv</code>, <code>system</code>, <code>poll</code>) memakai <code>bl</code>; simpan register caller-saved yang masih dibutuhkan setelah panggilan.</li>
 <li>Entry <code>main</code>: alokasi arena global 32 MB via <code>malloc</code>, simpan argc/argv, lalu panggil <code>main</code> Kopi.</li>
-<li>Blok <code>malloc&lt;...&gt;</code> memakai helper <code>kop_arena_enter</code>/<code>kop_arena_leave</code>: handler menyimpan (base, cap, used) arena luar, mengalokasi arena baru, lalu memulihkannya (dan <code>free</code>) saat blok selesai. <code>kopalloc</code> membaca batas dari <code>kop_arena_cap</code>, bukan konstanta 32 MB.</li>
+<li>Blok <code>malloc</code> memakai helper <code>kop_arena_enter</code>/<code>kop_arena_leave</code>: handler menyimpan (base, cap, used, flag mmap/auto) arena luar, lalu menyiapkan arena baru. Ukuran 0 = <strong>otomatis</strong>: <code>mmap</code> 4096 MB dengan <code>MAP_NORESERVE</code> (RAM sesuai halaman yang disentuh); ukuran eksplisit = <code>malloc</code>. Saat keluar, arena auto di-<code>munmap</code>, arena eksplisit di-<code>free</code>. <code>kopalloc</code> membaca batas dari <code>kop_arena_cap</code>, bukan konstanta 32 MB.</li>
 </ul>
 <h3 id="x86-64-gen-x64-c">x86-64 (<code>gen_x64.c</code>)<a class="anchor" href="#x86-64-gen-x64-c" aria-label="tautan">#</a></h3>
 <ul>
@@ -117,9 +117,39 @@ cc (link libc)  atau  kopivm</code></pre>
 <li>Mesin stack; opcode di <code>vm/kopivm.c</code> (<code>OP_*</code>).</li>
 <li>Nilai selalu 64-bit; operasi int32 harus dinormalisasi (<code>OP_NORM</code>) agar semantik sama dengan native.</li>
 <li><code>OP_NET</code> + field <code>bi</code> memetakan builtin <code>Net.*</code> ke syscall host.</li>
-<li>Heap global 32 MB (<code>HEAPLEN</code> = 4M elemen 64-bit); <code>new</code> men-zero-kan. Blok <code>malloc&lt;...&gt;</code> mengalokasi heap sendiri (<code>OP_RENTER</code>) dan membebaskannya (<code>OP_RLEAVE</code>); <code>heap_cap</code> menyesuaikan batas aktif.</li>
+<li>Heap global 32 MB (<code>HEAPLEN</code> = 4M elemen 64-bit); <code>new</code> men-zero-kan. Blok <code>malloc</code> mengalokasi heap sendiri (<code>OP_RENTER</code>) dan membebaskannya (<code>OP_RLEAVE</code>); ukuran 0 = auto (<code>mmap</code> 4096 MB), selain itu <code>malloc</code>. <code>heap_cap</code> menyesuaikan batas aktif; <code>heap_mmapped</code>/<code>heap_auto</code> menentukan <code>munmap</code> vs <code>free</code> dan pesan OOM.</li>
+<li>v1.22: loop panas memakai superinstruksi (<code>OP_LOOP</code>, <code>OP_CMP_JMP*</code>, <code>OP_OP_STORE</code>, <code>OP_IDXR_L</code>, <code>OP_IDXW_L</code>, <code>OP_BIN_L</code>) + lipat konstanta; emitter ada di <code>gen_vm_fuse.inc</code>.</li>
 <li>Label = indeks instruksi (<code>newlab/mark</code>), bukan string.</li>
 </ul>
+<h3 id="struktur-berkas-v1-22">Struktur berkas (v1.22)<a class="anchor" href="#struktur-berkas-v1-22" aria-label="tautan">#</a></h3>
+<p>Berkas besar dipecah menjadi fragmen <code>.inc</code> yang tetap <strong>satu unit kompilasi</strong> (di-<code>#include</code>), sehingga state <code>static</code> tidak perlu diekspor dan tidak ada biaya dispatch tambahan:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Induk</th>
+<th>Fragmen</th>
+</tr></thead><tbody>
+<tr>
+<td><code>src/parse.c</code></td>
+<td><code>parse_stmt.inc</code>, <code>parse_class.inc</code>, <code>parse_expr.inc</code>, <code>parse_scope.inc</code>, <code>parse_type.inc</code>, <code>parse_resolve.inc</code></td>
+</tr>
+<tr>
+<td><code>src/gen_a64.c</code></td>
+<td><code>gen_a64_expr.inc</code>, <code>gen_a64_rt.inc</code></td>
+</tr>
+<tr>
+<td><code>src/gen_x64.c</code></td>
+<td><code>gen_x64_expr.inc</code>, <code>gen_x64_rt.inc</code></td>
+</tr>
+<tr>
+<td><code>src/gen_vm.c</code></td>
+<td><code>gen_vm_fuse.inc</code>, <code>gen_vm_expr.inc</code></td>
+</tr>
+<tr>
+<td><code>vm/kopivm.c</code></td>
+<td><code>vm_core.inc</code>, <code>vm_ops_base.inc</code>, <code>vm_ops_net.inc</code>, <code>vm_ops_num.inc</code>, <code>vm_ops_fast.inc</code></td>
+</tr>
+</tbody></table></div>
+<p><code>make</code> sudah memantau fragmen: mengubah <code>.inc</code> otomatis membangun ulang.</p>
 <h2 id="7-menambah-fitur-bahasa-checklist">7. Menambah fitur bahasa (checklist)<a class="anchor" href="#7-menambah-fitur-bahasa-checklist" aria-label="tautan">#</a></h2>
 <p>Contoh nyata: ternary &amp; do/while (v1.11).</p>
 <ol>
@@ -144,6 +174,14 @@ cc (link libc)  atau  kopivm</code></pre>
 <li>Uji a64 + VM (nilai harus sama), lalu <code>cc -target x86_64-linux-gnu -c</code> untuk asm x64.</li>
 </ol>
 <p>Contoh yang bisa ditiru: <code>Net.pollfd</code>, <code>Net.settimeout</code>, <code>Net.recv1</code>, <code>Net.localport</code>.</p>
+<h3 id="pustaka-teks-vs-buffer-v1-23">Pustaka teks vs buffer (v1.23)<a class="anchor" href="#pustaka-teks-vs-buffer-v1-23" aria-label="tautan">#</a></h3>
+<ul>
+<li><code>lib/core/Str.kop</code> — <strong>hanya <code>String</code></strong>: parameter dan hasil teks tidak memakai <code>int[]</code>. Berisi trim/case, potong/cari, split/join/lines/words, padding, konversi skalar (<code>fromShort/fromFloat/...</code>, <code>toLong/toBool/...</code>), hex, dan utilitas UTF-8.</li>
+<li><code>lib/core/Bytes.kop</code> — <strong>hanya <code>int[]</code></strong>: buffer I/O biner, jaringan, kriptografi (<code>cat/slice/indexOf/trim/hex/...</code>).</li>
+<li>Pustaka teks lain sudah <code>String</code> di API publik: <code>File</code>, <code>Path</code>, <code>Time.format</code>, <code>Log</code>, <code>Url</code>, <code>Mime</code>, <code>Http</code> (baris/header/body request), <code>Dns</code>, <code>Resolv</code>, <code>Auth</code>, <code>Jwt</code>, <code>Session</code>, <code>Json</code>, dan kunci <code>MapStr</code>. Buffer respons/HTTP, TCP/TLS, hash, cipher, DER, dan tape JSON internal tetap <code>int[]</code>.</li>
+<li>Pindah representasi eksplisit: <code>Net.strbytes(String) → int[]</code>, <code>Net.mkstr(int[]) → String</code> (atau <code>Bytes.of</code> / <code>Bytes.text</code>).</li>
+<li>Gula metode di parser memilih kelas dari tipe penerima: <code>T_STR → Str</code>, <code>T_ARI → Bytes</code> (lihat <code>parse_type.inc</code>), jadi <code>buf.trim()</code> dan <code>teks.trim()</code> sama-sama bekerja dengan impor masing-masing.</li>
+</ul>
 <h2 id="9-menambah-pustaka-kop">9. Menambah pustaka <code>.kop</code><a class="anchor" href="#9-menambah-pustaka-kop" aria-label="tautan">#</a></h2>
 <ul>
 <li>Cukup buat <code>lib/&lt;kategori&gt;/Nama.kop</code> dengan <code>class Nama { static ... }</code>.</li>

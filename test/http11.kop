@@ -2,37 +2,38 @@
 // Server uji: tools/http_test_server.py <port>
 import Tcp;
 import Http;
+import Bytes;
 import Str;
 
 class Main {
-    static void show(int[] tag, int[] b) {
-        System.out.println(Str.cat(tag, b));
+    static void show(String tag, int[] b) {
+        System.out.println(Str.cat(tag, Net.mkstr(b)));
     }
     public static void main(String[] args) {
         int port = 10020;
-        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+        if (Net.argc() > 0) port = Bytes.toInt(Net.argv(0));
         int addr = Tcp.loopback();
-        int[] host = Net.bytes("127.0.0.1");
+        String host = "127.0.0.1";
 
-        int[] r = Http.getFull(addr, port, host, Net.bytes("/chunked"), 8192);
+        int[] r = Http.getFull(addr, port, host, "/chunked", 8192);
         System.out.println(Http.statusOf(r));
-        show(Net.bytes("body="), Http.payload(r));
+        show("body=", Http.payload(r));
 
-        int[] f = Http.follow(addr, port, host, Net.bytes("/redirect"), 3, 8192);
+        int[] f = Http.follow(addr, port, host, "/redirect", 3, 8192);
         System.out.println(Http.statusOf(f));
-        show(Net.bytes("final="), Http.payload(f));
+        show("final=", Http.payload(f));
 
-        int[] b = Http.basic(Net.bytes("budi"), Net.bytes("rahasia"));
-        int[] r2 = Http.exchange(addr, port, Net.bytes("GET"), host,
-                                 Net.bytes("/whoami"), b, new int[0], 8192);
-        show(Net.bytes("auth="), Http.payload(r2));
+        String b = Http.basic("budi", "rahasia");
+        int[] r2 = Http.exchange(addr, port, "GET", host,
+                                 "/whoami", b, new int[0], 8192);
+        show("auth=", Http.payload(r2));
 
-        int[] form = Net.bytes("nama=Kopi%20Arena&n=3");
-        int[] r3 = Http.formPost(addr, port, host, Net.bytes("/form"), form, 8192);
-        show(Net.bytes("form="), Http.payload(r3));
+        String form = "nama=Kopi%20Arena&n=3";
+        int[] r3 = Http.formPost(addr, port, host, "/form", form, 8192);
+        show("form=", Http.payload(r3));
 
-        int[] js = Net.bytes("{\"ok\":true}");
-        int[] r4 = Http.jsonPost(addr, port, host, Net.bytes("/json"), js, 8192);
-        show(Net.bytes("json="), Http.payload(r4));
+        String js = "{\"ok\":true}";
+        int[] r4 = Http.jsonPost(addr, port, host, "/json", js, 8192);
+        show("json=", Http.payload(r4));
     }
 }

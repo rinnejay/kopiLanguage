@@ -15,6 +15,7 @@
 //     Net.memReset(mark);
 //   }
 
+import Bytes;
 import Str;
 
 class HttpServer {
@@ -44,15 +45,15 @@ class HttpServer {
             if (n <= 0) break;
             for (int i = 0; i < n; i++) buf[got + i] = chunk[i];
             got = got + n;
-            he = Str.indexOf(buf, CRLF2(), 0);
+            he = Bytes.indexOf(buf, CRLF2(), 0);
             if (he >= 0 && he < got) break;
         }
         if (he < 0 || he >= got) {
             if (got <= 0) return new int[0];
-            return Str.slice(buf, 0, got);
+            return Bytes.slice(buf, 0, got);
         }
         int endHead = he + 4;
-        int[] headOnly = Str.slice(buf, 0, endHead);
+        int[] headOnly = Bytes.slice(buf, 0, endHead);
         int cl = contentLength(headOnly);
         int need = endHead + cl;
         if (need > max) need = max;
@@ -63,86 +64,96 @@ class HttpServer {
             for (int i = 0; i < n2; i++) buf[got + i] = chunk2[i];
             got = got + n2;
         }
-        return Str.slice(buf, 0, got);
+        return Bytes.slice(buf, 0, got);
     }
 
     static int[] requestLine(int[] req) {
-        int e = Str.indexOf(req, CRLF(), 0);
+        int e = Bytes.indexOf(req, CRLF(), 0);
         if (e < 0) e = req.length;
-        return Str.slice(req, 0, e);
+        return Bytes.slice(req, 0, e);
     }
 
-    static int[] method(int[] req) {
+    static String method(int[] req) {
         int[] l = requestLine(req);
-        int sp = Str.indexOf(l, SP(), 0);
-        if (sp < 0) return l;
-        return Str.slice(l, 0, sp);
+        int sp = Bytes.indexOf(l, SP(), 0);
+        if (sp < 0) return Net.mkstr(l);
+        return Net.mkstr(Bytes.slice(l, 0, sp));
     }
 
-    static int[] target(int[] req) {
+    static String target(int[] req) {
         int[] l = requestLine(req);
-        int sp = Str.indexOf(l, SP(), 0);
-        if (sp < 0) return new int[0];
-        int sp2 = Str.indexOf(l, SP(), sp + 1);
+        int sp = Bytes.indexOf(l, SP(), 0);
+        if (sp < 0) return "";
+        int sp2 = Bytes.indexOf(l, SP(), sp + 1);
         if (sp2 < 0) sp2 = l.length;
-        return Str.slice(l, sp + 1, sp2 - sp - 1);
+        return Net.mkstr(Bytes.slice(l, sp + 1, sp2 - sp - 1));
     }
 
-    static int[] path(int[] req) { return pathOnly(target(req)); }
+    static String path(int[] req) { return pathOnly(target(req)); }
 
-    static int[] pathOnly(int[] target) {
-        int q = findByte(target, 63, 0, target.length);   /* '?' */
+    static String pathOnly(String target) {
+        int q = findChar(target, 63, 0, target.length);   /* '?' */
         if (q < 0) return target;
-        return Str.slice(target, 0, q);
+        return Str.sub(target, 0, q);
     }
 
-    static int[] version(int[] req) {
+    static String version(int[] req) {
         int[] l = requestLine(req);
-        int sp = Str.indexOf(l, SP(), 0);
-        if (sp < 0) return new int[0];
-        int sp2 = Str.indexOf(l, SP(), sp + 1);
-        if (sp2 < 0) return new int[0];
-        return Str.slice(l, sp2 + 1, l.length - sp2 - 1);
+        int sp = Bytes.indexOf(l, SP(), 0);
+        if (sp < 0) return "";
+        int sp2 = Bytes.indexOf(l, SP(), sp + 1);
+        if (sp2 < 0) return "";
+        return Net.mkstr(Bytes.slice(l, sp2 + 1, l.length - sp2 - 1));
     }
 
-    static int[] headerValue(int[] req, int[] name) {
-        int he = Str.indexOf(req, CRLF2(), 0);
+    /* cari byte pada String dalam rentang [from,to) */
+    static int findChar(String s, int b, int from, int to) {
+        int i = from;
+        while (i < to && i < s.length) {
+            if (s[i] == b) return i;
+            i++;
+        }
+        return -1;
+    }
+
+    static String headerValue(int[] req, String name) {
+        int he = Bytes.indexOf(req, CRLF2(), 0);
         if (he < 0) he = req.length;
-        int p = Str.indexOf(req, CRLF(), 0);
+        int p = Bytes.indexOf(req, CRLF(), 0);
         if (p < 0 || p + 2 > he) return new int[0];
         p = p + 2;
         while (p < he) {
-            int e = Str.indexOf(req, CRLF(), p);
+            int e = Bytes.indexOf(req, CRLF(), p);
             if (e < 0 || e > he) e = he;
             int c = findByte(req, 58, p, e);              /* ':' */
             if (c > p) {
-                int[] nm = Str.slice(req, p, c - p);
-                if (Str.equalsIgnoreCase(nm, name)) {
-                    int[] val = Str.slice(req, c + 1, e - c - 1);
-                    return Str.trim(val);
+                int[] nm = Bytes.slice(req, p, c - p);
+                if (Bytes.equalsIgnoreCase(nm, name)) {
+                    int[] val = Bytes.slice(req, c + 1, e - c - 1);
+                    return Net.mkstr(Bytes.trim(val));
                 }
             }
             p = e + 2;
         }
-        return new int[0];
+        return "";
     }
 
     static int contentLength(int[] req) {
-        int[] v = headerValue(req, Net.bytes("Content-Length"));
+        String v = headerValue(req, "Content-Length");
         if (v.length == 0) return 0;
         return Str.toInt(v);
     }
 
     static int[] body(int[] req) {
-        int he = Str.indexOf(req, CRLF2(), 0);
+        int he = Bytes.indexOf(req, CRLF2(), 0);
         if (he < 0) return new int[0];
         int start = he + 4;
         if (start >= req.length) return new int[0];
         int cl = contentLength(req);
         int avail = req.length - start;
-        if (cl <= 0) return Str.slice(req, start, avail);
+        if (cl <= 0) return Bytes.slice(req, start, avail);
         if (cl > avail) cl = avail;
-        return Str.slice(req, start, cl);
+        return Bytes.slice(req, start, cl);
     }
 
     static int hexv(int c) {
@@ -152,7 +163,7 @@ class HttpServer {
         return -1;
     }
 
-    static int[] urlDecode(int[] s) {
+    static String urlDecode(String s) {
         int[] out = new int[s.length];
         int k = 0;
         int i = 0;
@@ -175,171 +186,170 @@ class HttpServer {
                 i++;
             }
         }
-        return Str.slice(out, 0, k);
+        return Net.mkstr(Bytes.slice(out, 0, k));
     }
 
-    static int[] queryValue(int[] req, int[] key) {
-        int[] t = target(req);
-        int q = findByte(t, 63, 0, t.length);
-        if (q < 0) return new int[0];
+    static String queryValue(int[] req, String key) {
+        String t = target(req);
+        int q = findChar(t, 63, 0, t.length);
+        if (q < 0) return "";
         int p = q + 1;
         while (p <= t.length) {
-            int amp = findByte(t, 38, p, t.length);        /* '&' */
+            int amp = findChar(t, 38, p, t.length);        /* '&' */
             int e = amp;
             if (e < 0) e = t.length;
-            int eq = findByte(t, 61, p, e);                /* '=' */
+            int eq = findChar(t, 61, p, e);                /* '=' */
             if (eq < 0) eq = e;
-            int[] nm = Str.slice(t, p, eq - p);
-            if (Str.eq(nm, key)) {
-                int[] val = Str.slice(t, eq + 1, e - eq - 1);
+            String nm = Str.sub(t, p, eq - p);
+            if (nm == key) {
+                String val = Str.sub(t, eq + 1, e - eq - 1);
                 return urlDecode(val);
             }
             if (amp < 0) break;
             p = amp + 1;
         }
-        return new int[0];
+        return "";
     }
 
-    static int[] statusText(int code) {
-        if (code == 200) return Net.bytes("OK");
-        if (code == 202) return Net.bytes("Accepted");
-        if (code == 206) return Net.bytes("Partial Content");
-        if (code == 201) return Net.bytes("Created");
-        if (code == 204) return Net.bytes("No Content");
-        if (code == 304) return Net.bytes("Not Modified");
-        if (code == 301) return Net.bytes("Moved Permanently");
-        if (code == 302) return Net.bytes("Found");
-        if (code == 307) return Net.bytes("Temporary Redirect");
-        if (code == 308) return Net.bytes("Permanent Redirect");
-        if (code == 400) return Net.bytes("Bad Request");
-        if (code == 401) return Net.bytes("Unauthorized");
-        if (code == 403) return Net.bytes("Forbidden");
-        if (code == 404) return Net.bytes("Not Found");
-        if (code == 405) return Net.bytes("Method Not Allowed");
-        if (code == 413) return Net.bytes("Payload Too Large");
-        if (code == 429) return Net.bytes("Too Many Requests");
-        if (code == 500) return Net.bytes("Internal Server Error");
-        if (code == 503) return Net.bytes("Service Unavailable");
-        return Net.bytes("OK");
+    static String statusText(int code) {
+        if (code == 200) return "OK";
+        if (code == 202) return "Accepted";
+        if (code == 206) return "Partial Content";
+        if (code == 201) return "Created";
+        if (code == 204) return "No Content";
+        if (code == 304) return "Not Modified";
+        if (code == 301) return "Moved Permanently";
+        if (code == 302) return "Found";
+        if (code == 307) return "Temporary Redirect";
+        if (code == 308) return "Permanent Redirect";
+        if (code == 400) return "Bad Request";
+        if (code == 401) return "Unauthorized";
+        if (code == 403) return "Forbidden";
+        if (code == 404) return "Not Found";
+        if (code == 405) return "Method Not Allowed";
+        if (code == 413) return "Payload Too Large";
+        if (code == 429) return "Too Many Requests";
+        if (code == 500) return "Internal Server Error";
+        if (code == 503) return "Service Unavailable";
+        return "OK";
     }
 
-    static int[] responseKA(int code, int[] ctype, int[] body, int keep) {
+    static int[] responseKA(int code, String ctype, int[] body, int keep) {
         int[] s = Net.bytes("HTTP/1.1 ");
-        s = Str.cat(s, Str.fromInt(code));
-        s = Str.cat(s, Net.bytes(" "));
-        s = Str.cat(s, statusText(code));
-        s = Str.cat(s, Net.bytes("\r\nContent-Type: "));
-        s = Str.cat(s, ctype);
-        s = Str.cat(s, Net.bytes("\r\nContent-Length: "));
-        s = Str.cat(s, Str.fromInt(body.length));
-        if (keep != 0) s = Str.cat(s, Net.bytes("\r\nConnection: keep-alive\r\n\r\n"));
-        else s = Str.cat(s, Net.bytes("\r\nConnection: close\r\n\r\n"));
-        s = Str.cat(s, body);
+        s = Bytes.cat(s, Bytes.fromInt(code));
+        s = Bytes.cat(s, Net.bytes(" "));
+        s = Bytes.cat(s, statusText(code));
+        s = Bytes.cat(s, Net.bytes("\r\nContent-Type: "));
+        s = Bytes.cat(s, ctype);
+        s = Bytes.cat(s, Net.bytes("\r\nContent-Length: "));
+        s = Bytes.cat(s, Bytes.fromInt(body.length));
+        if (keep != 0) s = Bytes.cat(s, Net.bytes("\r\nConnection: keep-alive\r\n\r\n"));
+        else s = Bytes.cat(s, Net.bytes("\r\nConnection: close\r\n\r\n"));
+        s = Bytes.cat(s, body);
         return s;
     }
 
     /* respons dengan header tambahan (mis. Set-Cookie) */
-    static int[] respond(int code, int[] ctype, int[] body, int[] extra, int keep) {
+    static int[] respond(int code, String ctype, int[] body, String extra, int keep) {
         int[] s = Net.bytes("HTTP/1.1 ");
-        s = Str.cat(s, Str.fromInt(code));
-        s = Str.cat(s, Net.bytes(" "));
-        s = Str.cat(s, statusText(code));
-        s = Str.cat(s, Net.bytes("\r\nContent-Type: "));
-        s = Str.cat(s, ctype);
-        s = Str.cat(s, Net.bytes("\r\nContent-Length: "));
-        s = Str.cat(s, Str.fromInt(body.length));
-        s = Str.cat(s, Net.bytes("\r\n"));
-        if (extra.length > 0) s = Str.cat(s, extra);
-        if (keep != 0) s = Str.cat(s, Net.bytes("Connection: keep-alive\r\n\r\n"));
-        else s = Str.cat(s, Net.bytes("Connection: close\r\n\r\n"));
-        s = Str.cat(s, body);
+        s = Bytes.cat(s, Bytes.fromInt(code));
+        s = Bytes.cat(s, Net.bytes(" "));
+        s = Bytes.cat(s, statusText(code));
+        s = Bytes.cat(s, Net.bytes("\r\nContent-Type: "));
+        s = Bytes.cat(s, ctype);
+        s = Bytes.cat(s, Net.bytes("\r\nContent-Length: "));
+        s = Bytes.cat(s, Bytes.fromInt(body.length));
+        s = Bytes.cat(s, Net.bytes("\r\n"));
+        if (extra.length > 0) s = Bytes.cat(s, extra);
+        if (keep != 0) s = Bytes.cat(s, Net.bytes("Connection: keep-alive\r\n\r\n"));
+        else s = Bytes.cat(s, Net.bytes("Connection: close\r\n\r\n"));
+        s = Bytes.cat(s, body);
         return s;
     }
 
-    static int[] response(int code, int[] ctype, int[] body) {
+    static int[] response(int code, String ctype, int[] body) {
         return responseKA(code, ctype, body, 0);
     }
 
     /* HEAD: header tetap (Content-Length body), tanpa body */
     static int[] headOnly(int[] resp) {
-        int p = Str.indexOf(resp, CRLF2(), 0);
+        int p = Bytes.indexOf(resp, CRLF2(), 0);
         if (p < 0) return resp;
-        return Str.slice(resp, 0, p + 4);
+        return Bytes.slice(resp, 0, p + 4);
     }
 
-    static int[] responseFor(int[] req, int code, int[] ctype, int[] body, int keep) {
+    static int[] responseFor(int[] req, int code, String ctype, int[] body, int keep) {
         int[] r = responseKA(code, ctype, body, keep);
         if (methodIs(req, Net.bytes("HEAD"))) return headOnly(r);
         return r;
     }
 
-    static boolean methodIs(int[] req, int[] m) {
-        return Str.eq(method(req), m);
+    static boolean methodIs(int[] req, String m) {
+        return method(req) == m;
     }
 
-    static int[] text(int code, int[] body) {
-        return response(code, Net.bytes("text/plain; charset=utf-8"), body);
+    static int[] text(int code, String body) {
+        return response(code, "text/plain; charset=utf-8", body);
     }
 
-    static int[] html(int code, int[] body) {
-        return response(code, Net.bytes("text/html; charset=utf-8"), body);
+    static int[] html(int code, String body) {
+        return response(code, "text/html; charset=utf-8", body);
     }
 
-    static int[] jsonResponse(int[] body) {
-        return response(200, Net.bytes("application/json"), body);
+    static int[] jsonResponse(String body) {
+        return response(200, "application/json", body);
     }
 
     static int[] notFound() {
-        return text(404, Net.bytes("not found\n"));
+        return text(404, "not found\n");
     }
 
     static int[] forbidden() {
-        return text(403, Net.bytes("forbidden\n"));
+        return text(403, "forbidden\n");
     }
 
     /* ── keep-alive, cookie, body chunked (v1.9.2) ─────────────── */
 
     static boolean keepAlive(int[] req) {
-        int[] v = headerValue(req, Net.bytes("Connection"));
-        int[] ver = version(req);
-        if (Str.contains(ver, Net.bytes("1.1")))
-            return !Str.equalsIgnoreCase(v, Net.bytes("close"));
-        return Str.equalsIgnoreCase(v, Net.bytes("keep-alive"));
+        String v = headerValue(req, "Connection");
+        String ver = version(req);
+        if (Str.contains(ver, "1.1")) return v != "close";
+        return Str.equalsIgnoreCase(v, "keep-alive");
     }
 
     /* nilai cookie dari header "Cookie: a=1; b=2" */
-    static int[] cookie(int[] req, int[] name) {
-        int[] h = headerValue(req, Net.bytes("Cookie"));
+    static String cookie(int[] req, String name) {
+        String h = headerValue(req, "Cookie");
         int i = 0;
         while (i < h.length) {
             while (i < h.length && (h[i] == 32 || h[i] == 59)) i++;   /* spasi ; */
             int s0 = i;
             while (i < h.length && h[i] != 61 && h[i] != 59) i++;      /* = ; */
             int s1 = i;
-            int[] nm = Str.trim(Str.slice(h, s0, s1 - s0));
+            String nm = Str.trim(Str.sub(h, s0, s1 - s0));
             if (i < h.length && h[i] == 61) i++;
             int v0 = i;
             while (i < h.length && h[i] != 59) i++;
             int v1 = i;
-            if (Str.eq(nm, name)) return Str.trim(Str.slice(h, v0, v1 - v0));
+            if (nm == name) return Str.trim(Str.sub(h, v0, v1 - v0));
         }
-        return new int[0];
+        return "";
     }
 
     /* baris Set-Cookie; maxAge < 0 → tanpa Max-Age */
-    static int[] setCookie(int[] name, int[] value, int[] path, int maxAge) {
+    static String setCookie(String name, String value, String path, int maxAge) {
         int[] s = Net.bytes("Set-Cookie: ");
-        s = Str.cat(s, name);
-        s = Str.cat(s, Net.bytes("="));
-        s = Str.cat(s, value);
-        s = Str.cat(s, Net.bytes("; Path="));
-        s = Str.cat(s, path);
+        s = Bytes.cat(s, name);
+        s = Bytes.cat(s, Net.bytes("="));
+        s = Bytes.cat(s, value);
+        s = Bytes.cat(s, Net.bytes("; Path="));
+        s = Bytes.cat(s, path);
         if (maxAge >= 0) {
-            s = Str.cat(s, Net.bytes("; Max-Age="));
-            s = Str.cat(s, Str.fromInt(maxAge));
+            s = Bytes.cat(s, Net.bytes("; Max-Age="));
+            s = Bytes.cat(s, Bytes.fromInt(maxAge));
         }
-        s = Str.cat(s, Net.bytes("\r\n"));
-        return s;
+        s = Bytes.cat(s, Net.bytes("\r\n"));
+        return Net.mkstr(s);
     }
 
     /* decode body chunked (permintaan upload) */
@@ -376,16 +386,16 @@ class HttpServer {
             i = s0 + cnt;
             while (i < raw.length && (raw[i] == 13 || raw[i] == 10)) i++;
         }
-        return Str.slice(out, 0, o);
+        return Bytes.slice(out, 0, o);
     }
 
     /* body permintaan: chunked bila Transfer-Encoding: chunked */
     static int[] bodyAny(int[] req) {
-        int[] te = headerValue(req, Net.bytes("Transfer-Encoding"));
-        if (Str.equalsIgnoreCase(te, Net.bytes("chunked"))) {
-            int he = Str.indexOf(req, CRLF2(), 0);
+        String te = headerValue(req, "Transfer-Encoding");
+        if (Str.equalsIgnoreCase(te, "chunked")) {
+            int he = Bytes.indexOf(req, CRLF2(), 0);
             if (he < 0) return new int[0];
-            return dechunk(Str.slice(req, he + 4, req.length - he - 4));
+            return dechunk(Bytes.slice(req, he + 4, req.length - he - 4));
         }
         return body(req);
     }

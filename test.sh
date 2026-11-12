@@ -173,25 +173,25 @@ class Main {
         int[] j = json { "nama": "budi", "umur": 20, "aktif": true, "nilai": [1, 2.5, null] };
         Json.line(j);
         System.out.println(Json.typeOf(j));
-        System.out.println(Json.asInt(Json.get(j, Net.bytes("umur"))));
-        System.out.println(Json.isBool(Json.get(j, Net.bytes("aktif"))));
-        Json.line(Json.get(j, Net.bytes("nilai")));
-        int[] n = Json.get(j, Net.bytes("nilai"));
+        System.out.println(Json.asInt(Json.get(j, "umur")));
+        System.out.println(Json.isBool(Json.get(j, "aktif")));
+        Json.line(Json.get(j, "nilai"));
+        int[] n = Json.get(j, "nilai");
         System.out.println(Json.count(n));
         System.out.println(Json.asInt(Json.at(n, 0)));
         System.out.println(Json.asDouble(Json.at(n, 1)));
         System.out.println(Json.isNull(Json.at(n, 2)));
 
-        int[] j2 = Json.put(j, Net.bytes("umur"), Json.num(Net.bytes("21")));
+        int[] j2 = Json.put(j, "umur", Json.num("21"));
         Json.line(j2);
-        int[] j3 = Json.add(Json.get(j2, Net.bytes("nilai")), Json.str(Net.bytes("x")));
+        int[] j3 = Json.add(Json.get(j2, "nilai"), Json.str("x"));
         Json.line(j3);
-        int[] j4 = Json.parse(Net.bytes("{ \"a\" : [ true, 1e3, {\"b\":\"c\\n\"} ], \"z\": null }"));
+        int[] j4 = Json.parse("{ \"a\" : [ true, 1e3, {\"b\":\"c\\n\"} ], \"z\": null }");
         Json.line(j4);
-        System.out.println(Json.asDouble(Json.at(Json.get(j4, Net.bytes("a")), 1)));
-        Json.line(Json.parse(Net.bytes("[]")));
-        System.out.println(Json.parse(Net.bytes("{rusak")).length);
-        Json.line(Json.del(j, Net.bytes("aktif")));
+        System.out.println(Json.asDouble(Json.at(Json.get(j4, "a"), 1)));
+        Json.line(Json.parse("[]"));
+        System.out.println(Json.parse("{rusak").length);
+        Json.line(Json.del(j, "aktif"));
     }
 }
 EOF
@@ -217,11 +217,11 @@ check proyekbesar examples/proyekbesar/ProyekBesar.kop
 rm -rf ostest_tmp1.txt ostest_tmp2.txt ostest_dir
 cat > "$T/kopi/ostest.kop" <<'EOF'
 import File;
-import Str;
+import Bytes;
 
 class Main {
     public static void main(String[] args) {
-        int[] p1 = Net.bytes("ostest_tmp1.txt");
+        String p1 = "ostest_tmp1.txt";
         int fd = File.create(p1);
         System.out.println(fd > 0);
         int[] data = Net.bytes("halo dunia");
@@ -233,16 +233,16 @@ class Main {
         int[] buf = new int[64];
         int n = File.readInto(fd, buf);
         System.out.println(n);
-        System.out.println(Str.eq(Str.slice(buf, 0, n), data));
+        System.out.println(Bytes.eq(Bytes.slice(buf, 0, n), data));
         System.out.println(File.size(fd));
         System.out.println(File.seekSet(fd, 5));
         int[] b2 = new int[16];
         int n2 = File.readInto(fd, b2);
         System.out.println(n2);
-        System.out.println(Str.eq(Str.slice(b2, 0, n2), Net.bytes("dunia")));
+        System.out.println(Bytes.eq(Bytes.slice(b2, 0, n2), Net.bytes("dunia")));
         File.close(fd);
 
-        int[] p2 = Net.bytes("ostest_tmp2.txt");
+        String p2 = "ostest_tmp2.txt";
         System.out.println(File.renameTo(p1, p2));
         fd = File.openRead(p2);
         System.out.println(File.size(fd));
@@ -250,10 +250,10 @@ class Main {
         System.out.println(File.remove(p2));
         System.out.println(File.openRead(p2) < 0);
 
-        int[] dir = Net.bytes("ostest_dir");
+        String dir = "ostest_dir";
         int mr = File.mkdir(dir);
         System.out.println(mr == 0 || mr == -17);   /* baru atau sudah ada */
-        int[] fp = Net.bytes("ostest_dir/f.txt");
+        String fp = "ostest_dir/f.txt";
         fd = File.create(fp);
         System.out.println(fd > 0);
         File.writeAll(fd, Net.bytes("abc"));
@@ -270,7 +270,7 @@ check ostest "$T/kopi/ostest.kop"
 rm -rf ostest_tmp1.txt ostest_tmp2.txt ostest_dir
 
 cat > "$T/kopi/textmap.kop" <<'EOF'
-import Str;
+import Bytes;
 import Map;
 import Set;
 import Deque;
@@ -280,17 +280,17 @@ import Time;
 class Main {
     public static void main(String[] args) {
         int[] s = Net.bytes("  Kopi Language  ");
-        System.out.println(Str.len(s));
-        System.out.println(Str.len(Str.trim(s)));
-        System.out.println(Str.eq(Str.upper(Net.bytes("kopi")), Net.bytes("KOPI")));
-        System.out.println(Str.indexOf(s, Net.bytes("Lang"), 0));
-        System.out.println(Str.splitCount(Net.bytes("a,b,c"), 44));
-        System.out.println(Str.eq(Str.splitAt(Net.bytes("a,b,c"), 44, 1), Net.bytes("b")));
-        System.out.println(Str.toInt(Net.bytes("-42")));
-        System.out.println(Str.len(Str.fromInt(12345)));
-        System.out.println(Str.eq(Str.replaceSeq(Net.bytes("a-b-a"), Net.bytes("a"), Net.bytes("xy")), Net.bytes("xy-b-xy")));
-        System.out.println(Str.eq(Str.padLeft(Net.bytes("7"), 3, 48), Net.bytes("007")));
-        System.out.println(Str.utf8Count(Net.bytes("é")));
+        System.out.println(Bytes.len(s));
+        System.out.println(Bytes.len(Bytes.trim(s)));
+        System.out.println(Bytes.eq(Bytes.upper(Net.bytes("kopi")), Net.bytes("KOPI")));
+        System.out.println(Bytes.indexOf(s, Net.bytes("Lang"), 0));
+        System.out.println(Bytes.splitCount(Net.bytes("a,b,c"), 44));
+        System.out.println(Bytes.eq(Bytes.splitAt(Net.bytes("a,b,c"), 44, 1), Net.bytes("b")));
+        System.out.println(Bytes.toInt(Net.bytes("-42")));
+        System.out.println(Bytes.len(Bytes.fromInt(12345)));
+        System.out.println(Bytes.eq(Bytes.replaceSeq(Net.bytes("a-b-a"), Net.bytes("a"), Net.bytes("xy")), Net.bytes("xy-b-xy")));
+        System.out.println(Bytes.eq(Bytes.padLeft(Net.bytes("7"), 3, 48), Net.bytes("007")));
+        System.out.println(Bytes.utf8Count(Net.bytes("é")));
 
         int[] m = Map.make(128);
         for (int i = 0; i < 100; i++) Map.put(m, i * 7, i);
@@ -325,12 +325,12 @@ class Main {
         System.out.println(Deque.popBack(d));
         System.out.println(Deque.size(d));
 
-        System.out.println(Str.eq(Path.base(Net.bytes("/a/b/c.txt")), Net.bytes("c.txt")));
-        System.out.println(Str.eq(Path.dir(Net.bytes("/a/b/c.txt")), Net.bytes("/a/b")));
-        System.out.println(Str.eq(Path.ext(Net.bytes("/a/b/c.txt")), Net.bytes("txt")));
-        System.out.println(Str.eq(Path.join(Net.bytes("/a"), Net.bytes("b")), Net.bytes("/a/b")));
+        System.out.println(Path.base("/a/b/c.txt") == "c.txt");
+        System.out.println(Path.dir("/a/b/c.txt") == "/a/b");
+        System.out.println(Path.ext("/a/b/c.txt") == "txt");
+        System.out.println(Path.join("/a", "b") == "/a/b");
 
-        System.out.println(Str.eq(Time.format(1700000000), Net.bytes("2023-11-14 22:13:20")));
+        System.out.println(Time.format(1700000000) == "2023-11-14 22:13:20");
         System.out.println(Time.weekday(1700000000));
         int[] c = Time.civil(0);
         System.out.println(c[0]);
@@ -356,6 +356,7 @@ done
 # ─── template string backtick `...{expr}...` (v1.7.1) ───────────────────
 cat > "$T/kopi/tstrtest.kop" <<'EOF'
 import Str;
+import Bytes;
 
 class Main {
     static int dua() { return 2; }
@@ -392,7 +393,7 @@ class Main {
         System.out.println(Str.len(`a{1}b`));
         int[] t = `x{2}y`;
         System.out.println(t.length);
-        System.out.println(Str.eq(t, Net.bytes("x2y")));
+        System.out.println(Bytes.eq(t, Net.bytes("x2y")));
     }
 }
 EOF
@@ -710,8 +711,8 @@ import Http;
 
 class Main {
     public static void main(String[] args) {
-        int[] host = Net.bytes("127.0.0.1");
-        int[] path = Net.bytes("/halo.txt");
+        String host = "127.0.0.1";
+        String path = "/halo.txt";
         int[] buf = new int[8192];
         int n = Http.getInto(Tcp.loopback(), 9911, host, path, buf);
         if (n < 0) { System.out.println(n); return; }
@@ -755,14 +756,14 @@ class Main {
         System.out.println(Cipher.crc16(Net.bytes("123456789")));      // 10673 (0x29B1)
         System.out.println(Cipher.adler32(Net.bytes("Wikipedia")));    // 300286872
         // base64: vektor klasik "Man" → TWFu
-        int[] e = Cipher.b64enc(Net.bytes("Man"));
+        String e = Cipher.b64enc(Net.bytes("Man"));
         System.out.println(e[0]);          // 'T' 84
         System.out.println(e[1]);          // 'W' 87
         System.out.println(e[2]);          // 'F' 70
         System.out.println(e[3]);          // 'u' 117
         System.out.println(Crypto.arrEq(Net.bytes("Man"), Cipher.b64dec(e)));// 1
         // hex: 1,2,255 → "0102ff"; roundtrip
-        int[] h = Cipher.hexenc(dec(1, 2, 255));
+        String h = Cipher.hexenc(dec(1, 2, 255));
         int cocok = 1;
         int[] hx = Net.bytes("0102ff");
         for (int i = 0; i < hx.length; i++) if (hx[i] != h[i]) cocok = 0;
@@ -927,7 +928,7 @@ import Tcp;
 class Main {
     public static void main(String[] args) {
         int[] hasil = new int[5];
-        int r = Dns.lookup(Tcp.loopback(), 9953, Net.bytes("kopi.test"), hasil, 512);
+        int r = Dns.lookup(Tcp.loopback(), 9953, "kopi.test", hasil, 512);
         System.out.println(r);          // 0 sukses jaringan
         System.out.println(hasil[0]);   // RCODE 0 = NOERROR
         System.out.println(hasil[1]);   // 10
@@ -984,10 +985,10 @@ import Http;
 
 class Main {
     public static void main(String[] args) {
-        int[] path = Net.bytes("/kirim");
+        String path = "/kirim";
         int[] body = Net.bytes("kopi-body");
         int[] buf = new int[256];
-        int n = Http.postInto(Tcp.loopback(), 9927, Net.bytes("h"), path, body, buf);
+        int n = Http.postInto(Tcp.loopback(), 9927, "h", path, body, buf);
         if (n < 0) { System.out.println(n); return; }
         int[] resp = new int[n];
         for (int i = 0; i < n; i++) resp[i] = buf[i];
@@ -1150,26 +1151,26 @@ class Main {
     }
 
     public static void main(String[] args) {
-        int[] h = Net.bytes("X-Kopi: 123\r\nUser-Agent: Kopi/1\r\n");
+        String h = "X-Kopi: 123\r\nUser-Agent: Kopi/1\r\n";
         int[] buf = new int[2048];
-        int n = Http.getWith(2130706433, 9919, Net.bytes("127.0.0.1"),
-                             Net.bytes("/halo"), h, buf);
+        int n = Http.getWith(2130706433, 9919, "127.0.0.1",
+                             "/halo", h, buf);
         System.out.println(n > 0);
         int m = 0;
         if (n > 0) m = n;
         int[] resp = slice(buf, m);
         System.out.println(Http.statusOf(resp));
-        int[] saw = Http.headerValue(resp, Net.bytes("x-saw"));
+        String saw = Http.headerValue(resp, "x-saw");
         System.out.println(saw.length);
         System.out.println(saw[0]);
         int[] body = Http.bodyOf(resp);
         System.out.println(body.length);
         for (int i = 0; i < body.length; i++) System.out.println(body[i]);
-        int[] v = Http.headerValue(resp, Net.bytes("X-Kopi"));
+        String v = Http.headerValue(resp, "X-Kopi");
         System.out.println(v.length);
         for (int i = 0; i < v.length; i++) System.out.println(v[i]);
-        System.out.println(Http.hasHeader(resp, Net.bytes("content-length")));
-        int[] cl = Http.headerValue(resp, Net.bytes("Content-Length"));
+        System.out.println(Http.hasHeader(resp, "content-length"));
+        String cl = Http.headerValue(resp, "Content-Length");
         System.out.println(cl.length);
         System.out.println(cl[0]);
     }
@@ -1403,6 +1404,13 @@ check mkstrtest test/mkstrtest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/mkstrtest64.s" -o /dev/null \
     && echo "PASS  mkstrtest [x64]" || { echo "FAIL  mkstrtest [x64]"; FAIL=$((FAIL+1)); }
 
+# ─── v1.23: Str native String + Bytes buffer (API lengkap) ───
+cp test/strbytes.ref "$T/kopi/strbytes.ref"
+check strbytes test/strbytes.kop
+./kopicc test/strbytes.kop -t x64 -o "$T/kopi/strbytes64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/strbytes64.s" -o /dev/null \
+    && echo "PASS  strbytes [x64]" || { echo "FAIL  strbytes [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── fitur bahasa v1.18: String packed 1 byte/karakter ───
 cp test/packedreuse.ref "$T/kopi/packedreuse.ref"
 check packedreuse test/packedreuse.kop
@@ -1503,6 +1511,59 @@ if [ $? -ne 0 ] && grep -q "batas 1 MB terlampaui" "$T/kopi/moom.out"; then
 else
     echo "FAIL  malloc limit [a64]"; FAIL=$((FAIL+1)); head -3 "$T/kopi/moom.out"
 fi
+
+# ─── v1.22: malloc { ... } otomatis (tanpa <...>, >32 MB) ───
+cp test/autosize.ref "$T/kopi/autosize.ref"
+check autosize test/autosize.kop
+./kopicc test/autosize.kop -t x64 -o "$T/kopi/autosize64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/autosize64.s" -o /dev/null \
+    && echo "PASS  autosize [x64]" || { echo "FAIL  autosize [x64]"; FAIL=$((FAIL+1)); }
+
+# ─── v1.22: pola loop panas (superinstruksi VM) tetap benar ───
+cp test/loopfast.ref "$T/kopi/loopfast.ref"
+check loopfast test/loopfast.kop
+./kopicc test/loopfast.kop -t x64 -o "$T/kopi/loopfast64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/loopfast64.s" -o /dev/null \
+    && echo "PASS  loopfast [x64]" || { echo "FAIL  loopfast [x64]"; FAIL=$((FAIL+1)); }
+
+# ─── v1.22: diagnostik pintar — baris sumber + saran perbaikan ───
+cat > "$T/kopi/diagstr.kop" <<'EOF'
+class Main {
+    public static void main(String[] args) {
+        int x = 7;
+        System.out.println(`nilai {x}`);
+    }
+}
+EOF
+if ./kopicc "$T/kopi/diagstr.kop" -t vm -o /dev/null 2>&1 \
+        | grep -q "saran: Tambahkan \`import Str;\`"; then
+    echo "PASS  diagnostic hint [err]"; PASS=$((PASS+1))
+else
+    echo "FAIL  diagnostic hint [err]"; FAIL=$((FAIL+1))
+fi
+cat > "$T/kopi/diagidx.kop" <<'EOF'
+class Main {
+    public static void main(String[] args) {
+        int[] a = new int[2];
+        a[5] = 1;
+        System.out.println(a[0]);
+    }
+}
+EOF
+./kopicc "$T/kopi/diagidx.kop" -t vm -o "$T/kopi/diagidx.kbc" \
+    && ./kopivm "$T/kopi/diagidx.kbc" > "$T/kopi/diagidx.out" 2>&1
+if [ $? -ne 0 ] && grep -q "saran: indeks valid" "$T/kopi/diagidx.out"; then
+    echo "PASS  runtime hint [vm]"; PASS=$((PASS+1))
+else
+    echo "FAIL  runtime hint [vm]"; FAIL=$((FAIL+1)); head -3 "$T/kopi/diagidx.out"
+fi
+
+# ─── v1.22: lib Pbkdf2 membebaskan buffer HMAC tiap iterasi ───
+cp test/pbkdf2long.ref "$T/kopi/pbkdf2long.ref"
+check pbkdf2long test/pbkdf2long.kop
+./kopicc test/pbkdf2long.kop -t x64 -o "$T/kopi/pbkdf2long64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/pbkdf2long64.s" -o /dev/null \
+    && echo "PASS  pbkdf2long [x64]" || { echo "FAIL  pbkdf2long [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"

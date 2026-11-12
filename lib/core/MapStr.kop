@@ -1,4 +1,4 @@
-// MapStr.kop — peta String→int (open addressing + kolam kunci) v1.9.
+// MapStr.kop — peta String→int (open addressing + kolam kunci) v1.23.
 // Satu int[] mandiri:
 //   [0]=cap [1]=size [2]=poolUsed [3]=poolCap
 //   hash[cap] @4, off[cap], len[cap], val[cap],
@@ -23,7 +23,7 @@ class MapStr {
     static int size(int[] m) { return m[1]; }
     static int poolUsed(int[] m) { return m[2]; }
 
-    static int hash(int[] k) {
+    private static int hash(int[] k) {
         int h = (int)2166136261L;
         for (int i = 0; i < k.length; i++) {
             h = h ^ (k[i] & 255);
@@ -34,7 +34,7 @@ class MapStr {
         return h;
     }
 
-    static boolean same(int[] m, int slot, int[] key, int h) {
+    private static boolean same(int[] m, int slot, int[] key, int h) {
         int c = m[0];
         if (m[4 + slot] != h) return false;
         int len = m[4 + 2 * c + slot];
@@ -46,7 +46,7 @@ class MapStr {
         return true;
     }
 
-    static int find(int[] m, int[] key) {
+    private static int find(int[] m, int[] key) {
         int c = m[0];
         int h = hash(key);
         int i = h & (c - 1);
@@ -59,21 +59,21 @@ class MapStr {
         return -1;
     }
 
-    static boolean has(int[] m, int[] key) { return find(m, key) >= 0; }
+    static boolean has(int[] m, String key) { return find(m, Net.strbytes(key)) >= 0; }
 
-    static int get(int[] m, int[] key) {
-        int i = find(m, key);
+    static int get(int[] m, String key) {
+        int i = find(m, Net.strbytes(key));
         if (i < 0) return 0;
         return m[4 + 3 * m[0] + i];
     }
 
-    static int getOr(int[] m, int[] key, int def) {
-        int i = find(m, key);
+    static int getOr(int[] m, String key, int def) {
+        int i = find(m, Net.strbytes(key));
         if (i < 0) return def;
         return m[4 + 3 * m[0] + i];
     }
 
-    static boolean place(int[] m, int at, int[] key, int h, int v) {
+    private static boolean place(int[] m, int at, int[] key, int h, int v) {
         int c = m[0];
         int used = m[2];
         if (used + key.length > m[3]) return false;
@@ -88,7 +88,8 @@ class MapStr {
         return true;
     }
 
-    static boolean put(int[] m, int[] key, int v) {
+    static boolean put(int[] m, String keyStr, int v) {
+        int[] key = Net.strbytes(keyStr);
         int c = m[0];
         int h = hash(key);
         int i = h & (c - 1);
@@ -112,8 +113,8 @@ class MapStr {
         return false;
     }
 
-    static boolean remove(int[] m, int[] key) {
-        int i = find(m, key);
+    static boolean remove(int[] m, String key) {
+        int i = find(m, Net.strbytes(key));
         if (i < 0) return false;
         m[4 + i] = TOMB();
         m[1] = m[1] - 1;
@@ -134,13 +135,13 @@ class MapStr {
 
     static int valAtSlot(int[] m, int i) { return m[4 + 3 * m[0] + i]; }
 
-    static int[] keyAtSlot(int[] m, int i) {
+    static String keyAtSlot(int[] m, int i) {
         int c = m[0];
         int off = m[4 + c + i];
         int len = m[4 + 2 * c + i];
         int base = 4 + 4 * c;
         int[] out = new int[len];
         for (int j = 0; j < len; j++) out[j] = m[base + off + j];
-        return out;
+        return Net.mkstr(out);
     }
 }

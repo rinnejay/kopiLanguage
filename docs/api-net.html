@@ -34,7 +34,7 @@
 <p>Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401.</p>
 <pre><code class="language-java">import Auth;
 
-int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
+String h = HttpServer.headerValue(req, "Authorization");
 if (!Auth.checkBasic(h, user, pass)) { /* 401 */ }</code></pre>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -42,35 +42,35 @@ if (!Auth.checkBasic(h, user, pass)) { /* 401 */ }</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int spaceAt(int[] v)</code></td>
+<td><code>static int spaceAt(String v)</code></td>
 <td>(internal) posisi spasi pertama di header</td>
 </tr>
 <tr>
-<td><code>static int[] scheme(int[] v)</code></td>
+<td><code>static String scheme(String v)</code></td>
 <td>skema URL</td>
 </tr>
 <tr>
-<td><code>static int[] token(int[] v)</code></td>
+<td><code>static String token(String v)</code></td>
 <td>bagian token setelah skema</td>
 </tr>
 <tr>
-<td><code>static boolean same(int[] a, int[] b)</code></td>
+<td><code>static boolean same(String a, String b)</code></td>
 <td>bandingkan dua nilai</td>
 </tr>
 <tr>
-<td><code>static int[] basicRaw(int[] v)</code></td>
+<td><code>static String basicRaw(String v)</code></td>
 <td>hasil "user:pass" dari Basic, kosong bila bukan Basic</td>
 </tr>
 <tr>
-<td><code>static boolean checkBasic(int[] v, int[] user, int[] pass)</code></td>
+<td><code>static boolean checkBasic(String v, String user, String pass)</code></td>
 <td>true bila Basic cocok user:pass</td>
 </tr>
 <tr>
-<td><code>static int[] bearer(int[] v)</code></td>
+<td><code>static String bearer(String v)</code></td>
 <td>token Bearer</td>
 </tr>
 <tr>
-<td><code>static int[] challenge(int[] realm)</code></td>
+<td><code>static String challenge(String realm)</code></td>
 <td>baris header tantangan untuk 401</td>
 </tr>
 </tbody></table></div>
@@ -81,7 +81,7 @@ if (!Auth.checkBasic(h, user, pass)) { /* 401 */ }</code></pre>
 <pre><code class="language-java">import Dns;
 
 int[] hasil = new int[5];
-Dns.lookup(serverIp, 53, Net.bytes("example.com"), hasil, 512);</code></pre>
+Dns.lookup(serverIp, 53, "example.com", hasil, 512);</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
 <li>Hanya record A; ID 0; satu jawaban pertama.</li>
@@ -93,11 +93,11 @@ Dns.lookup(serverIp, 53, Net.bytes("example.com"), hasil, 512);</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] qname(int[] dotted)</code></td>
+<td><code>static int[] qname(String dotted)</code></td>
 <td>nama "kopi.test" (byte-as-int, pemisah titik ASCII 46) → QNAME: panjang·oktet ... lalu terminator 0</td>
 </tr>
 <tr>
-<td><code>static int[] query(int[] dottedName, int qtype)</code></td>
+<td><code>static int[] query(String dottedName, int qtype)</code></td>
 <td>permintaan penuh: header + QNAME + QTYPE + QCLASS=1 (IN)</td>
 </tr>
 <tr>
@@ -113,7 +113,7 @@ Dns.lookup(serverIp, 53, Net.bytes("example.com"), hasil, 512);</code></pre>
 <td>telaah pesan DNS mentah (tanpa awalan panjang TCP) menjadi A. hasil[0]=RCODE, hasil[1..4]=oktet IPv4 (atau -1).</td>
 </tr>
 <tr>
-<td><code>static int lookup(int addr, int port, int[] dottedName, int[] hasil, int cap)</code></td>
+<td><code>static int lookup(int addr, int port, String dottedName, int[] hasil, int cap)</code></td>
 <td>kirim kueri A (qtype=1) ke addr:port (TCP, awalan panjang 2 byte) dan telaah balasannya melalui hasil: hasil[0] = RCODE (0 = NOERROR, 3 = NXDOMAIN, ...), hasil[1..4] = oktet IPv…</td>
 </tr>
 </tbody></table></div>
@@ -124,7 +124,7 @@ Dns.lookup(serverIp, 53, Net.bytes("example.com"), hasil, 512);</code></pre>
 <pre><code class="language-java">import Tcp;
 import Http;
 
-int[] r = Http.getFull(Tcp.loopback(), 8080, Net.bytes("127.0.0.1"), Net.bytes("/health"), 8192);
+int[] r = Http.getFull(Tcp.loopback(), 8080, "127.0.0.1", "/health", 8192);
 System.out.println(Http.statusOf(r));
 System.out.println(Http.payload(r));</code></pre>
 <p><strong>Catatan</strong></p>
@@ -138,7 +138,7 @@ System.out.println(Http.payload(r));</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] req(int[] host, int[] path)</code></td>
+<td><code>static String req(String host, String path)</code></td>
 <td>susun baris permintaan GET lengkap: "GET &lt;path&gt; HTTP/1.0\r\nHost: &lt;host&gt;\r\n\r\n" (Net.bytes literal sama di-dedup compiler ke satu isi cpool)</td>
 </tr>
 <tr>
@@ -150,31 +150,31 @@ System.out.println(Http.payload(r));</code></pre>
 <td>isi (body) respons: semua byte setelah pemisah CRLF CRLF. tanpa pemisah (jawaban tak utuh) → seluruh respons dibalikkan.</td>
 </tr>
 <tr>
-<td><code>static int getInto(int addr, int port, int[] host, int[] path, int[] buf)</code></td>
+<td><code>static int getInto(int addr, int port, String host, String path, int[] buf)</code></td>
 <td>kirim GET dan muat SELURUH respons (header + body) ke buf. sukses → total byte respons (≥ 0); gagal → kode negatif. buf terlalu kecil → respons terpotong (batas v1 tercatat).</td>
 </tr>
 <tr>
-<td><code>static int postInto(int addr, int port, int[] host, int[] path, int[] body, int[] buf)</code></td>
+<td><code>static int postInto(int addr, int port, String host, String path, int[] body, int[] buf)</code></td>
 <td>kirim POST dengan body (Content-Length dari Tcp.num), muat SELURUH respons ke buf — semantik sama dengan getInto.</td>
 </tr>
 <tr>
-<td><code>static int[] body(int addr, int port, int[] host, int[] path, int cap)</code></td>
+<td><code>static int[] body(int addr, int port, String host, String path, int cap)</code></td>
 <td>kenyamanan: GET lalu langsung ke body. galat ditandai array hasil [0] = kode negatif (body tidak mungkin negatif).</td>
 </tr>
 <tr>
-<td><code>static int[] reqEx(int[] method, int[] host, int[] path, int[] headers, int[] body)</code></td>
+<td><code>static String reqEx(String method, String host, String path, String headers, int[] body)</code></td>
 <td>kirim permintaan generik dengan header tambahan. <code>headers</code> berisi baris mentah "Nama: nilai\r\n" (boleh kosong). body kosong (length 0) → tanpa Content-Length (GET/HEAD). HTTP/1…</td>
 </tr>
 <tr>
-<td><code>static int requestInto(int addr, int port, int[] method, int[] host, int[] path, int[] headers, int[] body, int[] buf)</code></td>
+<td><code>static int requestInto(int addr, int port, String method, String host, String path, String headers, int[] body, int[] buf)</code></td>
 <td>satu putaran penuh dengan method/header/body bebas.</td>
 </tr>
 <tr>
-<td><code>static int getWith(int addr, int port, int[] host, int[] path, int[] headers, int[] buf)</code></td>
+<td><code>static int getWith(int addr, int port, String host, String path, String headers, int[] buf)</code></td>
 <td>GET dengan header tambahan</td>
 </tr>
 <tr>
-<td><code>static int postWith(int addr, int port, int[] host, int[] path, int[] headers, int[] body, int[] buf)</code></td>
+<td><code>static int postWith(int addr, int port, String host, String path, String headers, int[] body, int[] buf)</code></td>
 <td>POST dengan header tambahan + body</td>
 </tr>
 <tr>
@@ -190,15 +190,15 @@ System.out.println(Http.payload(r));</code></pre>
 <td>(internal) huruf kecil ASCII</td>
 </tr>
 <tr>
-<td><code>static boolean nameEq(int[] line, int at, int[] name)</code></td>
+<td><code>static boolean nameEq(int[] line, int at, String name)</code></td>
 <td>(internal) nama header cocok pada posisi</td>
 </tr>
 <tr>
-<td><code>static int[] headerValue(int[] resp, int[] name)</code></td>
+<td><code>static String headerValue(int[] resp, String name)</code></td>
 <td>nilai header (tanpa spasi tepi), array kosong bila tidak ada. perbandingan nama case-insensitive; baris pertama yang cocok dipakai.</td>
 </tr>
 <tr>
-<td><code>static boolean hasHeader(int[] resp, int[] name)</code></td>
+<td><code>static boolean hasHeader(int[] resp, String name)</code></td>
 <td>true bila respons punya header name</td>
 </tr>
 <tr>
@@ -206,7 +206,7 @@ System.out.println(Http.payload(r));</code></pre>
 <td>═══ v1.9.2: HTTP/1.1 — chunked, redirect, form, auth ═══════</td>
 </tr>
 <tr>
-<td><code>static boolean hasToken(int[] resp, int[] name, int[] tok)</code></td>
+<td><code>static boolean hasToken(int[] resp, String name, String tok)</code></td>
 <td>cari token (case-insensitive) di nilai header</td>
 </tr>
 <tr>
@@ -218,44 +218,44 @@ System.out.println(Http.payload(r));</code></pre>
 <td>body sebenarnya: chunked → decode; Content-Length → potong</td>
 </tr>
 <tr>
-<td><code>static int[] req11(int[] method, int[] hostHdr, int[] path, int[] headers, int[] body, int keep)</code></td>
+<td><code>static String req11(String method, String hostHdr, String path, String headers, int[] body, int keep)</code></td>
 <td>susun permintaan HTTP/1.1 (keep=1 → keep-alive, else close)</td>
 </tr>
 <tr>
-<td><code>static int[] exchange(int addr, int port, int[] method, int[] hostHdr, int[] path, int[] headers, int[] body, int cap)</code></td>
+<td><code>static int[] exchange(int addr, int port, String method, String hostHdr, String path, String headers, int[] body, int cap)</code></td>
 <td>satu transaksi; timeoutMs &gt; 0 memasang SO_RCVTIMEO/SO_SNDTIMEO</td>
 </tr>
 <tr>
-<td><code>static int[] getFull(int addr, int port, int[] hostHdr, int[] path, int cap)</code></td>
+<td><code>static int[] getFull(int addr, int port, String hostHdr, String path, int cap)</code></td>
 <td>GET + respons lengkap (status, header, body)</td>
 </tr>
 <tr>
-<td><code>static int[] follow(int addr, int port, int[] hostHdr, int[] path, int maxHops, int cap)</code></td>
+<td><code>static int[] follow(int addr, int port, String hostHdr, String path, int maxHops, int cap)</code></td>
 <td>ikuti 301/302/303/307/308 (maks maxHops, host harus sama)</td>
 </tr>
 <tr>
-<td><code>static int[] basic(int[] user, int[] pass)</code></td>
+<td><code>static String basic(String user, String pass)</code></td>
 <td>header "Authorization: Basic ..." dari user:pass</td>
 </tr>
 <tr>
-<td><code>static int[] formPost(int addr, int port, int[] hostHdr, int[] path, int[] form, int cap)</code></td>
+<td><code>static int[] formPost(int addr, int port, String hostHdr, String path, String form, int cap)</code></td>
 <td>POST application/x-www-form-urlencoded</td>
 </tr>
 <tr>
-<td><code>static int[] jsonPost(int addr, int port, int[] hostHdr, int[] path, int[] jsonBody, int cap)</code></td>
+<td><code>static int[] jsonPost(int addr, int port, String hostHdr, String path, String jsonBody, int cap)</code></td>
 <td>POST application/json</td>
 </tr>
 </tbody></table></div>
 <hr>
 <h2 id="httpserver">HttpServer<a class="anchor" href="#httpserver" aria-label="tautan">#</a></h2>
-<p><code>lib/net/HttpServer.kop</code> · 33 fungsi</p>
+<p><code>lib/net/HttpServer.kop</code> · 34 fungsi</p>
 <p>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie, chunked.</p>
 <pre><code class="language-java">import HttpServer;
 
 int[] req = HttpServer.readRequest(c, 16384);
 int keep = 0;
 if (HttpServer.keepAlive(req)) keep = 1;
-int[] resp = HttpServer.responseFor(req, 200, Net.bytes("text/plain"), Net.bytes("ok\n"), keep);
+int[] resp = HttpServer.responseFor(req, 200, "text/plain", "ok\n", keep);
 HttpServer.send(c, resp);</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
@@ -280,27 +280,31 @@ HttpServer.send(c, resp);</code></pre>
 <td>baris pertama request (method target versi)</td>
 </tr>
 <tr>
-<td><code>static int[] method(int[] req)</code></td>
+<td><code>static String method(int[] req)</code></td>
 <td>method request (GET/POST/...)</td>
 </tr>
 <tr>
-<td><code>static int[] target(int[] req)</code></td>
+<td><code>static String target(int[] req)</code></td>
 <td>target request (path + query)</td>
 </tr>
 <tr>
-<td><code>static int[] path(int[] req)</code></td>
+<td><code>static String path(int[] req)</code></td>
 <td>bagian path</td>
 </tr>
 <tr>
-<td><code>static int[] pathOnly(int[] target)</code></td>
+<td><code>static String pathOnly(String target)</code></td>
 <td>path tanpa query</td>
 </tr>
 <tr>
-<td><code>static int[] version(int[] req)</code></td>
+<td><code>static String version(int[] req)</code></td>
 <td>versi HTTP dari baris request</td>
 </tr>
 <tr>
-<td><code>static int[] headerValue(int[] req, int[] name)</code></td>
+<td><code>static int findChar(String s, int b, int from, int to)</code></td>
+<td>cari byte pada String dalam rentang [from,to)</td>
+</tr>
+<tr>
+<td><code>static String headerValue(int[] req, String name)</code></td>
 <td>nilai header pertama bernama name</td>
 </tr>
 <tr>
@@ -316,27 +320,27 @@ HttpServer.send(c, resp);</code></pre>
 <td>(internal) hex char → nilai</td>
 </tr>
 <tr>
-<td><code>static int[] urlDecode(int[] s)</code></td>
+<td><code>static String urlDecode(String s)</code></td>
 <td>decode %XX dan + menjadi byte</td>
 </tr>
 <tr>
-<td><code>static int[] queryValue(int[] req, int[] key)</code></td>
+<td><code>static String queryValue(int[] req, String key)</code></td>
 <td>nilai parameter query bernama key</td>
 </tr>
 <tr>
-<td><code>static int[] statusText(int code)</code></td>
+<td><code>static String statusText(int code)</code></td>
 <td>teks status standar untuk kode</td>
 </tr>
 <tr>
-<td><code>static int[] responseKA(int code, int[] ctype, int[] body, int keep)</code></td>
+<td><code>static int[] responseKA(int code, String ctype, int[] body, int keep)</code></td>
 <td>bangun respons dengan keep-alive eksplisit</td>
 </tr>
 <tr>
-<td><code>static int[] respond(int code, int[] ctype, int[] body, int[] extra, int keep)</code></td>
+<td><code>static int[] respond(int code, String ctype, int[] body, String extra, int keep)</code></td>
 <td>respons dengan header tambahan (mis. Set-Cookie)</td>
 </tr>
 <tr>
-<td><code>static int[] response(int code, int[] ctype, int[] body)</code></td>
+<td><code>static int[] response(int code, String ctype, int[] body)</code></td>
 <td>bangun respons (Connection: close)</td>
 </tr>
 <tr>
@@ -344,23 +348,23 @@ HttpServer.send(c, resp);</code></pre>
 <td>HEAD: header tetap (Content-Length body), tanpa body</td>
 </tr>
 <tr>
-<td><code>static int[] responseFor(int[] req, int code, int[] ctype, int[] body, int keep)</code></td>
+<td><code>static int[] responseFor(int[] req, int code, String ctype, int[] body, int keep)</code></td>
 <td>respons yang meniru kepala request (keep-alive/HEAD)</td>
 </tr>
 <tr>
-<td><code>static boolean methodIs(int[] req, int[] m)</code></td>
+<td><code>static boolean methodIs(int[] req, String m)</code></td>
 <td>true bila method request = m</td>
 </tr>
 <tr>
-<td><code>static int[] text(int code, int[] body)</code></td>
+<td><code>static int[] text(int code, String body)</code></td>
 <td>ubah nilai menjadi teks</td>
 </tr>
 <tr>
-<td><code>static int[] html(int code, int[] body)</code></td>
+<td><code>static int[] html(int code, String body)</code></td>
 <td>respons HTML lengkap dengan status</td>
 </tr>
 <tr>
-<td><code>static int[] jsonResponse(int[] body)</code></td>
+<td><code>static int[] jsonResponse(String body)</code></td>
 <td>respons application/json lengkap</td>
 </tr>
 <tr>
@@ -376,11 +380,11 @@ HttpServer.send(c, resp);</code></pre>
 <td>true bila klien minta koneksi tetap terbuka</td>
 </tr>
 <tr>
-<td><code>static int[] cookie(int[] req, int[] name)</code></td>
+<td><code>static String cookie(int[] req, String name)</code></td>
 <td>nilai cookie dari header "Cookie: a=1; b=2"</td>
 </tr>
 <tr>
-<td><code>static int[] setCookie(int[] name, int[] value, int[] path, int maxAge)</code></td>
+<td><code>static String setCookie(String name, String value, String path, int maxAge)</code></td>
 <td>baris Set-Cookie; maxAge &lt; 0 → tanpa Max-Age</td>
 </tr>
 <tr>
@@ -425,7 +429,7 @@ HttpServer.send(c, resp);</code></pre>
 <p>JWT HS256: tanda tangan, verifikasi, ambil payload.</p>
 <pre><code class="language-java">import Jwt;
 
-int[] token = Jwt.sign(Net.bytes("{\"sub\":\"budi\"}"), secret);
+String token = Jwt.sign("{\"sub\":\"budi\"}", secret);
 int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
@@ -437,15 +441,15 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] b64(int[] raw)</code></td>
-<td>base64url tanpa padding</td>
+<td><code>static String b64(int[] raw)</code></td>
+<td>base64url tanpa padding (biner → teks)</td>
 </tr>
 <tr>
-<td><code>static int[] unb64(int[] s)</code></td>
+<td><code>static int[] unb64(String s)</code></td>
 <td>(internal) base64url decode</td>
 </tr>
 <tr>
-<td><code>static int[] sign(int[] payload, int[] secret)</code></td>
+<td><code>static String sign(String payload, String secret)</code></td>
 <td>tanda tangani payload dengan HS256 → token</td>
 </tr>
 <tr>
@@ -453,11 +457,11 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <td>bandingkan dua array byte secara konstan (panjang sama)</td>
 </tr>
 <tr>
-<td><code>static int verify(int[] token, int[] secret, int[] payloadOut)</code></td>
+<td><code>static int verify(String token, String secret, int[] payloadOut)</code></td>
 <td>hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah</td>
 </tr>
 <tr>
-<td><code>static int[] payloadOf(int[] token)</code></td>
+<td><code>static String payloadOf(String token)</code></td>
 <td>payload JSON dari token tanpa verifikasi (hati-hati)</td>
 </tr>
 </tbody></table></div>
@@ -468,7 +472,7 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] HEADER()</code></td>
+<td><code>static String HEADER()</code></td>
 <td>header JWT bawaan {"alg":"HS256"}</td>
 </tr>
 </tbody></table></div>
@@ -478,14 +482,14 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <p>Pemetaan ekstensi file → header Content-Type.</p>
 <pre><code class="language-java">import Mime;
 
-int[] ct = Mime.of(Net.bytes("app.js")); // application/javascript</code></pre>
+String ct = Mime.of("app.js"); // application/javascript</code></pre>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Fungsi</th>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] of(int[] path)</code></td>
+<td><code>static String of(String path)</code></td>
 <td>Content-Type berdasarkan ekstensi</td>
 </tr>
 </tbody></table></div>
@@ -496,7 +500,7 @@ int[] ct = Mime.of(Net.bytes("app.js")); // application/javascript</code></pre>
 <pre><code class="language-java">import Resolv;
 
 int[] hasil = new int[5];
-Resolv.lookup(Net.bytes("example.com"), 2000, hasil, 512);
+Resolv.lookup("example.com", 2000, hasil, 512);
 // hasil[0]=RCODE, hasil[1..4]=oktet IPv4</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
@@ -512,7 +516,7 @@ Resolv.lookup(Net.bytes("example.com"), 2000, hasil, 512);
 <td>IP server nama pertama /etc/resolv.conf (0 bila gagal)</td>
 </tr>
 <tr>
-<td><code>static int[] parse(int[] text)</code></td>
+<td><code>static int[] parse(String text)</code></td>
 <td>telaah teks resolv.conf → daftar ip (flat)</td>
 </tr>
 <tr>
@@ -520,11 +524,11 @@ Resolv.lookup(Net.bytes("example.com"), 2000, hasil, 512);
 <td>semua IP nameserver dari /etc/resolv.conf</td>
 </tr>
 <tr>
-<td><code>static int lookupUdp(int serverIp, int port, int[] name, int timeoutMs, int[] hasil, int cap)</code></td>
+<td><code>static int lookupUdp(int serverIp, int port, String name, int timeoutMs, int[] hasil, int cap)</code></td>
 <td>satu kueri A lewat UDP; hasil[0]=RCODE, hasil[1..4]=oktet</td>
 </tr>
 <tr>
-<td><code>static int lookup(int[] name, int timeoutMs, int[] hasil, int cap)</code></td>
+<td><code>static int lookup(String name, int timeoutMs, int[] hasil, int cap)</code></td>
 <td>coba semua server dari resolv.conf</td>
 </tr>
 </tbody></table></div>
@@ -574,7 +578,7 @@ import MapStr;
 
 int[] ids = MapStr.make(256, 8192);
 int[] exps = MapStr.make(256, 8192);
-int[] sid = Session.create(ids, exps, uid, 3600);
+String sid = Session.create(ids, exps, uid, 3600);
 int uid2 = Session.get(ids, exps, sid, Net.time());</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
@@ -586,23 +590,23 @@ int uid2 = Session.get(ids, exps, sid, Net.time());</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] newId()</code></td>
+<td><code>static String newId()</code></td>
 <td>id sesi acak 128-bit ter-encode hex</td>
 </tr>
 <tr>
-<td><code>static boolean put(int[] ids, int[] exps, int[] id, int uid, int ttl, int now)</code></td>
+<td><code>static boolean put(int[] ids, int[] exps, String id, int uid, int ttl, int now)</code></td>
 <td>simpan pasangan</td>
 </tr>
 <tr>
-<td><code>static int[] create(int[] ids, int[] exps, int uid, int ttl)</code></td>
+<td><code>static String create(int[] ids, int[] exps, int uid, int ttl)</code></td>
 <td>buat/buka file</td>
 </tr>
 <tr>
-<td><code>static int get(int[] ids, int[] exps, int[] id, int now)</code></td>
+<td><code>static int get(int[] ids, int[] exps, String id, int now)</code></td>
 <td>-1 bila tidak ada / kedaluwarsa (entri dibersihkan sekalian)</td>
 </tr>
 <tr>
-<td><code>static boolean drop(int[] ids, int[] exps, int[] id)</code></td>
+<td><code>static boolean drop(int[] ids, int[] exps, String id)</code></td>
 <td>hapus sesi</td>
 </tr>
 <tr>
@@ -616,7 +620,7 @@ int uid2 = Session.get(ids, exps, sid, Net.time());</code></pre>
 <p>Penyajian file statis + MIME; menolak path traversal <code>..</code>.</p>
 <pre><code class="language-java">import Static;
 
-int[] resp = Static.serve(Net.bytes("public/index.html"));</code></pre>
+int[] resp = Static.serve("public/index.html");</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
 <li>Membaca seluruh file ke memori; file besar sebaiknya lewat reverse proxy.</li>
@@ -627,15 +631,15 @@ int[] resp = Static.serve(Net.bytes("public/index.html"));</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] mime(int[] path)</code></td>
+<td><code>static String mime(String path)</code></td>
 <td>kompatibilitas: dulu ada di Static, kini delegasi ke Mime</td>
 </tr>
 <tr>
-<td><code>static int[] serve(int[] path)</code></td>
+<td><code>static int[] serve(String path)</code></td>
 <td>sajikan file; tolak path traversal "..".</td>
 </tr>
 <tr>
-<td><code>static int[] serveKA(int[] path, int keep)</code></td>
+<td><code>static int[] serveKA(String path, int keep)</code></td>
 <td>varian keep-alive</td>
 </tr>
 </tbody></table></div>
@@ -891,8 +895,8 @@ Udp.sendTo(s, from[0], from[1], Net.bytes("pong"));</code></pre>
 <p>URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4.</p>
 <pre><code class="language-java">import Url;
 
-int[] u = Url.resolve("http://a/b/c/d;p?q", "../g"); // http://a/b/g
-int[] q = Url.appendQuery(Url.pair("q", "a b"), Url.pair("n", "3"));</code></pre>
+String u = Url.resolve("http://a/b/c/d;p?q", "../g"); // http://a/b/g
+String q = Url.appendQuery(Url.pair("q", "a b"), Url.pair("n", "3"));</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
 <li><code>decode</code> memperlakukan <code>+</code> sebagai spasi (form).</li>
@@ -915,95 +919,95 @@ int[] q = Url.appendQuery(Url.pair("q", "a b"), Url.pair("n", "3"));</code></pre
 <td>(internal) karakter RFC 3986 unreserved</td>
 </tr>
 <tr>
-<td><code>static int find(int[] s, int b, int from)</code></td>
+<td><code>static int find(String s, int b, int from)</code></td>
 <td>indeks elemen, -1 bila tidak ada</td>
 </tr>
 <tr>
-<td><code>static int[] encode(int[] s)</code></td>
+<td><code>static String encode(String s)</code></td>
 <td>percent-encode semua kecuali unreserved</td>
 </tr>
 <tr>
-<td><code>static int[] decode(int[] s)</code></td>
+<td><code>static String decode(String s)</code></td>
 <td>percent-decode; '+' diperlakukan sebagai spasi</td>
 </tr>
 <tr>
-<td><code>static int[] formEncode(int[] s)</code></td>
+<td><code>static String formEncode(String s)</code></td>
 <td>form-urlencoded: spasi → '+', lalu encode sisanya</td>
 </tr>
 <tr>
-<td><code>static int[] formDecode(int[] s)</code></td>
+<td><code>static String formDecode(String s)</code></td>
 <td>decode form: %XX, + menjadi spasi</td>
 </tr>
 <tr>
-<td><code>static int[] pair(int[] name, int[] val)</code></td>
+<td><code>static String pair(String name, String val)</code></td>
 <td>nama=nilai (keduanya di-encode sebagai form)</td>
 </tr>
 <tr>
-<td><code>static int[] appendQuery(int[] q, int[] p)</code></td>
+<td><code>static String appendQuery(String q, String p)</code></td>
 <td>gabungkan query: q kosong → p; selain itu q + "&amp;" + p</td>
 </tr>
 <tr>
-<td><code>static int schemeEnd(int[] u)</code></td>
+<td><code>static int schemeEnd(String u)</code></td>
 <td>indeks ':' skema (ALPHA ( ALPHA / DIGIT / "+" / "-" / "." ) ':')</td>
 </tr>
 <tr>
-<td><code>static boolean hasScheme(int[] u)</code></td>
+<td><code>static boolean hasScheme(String u)</code></td>
 <td>true bila URL diawali skema:</td>
 </tr>
 <tr>
-<td><code>static int[] scheme(int[] u)</code></td>
+<td><code>static String scheme(String u)</code></td>
 <td>skema URL</td>
 </tr>
 <tr>
-<td><code>static int authStart(int[] u)</code></td>
+<td><code>static int authStart(String u)</code></td>
 <td>awal otoritas "//" setelah skema; -1 bila tidak ada</td>
 </tr>
 <tr>
-<td><code>static int authEnd(int[] u)</code></td>
+<td><code>static int authEnd(String u)</code></td>
 <td>(internal) posisi akhir authority</td>
 </tr>
 <tr>
-<td><code>static int[] authority(int[] u)</code></td>
+<td><code>static String authority(String u)</code></td>
 <td>bagian authority (host:port)</td>
 </tr>
 <tr>
-<td><code>static int[] host(int[] u)</code></td>
+<td><code>static String host(String u)</code></td>
 <td>host tanpa port</td>
 </tr>
 <tr>
-<td><code>static int portOf(int[] u, int def)</code></td>
+<td><code>static int portOf(String u, int def)</code></td>
 <td>port eksplisit atau default skema</td>
 </tr>
 <tr>
-<td><code>static int pathStart(int[] u)</code></td>
+<td><code>static int pathStart(String u)</code></td>
 <td>(internal) posisi awal path</td>
 </tr>
 <tr>
-<td><code>static int[] path(int[] u)</code></td>
+<td><code>static String path(String u)</code></td>
 <td>bagian path</td>
 </tr>
 <tr>
-<td><code>static int[] query(int[] u)</code></td>
+<td><code>static String query(String u)</code></td>
 <td>bagian query tanpa tanda ?</td>
 </tr>
 <tr>
-<td><code>static int[] fragment(int[] u)</code></td>
+<td><code>static String fragment(String u)</code></td>
 <td>bagian fragment tanpa tanda #</td>
 </tr>
 <tr>
-<td><code>static int ip4(int[] s)</code></td>
+<td><code>static int ip4(String s)</code></td>
 <td>empat oktet "a.b.c.d" → ip; 0 bila tidak valid</td>
 </tr>
 <tr>
-<td><code>static int[] normalize(int[] p)</code></td>
+<td><code>static String normalize(String p)</code></td>
 <td>normalisasi path (titik-titik RFC 3986 §5.2.4)</td>
 </tr>
 <tr>
-<td><code>static int[] dropFragment(int[] u)</code></td>
+<td><code>static String dropFragment(String u)</code></td>
 <td>URL tanpa fragment</td>
 </tr>
 <tr>
-<td><code>static int[] resolve(int[] base, int[] rel)</code></td>
+<td><code>static String resolve(String base, String rel)</code></td>
 <td>resolusi referensi relatif terhadap base absolut</td>
 </tr>
 </tbody></table></div>
@@ -1028,7 +1032,7 @@ if (WebSocket.isUpgrade(req)) {
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] accept(int[] key)</code></td>
+<td><code>static String accept(String key)</code></td>
 <td>Sec-WebSocket-Accept = base64(SHA1(key + GUID))</td>
 </tr>
 <tr>

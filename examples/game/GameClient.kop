@@ -10,7 +10,7 @@
 // Input dikirim 10×/detik; snapshot ditampilkan ~15 fps. Terminal
 // dimasukkan ke mode raw (stty) agar tombol terbaca tanpa Enter.
 
-import Str;
+import Bytes;
 import Wire;
 import Render;
 
@@ -36,7 +36,7 @@ class Main {
     public static void main(String[] args) {
         int port = 9999;
         if (Net.argc() > 0) {
-            int p = Str.toInt(Net.argv(0));
+            int p = Bytes.toInt(Net.argv(0));
             if (p > 0) port = p;
         }
         int[] hostArg = new int[0];
@@ -48,10 +48,10 @@ class Main {
             int[] n = Net.argv(2);
             if (n.length > 0) name = n;
         }
-        if (name.length > 12) name = Str.slice(name, 0, 12);
+        if (name.length > 12) name = Bytes.slice(name, 0, 12);
 
         int wantFrames = 0;
-        if (Net.argc() > 3) wantFrames = Str.toInt(Net.argv(3));
+        if (Net.argc() > 3) wantFrames = Bytes.toInt(Net.argv(3));
 
         int fd = Net.socket(2, 2);                 /* UDP */
         if (fd < 0) {

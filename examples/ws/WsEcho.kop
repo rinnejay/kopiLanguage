@@ -21,13 +21,13 @@ class Main {
         if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
 
         int fd = Net.socket(2, 1);
-        if (fd < 0) { Log.error(Net.bytes("ws"), Net.bytes("socket gagal")); return; }
+        if (fd < 0) { Log.error("ws", "socket gagal"); return; }
         Net.setsockopt(fd, 1, 2, 1);                 /* SO_REUSEADDR */
         if (Net.bind(fd, 0, port) < 0 || Net.listen(fd, 16) < 0) {
-            Log.error(Net.bytes("ws"), Net.bytes("bind/listen gagal"));
+            Log.error("ws", "bind/listen gagal");
             return;
         }
-        Log.info(Net.bytes("ws"), Net.bytes("siap"));
+        Log.info("ws", "siap");
 
         while (true) {
             int c = Net.accept(fd);

@@ -1,20 +1,35 @@
-// Str.kop — utilitas teks (byte-as-int) murni Kopi (v1.7).
-// Teks direpresentasikan int[] berisi byte 0..255; versi ini ASCII +
-// hitung UTF-8 sederhana (tanpa normalisasi/segmentation Unicode).
+// Str.kop — pustaka teks native String (v1.23).
+//
+// Semua parameter dan hasil teks memakai `String` (bukan `int[]`).
+// Buffer byte I/O tetap di `Bytes` (lib/core/Bytes.kop); pindah
+// representasi eksplisit dengan `Net.strbytes` / `Net.mkstr`.
+//
+// Cakupan: ASCII + utilitas UTF-8 dasar (hitung, validasi, potong per
+// code point). Tidak ada normalisasi/segmentation Unicode.
 
 class Str {
 
-    static int len(int[] s) { return s.length; }
+    /* ── dasar ───────────────────────────────────────────────────── */
 
-    static boolean isEmpty(int[] s) { return s.length == 0; }
+    static int len(String s) { return s.length; }
 
-    static boolean eq(int[] a, int[] b) {
-        if (a.length != b.length) return false;
-        for (int i = 0; i < a.length; i++) if (a[i] != b[i]) return false;
+    static boolean isEmpty(String s) { return s.length == 0; }
+
+    static boolean isSpace(int c) {
+        return c == 32 || c == 9 || c == 10 || c == 13 || c == 11 || c == 12;
+    }
+
+    static boolean isBlank(String s) {
+        for (int i = 0; i < s.length; i++) if (!isSpace(s[i])) return false;
         return true;
     }
 
-    static int cmp(int[] a, int[] b) {
+    /* perbandingan isi (String == String juga membandingkan isi) */
+    static boolean eq(String a, String b) { return a == b; }
+
+    static boolean equals(String a, String b) { return a == b; }
+
+    static int cmp(String a, String b) {
         int n = a.length;
         if (b.length < n) n = b.length;
         for (int i = 0; i < n; i++) {
@@ -26,37 +41,150 @@ class Str {
         return 0;
     }
 
-    static int[] copy(int[] a) {
-        int[] o = new int[a.length];
-        for (int i = 0; i < a.length; i++) o[i] = a[i];
-        return o;
+    static int compare(String a, String b) { return cmp(a, b); }
+
+    static int compareIgnoreCase(String a, String b) {
+        int n = a.length;
+        if (b.length < n) n = b.length;
+        for (int i = 0; i < n; i++) {
+            int x = lowerByte(a[i]);
+            int y = lowerByte(b[i]);
+            if (x < y) return -1;
+            if (x > y) return 1;
+        }
+        if (a.length < b.length) return -1;
+        if (a.length > b.length) return 1;
+        return 0;
     }
 
-    static int[] cat(int[] a, int[] b) {
-        int[] o = new int[a.length + b.length];
+    static boolean equalsIgnoreCase(String a, String b) {
+        if (a.length != b.length) return false;
+        for (int i = 0; i < a.length; i++) {
+            if (lowerByte(a[i]) != lowerByte(b[i])) return false;
+        }
+        return true;
+    }
+
+    /* String immutable: salinan aman dipakai sebagai nilai baru */
+    static String copy(String s) { return s; }
+
+    static String cat(String a, String b) { return a + b; }
+
+    static String join(String[] parts, String sep) {
+        if (parts.length == 0) return "";
+        int total = 0;
+        for (int i = 0; i < parts.length; i++) total = total + parts[i].length;
+        total = total + sep.length * (parts.length - 1);
+        int[] o = new int[total];
         int k = 0;
-        for (int i = 0; i < a.length; i++) { o[k] = a[i]; k++; }
-        for (int i = 0; i < b.length; i++) { o[k] = b[i]; k++; }
-        return o;
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                for (int j = 0; j < sep.length; j++) { o[k] = sep[j]; k++; }
+            }
+            String p = parts[i];
+            for (int j = 0; j < p.length; j++) { o[k] = p[j]; k++; }
+        }
+        return Net.mkstr(o);
     }
 
-    static int[] slice(int[] s, int from, int n) {
+    /* ── potong / ambil ──────────────────────────────────────────── */
+
+    /* sub(s, from, n): n byte mulai from (bukan indeks akhir) */
+    static String sub(String s, int from, int n) {
         if (from < 0) from = 0;
         if (from > s.length) from = s.length;
         if (n < 0) n = 0;
         if (from + n > s.length) n = s.length - from;
+        if (from == 0 && n == s.length) return s;
         int[] o = new int[n];
         for (int i = 0; i < n; i++) o[i] = s[from + i];
-        return o;
+        return Net.mkstr(o);
     }
 
-    static int at(int[] s, int i) {
+    static String slice(String s, int from, int n) { return sub(s, from, n); }
+
+    static String left(String s, int n) { return sub(s, 0, n); }
+
+    static String right(String s, int n) {
+        if (n <= 0) return "";
+        if (n >= s.length) return s;
+        return sub(s, s.length - n, n);
+    }
+
+    static String dropLeft(String s, int n) { return sub(s, n, s.length); }
+
+    static String dropRight(String s, int n) {
+        if (n <= 0) return s;
+        return sub(s, 0, s.length - n);
+    }
+
+    /* potongan sebelum/sesudah pemisah pertama ("" bila tidak ada) */
+    static String before(String s, String sep) {
+        int i = indexOf(s, sep, 0);
+        if (i < 0) return "";
+        return sub(s, 0, i);
+    }
+
+    static String after(String s, String sep) {
+        int i = indexOf(s, sep, 0);
+        if (i < 0) return "";
+        return sub(s, i + sep.length, s.length - i - sep.length);
+    }
+
+    /* potongan sebelum/sesudah pemisah terakhir */
+    static String beforeLast(String s, String sep) {
+        int i = lastIndexOf(s, sep);
+        if (i < 0) return "";
+        return sub(s, 0, i);
+    }
+
+    static String afterLast(String s, String sep) {
+        int i = lastIndexOf(s, sep);
+        if (i < 0) return "";
+        return sub(s, i + sep.length, s.length - i - sep.length);
+    }
+
+    static String between(String s, String open, String close) {
+        int a = indexOf(s, open, 0);
+        if (a < 0) return "";
+        int b = indexOf(s, close, a + open.length);
+        if (b < 0) return "";
+        return sub(s, a + open.length, b - a - open.length);
+    }
+
+    static int at(String s, int i) {
         if (i < 0 || i >= s.length) return -1;
         return s[i];
     }
 
-    static int indexOf(int[] s, int[] ndl, int from) {
-        if (ndl.length == 0) return from;
+    static int charAt(String s, int i) { return at(s, i); }
+
+    static int first(String s) {
+        if (s.length == 0) return -1;
+        return s[0];
+    }
+
+    static int last(String s) {
+        if (s.length == 0) return -1;
+        return s[s.length - 1];
+    }
+
+    static String removePrefix(String s, String p) {
+        if (!startsWith(s, p)) return s;
+        return sub(s, p.length, s.length - p.length);
+    }
+
+    static String removeSuffix(String s, String p) {
+        if (!endsWith(s, p)) return s;
+        return sub(s, 0, s.length - p.length);
+    }
+
+    /* ── pencarian ───────────────────────────────────────────────── */
+
+    static int indexOf(String s, String ndl, int from) {
+        if (from < 0) from = 0;
+        if (ndl.length == 0) return from <= s.length ? from : s.length;
+        if (from > s.length - ndl.length) return -1;
         int lim = s.length - ndl.length;
         for (int i = from; i <= lim; i++) {
             int j = 0;
@@ -66,63 +194,126 @@ class Str {
         return -1;
     }
 
-    static int lastIndexOf(int[] s, int[] ndl) {
-        int last = -1;
-        int p = 0;
-        while (true) {
-            int q = indexOf(s, ndl, p);
-            if (q < 0) break;
-            last = q;
-            p = q + 1;
+    static int lastIndexOf(String s, String ndl) {
+        if (ndl.length == 0) return s.length;
+        if (ndl.length > s.length) return -1;
+        int i = s.length - ndl.length;
+        while (i >= 0) {
+            int j = 0;
+            while (j < ndl.length && s[i + j] == ndl[j]) j++;
+            if (j == ndl.length) return i;
+            i--;
         }
-        return last;
+        return -1;
     }
 
-    static boolean contains(int[] s, int[] ndl) { return indexOf(s, ndl, 0) >= 0; }
+    static boolean contains(String s, String ndl) { return indexOf(s, ndl, 0) >= 0; }
 
-    static boolean startsWith(int[] s, int[] p) {
+    static boolean startsWith(String s, String p) {
         if (p.length > s.length) return false;
         for (int i = 0; i < p.length; i++) if (s[i] != p[i]) return false;
         return true;
     }
 
-    static boolean endsWith(int[] s, int[] p) {
+    static boolean endsWith(String s, String p) {
         if (p.length > s.length) return false;
         int off = s.length - p.length;
         for (int i = 0; i < p.length; i++) if (s[off + i] != p[i]) return false;
         return true;
     }
 
-    /* v1.17: fungsi pembangun teks mengembalikan String (materialisasi
-     * eksplisit via Net.mkstr). int[] tetap khusus buffer byte I/O. */
-    static String trimLeft(int[] s) {
+    /* jumlah kemunculan tidak tumpang tindih */
+    static int count(String s, String ndl) {
+        if (ndl.length == 0) return 0;
+        int n = 0;
+        int i = indexOf(s, ndl, 0);
+        while (i >= 0) {
+            n++;
+            i = indexOf(s, ndl, i + ndl.length);
+        }
+        return n;
+    }
+
+    static int countByte(String s, int b) {
+        int n = 0;
+        for (int i = 0; i < s.length; i++) if (s[i] == b) n++;
+        return n;
+    }
+
+    /* ── trim / case ─────────────────────────────────────────────── */
+
+    static String trimLeft(String s) {
         int a = 0;
-        while (a < s.length && (s[a] == 32 || s[a] == 9 || s[a] == 10 || s[a] == 13)) a++;
-        return Net.mkstr(slice(s, a, s.length - a));
+        while (a < s.length && isSpace(s[a])) a++;
+        return sub(s, a, s.length - a);
     }
 
-    static String trimRight(int[] s) {
+    static String trimRight(String s) {
         int b = s.length;
-        while (b > 0 && (s[b - 1] == 32 || s[b - 1] == 9 || s[b - 1] == 10 || s[b - 1] == 13)) b--;
-        return Net.mkstr(slice(s, 0, b));
+        while (b > 0 && isSpace(s[b - 1])) b--;
+        return sub(s, 0, b);
     }
 
-    static String trim(int[] s) { return trimRight(trimLeft(s)); }
+    static String trim(String s) { return trimRight(trimLeft(s)); }
 
-    static String upper(int[] s) {
-        int[] o = copy(s);
-        for (int i = 0; i < o.length; i++) if (o[i] >= 97 && o[i] <= 122) o[i] = o[i] - 32;
+    static String strip(String s) { return trim(s); }
+
+    static String capitalize(String s) {
+        if (s.length == 0) return s;
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) o[i] = s[i];
+        if (o[0] >= 97 && o[0] <= 122) o[0] = o[0] - 32;
         return Net.mkstr(o);
     }
 
-    static String lower(int[] s) {
-        int[] o = copy(s);
-        for (int i = 0; i < o.length; i++) if (o[i] >= 65 && o[i] <= 90) o[i] = o[i] + 32;
+    static String uncapitalize(String s) {
+        if (s.length == 0) return s;
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) o[i] = s[i];
+        if (o[0] >= 65 && o[0] <= 90) o[0] = o[0] + 32;
         return Net.mkstr(o);
     }
 
-    static String repeat(int[] s, int n) {
-        if (n <= 0) return Net.mkstr(new int[0]);
+    static String upper(String s) {
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i];
+            if (c >= 97 && c <= 122) c = c - 32;
+            o[i] = c;
+        }
+        return Net.mkstr(o);
+    }
+
+    static String lower(String s) {
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i];
+            if (c >= 65 && c <= 90) c = c + 32;
+            o[i] = c;
+        }
+        return Net.mkstr(o);
+    }
+
+    static int lowerByte(int c) {
+        if (c >= 65 && c <= 90) return c + 32;
+        return c;
+    }
+
+    static String swapCase(String s) {
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i];
+            if (c >= 97 && c <= 122) c = c - 32;
+            else if (c >= 65 && c <= 90) c = c + 32;
+            o[i] = c;
+        }
+        return Net.mkstr(o);
+    }
+
+    /* ── bangun / ubah ───────────────────────────────────────────── */
+
+    static String repeat(String s, int n) {
+        if (n <= 0 || s.length == 0) return "";
         int[] o = new int[s.length * n];
         int k = 0;
         for (int r = 0; r < n; r++)
@@ -130,73 +321,45 @@ class Str {
         return Net.mkstr(o);
     }
 
-    static String reverse(int[] s) {
+    /* balik byte (ASCII). Untuk UTF-8 gunakan utf8Slice/utf8Reverse. */
+    static String reverse(String s) {
         int[] o = new int[s.length];
         for (int i = 0; i < s.length; i++) o[i] = s[s.length - 1 - i];
         return Net.mkstr(o);
     }
 
-    static String replaceByte(int[] s, int from, int to) {
-        int[] o = copy(s);
-        for (int i = 0; i < o.length; i++) if (o[i] == from) o[i] = to;
-        return Net.mkstr(o);
-    }
-
-    static String replaceSeq(int[] s, int[] old, int[] nw) {
-        if (old.length == 0) return Net.mkstr(copy(s));
-        int[] o = new int[0];
-        int i = 0;
-        while (i < s.length) {
-            if (i + old.length <= s.length) {
-                int j = 0;
-                while (j < old.length && s[i + j] == old[j]) j++;
-                if (j == old.length) { o = cat(o, nw); i = i + old.length; continue; }
-            }
-            int[] one = new int[1];
-            one[0] = s[i];
-            o = cat(o, one);
-            i++;
-        }
-        return Net.mkstr(o);
-    }
-
-    static int countByte(int[] s, int b) {
-        int n = 0;
-        for (int i = 0; i < s.length; i++) if (s[i] == b) n++;
-        return n;
-    }
-
-    static int splitCount(int[] s, int sep) {
-        if (s.length == 0) return 0;
-        int n = 1;
-        for (int i = 0; i < s.length; i++) if (s[i] == sep) n++;
-        return n;
-    }
-
-    static String splitAt(int[] s, int sep, int idx) {
+    static String replaceSeq(String s, String old, String nw) {
+        if (old.length == 0) return s;
+        int n = count(s, old);
+        if (n == 0) return s;
+        int total = s.length + n * (nw.length - old.length);
+        int[] o = new int[total];
         int k = 0;
-        int st = 0;
-        for (int i = 0; i <= s.length; i++) {
-            boolean end = i == s.length;
-            boolean hit = false;
-            if (!end && s[i] == sep) hit = true;
-            if (end || hit) {
-                if (k == idx) return Net.mkstr(slice(s, st, i - st));
-                k++;
-                st = i + 1;
-            }
+        int i = 0;
+        int p = indexOf(s, old, 0);
+        while (p >= 0) {
+            while (i < p) { o[k] = s[i]; i++; k++; }
+            for (int j = 0; j < nw.length; j++) { o[k] = nw[j]; k++; }
+            i = p + old.length;
+            p = indexOf(s, old, i);
         }
-        return Net.mkstr(new int[0]);
+        while (i < s.length) { o[k] = s[i]; i++; k++; }
+        return Net.mkstr(o);
     }
 
-    /* substring ala umum: potongan teks sebagai String (v1.17).
-     * Str.slice tetap int[] untuk buffer byte I/O. */
-    static String sub(int[] s, int from, int n) {
-        return Net.mkstr(slice(s, from, n));
+    static String replace(String s, String old, String nw) { return replaceSeq(s, old, nw); }
+
+    static String replaceByte(String s, int from, int to) {
+        int[] o = new int[s.length];
+        for (int i = 0; i < s.length; i++) {
+            if (s[i] == from) o[i] = to;
+            else o[i] = s[i];
+        }
+        return Net.mkstr(o);
     }
 
-    static String padLeft(int[] s, int width, int pad) {
-        if (s.length >= width) return Net.mkstr(copy(s));
+    static String padLeft(String s, int width, int pad) {
+        if (s.length >= width) return s;
         int[] o = new int[width];
         int fill = width - s.length;
         for (int i = 0; i < fill; i++) o[i] = pad;
@@ -204,96 +367,181 @@ class Str {
         return Net.mkstr(o);
     }
 
-    static String padRight(int[] s, int width, int pad) {
-        if (s.length >= width) return Net.mkstr(copy(s));
+    static String padRight(String s, int width, int pad) {
+        if (s.length >= width) return s;
         int[] o = new int[width];
         for (int i = 0; i < s.length; i++) o[i] = s[i];
         for (int i = s.length; i < width; i++) o[i] = pad;
         return Net.mkstr(o);
     }
 
+    static String center(String s, int width, int pad) {
+        if (s.length >= width) return s;
+        int gap = width - s.length;
+        int left = gap / 2;
+        int right = gap - left;
+        int[] o = new int[width];
+        int k = 0;
+        for (int i = 0; i < left; i++) { o[k] = pad; k++; }
+        for (int i = 0; i < s.length; i++) { o[k] = s[i]; k++; }
+        for (int i = 0; i < right; i++) { o[k] = pad; k++; }
+        return Net.mkstr(o);
+    }
+
+    static String truncate(String s, int max) {
+        if (max <= 0) return "";
+        if (s.length <= max) return s;
+        return sub(s, 0, max);
+    }
+
+    static String ellipsis(String s, int max) {
+        if (max <= 0) return "";
+        if (s.length <= max) return s;
+        if (max <= 3) return sub(s, 0, max);
+        return sub(s, 0, max - 3) + "...";
+    }
+
+    /* ── split / lines / words ───────────────────────────────────── */
+
+    static int splitCountChar(String s, int sep) {
+        if (s.length == 0) return 0;
+        int n = 1;
+        for (int i = 0; i < s.length; i++) if (s[i] == sep) n++;
+        return n;
+    }
+
+    static String splitAtChar(String s, int sep, int idx) {
+        int k = 0;
+        int st = 0;
+        for (int i = 0; i <= s.length; i++) {
+            boolean end = i == s.length;
+            boolean hit = false;
+            if (!end && s[i] == sep) hit = true;
+            if (end || hit) {
+                if (k == idx) return sub(s, st, i - st);
+                k++;
+                st = i + 1;
+            }
+        }
+        return "";
+    }
+
+    static String[] splitChar(String s, int sep) {
+        int n = splitCountChar(s, sep);
+        String[] o = new String[n];
+        int k = 0;
+        int st = 0;
+        for (int i = 0; i <= s.length; i++) {
+            boolean end = i == s.length;
+            boolean hit = false;
+            if (!end && s[i] == sep) hit = true;
+            if (end || hit) {
+                if (k < n) o[k] = sub(s, st, i - st);
+                k++;
+                st = i + 1;
+            }
+        }
+        return o;
+    }
+
+    static int splitCount(String s, String sep) {
+        if (s.length == 0) return 0;
+        if (sep.length == 0) return 1;
+        return 1 + count(s, sep);
+    }
+
+    static String splitAt(String s, String sep, int idx) {
+        if (sep.length == 0) return idx == 0 ? s : "";
+        int k = 0;
+        int st = 0;
+        int p = indexOf(s, sep, 0);
+        while (p >= 0) {
+            if (k == idx) return sub(s, st, p - st);
+            k++;
+            st = p + sep.length;
+            p = indexOf(s, sep, st);
+        }
+        if (k == idx) return sub(s, st, s.length - st);
+        return "";
+    }
+
+    static String[] split(String s, String sep) {
+        if (sep.length == 0) {
+            String[] one = new String[1];
+            one[0] = s;
+            return one;
+        }
+        int n = splitCount(s, sep);
+        String[] o = new String[n];
+        int k = 0;
+        int st = 0;
+        int p = indexOf(s, sep, 0);
+        while (p >= 0) {
+            if (k < n) o[k] = sub(s, st, p - st);
+            k++;
+            st = p + sep.length;
+            p = indexOf(s, sep, st);
+        }
+        if (k < n) o[k] = sub(s, st, s.length - st);
+        return o;
+    }
+
+    /* baris: pemisah \n, \r di ujung tiap baris dibuang */
+    static String[] lines(String s) {
+        String[] raw = splitChar(s, 10);
+        for (int i = 0; i < raw.length; i++) {
+            if (endsWith(raw[i], "\r")) raw[i] = sub(raw[i], 0, raw[i].length - 1);
+        }
+        return raw;
+    }
+
+    /* kata: pemisah spasi/tab/CR/LF, pemisah berurutan dilewati */
+    static String[] words(String s) {
+        int n = 0;
+        int i = 0;
+        while (i < s.length) {
+            while (i < s.length && isSpace(s[i])) i++;
+            if (i >= s.length) break;
+            n++;
+            while (i < s.length && !isSpace(s[i])) i++;
+        }
+        String[] o = new String[n];
+        int k = 0;
+        i = 0;
+        while (i < s.length) {
+            while (i < s.length && isSpace(s[i])) i++;
+            if (i >= s.length) break;
+            int st = i;
+            while (i < s.length && !isSpace(s[i])) i++;
+            o[k] = sub(s, st, i - st);
+            k++;
+        }
+        return o;
+    }
+
+    /* ── angka ↔ teks ────────────────────────────────────────────── */
+
     static String fromInt(int v) {
+        return Net.mkstr(intBytes(v));
+    }
+
+    private static int[] intBytes(int v) {
         boolean neg = v < 0;
-        int n = v;
+        long n = v;
         if (neg) n = -n;
         int[] tmp = new int[12];
         int k = 0;
         if (n == 0) { tmp[0] = 48; k = 1; }
-        while (n > 0) { tmp[k] = 48 + n % 10; k++; n = n / 10; }
+        while (n > 0) { tmp[k] = 48 + (int)(n % 10); k++; n = n / 10; }
         int off = 0;
         if (neg) off = 1;
         int[] o = new int[k + off];
         if (neg) o[0] = 45;
         for (int i = 0; i < k; i++) o[off + i] = tmp[k - 1 - i];
-        return Net.mkstr(o);
-    }
-
-    static int toInt(int[] s) {
-        int i = 0;
-        boolean neg = false;
-        if (i < s.length && s[i] == 45) { neg = true; i++; }
-        int r = 0;
-        while (i < s.length) {
-            int c = s[i];
-            if (c < 48 || c > 57) break;
-            r = r * 10 + (c - 48);
-            i++;
-        }
-        if (neg) r = -r;
-        return r;
-    }
-
-    static boolean isDigits(int[] s) {
-        if (s.length == 0) return false;
-        for (int i = 0; i < s.length; i++) if (s[i] < 48 || s[i] > 57) return false;
-        return true;
-    }
-
-    static boolean equalsIgnoreCase(int[] a, int[] b) {
-        if (a.length != b.length) return false;
-        for (int i = 0; i < a.length; i++) {
-            int x = a[i];
-            int y = b[i];
-            if (x >= 65 && x <= 90) x = x + 32;
-            if (y >= 65 && y <= 90) y = y + 32;
-            if (x != y) return false;
-        }
-        return true;
-    }
-
-    static int utf8Count(int[] s) {
-        int n = 0;
-        for (int i = 0; i < s.length; i++) {
-            if ((s[i] & 192) != 128) n++;
-        }
-        return n;
-    }
-
-    static int[] hex(int[] data) {
-        int[] dig = new int[16];
-        int k = 0;
-        for (int i = 0; i < data.length; i++) {
-            int v = data[i] & 255;
-            int hi = v / 16;
-            int lo = v % 16;
-            if (hi < 10) dig[k] = 48 + hi; else dig[k] = 87 + hi;
-            k++;
-            if (lo < 10) dig[k] = 48 + lo; else dig[k] = 87 + lo;
-            k++;
-        }
-        int[] o = new int[k];
-        for (int i = 0; i < k; i++) o[i] = dig[i];
         return o;
     }
 
-    /* ── konversi untuk template & umum (v1.7.1) ─────────────── */
-
-    static String boolText(boolean b) {
-        if (b) return Net.bytes("true");
-        return Net.bytes("false");
-    }
-
-    /* uint32 (nilai kanonik zero-extended di int) */
+    /* uint32 dalam nilai kanonik int (zero-extended) */
     static String fromUInt(int v) {
         if (v >= 0) return fromInt(v);
         long u = ((long)v) & 4294967295L;
@@ -345,17 +593,45 @@ class Str {
         return Net.mkstr(o);
     }
 
-    /* double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang).
-     * Batas jujur: bukan algoritma pembulatan Java/printf. */
+    static String boolText(boolean b) {
+        if (b) return "true";
+        return "false";
+    }
+
+    static String fromBool(boolean b) { return boolText(b); }
+
+    /* varian skalar: tidak ada overloading di Kopi, jadi nama eksplisit */
+    static String fromByte(byte v) { return fromInt((int)v); }
+
+    static String fromShort(short v) { return fromInt((int)v); }
+
+    static String fromUInt8(uint8 v) { return fromInt((int)v); }
+
+    static String fromUInt16(uint16 v) { return fromInt((int)v); }
+
+    static String fromUInt32(uint32 v) { return fromUInt((int)v); }
+
+    static String fromUInt64(uint64 v) { return fromULong((long)v); }
+
+    static String fromFloat(float v) { return fromDouble((double)v); }
+
+    /* satu code point (0..255) menjadi teks */
+    static String fromChar(int c) {
+        int[] o = new int[1];
+        o[0] = c & 255;
+        return Net.mkstr(o);
+    }
+
+    /* double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang) */
     static String fromDouble(double d) {
         boolean neg = d < 0.0;
         boolean isnan = d != d;
         double x = d;
         if (neg) x = -x;
-        if (isnan) return Net.bytes("nan");
+        if (isnan) return "nan";
         if (x > 9000000000000000000.0) {
-            if (neg) return Net.bytes("-inf");
-            return Net.bytes("inf");
+            if (neg) return "-inf";
+            return "inf";
         }
         long ip = (long)x;
         String o = fromLong(ip);
@@ -374,18 +650,337 @@ class Str {
             if (k > 0) {
                 int[] fr = new int[k];
                 for (int i = 0; i < k; i++) fr[i] = fd[i];
-                o = o + Net.bytes(".") + Net.mkstr(fr);
+                o = o + "." + Net.mkstr(fr);
             }
         }
-        if (neg) o = Net.bytes("-") + o;
+        if (neg) o = "-" + o;
         return o;
     }
 
-    static void print(int[] s) {
+    /* angka desimal di awal teks; berhenti pada karakter non-digit */
+    static int toInt(String s) {
+        int i = 0;
+        boolean neg = false;
+        if (i < s.length && s[i] == 45) { neg = true; i++; }
+        else if (i < s.length && s[i] == 43) { i++; }
+        int r = 0;
+        while (i < s.length) {
+            int c = s[i];
+            if (c < 48 || c > 57) break;
+            r = r * 10 + (c - 48);
+            i++;
+        }
+        if (neg) r = -r;
+        return r;
+    }
+
+    static int toIntOr(String s, int def) {
+        if (s.length == 0) return def;
+        int i = 0;
+        if (s[i] == 45 || s[i] == 43) i++;
+        if (i >= s.length) return def;
+        for (int j = i; j < s.length; j++) {
+            if (s[j] < 48 || s[j] > 57) return def;
+        }
+        return toInt(s);
+    }
+
+    static long toLong(String s) {
+        int i = 0;
+        boolean neg = false;
+        if (i < s.length && s[i] == 45) { neg = true; i++; }
+        else if (i < s.length && s[i] == 43) { i++; }
+        long r = 0;
+        while (i < s.length) {
+            int c = s[i];
+            if (c < 48 || c > 57) break;
+            r = r * 10 + (c - 48);
+            i++;
+        }
+        if (neg) r = -r;
+        return r;
+    }
+
+    static int parseInt(String s, int radix) {
+        if (radix < 2 || radix > 36) return 0;
+        int i = 0;
+        boolean neg = false;
+        if (i < s.length && s[i] == 45) { neg = true; i++; }
+        else if (i < s.length && s[i] == 43) { i++; }
+        long r = 0;
+        while (i < s.length) {
+            int d = digitValue(s[i]);
+            if (d < 0 || d >= radix) break;
+            r = r * radix + d;
+            i++;
+        }
+        if (neg) r = -r;
+        return (int)r;
+    }
+
+    static long parseLong(String s, int radix) {
+        if (radix < 2 || radix > 36) return 0;
+        int i = 0;
+        boolean neg = false;
+        if (i < s.length && s[i] == 45) { neg = true; i++; }
+        else if (i < s.length && s[i] == 43) { i++; }
+        long r = 0;
+        while (i < s.length) {
+            int d = digitValue(s[i]);
+            if (d < 0 || d >= radix) break;
+            r = r * radix + d;
+            i++;
+        }
+        if (neg) r = -r;
+        return r;
+    }
+
+    static int digitValue(int c) {
+        if (c >= 48 && c <= 57) return c - 48;
+        if (c >= 97 && c <= 122) return c - 87;
+        if (c >= 65 && c <= 90) return c - 55;
+        return -1;
+    }
+
+    /* double sederhana: [-]digit[.digit][e[+-]digit] */
+    static double toDouble(String s) {
+        int i = 0;
+        boolean neg = false;
+        if (i < s.length && s[i] == 45) { neg = true; i++; }
+        else if (i < s.length && s[i] == 43) { i++; }
+        double r = 0.0;
+        while (i < s.length && s[i] >= 48 && s[i] <= 57) {
+            r = r * 10.0 + (double)(s[i] - 48);
+            i++;
+        }
+        if (i < s.length && s[i] == 46) {
+            i++;
+            double scale = 0.1;
+            while (i < s.length && s[i] >= 48 && s[i] <= 57) {
+                r = r + (double)(s[i] - 48) * scale;
+                scale = scale * 0.1;
+                i++;
+            }
+        }
+        if (i < s.length && (s[i] == 101 || s[i] == 69)) {
+            i++;
+            boolean eneg = false;
+            if (i < s.length && s[i] == 45) { eneg = true; i++; }
+            else if (i < s.length && s[i] == 43) i++;
+            int e = 0;
+            while (i < s.length && s[i] >= 48 && s[i] <= 57) {
+                e = e * 10 + (s[i] - 48);
+                i++;
+            }
+            while (e > 0) {
+                if (eneg) r = r / 10.0;
+                else r = r * 10.0;
+                e--;
+            }
+        }
+        if (neg) r = -r;
+        return r;
+    }
+
+    /* varian skalar hasil parsing */
+    static byte toByte(String s) { return (byte)toInt(s); }
+
+    static short toShort(String s) { return (short)toInt(s); }
+
+    static uint8 toUInt8(String s) { return (uint8)toInt(s); }
+
+    static uint16 toUInt16(String s) { return (uint16)toInt(s); }
+
+    static uint32 toUInt32(String s) { return (uint32)toLong(s); }
+
+    static uint64 toUInt64(String s) { return (uint64)toLong(s); }
+
+    static float toFloat(String s) { return (float)toDouble(s); }
+
+    /* true: "true", "1", "yes", "on" (tanpa beda huruf besar/kecil) */
+    static boolean toBool(String s) {
+        if (s == "1") return true;
+        if (equalsIgnoreCase(s, "true")) return true;
+        if (equalsIgnoreCase(s, "yes")) return true;
+        if (equalsIgnoreCase(s, "on")) return true;
+        return false;
+    }
+
+    /* ── validasi bentuk ─────────────────────────────────────────── */
+
+    static boolean isDigits(String s) {
+        if (s.length == 0) return false;
+        for (int i = 0; i < s.length; i++) if (s[i] < 48 || s[i] > 57) return false;
+        return true;
+    }
+
+    static boolean isNumber(String s) {
+        if (s.length == 0) return false;
+        int i = 0;
+        if (s[i] == 45 || s[i] == 43) i++;
+        if (i >= s.length) return false;
+        boolean dig = false;
+        boolean dot = false;
+        while (i < s.length) {
+            int c = s[i];
+            if (c >= 48 && c <= 57) { dig = true; i++; continue; }
+            if (c == 46 && !dot) { dot = true; i++; continue; }
+            return false;
+        }
+        return dig;
+    }
+
+    static boolean isHex(String s) {
+        if (s.length == 0) return false;
+        for (int i = 0; i < s.length; i++) if (digitValue(s[i]) < 0 || digitValue(s[i]) >= 16) return false;
+        return true;
+    }
+
+    /* ── hex ─────────────────────────────────────────────────────── */
+
+    static String toHex(String s) {
+        int[] o = new int[s.length * 2];
+        int k = 0;
+        for (int i = 0; i < s.length; i++) {
+            int v = s[i] & 255;
+            o[k] = hexChar(v / 16); k++;
+            o[k] = hexChar(v % 16); k++;
+        }
+        return Net.mkstr(o);
+    }
+
+    static int hexChar(int v) {
+        if (v < 10) return 48 + v;
+        return 87 + v;
+    }
+
+    /* byte dari pasangan hex; berhenti pada pasangan tidak valid */
+    static String fromHex(String s) {
+        int n = s.length / 2;
+        int[] o = new int[n];
+        int k = 0;
+        int i = 0;
+        while (i + 1 < s.length) {
+            int hi = digitValue(s[i]);
+            int lo = digitValue(s[i + 1]);
+            if (hi < 0 || hi >= 16 || lo < 0 || lo >= 16) break;
+            o[k] = hi * 16 + lo;
+            k++;
+            i = i + 2;
+        }
+        if (k == n) return Net.mkstr(o);
+        int[] cut = new int[k];
+        for (int j = 0; j < k; j++) cut[j] = o[j];
+        return Net.mkstr(cut);
+    }
+
+    /* ── UTF-8 ───────────────────────────────────────────────────── */
+
+    /* jumlah code point (byte non-continuation) */
+    static int utf8Count(String s) {
+        int n = 0;
+        for (int i = 0; i < s.length; i++) {
+            if ((s[i] & 192) != 128) n++;
+        }
+        return n;
+    }
+
+    static boolean utf8Valid(String s) {
+        int i = 0;
+        while (i < s.length) {
+            int c = s[i] & 255;
+            int need = 0;
+            if (c < 128) need = 0;
+            else if (c >= 194 && c <= 223) need = 1;
+            else if (c >= 224 && c <= 239) need = 2;
+            else if (c >= 240 && c <= 244) need = 3;
+            else return false;
+            for (int j = 1; j <= need; j++) {
+                if (i + j >= s.length) return false;
+                if ((s[i + j] & 192) != 128) return false;
+            }
+            i = i + need + 1;
+        }
+        return true;
+    }
+
+    /* offset byte untuk indeks code point ke-cp (0..utf8Count) */
+    static int utf8Offset(String s, int cp) {
+        if (cp <= 0) return 0;
+        int n = 0;
+        int i = 0;
+        while (i < s.length) {
+            if (n == cp) return i;
+            int c = s[i] & 255;
+            if (c < 128) i = i + 1;
+            else if (c >= 194 && c <= 223) i = i + 2;
+            else if (c >= 224 && c <= 239) i = i + 3;
+            else if (c >= 240 && c <= 244) i = i + 4;
+            else i = i + 1;
+            if (i > s.length) i = s.length;
+            n++;
+        }
+        return s.length;
+    }
+
+    /* potong n code point mulai code point from (bukan byte) */
+    static String utf8Slice(String s, int from, int n) {
+        if (from < 0) from = 0;
+        if (n < 0) n = 0;
+        int a = utf8Offset(s, from);
+        int b = utf8Offset(s, from + n);
+        return sub(s, a, b - a);
+    }
+
+    /* code point pertama pada byte offset i (-1 bila tidak valid) */
+    static int utf8CodeAt(String s, int i) {
+        if (i < 0 || i >= s.length) return -1;
+        int c = s[i] & 255;
+        if (c < 128) return c;
+        if (c >= 194 && c <= 223) {
+            if (i + 1 >= s.length) return -1;
+            int c1 = s[i + 1] & 255;
+            if ((c1 & 192) != 128) return -1;
+            return ((c & 31) << 6) | (c1 & 63);
+        }
+        if (c >= 224 && c <= 239) {
+            if (i + 2 >= s.length) return -1;
+            int c1 = s[i + 1] & 255;
+            int c2 = s[i + 2] & 255;
+            if ((c1 & 192) != 128 || (c2 & 192) != 128) return -1;
+            return ((c & 15) << 12) | ((c1 & 63) << 6) | (c2 & 63);
+        }
+        if (c >= 240 && c <= 244) {
+            if (i + 3 >= s.length) return -1;
+            int c1 = s[i + 1] & 255;
+            int c2 = s[i + 2] & 255;
+            int c3 = s[i + 3] & 255;
+            if ((c1 & 192) != 128 || (c2 & 192) != 128 || (c3 & 192) != 128) return -1;
+            return ((c & 7) << 18) | ((c1 & 63) << 12) | ((c2 & 63) << 6) | (c3 & 63);
+        }
+        return -1;
+    }
+
+    /* balik per code point (UTF-8 aman untuk teks valid) */
+    static String utf8Reverse(String s) {
+        int n = utf8Count(s);
+        int[] o = new int[s.length];
+        int k = 0;
+        for (int cp = n - 1; cp >= 0; cp--) {
+            int a = utf8Offset(s, cp);
+            int b = utf8Offset(s, cp + 1);
+            for (int i = a; i < b; i++) { o[k] = s[i]; k++; }
+        }
+        return Net.mkstr(o);
+    }
+
+    /* ── output ──────────────────────────────────────────────────── */
+
+    static void print(String s) {
         for (int i = 0; i < s.length; i++) Net.wrb(1, s[i]);
     }
 
-    static void line(int[] s) {
+    static void line(String s) {
         print(s);
         Net.wrb(1, 10);
     }

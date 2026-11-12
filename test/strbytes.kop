@@ -1,0 +1,116 @@
+// strbytes.kop — v1.23: API Str (String) + Bytes (int[]) lengkap.
+import Str;
+import Bytes;
+
+class Main {
+    public static void main(String[] args) {
+        String s = "  Kopi Bahasa  ";
+        String t = s.trim();
+        System.out.println(t);
+        System.out.println(t.upper());
+        System.out.println(t.lower());
+        System.out.println(t.capitalize());
+        System.out.println(t.swapCase());
+        System.out.println(t.length);
+        System.out.println(t.isEmpty());
+        System.out.println(Str.isBlank(" \t\r\n"));
+
+        System.out.println(t.sub(5, 6));
+        System.out.println(t.left(4));
+        System.out.println(t.right(6));
+        System.out.println(t.before(" "));
+        System.out.println(t.after(" "));
+        System.out.println(Str.beforeLast("a=b=c", "="));
+        System.out.println(Str.afterLast("a=b=c", "="));
+        System.out.println(Str.between("[kopi]", "[", "]"));
+        System.out.println(Str.removePrefix("kopi", "ko"));
+        System.out.println(Str.removeSuffix("kopi", "pi"));
+        System.out.println(t.charAt(0));
+
+        System.out.println(Str.indexOf(t, "a", 0));
+        System.out.println(Str.lastIndexOf(t, "a"));
+        System.out.println(Str.count(t, "a"));
+        System.out.println(t.contains("Bahasa"));
+        System.out.println(t.startsWith("Kopi"));
+        System.out.println(t.endsWith("Bahasa"));
+
+        System.out.println(Str.replace("a-b-c", "-", "+"));
+        System.out.println(Str.repeat("ab", 3));
+        System.out.println(Str.reverse("abc"));
+        System.out.println(Str.padLeft("7", 3, 48));
+        System.out.println(Str.padRight("7", 3, 46));
+        System.out.println(Str.center("ab", 6, 46));
+        System.out.println(Str.truncate("abcdef", 4));
+        System.out.println(Str.ellipsis("abcdefgh", 6));
+
+        String[] p = Str.split("a,b,c", ",");
+        System.out.println(p.length);
+        System.out.println(Str.join(p, "|"));
+        String[] q = Str.split("a::b::c", "::");
+        System.out.println(Str.join(q, "/"));
+        System.out.println(Str.splitCount("a::b::c", "::"));
+        System.out.println(Str.splitAt("a::b::c", "::", 1));
+        String[] ln = Str.lines("satu\r\ndua\n");
+        System.out.println(ln.length);
+        System.out.println(Str.join(ln, "#"));
+        String[] w = Str.words("  satu  dua\ttiga ");
+        System.out.println(w.length);
+        System.out.println(Str.join(w, "+"));
+
+        System.out.println(Str.fromInt(-42));
+        System.out.println(Str.fromLong(9000000000L));
+        System.out.println(Str.fromUInt(4000000000U));
+        System.out.println(Str.fromULong(-1L));
+        System.out.println(Str.fromShort(-123));
+        System.out.println(Str.fromByte(65));
+        System.out.println(Str.fromUInt8(255));
+        System.out.println(Str.fromUInt16(65535));
+        System.out.println(Str.fromUInt32(4000000000U));
+        System.out.println(Str.fromUInt64(18446744073709551615UL));
+        System.out.println(Str.fromFloat(1.5F));
+        System.out.println(Str.fromDouble(1.25));
+        System.out.println(Str.fromChar(65));
+        System.out.println(Str.boolText(3 > 2));
+
+        System.out.println(Str.toInt("-42xyz"));
+        System.out.println(Str.toLong("9000000000"));
+        System.out.println(Str.toShort("-12"));
+        System.out.println(Str.toByte("7"));
+        System.out.println(Str.toUInt8("255"));
+        System.out.println(Str.toUInt16("65535"));
+        System.out.println(Str.toUInt32("4000000000"));
+        System.out.println(Str.toUInt64("9000000000"));
+        System.out.println(Str.fromFloat(Str.toFloat("2.5")));
+        System.out.println(Str.fromDouble(Str.toDouble("1.25e2")));
+        System.out.println(Str.toBool("YES"));
+        System.out.println(Str.toBool("tidak"));
+        System.out.println(Str.parseInt("ff", 16));
+        System.out.println(Str.parseLong("1010", 2));
+        System.out.println(Str.isDigits("123"));
+        System.out.println(Str.isDigits("12a"));
+        System.out.println(Str.isNumber("-1.5"));
+        System.out.println(Str.isHex("ff00"));
+        System.out.println(Str.toHex("Kopi"));
+        System.out.println(Str.fromHex("4b6f7069"));
+        System.out.println(Str.utf8Count("é"));
+        System.out.println(Str.utf8Valid("hé"));
+        System.out.println(Str.utf8Slice("héllo", 1, 2));
+        System.out.println(Str.utf8CodeAt("é", 0));
+        System.out.println(Str.utf8Reverse("hé"));
+
+        int[] b = Net.strbytes("  Kopi  ");
+        System.out.println(Bytes.len(b));
+        System.out.println(Net.mkstr(Bytes.trim(b)));
+        System.out.println(Net.mkstr(Bytes.upper(b)));
+        System.out.println(Bytes.indexOf(b, Net.strbytes("Kopi"), 0));
+        System.out.println(Net.mkstr(Bytes.cat(Net.strbytes("a"), Net.strbytes("b"))));
+        System.out.println(Net.mkstr(Bytes.slice(b, 2, 4)));
+        System.out.println(Bytes.toInt(Net.bytes("123")));
+        System.out.println(Bytes.equalsIgnoreCase(Net.bytes("Ab"), Net.bytes("aB")));
+        System.out.println(Net.mkstr(Bytes.hex(Net.bytes("Kopi"))));
+        System.out.println(Bytes.splitCount(Net.bytes("a,b,c"), 44));
+        System.out.println(Net.mkstr(Bytes.splitAt(Net.bytes("a,b,c"), 44, 1)));
+        System.out.println(Bytes.text(Net.strbytes("teks")));
+        System.out.println(Net.mkstr(Bytes.of("teks")));
+    }
+}

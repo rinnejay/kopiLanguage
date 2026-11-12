@@ -13,16 +13,117 @@ void gen_x64(const char *outpath);
 Tok *units_load_many(const char **paths, int n, int *ntoks);
 
 const char *g_linefile = 0;
+int g_line = 0;
+int g_col = 0;
 
 Prog prog;
 
+/* ambil nomor baris dari pesan ("baris N: ...") */
+static int msg_line_no(const char *m) {
+    const char *p = strstr(m, "baris ");
+    if (!p) return 0;
+    p += 6;
+    if (*p < '0' || *p > '9') return 0;
+    int n = 0;
+    while (*p >= '0' && *p <= '9') n = n * 10 + (*p++ - '0');
+    return n;
+}
+
+/* tampilkan baris sumber + penunjuk kolom (bila diketahui) */
+static void show_source_line(int line) {
+    if (!g_linefile || !*g_linefile || line <= 0) return;
+    if (g_linefile[0] == '<') return;
+    FILE *f = fopen(g_linefile, "r");
+    if (!f) return;
+    char buf[1200];
+    int n = 0;
+    while (fgets(buf, sizeof buf, f)) {
+        if (++n != line) continue;
+        size_t L = strlen(buf);
+        while (L && (buf[L - 1] == '\n' || buf[L - 1] == '\r')) buf[--L] = 0;
+        fprintf(stderr, "  %4d | %s\n", n, buf);
+        if (g_line == line && g_col > 0 && g_col <= (int)L + 1) {
+            fprintf(stderr, "       | ");
+            for (int i = 0; i < g_col - 1; i++)
+                fputc(buf[i] == '\t' ? '\t' : ' ', stderr);
+            fprintf(stderr, "^\n");
+        }
+        break;
+    }
+    fclose(f);
+}
+
+/* rekomendasi perbaikan berdasarkan pola pesan error */
+static const char *hint_for(const char *m) {
+    static const struct { const char *pat, *hint; } tab[] = {
+    { "hidup di luar malloc{}",
+      "Pindahkan pemakaian ke dalam blok, atau salin nilainya (referensi tidak boleh keluar arena)." },
+    { "return bertipe rujukan dari dalam malloc{}",
+      "Hitung/salin hasil di dalam blok, lalu lakukan `return` setelah blok malloc{} selesai." },
+    { "template butuh 'import Str;'",
+      "Tambahkan `import Str;` di awal berkas (sebelum `class`)." },
+    { "metode String",
+      "Tambahkan `import Str;` di awal berkas agar metode String tersedia." },
+    { "';' setelah pernyataan import",
+      "Akhiri pernyataan import dengan `;`, mis. `import Str;`." },
+    { "expected ';'",
+      "Tambahkan `;` di akhir pernyataan." },
+    { "expected ')'",
+      "Periksa pasangan tanda kurung `(` dan `)`." },
+    { "expected '('",
+      "Tambahkan `(` setelah nama metode/`if`/`while`/`for`." },
+    { "expected '}'",
+      "Tutup blok dengan `}`; periksa pasangan `{` dan `}`." },
+    { "expected '{'",
+      "Tambahkan `{` untuk membuka blok." },
+    { "butuh cast", "Tambahkan cast eksplisit, mis. `(int)x`, `(long)x`, atau `(double)x`." },
+    { "perlu cast eksplisit", "Tambahkan cast eksplisit agar tipe kedua operand sama." },
+    { "tidak cocok tipe", "Samakan tipenya atau tambahkan cast eksplisit, mis. `(int)x`." },
+    { "tidak cocok dengan tipe", "Samakan tipe nilai dengan deklarasi variabel (atau tambah cast)." },
+    { "kondisi", "Kondisi harus boolean; gunakan perbandingan seperti `i < n` atau `x != 0`." },
+    { "boolean", "Gunakan ekspresi boolean (perbandingan/`true`/`false`), bukan angka." },
+    { "variabel", "Deklarasikan variabel sebelum dipakai dan periksa ejaan namanya." },
+    { "metode '%s' tidak ada", "Periksa ejaan nama metode, atau impor berkas yang mendefinisikannya." },
+    { "class '%s' tidak ada", "Definisikan class sebelum `new`, atau impor berkasnya." },
+    { "tidak menemukan modul untuk import",
+      "Periksa nama/path modul. Lib standar: `import Str;`, `import Net;`." },
+    { "indeks array", "Indeks array yang valid adalah 0 sampai `panjang - 1`." },
+    { ".length hanya", "`.length` hanya berlaku untuk array dan String." },
+    { "duplikat", "Hapus atau ganti nama deklarasi yang duplikat." },
+    { "case", "`case` hanya menerima literal bilangan bulat; pastikan juga tidak ada nilai ganda." },
+    { "switch tanpa", "Tambahkan minimal satu `case` atau `default` di dalam switch." },
+    { "static field belum didukung",
+      "Gunakan metode konstanta, mis. `static int W() { return 800; }`, lalu panggil `W()`." },
+    { "malloc<...> butuh angka", "Contoh: `malloc<64mb>`. Biarkan `malloc { }` untuk ukuran otomatis." },
+    { "ukuran malloc", "Gunakan angka positif dengan satuan b/kb/mb/gb, mis. `malloc<64mb>`." },
+    { "satuan", "Satuan yang didukung: b, kb, mb, gb (tanpa satuan = MB)." },
+    { "maksimum 4096 MB", "Pakai ukuran ≤ 4096 MB, atau `malloc { }` agar otomatis." },
+    { "belum didukung", "Fitur ini belum tersedia; lihat docs/06-batas-roadmap.md untuk alternatif." },
+    { "Net.", "Periksa signature builtin Net.* di docs/05-lib.md." },
+    { "JSON", "Gunakan bentuk JSON yang didukung: null/true/false/angka/string/objek/array." },
+    { "pembagian dengan nol", "Pastikan pembagi tidak nol sebelum operasi pembagian/modulo." },
+    { "arena malloc habis", "Naikkan batas dengan `malloc<...>`, atau gunakan `malloc { }` otomatis." },
+    { "tidak dikenal", "Periksa ejaan nama dan tipe operand." },
+    { 0, 0 }
+    };
+    for (int i = 0; tab[i].pat; i++)
+        if (strstr(m, tab[i].pat)) return tab[i].hint;
+    return 0;
+}
+
 void die(const char *fmt, ...) {
+    char msg[768];
     va_list ap;
-    fprintf(stderr, "kopicc: error: %s: ", g_linefile ? g_linefile : "");
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
+    vsnprintf(msg, sizeof msg, fmt, ap);
     va_end(ap);
-    fprintf(stderr, "\n");
+
+    fprintf(stderr, "kopicc: error: %s: %s\n",
+            g_linefile ? g_linefile : "", msg);
+    int ln = msg_line_no(msg);
+    show_source_line(ln > 0 ? ln : g_line);
+    const char *hint = hint_for(msg);
+    if (hint) fprintf(stderr, "  saran: %s\n", hint);
     exit(1);
 }
 
@@ -54,7 +155,7 @@ int main(int argc, char **argv) {
         if (!strcmp(argv[i], "a64") || !strcmp(argv[i], "x64") || !strcmp(argv[i], "vm"))
             { target = argv[i]; continue; }
         if (!strcmp(argv[i], "--version") || !strcmp(argv[i], "-V")) {
-            printf("kopicc 1.21.0 (Kopi) — target a64 | x64 | vm\n");
+            printf("kopicc 1.23.0 (Kopi) — target a64 | x64 | vm\n");
             return 0;
         }
         if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {

@@ -34,22 +34,47 @@ COMMON = {
 
 META = {
     "Str": {
-        "purpose": "Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks. Bekerja pada String maupun `int[]` byte.",
-        "example": 'import Str;\n\nString s = "  Kopi  ";\nSystem.out.println(Str.trim(s));              // Kopi\nSystem.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007',
+        "purpose": "Utilitas teks native `String`: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding, konversi semua tipe skalar, hex, dan UTF-8. Tidak memakai `int[]`.",
+        "example": 'import Str;\n\nString s = "  Kopi  ";\nSystem.out.println(Str.trim(s));                        // Kopi\nSystem.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007\nSystem.out.println(Str.join(Str.split("a,b", ","), "|")); // a|b',
         "notes": ["`length` adalah jumlah byte, bukan karakter Unicode.",
-                  "`fromDouble` maksimum 6 digit pecahan; format specifier belum ada."],
+                  "`fromDouble` maksimum 6 digit pecahan; format specifier belum ada.",
+                  "Buffer byte ada di modul `Bytes`; konversi `Net.strbytes`/`Net.mkstr`."],
         "descs": {
             "eq": "true bila isi kedua teks sama",
             "cmp": "perbandingan leksikografis (-1/0/1)",
-            "cat": "gabung dua array menjadi array baru",
-            "slice": "potong `n` byte mulai `from` (di-clamp)",
-            "at": "byte pada indeks (0..255)",
+            "cat": "gabung dua teks",
+            "sub": "potong `n` byte mulai `from` (di-clamp)",
+            "slice": "alias `sub` untuk String",
+            "at": "byte pada indeks (0..255), -1 di luar batas",
             "indexOf": "indeks kemunculan pertama dari `from`, -1 bila tidak ada",
             "trim": "buang spasi/tab/CR/LF di kedua ujung",
+            "split": "pecah teks dengan pemisah String menjadi String[]",
+            "join": "gabung String[] dengan pemisah",
             "fromInt": "int → teks desimal",
             "toInt": "parse desimal; 0 bila bukan angka",
-            "hex": "byte → teks hex lowercase",
-            "print": "tulis byte ke stdout tanpa newline",
+            "toHex": "byte teks → hex lowercase",
+            "fromHex": "hex → teks byte",
+            "utf8Count": "jumlah code point UTF-8",
+            "print": "tulis teks ke stdout tanpa newline",
+        },
+    },
+    "Bytes": {
+        "purpose": "Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`.",
+        "example": 'import Bytes;\n\nint[] b = Net.strbytes("  Kopi  ");\nSystem.out.println(Net.mkstr(Bytes.trim(b))); // Kopi\nString t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));',
+        "notes": ["Semua parameter/hasil byte memakai `int[]`.",
+                  "`String → int[]` implisit; `int[] → String` lewat `Net.mkstr`/`Bytes.text`.",
+                  "Gula `buf.trim()` didesugar ke `Bytes.trim(buf)` (butuh `import Bytes;`)."],
+        "descs": {
+            "eq": "true bila isi kedua buffer sama",
+            "cat": "gabung dua buffer menjadi buffer baru",
+            "slice": "potong `n` byte mulai `from` (di-clamp)",
+            "at": "byte pada indeks, -1 di luar batas",
+            "indexOf": "indeks kemunculan pertama dari `from`, -1 bila tidak ada",
+            "trim": "buang spasi/tab/CR/LF di kedua ujung",
+            "hex": "byte → teks hex lowercase (int[])",
+            "text": "buffer → String (materialisasi)",
+            "of": "String → salinan byte",
+            "toInt": "parse desimal dari buffer",
         },
     },
     "Arrays": {
@@ -150,7 +175,7 @@ META = {
     },
     "Log": {
         "purpose": "Logging ke stderr dengan timestamp UTC dan level.",
-        "example": 'import Log;\n\nLog.info(Net.bytes("boot"), Net.bytes("server siap"));\nLog.error(Net.bytes("db"), Net.bytes("gagal konek"));',
+        "example": 'import Log;\n\nLog.info("boot", "server siap");\nLog.error("db", "gagal konek");',
         "notes": ["stderr tidak di-buffer; aman untuk supervisor."],
     },
 
@@ -169,7 +194,7 @@ META = {
     },
     "Cipher": {
         "purpose": "Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibilitas.",
-        "example": 'import Cipher;\n\nint[] b = Cipher.b64enc(Net.bytes("halo"));\nSystem.out.println(b);              // aGFsbw==\nSystem.out.println(Cipher.b64dec(b)); // halo',
+        "example": 'import Cipher;\n\nString b = Cipher.b64enc(Net.bytes("halo"));\nSystem.out.println(b);                           // aGFsbw==\nSystem.out.println(Net.mkstr(Cipher.b64dec(b))); // halo',
         "notes": ["Cipher klasik **bukan** untuk keamanan produksi."],
     },
     "Crypto": {
@@ -229,40 +254,40 @@ META = {
     },
     "Dns": {
         "purpose": "Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.",
-        "example": 'import Dns;\n\nint[] hasil = new int[5];\nDns.lookup(serverIp, 53, Net.bytes("example.com"), hasil, 512);',
+        "example": 'import Dns;\n\nint[] hasil = new int[5];\nDns.lookup(serverIp, 53, "example.com", hasil, 512);',
         "notes": ["Hanya record A; ID 0; satu jawaban pertama.",
                   "Untuk resolver sistem lihat `Resolv`."],
     },
     "Resolv": {
         "purpose": "Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout.",
-        "example": 'import Resolv;\n\nint[] hasil = new int[5];\nResolv.lookup(Net.bytes("example.com"), 2000, hasil, 512);\n// hasil[0]=RCODE, hasil[1..4]=oktet IPv4',
+        "example": 'import Resolv;\n\nint[] hasil = new int[5];\nResolv.lookup("example.com", 2000, hasil, 512);\n// hasil[0]=RCODE, hasil[1..4]=oktet IPv4',
         "notes": ["Tanpa cache/AAAA/`search`/`ndots`."],
     },
     "Url": {
         "purpose": "URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4.",
-        "example": 'import Url;\n\nint[] u = Url.resolve("http://a/b/c/d;p?q", "../g"); // http://a/b/g\nint[] q = Url.appendQuery(Url.pair("q", "a b"), Url.pair("n", "3"));',
+        "example": 'import Url;\n\nString u = Url.resolve("http://a/b/c/d;p?q", "../g"); // http://a/b/g\nString q = Url.appendQuery(Url.pair("q", "a b"), Url.pair("n", "3"));',
         "notes": ["`decode` memperlakukan `+` sebagai spasi (form)."],
     },
     "Http": {
         "purpose": "Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.",
-        "example": 'import Tcp;\nimport Http;\n\nint[] r = Http.getFull(Tcp.loopback(), 8080, Net.bytes("127.0.0.1"), Net.bytes("/health"), 8192);\nSystem.out.println(Http.statusOf(r));\nSystem.out.println(Http.payload(r));',
+        "example": 'import Tcp;\nimport Http;\n\nint[] r = Http.getFull(Tcp.loopback(), 8080, "127.0.0.1", "/health", 8192);\nSystem.out.println(Http.statusOf(r));\nSystem.out.println(Http.payload(r));',
         "notes": ["API lama (`getInto`, `statusOf`, `bodyOf`) tetap tersedia.",
                   "Redirect hanya diikuti bila host sama."],
     },
     "HttpServer": {
         "purpose": "Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie, chunked.",
-        "example": 'import HttpServer;\n\nint[] req = HttpServer.readRequest(c, 16384);\nint keep = 0;\nif (HttpServer.keepAlive(req)) keep = 1;\nint[] resp = HttpServer.responseFor(req, 200, Net.bytes("text/plain"), Net.bytes("ok\\n"), keep);\nHttpServer.send(c, resp);',
+        "example": 'import HttpServer;\n\nint[] req = HttpServer.readRequest(c, 16384);\nint keep = 0;\nif (HttpServer.keepAlive(req)) keep = 1;\nint[] resp = HttpServer.responseFor(req, 200, "text/plain", "ok\\n", keep);\nHttpServer.send(c, resp);',
         "notes": ["Tidak ada multipart/HTTP2/TLS server.",
                   "Routing manual; lihat examples/server."],
     },
     "Static": {
         "purpose": "Penyajian file statis + MIME; menolak path traversal `..`.",
-        "example": 'import Static;\n\nint[] resp = Static.serve(Net.bytes("public/index.html"));',
+        "example": 'import Static;\n\nint[] resp = Static.serve("public/index.html");',
         "notes": ["Membaca seluruh file ke memori; file besar sebaiknya lewat reverse proxy."],
     },
     "Mime": {
         "purpose": "Pemetaan ekstensi file → header Content-Type.",
-        "example": 'import Mime;\n\nint[] ct = Mime.of(Net.bytes("app.js")); // application/javascript',
+        "example": 'import Mime;\n\nString ct = Mime.of("app.js"); // application/javascript',
         "descs": {"of": "Content-Type berdasarkan ekstensi"},
     },
     "WebSocket": {
@@ -272,17 +297,17 @@ META = {
     },
     "Jwt": {
         "purpose": "JWT HS256: tanda tangan, verifikasi, ambil payload.",
-        "example": 'import Jwt;\n\nint[] token = Jwt.sign(Net.bytes("{\\"sub\\":\\"budi\\"}"), secret);\nint ok = Jwt.verify(token, secret, new int[128]); // 1 sah',
+        "example": 'import Jwt;\n\nString token = Jwt.sign("{\\"sub\\":\\"budi\\"}", secret);\nint ok = Jwt.verify(token, secret, new int[128]); // 1 sah',
         "notes": ["Hanya HS256; `exp`/`iat` tidak diperiksa otomatis."],
     },
     "Session": {
         "purpose": "Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry).",
-        "example": 'import Session;\nimport MapStr;\n\nint[] ids = MapStr.make(256, 8192);\nint[] exps = MapStr.make(256, 8192);\nint[] sid = Session.create(ids, exps, uid, 3600);\nint uid2 = Session.get(ids, exps, sid, Net.time());',
+        "example": 'import Session;\nimport MapStr;\n\nint[] ids = MapStr.make(256, 8192);\nint[] exps = MapStr.make(256, 8192);\nString sid = Session.create(ids, exps, uid, 3600);\nint uid2 = Session.get(ids, exps, sid, Net.time());',
         "notes": ["Belum persisten; restart server = sesi hilang."],
     },
     "Auth": {
         "purpose": "Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401.",
-        "example": 'import Auth;\n\nint[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));\nif (!Auth.checkBasic(h, user, pass)) { /* 401 */ }',
+        "example": 'import Auth;\n\nString h = HttpServer.headerValue(req, "Authorization");\nif (!Auth.checkBasic(h, user, pass)) { /* 401 */ }',
     },
     "Rfc": {
         "purpose": "Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan.",

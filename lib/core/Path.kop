@@ -1,38 +1,38 @@
-// Path.kop — operasi path sederhana (byte-as-int) v1.7.
+// Path.kop — operasi path berbasis String (v1.23).
 import Str;
 
 class Path {
     static int SEP() { return 47; }
-    static int[] sep() { return Net.bytes("/"); }
+    static String sep() { return "/"; }
 
-    static int[] join(int[] a, int[] b) {
-        if (a.length == 0) return Str.copy(b);
-        if (b.length == 0) return Str.copy(a);
-        if (a[a.length - 1] == 47) return Str.cat(a, b);
-        return Str.cat(a, Str.cat(sep(), b));
+    static String join(String a, String b) {
+        if (a.length == 0) return b;
+        if (b.length == 0) return a;
+        if (a[a.length - 1] == 47) return a + b;
+        return a + "/" + b;
     }
 
-    static int[] base(int[] p) {
+    static String base(String p) {
         int i = p.length - 1;
         while (i >= 0 && p[i] != 47) i--;
-        return Str.slice(p, i + 1, p.length - i - 1);
+        return Str.sub(p, i + 1, p.length - i - 1);
     }
 
-    static int[] dir(int[] p) {
+    static String dir(String p) {
         int i = p.length - 1;
         while (i >= 0 && p[i] != 47) i--;
-        if (i < 0) return Net.bytes(".");
-        if (i == 0) return Net.bytes("/");
-        return Str.slice(p, 0, i);
+        if (i < 0) return ".";
+        if (i == 0) return "/";
+        return Str.sub(p, 0, i);
     }
 
-    static int[] ext(int[] p) {
-        int[] b = base(p);
+    static String ext(String p) {
+        String b = base(p);
         int i = b.length - 1;
         while (i >= 0 && b[i] != 46) i--;
-        if (i < 0) return new int[0];
-        return Str.slice(b, i + 1, b.length - i - 1);
+        if (i < 0) return "";
+        return Str.sub(b, i + 1, b.length - i - 1);
     }
 
-    static boolean isAbsolute(int[] p) { return p.length > 0 && p[0] == 47; }
+    static boolean isAbsolute(String p) { return p.length > 0 && p[0] == 47; }
 }

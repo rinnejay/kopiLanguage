@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="03-pustaka-standar">03 — Pustaka standar<a class="anchor" href="#03-pustaka-standar" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-str-teks-konversi">1. Str — teks &amp; konversi</a></li><li class="toc-h2"><a href="#2-arrays-array-int">2. Arrays — array int[]</a></li><li class="toc-h2"><a href="#3-math-digits-stats-matrix">3. Math, Digits, Stats, Matrix</a></li><li class="toc-h2"><a href="#4-json">4. Json</a></li><li class="toc-h2"><a href="#5-koleksi">5. Koleksi</a></li><li class="toc-h2"><a href="#6-file-path-time">6. File, Path, Time</a></li><li class="toc-h2"><a href="#7-log">7. Log</a></li><li class="toc-h2"><a href="#8-jaringan">8. Jaringan</a></li><li class="toc-h3"><a href="#tcp">Tcp</a></li><li class="toc-h3"><a href="#udp">Udp</a></li><li class="toc-h3"><a href="#dns-resolv">Dns / Resolv</a></li><li class="toc-h3"><a href="#url">Url</a></li><li class="toc-h3"><a href="#http-klien">Http (klien)</a></li><li class="toc-h3"><a href="#httpserver-static-mime">HttpServer, Static, Mime</a></li><li class="toc-h3"><a href="#websocket">WebSocket</a></li><li class="toc-h3"><a href="#tls-klien-tls-1-3">Tls (klien TLS 1.3)</a></li><li class="toc-h2"><a href="#9-kriptografi">9. Kriptografi</a></li><li class="toc-h2"><a href="#10-auth-session">10. Auth &amp; session</a></li><li class="toc-h2"><a href="#11-log-observability">11. Log + observability</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-str-teks-native-string">1. Str — teks native String</a></li><li class="toc-h2"><a href="#1b-bytes-buffer-int">1b. Bytes — buffer int[]</a></li><li class="toc-h2"><a href="#2-arrays-array-int">2. Arrays — array int[]</a></li><li class="toc-h2"><a href="#3-math-digits-stats-matrix">3. Math, Digits, Stats, Matrix</a></li><li class="toc-h2"><a href="#4-json">4. Json</a></li><li class="toc-h2"><a href="#5-koleksi">5. Koleksi</a></li><li class="toc-h2"><a href="#6-file-path-time">6. File, Path, Time</a></li><li class="toc-h2"><a href="#7-log">7. Log</a></li><li class="toc-h2"><a href="#8-jaringan">8. Jaringan</a></li><li class="toc-h3"><a href="#tcp">Tcp</a></li><li class="toc-h3"><a href="#udp">Udp</a></li><li class="toc-h3"><a href="#dns-resolv">Dns / Resolv</a></li><li class="toc-h3"><a href="#url">Url</a></li><li class="toc-h3"><a href="#http-klien">Http (klien)</a></li><li class="toc-h3"><a href="#httpserver-static-mime">HttpServer, Static, Mime</a></li><li class="toc-h3"><a href="#websocket">WebSocket</a></li><li class="toc-h3"><a href="#tls-klien-tls-1-3">Tls (klien TLS 1.3)</a></li><li class="toc-h2"><a href="#9-kriptografi">9. Kriptografi</a></li><li class="toc-h2"><a href="#10-auth-session">10. Auth &amp; session</a></li><li class="toc-h2"><a href="#11-log-observability">11. Log + observability</a></li></ul></nav>
 <p>Semua pustaka <strong>ditulis dalam bahasa Kopi</strong> (<code>lib/*.kop</code>) di atas builtin <code>Net</code> dan tipe dasar. Import selalu eksplisit:</p>
 <pre><code class="language-java">import Str;
 import Math;
@@ -38,7 +38,7 @@ import HttpServer;</code></pre>
 </tr></thead><tbody>
 <tr>
 <td><code>lib/core/</code></td>
-<td><code>Str</code> <code>Math</code> <code>Digits</code> <code>Stats</code> <code>Matrix</code> <code>Arrays</code> <code>Json</code> <code>Map</code> <code>MapStr</code> <code>Set</code> <code>Deque</code> <code>File</code> <code>Path</code> <code>Time</code> <code>Log</code></td>
+<td><code>Str</code> <code>Bytes</code> <code>Math</code> <code>Digits</code> <code>Stats</code> <code>Matrix</code> <code>Arrays</code> <code>Json</code> <code>Map</code> <code>MapStr</code> <code>Set</code> <code>Deque</code> <code>File</code> <code>Path</code> <code>Time</code> <code>Log</code></td>
 </tr>
 <tr>
 <td><code>lib/net/</code></td>
@@ -51,59 +51,115 @@ import HttpServer;</code></pre>
 </tbody></table></div>
 <blockquote><strong>Referensi API lengkap</strong> (signature semua fungsi diekstrak langsung dari source): <a href="api.html">Referensi pustaka</a> → <a href="api-core.html">Core</a> · <a href="api-net.html">Net</a> · <a href="api-crypto.html">Crypto</a>. Halaman di bawah ini adalah turunan berisi modul yang paling sering dipakai dengan pola pemakaian.</blockquote>
 <hr>
-<h2 id="1-str-teks-konversi">1. <code>Str</code> — teks &amp; konversi<a class="anchor" href="#1-str-teks-konversi" aria-label="tautan">#</a></h2>
-<p><code>String</code> dan <code>int[]</code> byte kompatibel; hampir semua fungsi <code>Str</code> menerima keduanya.</p>
+<h2 id="1-str-teks-native-string">1. <code>Str</code> — teks native <code>String</code><a class="anchor" href="#1-str-teks-native-string" aria-label="tautan">#</a></h2>
+<p>Sejak <strong>v1.23</strong> <code>Str</code> hanya memakai <code>String</code>: parameter dan hasil teks tidak lagi berupa <code>int[]</code>. Buffer byte ada di modul terpisah <code>Bytes</code>.</p>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Fungsi</th>
 <th>Guna</th>
 </tr></thead><tbody>
 <tr>
-<td><code>len(s) isEmpty(s)</code></td>
-<td>panjang byte / kosong</td>
+<td><code>len isEmpty isBlank eq/equals cmp compare equalsIgnoreCase</code></td>
+<td>dasar &amp; perbandingan</td>
 </tr>
 <tr>
-<td><code>eq(a,b) cmp(a,b) equalsIgnoreCase(a,b)</code></td>
-<td>perbandingan isi</td>
+<td><code>cat(a,b) join(parts,sep) copy</code></td>
+<td>gabung / salinan nilai</td>
 </tr>
 <tr>
-<td><code>copy(s) cat(a,b) slice(s,from,n) at(s,i)</code></td>
-<td>salin, gabung, potong, indeks</td>
+<td><code>sub/slice(from,n) left(n) right(n) before/after beforeLast/afterLast between</code></td>
+<td>potong teks</td>
 </tr>
 <tr>
-<td><code>indexOf(s,ndl,from) lastIndexOf(s,ndl) contains startsWith endsWith</code></td>
+<td><code>indexOf(s,ndl,from) lastIndexOf contains startsWith endsWith count</code></td>
 <td>pencarian</td>
 </tr>
 <tr>
-<td><code>trim trimLeft trimRight upper lower reverse repeat(n)</code></td>
-<td>transformasi</td>
+<td><code>trim trimLeft trimRight strip upper lower capitalize uncapitalize swapCase</code></td>
+<td>trim &amp; huruf</td>
 </tr>
 <tr>
-<td><code>replaceByte(from,to) replaceSeq(old,new)</code></td>
-<td>ganti byte / substring</td>
+<td><code>replace(old,new) replaceSeq replaceByte repeat reverse</code></td>
+<td>ubah teks</td>
 </tr>
 <tr>
-<td><code>countByte(b) splitCount(sep) splitAt(sep,idx)</code></td>
-<td>hitung/pisah</td>
+<td><code>split(s,sep) splitChar(s,sepByte) splitAt splitCount lines words</code></td>
+<td>pisah / baris / kata</td>
 </tr>
 <tr>
-<td><code>padLeft(s,w,pad) padRight(...)</code></td>
-<td>padding dengan byte <code>pad</code></td>
+<td><code>padLeft(s,w,pad) padRight center truncate ellipsis</code></td>
+<td>padding &amp; batas</td>
 </tr>
 <tr>
-<td><code>fromInt fromUInt fromLong fromULong fromDouble boolText</code></td>
-<td>angka → teks</td>
+<td><code>fromInt/Long/Short/Byte/UInt8..64/Float/Double/Bool/Char</code></td>
+<td>skalar → teks</td>
 </tr>
 <tr>
-<td><code>toInt isDigits utf8Count hex(data)</code></td>
-<td>parsing / utilitas</td>
+<td><code>toInt/Long/Short/Byte/UInt8..64/Float/Double/Bool</code></td>
+<td>teks → skalar</td>
+</tr>
+<tr>
+<td><code>parseInt/parseLong(s,radix) isDigits isNumber isHex</code></td>
+<td>parsing basis &amp; validasi</td>
+</tr>
+<tr>
+<td><code>toHex fromHex</code></td>
+<td>hex ↔ teks byte</td>
+</tr>
+<tr>
+<td><code>utf8Count utf8Valid utf8Offset utf8Slice utf8CodeAt utf8Reverse</code></td>
+<td>utilitas UTF-8</td>
 </tr>
 <tr>
 <td><code>print(s) line(s)</code></td>
-<td>tulis byte ke stdout (tanpa/dengan newline)</td>
+<td>tulis teks ke stdout</td>
 </tr>
 </tbody></table></div>
-<p><code>padLeft(Str.fromInt(7), 3, 48)</code> → <code>"007"</code>.</p>
+<p><code>Str.padLeft(Str.fromInt(7), 3, 48)</code> → <code>"007"</code>. <code>Str.join(Str.split("a,b,c", ","), "|")</code> → <code>"a|b|c"</code>.</p>
+<h2 id="1b-bytes-buffer-int">1b. <code>Bytes</code> — buffer <code>int[]</code><a class="anchor" href="#1b-bytes-buffer-int" aria-label="tautan">#</a></h2>
+<p>Untuk I/O biner, jaringan, dan kriptografi. Konversi eksplisit: <code>Net.strbytes(teks)</code> → <code>int[]</code>, <code>Net.mkstr(buf)</code> → <code>String</code> (atau <code>Bytes.of</code> / <code>Bytes.text</code>).</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Guna</th>
+</tr></thead><tbody>
+<tr>
+<td><code>len isEmpty eq cmp copy cat cat3</code></td>
+<td>dasar</td>
+</tr>
+<tr>
+<td><code>slice/sub(from,n) at first last</code></td>
+<td>potong &amp; indeks</td>
+</tr>
+<tr>
+<td><code>find(byte,from) indexOf lastIndexOf contains startsWith endsWith count</code></td>
+<td>cari</td>
+</tr>
+<tr>
+<td><code>trim trimLeft trimRight upper lower equalsIgnoreCase</code></td>
+<td>trim &amp; case</td>
+</tr>
+<tr>
+<td><code>repeat reverse replaceByte replaceSeq padLeft padRight fill zero</code></td>
+<td>ubah buffer</td>
+</tr>
+<tr>
+<td><code>splitCount(sepByte) splitAt(sepByte,idx)</code></td>
+<td>pisah</td>
+</tr>
+<tr>
+<td><code>fromInt fromLong toInt isDigits</code></td>
+<td>angka ↔ byte</td>
+</tr>
+<tr>
+<td><code>of(text) text(buf) hex(data)</code></td>
+<td>konversi representasi &amp; hex</td>
+</tr>
+<tr>
+<td><code>print(buf) line(buf)</code></td>
+<td>tulis buffer ke stdout</td>
+</tr>
+</tbody></table></div>
 <h2 id="2-arrays-array-int">2. <code>Arrays</code> — array <code>int[]</code><a class="anchor" href="#2-arrays-array-int" aria-label="tautan">#</a></h2>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -230,7 +286,7 @@ System.out.println(Time.sleepMs(10));</code></pre>
 <p><code>File.readInto</code> membaca sampai buffer penuh/EOF. Untuk file besar, baca per blok.</p>
 <h2 id="7-log">7. <code>Log</code><a class="anchor" href="#7-log" aria-label="tautan">#</a></h2>
 <pre><code class="language-java">import Log;
-Log.info(Net.bytes("boot"), Net.bytes("siap"));
+Log.info("boot", "siap");
 Log.warn(...); Log.error(...);</code></pre>
 <p>Menulis ke stderr dengan timestamp UTC. <code>Log.emit(level,tag,msg)</code> untuk level kustom.</p>
 <h2 id="8-jaringan">8. Jaringan<a class="anchor" href="#8-jaringan" aria-label="tautan">#</a></h2>
@@ -256,7 +312,7 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></
 <p><code>hasil[0]</code> = RCODE, <code>hasil[1..4]</code> = oktet IPv4.</p>
 <h3 id="url"><code>Url</code><a class="anchor" href="#url" aria-label="tautan">#</a></h3>
 <p><code>encode decode formEncode formDecode pair appendQuery hasScheme scheme authority host portOf path query fragment ip4 normalize resolve</code>.</p>
-<pre><code class="language-java">int[] u = Url.resolve("http://a/b/c/d;p?q", "../g");  // http://a/b/g</code></pre>
+<pre><code class="language-java">String u = Url.resolve("http://a/b/c/d;p?q", "../g");  // http://a/b/g</code></pre>
 <h3 id="http-klien"><code>Http</code> (klien)<a class="anchor" href="#http-klien" aria-label="tautan">#</a></h3>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -346,17 +402,17 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></
 <h2 id="10-auth-session">10. Auth &amp; session<a class="anchor" href="#10-auth-session" aria-label="tautan">#</a></h2>
 <pre><code class="language-java">import Pbkdf2; import Jwt; import Session; import Auth; import MapStr;
 
-int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);
-int[] token = Jwt.sign(payloadJson, secret);
-int valid = Jwt.verify(token, secret, out);      // 1 sah, 0 salah, -1 bentuk
+int[] hash  = Pbkdf2.sha256(pass, salt, 100000, 32);   // hash tetap biner
+String token = Jwt.sign(payloadJson, secret);           // JWT = teks
+int valid = Jwt.verify(token, secret, out);             // 1 sah, 0 salah, -1 bentuk
 
 int[] ids  = MapStr.make(256, 8192);
 int[] exps = MapStr.make(256, 8192);
-int[] sid  = Session.create(ids, exps, uid, 3600);
+String sid = Session.create(ids, exps, uid, 3600);
 int uid2   = Session.get(ids, exps, sid, Net.time());
 
-int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
-Auth.checkBasic(h, Net.bytes("budi"), Net.bytes("rahasia"));
+String h = HttpServer.headerValue(req, "Authorization");
+Auth.checkBasic(h, "budi", "rahasia");
 Auth.bearer(h);</code></pre>
 <p>Penyimpanan sesi masih in-memory (dua <code>MapStr</code>); belum persisten.</p>
 <h2 id="11-log-observability">11. <code>Log</code> + observability<a class="anchor" href="#11-log-observability" aria-label="tautan">#</a></h2>

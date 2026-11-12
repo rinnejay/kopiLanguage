@@ -7,7 +7,7 @@
 //
 // Dunia `w` dialokasikan sebelum mark, jadi bertahan sepanjang hidup server.
 
-import Str;
+import Bytes;
 import Wire;
 import Arena;
 import Log;
@@ -47,7 +47,7 @@ class ArenaServer {
             int[] name = new int[ln];
             for (int i = 0; i < ln; i++) name[i] = b[2 + i];
             sendAck(fd, ip, port, id);
-            Log.info(Net.bytes("join"), name);
+            Log.info("join", Net.mkstr(name));
             return;
         }
 
@@ -70,7 +70,7 @@ class ArenaServer {
         if (op == Wire.OP_QUIT()) {
             if (id >= 0) {
                 Arena.leave(w, id);
-                Log.info(Net.bytes("quit"), Net.bytes("pemain keluar"));
+                Log.info("quit", "pemain keluar");
             }
             return;
         }
@@ -87,11 +87,11 @@ class ArenaServer {
     static int serve(int port, int tickMs) {
         int fd = Net.socket(2, 2);                 /* AF_INET, SOCK_DGRAM */
         if (fd < 0) {
-            Log.error(Net.bytes("boot"), Net.bytes("socket gagal"));
+            Log.error("boot", "socket gagal");
             return 1;
         }
         if (Net.bind(fd, 0, port) < 0) {
-            Log.error(Net.bytes("boot"), Net.bytes("bind gagal"));
+            Log.error("boot", "bind gagal");
             return 2;
         }
         Net.setnonblock(fd);
@@ -101,12 +101,12 @@ class ArenaServer {
         int[] from = new int[4];
         long next = Net.mono();
 
-        Log.info(Net.bytes("boot"), Net.bytes("arena siap"));
+        Log.info("boot", "arena siap");
         int[] hello = Net.bytes("Kopi Arena server: port=");
-        hello = Str.cat(hello, Str.fromInt(port));
-        hello = Str.cat(hello, Net.bytes(" tick="));
-        hello = Str.cat(hello, Str.fromInt(tickMs));
-        hello = Str.cat(hello, Net.bytes("ms"));
+        hello = Bytes.cat(hello, Bytes.fromInt(port));
+        hello = Bytes.cat(hello, Net.bytes(" tick="));
+        hello = Bytes.cat(hello, Bytes.fromInt(tickMs));
+        hello = Bytes.cat(hello, Net.bytes("ms"));
         System.out.println(hello);
 
         while (true) {

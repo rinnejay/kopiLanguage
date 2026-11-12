@@ -209,9 +209,9 @@ int[] ks = ChaCha.block(key, counter, nonce);</code></pre>
 <p>Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibilitas.</p>
 <pre><code class="language-java">import Cipher;
 
-int[] b = Cipher.b64enc(Net.bytes("halo"));
-System.out.println(b);              // aGFsbw==
-System.out.println(Cipher.b64dec(b)); // halo</code></pre>
+String b = Cipher.b64enc(Net.bytes("halo"));
+System.out.println(b);                           // aGFsbw==
+System.out.println(Net.mkstr(Cipher.b64dec(b))); // halo</code></pre>
 <p><strong>Catatan</strong></p>
 <ul>
 <li>Cipher klasik <strong>bukan</strong> untuk keamanan produksi.</li>
@@ -234,16 +234,16 @@ System.out.println(Cipher.b64dec(b)); // halo</code></pre>
 <td>dekripsi Vigenère</td>
 </tr>
 <tr>
-<td><code>static int[] b64enc(int[] data)</code></td>
-<td>data byte-as-int → teks base64 (byte-as-int), padding '='</td>
+<td><code>static String b64enc(int[] data)</code></td>
+<td>data byte-as-int → teks base64 (String), padding '='</td>
 </tr>
 <tr>
-<td><code>static int[] b64dec(int[] txt)</code></td>
+<td><code>static int[] b64dec(String txt)</code></td>
 <td>teks base64 → byte-as-int; '=' diabaikan, karakter asing → 0</td>
 </tr>
 <tr>
-<td><code>static int[] hexenc(int[] data)</code></td>
-<td>data → hex lowercase, 2 karakter per byte</td>
+<td><code>static String hexenc(int[] data)</code></td>
+<td>data → hex lowercase (String), 2 karakter per byte</td>
 </tr>
 <tr>
 <td><code>static int hexdig(int n)</code></td>
@@ -254,7 +254,7 @@ System.out.println(Cipher.b64dec(b)); // halo</code></pre>
 <td>nilai hex digit ASCII → 0..15, -1 bila bukan digit hex</td>
 </tr>
 <tr>
-<td><code>static int[] hexdec(int[] txt)</code></td>
+<td><code>static int[] hexdec(String txt)</code></td>
 <td>teks hex (panjang ganjil dibatasi 0 di akhir) → byte-as-int</td>
 </tr>
 <tr>

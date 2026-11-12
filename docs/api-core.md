@@ -52,6 +52,79 @@ int[] s = Arrays.sort(a);                    // [1,2,3,4]
 
 ---
 
+## Bytes
+
+`lib/core/Bytes.kop` · 48 fungsi
+
+Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`.
+
+```java
+import Bytes;
+
+int[] b = Net.strbytes("  Kopi  ");
+System.out.println(Net.mkstr(Bytes.trim(b))); // Kopi
+String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));
+```
+
+**Catatan**
+
+- Semua parameter/hasil byte memakai `int[]`.
+- `String → int[]` implisit; `int[] → String` lewat `Net.mkstr`/`Bytes.text`.
+- Gula `buf.trim()` didesugar ke `Bytes.trim(buf)` (butuh `import Bytes;`).
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int len(int[] s)` | — |
+| `static boolean isEmpty(int[] s)` | true bila kosong |
+| `static boolean eq(int[] a, int[] b)` | true bila isi kedua buffer sama |
+| `static int cmp(int[] a, int[] b)` | — |
+| `static int[] copy(int[] a)` | salinan (array baru) |
+| `static int[] cat(int[] a, int[] b)` | gabung dua buffer menjadi buffer baru |
+| `static int[] cat3(int[] a, int[] b, int[] c)` | — |
+| `static int[] slice(int[] s, int from, int n)` | potong `n` byte mulai `from` (di-clamp) |
+| `static int[] sub(int[] s, int from, int n)` | — |
+| `static int at(int[] s, int i)` | byte pada indeks, -1 di luar batas |
+| `static int first(int[] s)` | — |
+| `static int last(int[] s)` | — |
+| `static int find(int[] s, int b, int from)` | indeks elemen, -1 bila tidak ada |
+| `static int indexOf(int[] s, int[] ndl, int from)` | indeks kemunculan pertama dari `from`, -1 bila tidak ada |
+| `static int lastIndexOf(int[] s, int[] ndl)` | — |
+| `static boolean contains(int[] s, int[] ndl)` | — |
+| `static boolean startsWith(int[] s, int[] p)` | — |
+| `static boolean endsWith(int[] s, int[] p)` | — |
+| `static int utf8Count(int[] s)` | jumlah code point UTF-8 (byte non-continuation) |
+| `static int countByte(int[] s, int b)` | — |
+| `static int count(int[] s, int[] ndl)` | — |
+| `static boolean isSpace(int c)` | — |
+| `static int[] trimLeft(int[] s)` | — |
+| `static int[] trimRight(int[] s)` | — |
+| `static int[] trim(int[] s)` | buang spasi/tab/CR/LF di kedua ujung |
+| `static int[] upper(int[] s)` | — |
+| `static int[] lower(int[] s)` | — |
+| `static boolean equalsIgnoreCase(int[] a, int[] b)` | — |
+| `static int[] repeat(int[] s, int n)` | — |
+| `static int[] reverse(int[] s)` | salinan terbalik |
+| `static int[] replaceByte(int[] s, int from, int to)` | — |
+| `static int[] replaceSeq(int[] s, int[] old, int[] nw)` | — |
+| `static int[] padLeft(int[] s, int width, int pad)` | — |
+| `static int[] padRight(int[] s, int width, int pad)` | — |
+| `static void fill(int[] s, int v)` | — |
+| `static void zero(int[] s)` | — |
+| `static int splitCount(int[] s, int sep)` | — |
+| `static int[] splitAt(int[] s, int sep, int idx)` | — |
+| `static int[] fromInt(int v)` | — |
+| `static int[] fromLong(long v)` | — |
+| `static int toInt(int[] s)` | parse desimal dari buffer |
+| `static boolean isDigits(int[] s)` | — |
+| `static int[] of(String s)` | String → salinan byte |
+| `static String text(int[] s)` | buffer → String (materialisasi) |
+| `static int[] hex(int[] data)` | byte → teks hex lowercase (int[]) |
+| `static int hexChar(int v)` | — |
+| `static void print(int[] s)` | — |
+| `static void line(int[] s)` | tulis dengan newline |
+
+---
+
 ## Deque
 
 `lib/core/Deque.kop` · 11 fungsi
@@ -143,9 +216,9 @@ File.close(r);
 
 | Fungsi | Keterangan |
 |---|---|
-| `static int openRead(int[] path)` | buka file hanya-baca; -1 bila gagal |
-| `static int create(int[] path)` | buat/buka file |
-| `static int append(int[] path)` | buka untuk menambah di akhir |
+| `static int openRead(String path)` | buka file hanya-baca; -1 bila gagal |
+| `static int create(String path)` | buat/buka file |
+| `static int append(String path)` | buka untuk menambah di akhir |
 | `static int close(int fd)` | tutup deskriptor |
 | `static int writeAll(int fd, int[] data)` | tulis seluruh data; jumlah byte tertulis |
 | `static int readInto(int fd, int[] buf)` | baca sampai buffer penuh/EOF; jumlah byte terbaca |
@@ -153,9 +226,9 @@ File.close(r);
 | `static int seekCur(int fd, int off)` | lompat relatif dari posisi |
 | `static int seekEnd(int fd, int off)` | lompat relatif dari akhir |
 | `static int size(int fd)` | jumlah elemen saat ini |
-| `static int remove(int[] path)` | hapus elemen |
-| `static int renameTo(int[] oldp, int[] newp)` | ganti nama file/direktori |
-| `static int mkdir(int[] path)` | buat direktori |
+| `static int remove(String path)` | hapus elemen |
+| `static int renameTo(String oldp, String newp)` | ganti nama file/direktori |
+| `static int mkdir(String path)` | buat direktori |
 | `static String readText(String path)` | v1.17.1: I/O teks langsung — kode biasa tak perlu sentuh int[] |
 | `static boolean writeText(String path, String text)` | — |
 
@@ -200,8 +273,8 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20
 | `static int[] two(int a, int b)` | (internal) tape dua elemen |
 | `static int[] nullV()` | nilai JSON null |
 | `static int[] boolV(int b)` | nilai JSON boolean |
-| `static int[] num(int[] text)` | nilai JSON angka dari teks desimal |
-| `static int[] str(int[] s)` | nilai JSON string (di-escape) |
+| `static int[] num(String text)` | nilai JSON angka dari teks desimal |
+| `static int[] str(String s)` | nilai JSON string (di-escape) |
 | `static int[] arr0()` | array JSON kosong |
 | `static int[] obj0()` | objek JSON kosong |
 | `static int skip(int[] t, int p)` | peta nilai: dipakai untuk skip/akses |
@@ -213,14 +286,14 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20
 | `static boolean isArray(int[] v)` | true bila array |
 | `static boolean isObject(int[] v)` | true bila objek |
 | `static int asBool(int[] v)` | boolean nilai (0/1) |
-| `static int[] asText(int[] v)` | teks mentah untuk number/string |
+| `static String asText(int[] v)` | teks mentah untuk number/string |
 | `static int count(int[] v)` | jumlah elemen array / pasangan objek |
 | `static int[] at(int[] arr, int idx)` | elemen array pada indeks (null di luar rentang) |
-| `static boolean keyEq(int[] t, int at, int len, int[] key)` | (internal) bandingkan kunci pada tape |
-| `static int[] get(int[] obj, int[] key)` | ambil nilai |
-| `static boolean has(int[] obj, int[] key)` | true bila elemen/kunci ada |
-| `static int[] put(int[] obj, int[] key, int[] val)` | objek baru dengan key diganti/ditambah (immutable) |
-| `static int[] del(int[] obj, int[] key)` | objek tanpa kunci key (tape baru) |
+| `static boolean keyEq(int[] t, int at, int len, String key)` | (internal) bandingkan kunci pada tape |
+| `static int[] get(int[] obj, String key)` | ambil nilai |
+| `static boolean has(int[] obj, String key)` | true bila elemen/kunci ada |
+| `static int[] put(int[] obj, String key, int[] val)` | objek baru dengan key diganti/ditambah (immutable) |
+| `static int[] del(int[] obj, String key)` | objek tanpa kunci key (tape baru) |
 | `static int[] add(int[] arr, int[] val)` | array baru + satu elemen di belakang |
 | `static int[] arr1(int[] a)` | array JSON 1 elemen |
 | `static int[] arr2(int[] a, int[] b)` | array JSON 2 elemen |
@@ -230,10 +303,10 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20
 | `static int[] arr6(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f)` | array JSON 6 elemen |
 | `static int[] arr7(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f, int[] g)` | array JSON 7 elemen |
 | `static int[] arr8(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f, int[] g, int[] h)` | array JSON 8 elemen |
-| `static int[] obj1(int[] k1, int[] v1)` | objek JSON 1 pasangan |
-| `static int[] obj2(int[] k1, int[] v1, int[] k2, int[] v2)` | objek JSON 2 pasangan |
-| `static int[] obj3(int[] k1, int[] v1, int[] k2, int[] v2, int[] k3, int[] v3)` | objek JSON 3 pasangan |
-| `static int[] obj4(int[] k1, int[] v1, int[] k2, int[] v2, int[] k3, int[] v3, int[] k4, int[] v4)` | objek JSON 4 pasangan |
+| `static int[] obj1(String k1, int[] v1)` | objek JSON 1 pasangan |
+| `static int[] obj2(String k1, int[] v1, String k2, int[] v2)` | objek JSON 2 pasangan |
+| `static int[] obj3(String k1, int[] v1, String k2, int[] v2, String k3, int[] v3)` | objek JSON 3 pasangan |
+| `static int[] obj4(String k1, int[] v1, String k2, int[] v2, String k3, int[] v3, String k4, int[] v4)` | objek JSON 4 pasangan |
 | `static int asInt(int[] v)` | integer dari teks number (bagian pecahan dipotong); wrap int32 |
 | `static double asDouble(int[] v)` | double dari teks number (dukung pecahan & eksponen) |
 | `static boolean isWs(int c)` | (internal) karakter whitespace JSON |
@@ -242,7 +315,7 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20
 | `static int[] putByte(int[] a, int b)` | (internal) tambah byte ke tape |
 | `static int[] pstr(int[] t, int[] pos)` | parse string JSON; hasil = byte array (sudah di-unescape) |
 | `static int[] pval(int[] t, int[] pos)` | (internal) parse satu nilai dari posisi |
-| `static int[] parse(int[] text)` | parse teks JSON menjadi tape (null bila rusak) |
+| `static int[] parse(String text)` | parse teks JSON menjadi tape (null bila rusak) |
 | `static int hexdig(int v)` | (internal) nilai → hex char |
 | `static int[] quote(int[] s)` | (internal) string JSON ter-escape |
 | `static int[] wr(int[] v)` | (internal) tulis nilai JSON ke teks |
@@ -274,8 +347,8 @@ Logging ke stderr dengan timestamp UTC dan level.
 ```java
 import Log;
 
-Log.info(Net.bytes("boot"), Net.bytes("server siap"));
-Log.error(Net.bytes("db"), Net.bytes("gagal konek"));
+Log.info("boot", "server siap");
+Log.error("db", "gagal konek");
 ```
 
 **Catatan**
@@ -284,10 +357,10 @@ Log.error(Net.bytes("db"), Net.bytes("gagal konek"));
 
 | Fungsi | Keterangan |
 |---|---|
-| `static void emit(int[] level, int[] tag, int[] msg)` | (internal) tulis baris level + pesan ke stderr |
-| `static void info(int[] tag, int[] msg)` | log INFO |
-| `static void warn(int[] tag, int[] msg)` | log WARN |
-| `static void error(int[] tag, int[] msg)` | log ERROR |
+| `static void emit(String level, String tag, String msg)` | (internal) tulis baris level + pesan ke stderr |
+| `static void info(String tag, String msg)` | log INFO |
+| `static void warn(String tag, String msg)` | log WARN |
+| `static void error(String tag, String msg)` | log ERROR |
 
 ---
 
@@ -338,7 +411,7 @@ System.out.println(Map.size(m));      // 1
 
 ## MapStr
 
-`lib/core/MapStr.kop` · 17 fungsi
+`lib/core/MapStr.kop` · 13 fungsi
 
 Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan tabel kecil.
 
@@ -361,19 +434,15 @@ System.out.println(MapStr.get(m, "Content-Type")); // 1
 | `static int cap(int[] m)` | kapasitas saat ini |
 | `static int size(int[] m)` | jumlah elemen saat ini |
 | `static int poolUsed(int[] m)` | byte pool kunci yang sudah terpakai |
-| `static int hash(int[] k)` | (internal) hash FNV kunci |
-| `static boolean same(int[] m, int slot, int[] key, int h)` | bandingkan dua nilai |
-| `static int find(int[] m, int[] key)` | indeks elemen, -1 bila tidak ada |
-| `static boolean has(int[] m, int[] key)` | true bila elemen/kunci ada |
-| `static int get(int[] m, int[] key)` | ambil nilai |
-| `static int getOr(int[] m, int[] key, int def)` | ambil nilai atau default bila tidak ada |
-| `static boolean place(int[] m, int at, int[] key, int h, int v)` | (internal) tulis pasangan pada slot |
-| `static boolean put(int[] m, int[] key, int v)` | simpan pasangan |
-| `static boolean remove(int[] m, int[] key)` | hapus elemen |
+| `static boolean has(int[] m, String key)` | true bila elemen/kunci ada |
+| `static int get(int[] m, String key)` | ambil nilai |
+| `static int getOr(int[] m, String key, int def)` | ambil nilai atau default bila tidak ada |
+| `static boolean put(int[] m, String keyStr, int v)` | simpan pasangan |
+| `static boolean remove(int[] m, String key)` | hapus elemen |
 | `static void clear(int[] m)` | kosongkan isi |
 | `static boolean used(int[] m, int i)` | (internal) slot i terisi |
 | `static int valAtSlot(int[] m, int i)` | (internal) nilai pada slot i |
-| `static int[] keyAtSlot(int[] m, int i)` | (internal) kunci pada slot i |
+| `static String keyAtSlot(int[] m, int i)` | (internal) kunci pada slot i |
 
 **Konstanta**
 
@@ -533,12 +602,12 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b
 
 | Fungsi | Keterangan |
 |---|---|
-| `static int[] sep()` | string pemisah path (/) |
-| `static int[] join(int[] a, int[] b)` | gabung dua path dengan pemisah |
-| `static int[] base(int[] p)` | nama file terakhir tanpa direktori |
-| `static int[] dir(int[] p)` | bagian direktori (tanpa nama file) |
-| `static int[] ext(int[] p)` | ekstensi tanpa titik |
-| `static boolean isAbsolute(int[] p)` | true bila path absolut |
+| `static String sep()` | string pemisah path (/) |
+| `static String join(String a, String b)` | gabung dua path dengan pemisah |
+| `static String base(String p)` | nama file terakhir tanpa direktori |
+| `static String dir(String p)` | bagian direktori (tanpa nama file) |
+| `static String ext(String p)` | ekstensi tanpa titik |
+| `static boolean isAbsolute(String p)` | true bila path absolut |
 
 **Konstanta**
 
@@ -611,66 +680,136 @@ System.out.println(Stats.median(a));    // 4
 
 ## Str
 
-`lib/core/Str.kop` · 41 fungsi
+`lib/core/Str.kop` · 109 fungsi
 
-Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks. Bekerja pada String maupun `int[]` byte.
+Utilitas teks native `String`: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding, konversi semua tipe skalar, hex, dan UTF-8. Tidak memakai `int[]`.
 
 ```java
 import Str;
 
 String s = "  Kopi  ";
-System.out.println(Str.trim(s));              // Kopi
+System.out.println(Str.trim(s));                        // Kopi
 System.out.println(Str.padLeft(Str.fromInt(7), 3, 48)); // 007
+System.out.println(Str.join(Str.split("a,b", ","), "|")); // a|b
 ```
 
 **Catatan**
 
 - `length` adalah jumlah byte, bukan karakter Unicode.
 - `fromDouble` maksimum 6 digit pecahan; format specifier belum ada.
+- Buffer byte ada di modul `Bytes`; konversi `Net.strbytes`/`Net.mkstr`.
 
 | Fungsi | Keterangan |
 |---|---|
-| `static int len(int[] s)` | panjang byte |
-| `static boolean isEmpty(int[] s)` | true bila kosong |
-| `static boolean eq(int[] a, int[] b)` | true bila isi kedua teks sama |
-| `static int cmp(int[] a, int[] b)` | perbandingan leksikografis (-1/0/1) |
-| `static int[] copy(int[] a)` | salinan (array baru) |
-| `static int[] cat(int[] a, int[] b)` | gabung dua array menjadi array baru |
-| `static int[] slice(int[] s, int from, int n)` | potong `n` byte mulai `from` (di-clamp) |
-| `static int at(int[] s, int i)` | byte pada indeks (0..255) |
-| `static int indexOf(int[] s, int[] ndl, int from)` | indeks kemunculan pertama dari `from`, -1 bila tidak ada |
-| `static int lastIndexOf(int[] s, int[] ndl)` | indeks kemunculan terakhir, -1 bila tidak ada |
-| `static boolean contains(int[] s, int[] ndl)` | true bila memuat substring |
-| `static boolean startsWith(int[] s, int[] p)` | true bila diawali ndl |
-| `static boolean endsWith(int[] s, int[] p)` | true bila diakhiri ndl |
-| `static String trimLeft(int[] s)` | buang whitespace di ujung kiri |
-| `static String trimRight(int[] s)` | buang whitespace di ujung kanan |
-| `static String trim(int[] s)` | buang spasi/tab/CR/LF di kedua ujung |
-| `static String upper(int[] s)` | huruf besar (ASCII) |
-| `static String lower(int[] s)` | huruf kecil (ASCII) |
-| `static String repeat(int[] s, int n)` | ulang string n kali |
-| `static String reverse(int[] s)` | salinan terbalik |
-| `static String replaceByte(int[] s, int from, int to)` | ganti semua byte from → to |
-| `static String replaceSeq(int[] s, int[] old, int[] nw)` | ganti semua kemunculan old → nw |
-| `static int countByte(int[] s, int b)` | berapa kali byte b muncul |
-| `static int splitCount(int[] s, int sep)` | berapa banyak potongan dengan pemisah sep |
-| `static String splitAt(int[] s, int sep, int idx)` | potongan ke-idx dengan pemisah sep |
-| `static String sub(int[] s, int from, int n)` | substring ala umum: potongan teks sebagai String (v1.17). Str.slice tetap int[] untuk buffer byte I/O. |
-| `static String padLeft(int[] s, int width, int pad)` | tambah byte pad di kiri sampai width |
-| `static String padRight(int[] s, int width, int pad)` | tambah byte pad di kanan sampai width |
+| `static int len(String s)` | panjang byte |
+| `static boolean isEmpty(String s)` | true bila kosong |
+| `static boolean isSpace(int c)` | — |
+| `static boolean isBlank(String s)` | — |
+| `static boolean eq(String a, String b)` | true bila isi kedua teks sama |
+| `static boolean equals(String a, String b)` | — |
+| `static int cmp(String a, String b)` | perbandingan leksikografis (-1/0/1) |
+| `static int compare(String a, String b)` | — |
+| `static int compareIgnoreCase(String a, String b)` | — |
+| `static boolean equalsIgnoreCase(String a, String b)` | perbandingan isi tanpa peduli huruf besar/kecil |
+| `static String copy(String s)` | String immutable: salinan aman dipakai sebagai nilai baru |
+| `static String cat(String a, String b)` | gabung dua teks |
+| `static String join(String[] parts, String sep)` | gabung String[] dengan pemisah |
+| `static String sub(String s, int from, int n)` | potong `n` byte mulai `from` (di-clamp) |
+| `static String slice(String s, int from, int n)` | alias `sub` untuk String |
+| `static String left(String s, int n)` | — |
+| `static String right(String s, int n)` | — |
+| `static String dropLeft(String s, int n)` | — |
+| `static String dropRight(String s, int n)` | — |
+| `static String before(String s, String sep)` | potongan sebelum/sesudah pemisah pertama ("" bila tidak ada) |
+| `static String after(String s, String sep)` | — |
+| `static String beforeLast(String s, String sep)` | potongan sebelum/sesudah pemisah terakhir |
+| `static String afterLast(String s, String sep)` | — |
+| `static String between(String s, String open, String close)` | — |
+| `static int at(String s, int i)` | byte pada indeks (0..255), -1 di luar batas |
+| `static int charAt(String s, int i)` | — |
+| `static int first(String s)` | — |
+| `static int last(String s)` | — |
+| `static String removePrefix(String s, String p)` | — |
+| `static String removeSuffix(String s, String p)` | — |
+| `static int indexOf(String s, String ndl, int from)` | indeks kemunculan pertama dari `from`, -1 bila tidak ada |
+| `static int lastIndexOf(String s, String ndl)` | indeks kemunculan terakhir, -1 bila tidak ada |
+| `static boolean contains(String s, String ndl)` | true bila memuat substring |
+| `static boolean startsWith(String s, String p)` | true bila diawali ndl |
+| `static boolean endsWith(String s, String p)` | true bila diakhiri ndl |
+| `static int count(String s, String ndl)` | jumlah kemunculan tidak tumpang tindih |
+| `static int countByte(String s, int b)` | berapa kali byte b muncul |
+| `static String trimLeft(String s)` | buang whitespace di ujung kiri |
+| `static String trimRight(String s)` | buang whitespace di ujung kanan |
+| `static String trim(String s)` | buang spasi/tab/CR/LF di kedua ujung |
+| `static String strip(String s)` | — |
+| `static String capitalize(String s)` | — |
+| `static String uncapitalize(String s)` | — |
+| `static String upper(String s)` | huruf besar (ASCII) |
+| `static String lower(String s)` | huruf kecil (ASCII) |
+| `static int lowerByte(int c)` | — |
+| `static String swapCase(String s)` | — |
+| `static String repeat(String s, int n)` | ulang string n kali |
+| `static String reverse(String s)` | balik byte (ASCII). Untuk UTF-8 gunakan utf8Slice/utf8Reverse. |
+| `static String replaceSeq(String s, String old, String nw)` | ganti semua kemunculan old → nw |
+| `static String replace(String s, String old, String nw)` | — |
+| `static String replaceByte(String s, int from, int to)` | ganti semua byte from → to |
+| `static String padLeft(String s, int width, int pad)` | tambah byte pad di kiri sampai width |
+| `static String padRight(String s, int width, int pad)` | tambah byte pad di kanan sampai width |
+| `static String center(String s, int width, int pad)` | — |
+| `static String truncate(String s, int max)` | — |
+| `static String ellipsis(String s, int max)` | — |
+| `static int splitCountChar(String s, int sep)` | — |
+| `static String splitAtChar(String s, int sep, int idx)` | — |
+| `static String[] splitChar(String s, int sep)` | — |
+| `static int splitCount(String s, String sep)` | berapa banyak potongan dengan pemisah sep |
+| `static String splitAt(String s, String sep, int idx)` | potongan ke-idx dengan pemisah sep |
+| `static String[] split(String s, String sep)` | pecah teks dengan pemisah String menjadi String[] |
+| `static String[] lines(String s)` | baris: pemisah \n, \r di ujung tiap baris dibuang |
+| `static String[] words(String s)` | kata: pemisah spasi/tab/CR/LF, pemisah berurutan dilewati |
 | `static String fromInt(int v)` | int → teks desimal |
-| `static int toInt(int[] s)` | parse desimal; 0 bila bukan angka |
-| `static boolean isDigits(int[] s)` | true bila seluruh isi digit desimal |
-| `static boolean equalsIgnoreCase(int[] a, int[] b)` | perbandingan isi tanpa peduli huruf besar/kecil |
-| `static int utf8Count(int[] s)` | jumlah karakter Unicode (bukan byte) |
-| `static int[] hex(int[] data)` | byte → teks hex lowercase |
-| `static String boolText(boolean b)` | boolean → "true"/"false" |
-| `static String fromUInt(int v)` | uint32 (nilai kanonik zero-extended di int) |
+| `static String fromUInt(int v)` | uint32 dalam nilai kanonik int (zero-extended) |
 | `static String fromLong(long v)` | long → teks desimal |
 | `static String fromULong(long v)` | uint64: divisi unsigned bit-per-bit |
-| `static String fromDouble(double d)` | double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang). Batas jujur: bukan algoritma pembulatan Java/printf. |
-| `static void print(int[] s)` | tulis byte ke stdout tanpa newline |
-| `static void line(int[] s)` | tulis dengan newline |
+| `static String boolText(boolean b)` | boolean → "true"/"false" |
+| `static String fromBool(boolean b)` | — |
+| `static String fromByte(byte v)` | varian skalar: tidak ada overloading di Kopi, jadi nama eksplisit |
+| `static String fromShort(short v)` | — |
+| `static String fromUInt8(uint8 v)` | — |
+| `static String fromUInt16(uint16 v)` | — |
+| `static String fromUInt32(uint32 v)` | — |
+| `static String fromUInt64(uint64 v)` | — |
+| `static String fromFloat(float v)` | — |
+| `static String fromChar(int c)` | satu code point (0..255) menjadi teks |
+| `static String fromDouble(double d)` | double → desimal sederhana (maks 6 digit pecahan, nol ekor dibuang) |
+| `static int toInt(String s)` | parse desimal; 0 bila bukan angka |
+| `static int toIntOr(String s, int def)` | — |
+| `static long toLong(String s)` | — |
+| `static int parseInt(String s, int radix)` | — |
+| `static long parseLong(String s, int radix)` | — |
+| `static int digitValue(int c)` | — |
+| `static double toDouble(String s)` | double sederhana: [-]digit[.digit][e[+-]digit] |
+| `static byte toByte(String s)` | varian skalar hasil parsing |
+| `static short toShort(String s)` | — |
+| `static uint8 toUInt8(String s)` | — |
+| `static uint16 toUInt16(String s)` | — |
+| `static uint32 toUInt32(String s)` | — |
+| `static uint64 toUInt64(String s)` | — |
+| `static float toFloat(String s)` | — |
+| `static boolean toBool(String s)` | true: "true", "1", "yes", "on" (tanpa beda huruf besar/kecil) |
+| `static boolean isDigits(String s)` | true bila seluruh isi digit desimal |
+| `static boolean isNumber(String s)` | — |
+| `static boolean isHex(String s)` | — |
+| `static String toHex(String s)` | byte teks → hex lowercase |
+| `static int hexChar(int v)` | — |
+| `static String fromHex(String s)` | hex → teks byte |
+| `static int utf8Count(String s)` | jumlah code point UTF-8 |
+| `static boolean utf8Valid(String s)` | — |
+| `static int utf8Offset(String s, int cp)` | offset byte untuk indeks code point ke-cp (0..utf8Count) |
+| `static String utf8Slice(String s, int from, int n)` | potong n code point mulai code point from (bukan byte) |
+| `static int utf8CodeAt(String s, int i)` | code point pertama pada byte offset i (-1 bila tidak valid) |
+| `static String utf8Reverse(String s)` | balik per code point (UTF-8 aman untuk teks valid) |
+| `static void print(String s)` | tulis teks ke stdout tanpa newline |
+| `static void line(String s)` | tulis dengan newline |
 
 ---
 
@@ -699,6 +838,6 @@ Time.sleepMs(10);
 | `static int sleepMs(int ms)` | tidur ms milidetik |
 | `static int[] civil(int sec)` | [tahun, bulan(1..12), hari(1..31), jam, menit, detik] UTC |
 | `static int weekday(int sec)` | nama hari dari epoch detik |
-| `static int[] format(int sec)` | format "YYYY-MM-DD HH:MM:SS" UTC |
+| `static String format(int sec)` | format "YYYY-MM-DD HH:MM:SS" UTC |
 
 ---

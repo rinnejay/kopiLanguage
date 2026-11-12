@@ -1,0 +1,31 @@
+// autosize.kop — v1.22: malloc { ... } otomatis, tanpa perlu isi <...>.
+// Arena otomatis menyediakan sampai 4096 MB; RAM hanya terpakai sesuai
+// kebutuhan. Array 40 MB di bawah ini melebihi default lama 32 MB.
+class Main {
+    public static void main(String[] args) {
+        int total = 0;
+        malloc {
+            int[] a = new int[5000000];          // 40 MB
+            for (int i = 0; i < 5000000; i++) a[i] = i;
+            for (int i = 0; i < 5000000; i++) total = total + a[i];
+            System.out.println(a.length);
+        }
+        System.out.println(total);
+
+        // blok kedua: pastikan arena sebelumnya benar-benar dilepas
+        malloc {
+            int[] b = new int[1000000];          // 8 MB
+            b[0] = 7;
+            b[999999] = 35;
+            System.out.println(b[0] + b[999999]);
+        }
+
+        // eksplisit tetap berfungsi
+        malloc<1mb> {
+            int[] c = new int[100000];           // 800 KB
+            c[0] = 42;
+            System.out.println(c[0]);
+        }
+        System.out.println("selesai");
+    }
+}

@@ -32,6 +32,7 @@ typedef struct {
     double fnum;  /* T_NUM nilai float/double */
     int numty;    /* T_NUM: tipe literal (T_INT/T_LONG/.../T_DOUBLE) */
     int line;
+    int col;            /* kolom awal token (1-based) — untuk diagnostik */
     const char *file;   /* file asal token — untuk laporan error */
 } Tok;
 

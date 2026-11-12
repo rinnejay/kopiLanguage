@@ -7,13 +7,13 @@ class Main {
         int port = 10055;
         if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
 
-        int[] s = Resolv.parse(Net.bytes("nameserver 1.2.3.4\nnameserver 10.0.0.53\n"));
+        int[] s = Resolv.parse("nameserver 1.2.3.4\nnameserver 10.0.0.53\n");
         System.out.println(s.length);
         System.out.println(s[0]);
         System.out.println(s[1]);
 
         int[] h = new int[5];
-        System.out.println(Resolv.lookupUdp(2130706433, port, Net.bytes("kopi.test"), 1000, h, 512));
+        System.out.println(Resolv.lookupUdp(2130706433, port, "kopi.test", 1000, h, 512));
         System.out.println(h[0]);
         System.out.println(h[1]);
         System.out.println(h[2]);
@@ -21,7 +21,7 @@ class Main {
         System.out.println(h[4]);
 
         int[] h2 = new int[5];
-        System.out.println(Resolv.lookupUdp(2130706433, port, Net.bytes("tidak.ada"), 1000, h2, 512));
+        System.out.println(Resolv.lookupUdp(2130706433, port, "tidak.ada", 1000, h2, 512));
         System.out.println(h2[0]);
     }
 }

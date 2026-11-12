@@ -1,4 +1,4 @@
-// File.kop — file I/O di atas builtin Net (path dinamis int[]) v1.7.
+// File.kop — file I/O di atas builtin Net (path String) v1.23.
 // Flag openat standar Linux; mode 0644 = 420.
 
 class File {
@@ -9,9 +9,9 @@ class File {
     static int O_APPEND() { return 1024; }
     static int MODE_0644() { return 420; }
 
-    static int openRead(int[] path)  { return Net.openb(path, 0, 0); }
-    static int create(int[] path)    { return Net.openb(path, 577, 420); }
-    static int append(int[] path)    { return Net.openb(path, 1089, 420); }
+    static int openRead(String path)  { return Net.openb(path, 0, 0); }
+    static int create(String path)    { return Net.openb(path, 577, 420); }
+    static int append(String path)    { return Net.openb(path, 1089, 420); }
     static int close(int fd)         { return Net.close(fd); }
 
     static int writeAll(int fd, int[] data) { return Net.sendb(fd, data); }
@@ -28,9 +28,9 @@ class File {
         return end;
     }
 
-    static int remove(int[] path) { return Net.unlinkb(path); }
-    static int renameTo(int[] oldp, int[] newp) { return Net.renameb(oldp, newp); }
-    static int mkdir(int[] path) { return Net.mkdirb(path); }
+    static int remove(String path) { return Net.unlinkb(path); }
+    static int renameTo(String oldp, String newp) { return Net.renameb(oldp, newp); }
+    static int mkdir(String path) { return Net.mkdirb(path); }
 
     /* v1.17.1: I/O teks langsung — kode biasa tak perlu sentuh int[] */
     static String readText(String path) {

@@ -1,4 +1,4 @@
-// Time.kop — waktu & tanggal (UTC) di atas builtin Net v1.7.
+// Time.kop — waktu & tanggal (UTC) di atas builtin Net v1.23.
 // epoch = detik Unix (int; batas 2038), monoMs = milidetik monotonik (long).
 import Str;
 
@@ -41,19 +41,14 @@ class Time {
         return w;                       /* 0=Minggu ... 6=Sabtu */
     }
 
-    static int[] format(int sec) {
+    static String format(int sec) {
         int[] c = civil(sec);
-        int[] o = Str.padLeft(Str.fromInt(c[0]), 4, 48);
-        o = Str.cat(o, Net.bytes("-"));
-        o = Str.cat(o, Str.padLeft(Str.fromInt(c[1]), 2, 48));
-        o = Str.cat(o, Net.bytes("-"));
-        o = Str.cat(o, Str.padLeft(Str.fromInt(c[2]), 2, 48));
-        o = Str.cat(o, Net.bytes(" "));
-        o = Str.cat(o, Str.padLeft(Str.fromInt(c[3]), 2, 48));
-        o = Str.cat(o, Net.bytes(":"));
-        o = Str.cat(o, Str.padLeft(Str.fromInt(c[4]), 2, 48));
-        o = Str.cat(o, Net.bytes(":"));
-        o = Str.cat(o, Str.padLeft(Str.fromInt(c[5]), 2, 48));
+        String o = Str.padLeft(Str.fromInt(c[0]), 4, 48);
+        o = o + "-" + Str.padLeft(Str.fromInt(c[1]), 2, 48);
+        o = o + "-" + Str.padLeft(Str.fromInt(c[2]), 2, 48);
+        o = o + " " + Str.padLeft(Str.fromInt(c[3]), 2, 48);
+        o = o + ":" + Str.padLeft(Str.fromInt(c[4]), 2, 48);
+        o = o + ":" + Str.padLeft(Str.fromInt(c[5]), 2, 48);
         return o;
     }
 }

@@ -1,5 +1,5 @@
 // mallocsize.kop — ukuran arena per blok: malloc<64mb> { ... } (v1.21)
-// Tanpa ukuran = default 32 MB. Satuan: b, kb, mb, gb.
+// Tanpa ukuran = otomatis (v1.22). Satuan: b, kb, mb, gb.
 // Blok dengan ukuran lebih kecil akan menolak alokasi yang melewati batas.
 import Str;
 
@@ -20,7 +20,7 @@ class Main {
     public static void main(String[] args) {
         int total = 0;
 
-        // 1) default 32 MB (tanpa <...>)
+        // 1) arena otomatis (tanpa <...>)
         malloc {
             int[] a = new int[500000];       // 4 MB
             a[0] = 11;

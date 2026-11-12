@@ -23,7 +23,7 @@ class Main {
             int t = Str.toInt(Net.argv(1));
             if (t > 0) tick = t;
         }
-        Log.info(Net.bytes("boot"), Net.bytes("mulai"));
+        Log.info("boot", "mulai");
         ArenaServer.serve(port, tick);
     }
 }

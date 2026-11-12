@@ -1,0 +1,44 @@
+// loopfast.kop — v1.22: pola loop yang memakai superinstruksi VM
+// (OP_LOOP, OP_OP_STORE, OP_IDXR_L, OP_IDXW_L, OP_BIN_L, OP_CMP_JMP*).
+class Main {
+    public static void main(String[] args) {
+        int s = 0;
+        for (int i = 1; i <= 100; i++) s = s + i;
+        System.out.println(s);                 // 5050
+
+        int d = 0;
+        for (int i = 10; i > 0; i--) d = d + i;
+        System.out.println(d);                 // 55
+
+        int w = 0;
+        int j = 0;
+        while (j < 100) { j += 3; w = w + 1; }
+        System.out.println(w);                 // 34
+
+        int k = 0;
+        int acc = 0;
+        do { acc = acc + k; k = k + 1; } while (k < 10);
+        System.out.println(acc);               // 45
+
+        int c = 0;
+        for (int i = 0; i < 100; i++) {
+            if (i % 2 == 0) continue;
+            c = c + i;
+        }
+        System.out.println(c);                 // 2500
+
+        int b = 0;
+        for (int i = 0; i < 1000; i++) {
+            if (i == 7) break;
+            b = b + i;
+        }
+        System.out.println(b);                 // 21
+
+        int[] a = new int[100];
+        for (int i = 0; i < 100; i++) a[i] = i * i;
+        int q = 0;
+        for (int i = 0; i < 100; i++) q = q + a[i];
+        System.out.println(q);                 // 328350
+        System.out.println(a[99]);             // 9801
+    }
+}

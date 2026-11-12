@@ -43,7 +43,7 @@
 </tr>
 <tr>
 <td>GC / free</td>
-<td>arena global 32 MB; <code>malloc&lt;...&gt; { ... }</code> memberi arena per blok (default 32 MB, custom <code>b/kb/mb/gb</code>, v1.21) dan membebaskan otomatis; <code>memMark/memReset</code> manual opsional</td>
+<td>arena global 32 MB; <code>malloc { ... }</code> otomatis (mmap hingga 4096 MB, RAM sesuai kebutuhan) atau <code>malloc&lt;N&gt;</code> batas keras 1 kb–4096 MB; <code>memMark/memReset</code> manual opsional</td>
 <td>region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler); batas blok dicek runtime</td>
 </tr>
 <tr>
@@ -53,8 +53,13 @@
 </tr>
 <tr>
 <td>~~String = <code>int[]</code>~~ <strong>✅ v1.17</strong> (String opaque; interop eksplisit <code>Net.mkstr</code>/<code>Net.strbytes</code>)</td>
-<td>~~byte-per-slot~~ <strong>✅ v1.18 packed</strong> (1 byte/karakter; konversi otomatis compiler di batas)</td>
-<td>alokasi String besar 5× lebih hemat; tidak ada perubahan semantik sumber</td>
+<td>~~byte-per-slot~~ <strong>✅ v1.18 packed</strong> (1 byte/karakter); <strong>✅ v1.23</strong> <code>Str</code> hanya <code>String</code>, buffer biner di <code>Bytes</code></td>
+<td>alokasi String 5× lebih hemat; API teks tak lagi memakai array</td>
+</tr>
+<tr>
+<td>~~Utilitas byte/teks bercampur~~ <strong>✅ v1.23</strong> (<code>Str</code> String, <code>Bytes</code> int[])</td>
+<td>sisa: normalisasi Unicode, <code>double[]</code></td>
+<td><code>Str.utf8*</code> untuk hitung/validasi/potong code point</td>
 </tr>
 <tr>
 <td><code>char</code> &amp; literal char</td>
@@ -143,11 +148,11 @@
 </tr>
 <tr>
 <td>Diagnostik runtime</td>
-<td>pesan tanpa nomor baris/stack trace</td>
+<td>nomor baris + stack trace + <code>saran:</code> perbaikan</td>
 </tr>
 <tr>
 <td>Arena</td>
-<td>global 32 MB (a64/x64/VM), arena blok <code>malloc&lt;...&gt;</code> bisa 1 kb–4096 MB; tanpa GC</td>
+<td>global 32 MB (a64/x64/VM); <code>malloc{}</code> otomatis (mmap hingga 4096 MB) atau <code>malloc&lt;N&gt;</code> 1 kb–4096 MB; tanpa GC</td>
 </tr>
 <tr>
 <td>Cross-compile</td>
@@ -259,7 +264,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>145/145</strong> (v1.21) — a64 + VM + sintaks x64 + dokumen HTML (150 PASS termasuk cek x64 yang tidak masuk counter).</li>
+<li>Suite: <strong>155/155</strong> (v1.23) — a64 + VM + sintaks x64 + dokumen HTML (150 PASS termasuk cek x64 yang tidak masuk counter).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>

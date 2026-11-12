@@ -211,6 +211,8 @@ typedef struct {
 
 extern Prog prog;
 extern const char *g_linefile;   /* file token/AST yang sedang ditinjau — dipakai die() */
+extern int g_line;               /* baris yang sedang ditinjau (0 = tak diketahui) */
+extern int g_col;                /* kolom token (0 = tak diketahui) */
 
 Node *newnode(int kind, int line);
 void die(const char *fmt, ...);

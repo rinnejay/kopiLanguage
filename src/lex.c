@@ -61,8 +61,8 @@ static char *unescape(const char *s, size_t n, char endq) {
 
 /* lewati satu template `...{...}...` (mendukung nested template di dalam
  * interpolasi). *pp masuk di posisi backtick, keluar setelah backtick tutup. */
-static void scan_tpl(const char **pp, int *line) {
-    const char *p = *pp;
+static void scan_tpl(char **pp, int *line) {
+    char *p = *pp;
     p++;                                   /* lewati ` pembuka */
     int depth = 0;
     while (*p) {
@@ -99,20 +99,23 @@ static Tok *lex_scan(char *src, const char *fname, int startline, int *ntoks) {
     int cap = 256, n = 0, line = startline;
     Tok *toks = xmalloc(sizeof(Tok) * (size_t)cap);
     char *p = src;
+    const char *lstart = src;          /* awal baris saat ini (untuk kolom) */
 
 #define PUSH(tt, ttx, tnm) do { \
         if (n == cap) { cap *= 2; toks = realloc(toks, sizeof(Tok) * (size_t)cap); } \
-        toks[n].type = (tt); toks[n].text = (ttx); toks[n].num = (tnm); toks[n].line = line; toks[n].file = g_srcfile; n++; \
+        toks[n].type = (tt); toks[n].text = (ttx); toks[n].num = (tnm); toks[n].line = line; \
+        toks[n].col = tcol; toks[n].file = g_srcfile; n++; \
     } while (0)
 
     while (*p) {
-        if (*p == '\n') { line++; p++; continue; }
+        int tcol = (int)(p - lstart) + 1;   /* kolom awal token ini */
+        if (*p == '\n') { line++; p++; lstart = p; continue; }
         if (isspace((unsigned char)*p)) { p++; continue; }
         if (p[0] == '/' && p[1] == '/') { while (*p && *p != '\n') p++; continue; }
         if (p[0] == '/' && p[1] == '*') {
             p += 2;
             while (*p && !(p[0] == '*' && p[1] == '/')) {
-                if (*p == '\n') line++;
+                if (*p == '\n') { line++; p++; lstart = p; continue; }
                 p++;
             }
             if (!*p) die("baris %d: komentar /* tidak ditutup", line);
@@ -272,6 +275,7 @@ static Tok *lex_scan(char *src, const char *fname, int startline, int *ntoks) {
         }
         die("baris %d: karakter tidak dikenal '%c'", line, *p);
     }
+    int tcol = (int)(p - lstart) + 1;
     PUSH(T_EOF, 0, 0);
     (void)src;
     *ntoks = n;

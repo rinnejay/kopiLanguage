@@ -11,7 +11,7 @@
 // per koneksi 8 KiB, tanpa pipelining lebih dari satu request sekaligus
 // (sisa byte digeser, bukan diproses berantai).
 
-import Str;
+import Bytes;
 import Log;
 import HttpServer;
 import Routes;
@@ -82,13 +82,13 @@ class Main {
 
     public static void main(String[] args) {
         int port = 8080;
-        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+        if (Net.argc() > 0) port = Bytes.toInt(Net.argv(0));
 
         int lfd = Net.socket(2, 1);
-        if (lfd < 0) { Log.error(Net.bytes("boot"), Net.bytes("socket gagal")); return; }
+        if (lfd < 0) { Log.error("boot", "socket gagal"); return; }
         Net.setsockopt(lfd, 1, 2, 1);
         if (Net.bind(lfd, 0, port) < 0 || Net.listen(lfd, 64) < 0) {
-            Log.error(Net.bytes("boot"), Net.bytes("bind/listen gagal"));
+            Log.error("boot", "bind/listen gagal");
             return;
         }
         Net.setnonblock(lfd);
@@ -105,9 +105,9 @@ class Main {
         int[] pslot = new int[MC + 1];
         int[] tmp = new int[4096];
 
-        Log.info(Net.bytes("boot"), Net.bytes("event-loop siap"));
+        Log.info("boot", "event-loop siap");
         int[] hello = Net.bytes("Kopi ServerEvent (poll) port=");
-        hello = Str.cat(hello, Str.fromInt(port));
+        hello = Bytes.cat(hello, Bytes.fromInt(port));
         System.out.println(hello);
 
         while (true) {
@@ -173,7 +173,7 @@ class Main {
                     int need = complete(cbuf, off, clen[slot]);
                     if (need < 0) break;
                     int mark = Net.memMark();
-                    int[] req = Str.slice(cbuf, off, need);
+                    int[] req = Bytes.slice(cbuf, off, need);
                     int keep = 0;
                     if (HttpServer.keepAlive(req)) keep = 1;
                     int[] resp = Routes.handle(req, keep);

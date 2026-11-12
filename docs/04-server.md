@@ -211,10 +211,10 @@ rantai/PKI, hostname, masa berlaku, session resumption.
 ## 7. Auth, session, JWT di server
 
 ```java
-int[] h = HttpServer.headerValue(req, Net.bytes("Authorization"));
+String h = HttpServer.headerValue(req, "Authorization");
 if (!Auth.checkBasic(h, user, pass)) {
     int[] r = HttpServer.respond(401, ctype,
-                  Net.bytes("unauthorized\n"), Auth.challenge(Net.bytes("admin")), keep);
+                  "unauthorized\n", Auth.challenge("admin"), keep);
     HttpServer.send(c, r);
     continue;
 }
@@ -226,10 +226,10 @@ Session in-memory:
 int[] ids  = MapStr.make(256, 8192);
 int[] exps = MapStr.make(256, 8192);
 // login:
-int[] sid = Session.create(ids, exps, uid, 3600);
-int[] extra = HttpServer.setCookie(Net.bytes("sid"), sid, Net.bytes("/"), 3600);
+String sid = Session.create(ids, exps, uid, 3600);
+String extra = HttpServer.setCookie("sid", sid, "/", 3600);
 // request berikutnya:
-int uid = Session.get(ids, exps, HttpServer.cookie(req, Net.bytes("sid")), Net.time());
+int uid = Session.get(ids, exps, HttpServer.cookie(req, "sid"), Net.time());
 ```
 
 JWT:

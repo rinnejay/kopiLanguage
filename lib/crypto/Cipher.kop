@@ -91,8 +91,8 @@ class Cipher {
         return t;
     }
 
-    /* data byte-as-int → teks base64 (byte-as-int), padding '=' */
-    static int[] b64enc(int[] data) {
+    /* data byte-as-int → teks base64 (String), padding '=' */
+    static String b64enc(int[] data) {
         int n = data.length;
         int ol = (n + 2) / 3 * 4;
         int[] t = b64tab();
@@ -112,11 +112,11 @@ class Cipher {
             if (i + 2 < n) { out[o] = t[tr % 64];         o++; }
             else           { out[o] = 61;                o++; }
         }
-        return out;
+        return Net.mkstr(out);
     }
 
     /* teks base64 → byte-as-int; '=' diabaikan, karakter asing → 0 */
-    static int[] b64dec(int[] txt) {
+    static int[] b64dec(String txt) {
         int[] t = b64tab();
         int n = txt.length;
         int[] raw = new int[n];
@@ -155,8 +155,8 @@ class Cipher {
 
     /* ── hex (kecil, huruf-perhuruf deterministik) ──────────────── */
 
-    /* data → hex lowercase, 2 karakter per byte */
-    static int[] hexenc(int[] data) {
+    /* data → hex lowercase (String), 2 karakter per byte */
+    static String hexenc(int[] data) {
         int[] out = new int[data.length * 2];
         int o = 0;
         for (int i = 0; i < data.length; i++) {
@@ -167,7 +167,7 @@ class Cipher {
             out[o] = hexdig(hi); o++;
             out[o] = hexdig(lo); o++;
         }
-        return out;
+        return Net.mkstr(out);
     }
 
     /* 0..15 → '0'..'9','a'..'f' */
@@ -185,7 +185,7 @@ class Cipher {
     }
 
     /* teks hex (panjang ganjil dibatasi 0 di akhir) → byte-as-int */
-    static int[] hexdec(int[] txt) {
+    static int[] hexdec(String txt) {
         int n = txt.length / 2;
         int[] out = new int[n];
         int o = 0;

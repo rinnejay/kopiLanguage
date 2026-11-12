@@ -8,7 +8,7 @@
 //   papan skor + petunjuk
 //   ESC[J                      hapus sisa layar
 
-import Str;
+import Bytes;
 
 class Render {
 
@@ -86,13 +86,13 @@ class Render {
         }
 
         int[] h1 = Net.bytes("KOPI ARENA  ");
-        h1 = Str.cat(h1, name);
-        h1 = Str.cat(h1, Net.bytes("  tick "));
-        h1 = Str.cat(h1, Str.fromInt(st[0]));
-        h1 = Str.cat(h1, Net.bytes("  pemain "));
-        h1 = Str.cat(h1, Str.fromInt(np));
-        h1 = Str.cat(h1, Net.bytes("  skor "));
-        h1 = Str.cat(h1, Str.fromInt(myscore));
+        h1 = Bytes.cat(h1, name);
+        h1 = Bytes.cat(h1, Net.bytes("  tick "));
+        h1 = Bytes.cat(h1, Bytes.fromInt(st[0]));
+        h1 = Bytes.cat(h1, Net.bytes("  pemain "));
+        h1 = Bytes.cat(h1, Bytes.fromInt(np));
+        h1 = Bytes.cat(h1, Net.bytes("  skor "));
+        h1 = Bytes.cat(h1, Bytes.fromInt(myscore));
 
         int[] h2 = Net.bytes("skor: ");
         for (int i = 0; i < np; i++) {
@@ -101,10 +101,10 @@ class Render {
             if (id == you) ch = 64;
             int[] one = new int[1];
             one[0] = ch;
-            h2 = Str.cat(h2, one);
-            h2 = Str.cat(h2, Net.bytes(":"));
-            h2 = Str.cat(h2, Str.fromInt(st[3 + 4 * i + 3]));
-            h2 = Str.cat(h2, Net.bytes("  "));
+            h2 = Bytes.cat(h2, one);
+            h2 = Bytes.cat(h2, Net.bytes(":"));
+            h2 = Bytes.cat(h2, Bytes.fromInt(st[3 + 4 * i + 3]));
+            h2 = Bytes.cat(h2, Net.bytes("  "));
         }
 
         int[] h3 = Net.bytes("WASD/panah: gerak   spasi: diam   q: keluar");
@@ -113,13 +113,13 @@ class Render {
         nl[0] = 10;
 
         int[] o = home();
-        o = Str.cat(o, h1);
-        o = Str.cat(o, nl);
-        o = Str.cat(o, g);
-        o = Str.cat(o, h2);
-        o = Str.cat(o, nl);
-        o = Str.cat(o, h3);
-        o = Str.cat(o, clearBelow());
+        o = Bytes.cat(o, h1);
+        o = Bytes.cat(o, nl);
+        o = Bytes.cat(o, g);
+        o = Bytes.cat(o, h2);
+        o = Bytes.cat(o, nl);
+        o = Bytes.cat(o, h3);
+        o = Bytes.cat(o, clearBelow());
         return o;
     }
 }

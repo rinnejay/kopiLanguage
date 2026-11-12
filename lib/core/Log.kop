@@ -1,21 +1,13 @@
-// Log.kop — logging sederhana ke stderr (fd 2) v1.9.
-import Str;
+// Log.kop — logging sederhana ke stderr (fd 2) v1.23.
 import Time;
 
 class Log {
-    static void emit(int[] level, int[] tag, int[] msg) {
-        int[] s = Net.bytes("[");
-        s = Str.cat(s, Time.format(Time.epoch()));
-        s = Str.cat(s, Net.bytes("] "));
-        s = Str.cat(s, level);
-        s = Str.cat(s, Net.bytes(" "));
-        s = Str.cat(s, tag);
-        s = Str.cat(s, Net.bytes(": "));
-        s = Str.cat(s, msg);
-        s = Str.cat(s, Net.bytes("\n"));
+    static void emit(String level, String tag, String msg) {
+        String s = "[" + Time.format(Time.epoch()) + "] ";
+        s = s + level + " " + tag + ": " + msg + "\n";
         Net.sendb(2, s);
     }
-    static void info(int[] tag, int[] msg) { emit(Net.bytes("INFO"), tag, msg); }
-    static void warn(int[] tag, int[] msg) { emit(Net.bytes("WARN"), tag, msg); }
-    static void error(int[] tag, int[] msg) { emit(Net.bytes("ERROR"), tag, msg); }
+    static void info(String tag, String msg) { emit("INFO", tag, msg); }
+    static void warn(String tag, String msg) { emit("WARN", tag, msg); }
+    static void error(String tag, String msg) { emit("ERROR", tag, msg); }
 }

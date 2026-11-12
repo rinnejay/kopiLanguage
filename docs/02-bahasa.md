@@ -159,7 +159,7 @@ a[0] = 7;
 for (int i = 0; i < a.length; i++) a[i] = i * i;
 
 int[] b = a;                  // alias, bukan salinan
-int[] c = Str.copy(a);        // salinan (byte-array helper)
+int[] c = Bytes.copy(a);      // salinan buffer (import Bytes;)
 ```
 
 - Indeks di luar `0..length-1` menghentikan program dengan pesan
@@ -239,12 +239,35 @@ String t = Net.mkstr(buf);     // byte → teks baru (materialisasi)
 - `String → int[]` masih bebas (String adalah view byte, ala `[]byte(s)` di Go).
 - `int[] → String` **wajib** `Net.mkstr(...)` — buffer byte tidak lagi otomatis
   dianggap teks; `int[] w = u;` (u String) ditolak compiler.
-- Fungsi pembangun teks (`Str.trim`, `Str.upper`, `Str.fromInt`,
-  `Str.fromLong`, `Str.fromDouble`, `Str.boolText`, `Str.repeat`,
-  `Str.padLeft`, `Str.splitAt`, ...) kini mengembalikan `String`.
-  `Str.substring` bernama `Str.sub` (kembalikan `String`);
-  `Str.slice` tetap `int[]` untuk buffer I/O.
+- Sejak **v1.23** pustaka dibagi dua: **`Str` hanya untuk `String`** (tidak
+  ada `int[]` di API publik) dan **`Bytes` untuk buffer `int[]`**
+  (`Bytes.cat/slice/indexOf/trim/hex/...`). `Str.slice` mengembalikan
+  `String`; potongan buffer memakai `Bytes.slice`.
+- Gula metode memilih pustaka dari tipe penerima: `String` → `Str`,
+  `int[]` → `Bytes` (jadi `buf.trim()` butuh `import Bytes;`).
 - `println(int[])` tetap mencetak buffer byte sebagai teks (debug).
+
+### Konversi skalar
+
+Kopi belum punya overloading, jadi varian tipe memakai nama eksplisit —
+parameter dan hasilnya selalu skalar (`String`, `long`, `short`, `byte`,
+`uint*`, `float`, `double`, `boolean`), bukan array:
+
+| Arah | Fungsi |
+|---|---|
+| → teks | `fromInt`, `fromLong`, `fromShort`, `fromByte`, `fromUInt8/16/32/64`, `fromFloat`, `fromDouble`, `fromBool`/`boolText`, `fromChar` |
+| teks → | `toInt`, `toLong`, `toShort`, `toByte`, `toUInt8/16/32/64`, `toFloat`, `toDouble`, `toBool` |
+| basis lain | `parseInt(s, radix)`, `parseLong(s, radix)` |
+| validasi | `isDigits`, `isNumber`, `isHex` |
+| hex | `toHex`, `fromHex` |
+
+```java
+System.out.println(Str.fromShort(-12));      // -12
+System.out.println(Str.fromUInt32(4000000000U));
+System.out.println(Str.fromFloat(1.5F));     // 1.5
+short n = Str.toShort("42");
+boolean ok = Str.toBool("YES");              // true
+```
 
 ### Metode instance (butuh `import Str;`)
 
@@ -255,27 +278,59 @@ String t = "  Kopi Bahasa  ";
 t.trim()                 // "Kopi Bahasa"
 t.upper()                // "KOPI BAHASA"
 t.lower()
-t.trim().substring(0, 4) // "Kopi"
+t.capitalize()           // "Kopi Bahasa"
+t.swapCase()             // "kOPI bAHASA"
+t.trim().substring(0, 4) // "Kopi"  (mulai, panjang)
+t.sub(5, 6)              // "Bahasa"
+t.left(4)                // "Kopi"
+t.right(6)               // "Bahasa"
 "arena".charAt(2)        // 101
 "game server".indexOf("server")   // 5
 "game server".indexOf("x")        // -1
 "kopi".contains("op")    // true
 "kopi".startsWith("ko")
 "kopi".endsWith("pi")
-"kopi".equals("kopi")
 "Kopi".equalsIgnoreCase("kOPI")
+"a=b=c".count("=")       // 2
 "".isEmpty()
 "ab".repeat(3)           // "ababab"
+"abc".reverse()          // "cba"
+"a-b-c".replace("-", "+")// "a+b+c"
 "123".toInt()            // 123
-"a,b".replaceSeq(",", ";")
+"9000000000".toLong()
 "7".padLeft(3, 48)       // "007"
-"teks".countByte(101)
-"é".utf8Count()
+"ab".center(6, 46)       // "..ab.."
+"abcdefgh".ellipsis(6)   // "abc..."
+"a,b,c".split(",")       // String[] → Str.join(parts, "|")
+"a::b::c".split("::")
+"satu\ndua".lines()
+" satu  dua ".words()
+"é".utf8Count()          // 1
+Str.utf8Slice("héllo", 1, 2) // "él"
+Str.utf8Reverse("hé")        // "éh"
 ```
 
 Metode ini hanya gula parser menjadi `Str.<nama>(receiver, ...)`. Bila
 `Str` belum diimpor, compiler memberi pesan: *metode String 'x' butuh
-'import Str;'*.
+'import Str;'*. Untuk buffer `int[]`, gula yang sama memakai `Bytes`
+(mis. `buf.trim()` → `Bytes.trim(buf)`).
+
+### Buffer byte: `Bytes`
+
+```java
+import Bytes;
+
+int[] b = Net.strbytes("  Kopi  ");
+System.out.println(Net.mkstr(Bytes.trim(b)));    // "Kopi"
+int[] c = Bytes.cat(Bytes.of("a"), Bytes.of("b"));
+String t = Bytes.text(c);                        // "ab"
+```
+
+`Bytes` menyediakan `len/isEmpty/eq/cmp/copy/cat/slice/at/find/indexOf/
+lastIndexOf/contains/startsWith/endsWith/count/countByte/trim/upper/lower/
+repeat/reverse/replaceByte/replaceSeq/padLeft/padRight/splitCount/splitAt/
+fromInt/fromLong/toInt/isDigits/equalsIgnoreCase/hex/print/line`, semuanya
+dengan `int[]`. Untuk teks gunakan `Str`.
 
 ### Template string (backtick)
 
@@ -490,36 +545,45 @@ class Main {
 Semua alokasi dinamis (array, string hasil operasi) masuk **arena bump
 allocator**. Di luar blok `malloc`, arena global berukuran **32 MB**.
 Sejak **v1.20** compiler mengurus pembebasan otomatis lewat blok
-`malloc`; sejak **v1.21** setiap blok punya **arena sendiri** dan
-ukurannya bisa ditentukan:
+`malloc`; sejak **v1.22** blok tanpa `<...>` **otomatis** menyediakan
+arena sampai **4096 MB**. Runtime memakai `mmap(MAP_NORESERVE)`:
+alamat maya besar dipesan murah, dan RAM fisik baru terpakai saat
+halaman benar-benar ditulis — jadi tidak perlu menebak ukuran:
 
 ```java
 malloc {
-    int[] sementara = new int[10000];   // arena blok 32 MB (default)
+    int[] sementara = new int[5000000];  // 40 MB — otomatis, muat
     String tmp = Str.upper(text);
-}                                      // arena blok dibebaskan OTOMATIS
+}                                        // arena dibebaskan OTOMATIS
 
-malloc<64mb> {
-    int[] besar = new int[4000000];     // arena blok 64 MB
+malloc<64mb> {                           // batas keras 64 MB
+    int[] besar = new int[4000000];
 }
 
-malloc<512kb> {                         // satuan: b, kb, mb, gb
-    int[] kecil = new int[60000];       // 480 KB — muat
+malloc<512kb> {                           // satuan: b, kb, mb, gb
+    int[] kecil = new int[60000];         // 480 KB — muat
 }
 ```
 
-Ukuran harus bilangan bulat lebih dari 0, minimal **1 kb**, maksimum
-**4096 MB**; tanpa satuan dianggap **MB** (`malloc<64>` = 64 MB).
-Bila alokasi di dalam blok melewati batasnya, program berhenti dengan
+Tanpa `<...>` tidak ada batas yang perlu dihitung (batas atas 4096 MB).
+Ukuran eksplisit harus bilangan bulat lebih dari 0, minimal **1 kb**,
+maksimum **4096 MB**; tanpa satuan dianggap **MB** (`malloc<64>` = 64 MB).
+Bila alokasi melewati batas blok eksplisit, program berhenti dengan
 error yang menyebut batasnya:
 
 ```
 kopivm: error: arena malloc habis — batas 1 MB terlampaui (naikkan malloc<...>)
 ```
 
-Native (a64/x64) mencetak `kopi: arena malloc habis — batas 1 MB
-terlampaui`. Blok bersarang boleh memakai ukuran berbeda; arena dalam
-dibebaskan lebih dulu, lalu arena luar dipulihkan.
+Untuk arena otomatis, pesannya menyebut batas otomatis:
+
+```
+kopivm: error: arena malloc habis — batas otomatis 4096 MB terlampaui (pakai malloc<N> untuk batas lain)
+```
+
+Native (a64/x64) memakai pesan yang sama. Blok bersarang boleh memakai
+ukuran berbeda; arena dalam dibebaskan lebih dulu, lalu arena luar
+dipulihkan.
 
 Compiler memasang arena baru saat masuk blok dan membebaskannya di
 **semua jalur keluar**:
@@ -585,8 +649,9 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark
 3. `new int[n]` selalu men-zero-kan elemen, termasuk memori daur ulang.
 4. Tanpa reset, program batch panjang bisa kehabisan arena; `malloc{}`
    atau reset per request/iterasi menghindarinya.
-5. Melebihi batas arena (32 MB default atau ukuran `malloc<...>`) →
-   `arena malloc habis — batas N MB terlampaui` + exit 1 (bukan crash).
+5. Melebihi batas arena (4096 MB untuk `malloc{}` otomatis atau ukuran
+   `malloc<...>`) → `arena malloc habis — batas N MB terlampaui` + exit 1
+   (bukan crash).
 6. `memMark`/`memReset` bekerja pada arena yang **sedang aktif**; di
    dalam `malloc<...>`, mark/reset berlaku untuk arena blok itu.
 

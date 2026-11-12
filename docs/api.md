@@ -4,7 +4,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Kelompok | Folder | Modul |
 |---|---|---|
-| **Core** | `lib/core/` | `Arrays`, `Deque`, `Digits`, `File`, `Json`, `Log`, `Map`, `MapStr`, `Math`, `Matrix`, `Path`, `Set`, `Stats`, `Str`, `Time` |
+| **Core** | `lib/core/` | `Arrays`, `Bytes`, `Deque`, `Digits`, `File`, `Json`, `Log`, `Map`, `MapStr`, `Math`, `Matrix`, `Path`, `Set`, `Stats`, `Str`, `Time` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Big`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Hash`, `Kdf`, `Pbkdf2`, `Poly`, `Rand`, `X25519` |
 
@@ -15,19 +15,20 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | Modul | File | Fungsi | Ringkasan |
 |---|---|---|---|
 | [`Arrays`](api-core.md#arrays) | `lib/core/Arrays.kop` | 23 | Operasi array `int[]`: agregat, potong/gabung, sort, pencarian, dan gaya fungsional (lambda). |
+| [`Bytes`](api-core.md#bytes) | `lib/core/Bytes.kop` | 48 | Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`. |
 | [`Deque`](api-core.md#deque) | `lib/core/Deque.kop` | 11 | Antrean dua ujung (ring buffer) berkapasitas tetap: push/pop depan-belakang. |
 | [`Digits`](api-core.md#digits) | `lib/core/Digits.kop` | 11 | Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain. |
 | [`File`](api-core.md#file) | `lib/core/File.kop` | 15 | I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir. |
 | [`Json`](api-core.md#json) | `lib/core/Json.kop` | 57 | Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape `int[]`; literal bahasa memakai… |
 | [`Log`](api-core.md#log) | `lib/core/Log.kop` | 4 | Logging ke stderr dengan timestamp UTC dan level. |
 | [`Map`](api-core.md#map) | `lib/core/Map.kop` | 13 | Hash map int→int dengan open addressing dan `grow` eksplisit. |
-| [`MapStr`](api-core.md#mapstr) | `lib/core/MapStr.kop` | 17 | Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan… |
+| [`MapStr`](api-core.md#mapstr) | `lib/core/MapStr.kop` | 13 | Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan… |
 | [`Math`](api-core.md#math) | `lib/core/Math.kop` | 72 | Matematika integer 32-bit: bit, pangkat/akar/log, FPB/modular, prima, kombinatorika, dan geometri. |
 | [`Matrix`](api-core.md#matrix) | `lib/core/Matrix.kop` | 15 | Matriks persegi yang disimpan sebagai `int[]` datar (baris demi baris): aritmetika, transpose, trace,… |
 | [`Path`](api-core.md#path) | `lib/core/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
 | [`Set`](api-core.md#set) | `lib/core/Set.kop` | 8 | Himpunan int di atas Map: tambah/hapus/uji keanggotaan. |
 | [`Stats`](api-core.md#stats) | `lib/core/Stats.kop` | 14 | Statistik deskriptif sederhana untuk array int: mean, median, modus, variansi, standar deviasi. |
-| [`Str`](api-core.md#str) | `lib/core/Str.kop` | 41 | Utilitas teks: perbandingan, potong/gabung, pencarian, trim, padding, dan konversi angka/boolean ke teks.… |
+| [`Str`](api-core.md#str) | `lib/core/Str.kop` | 109 | Utilitas teks native `String`: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding,… |
 | [`Time`](api-core.md#time) | `lib/core/Time.kop` | 6 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
 
 ### Net — [buka referensi](api-net.md)
@@ -37,7 +38,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Auth`](api-net.md#auth) | `lib/net/Auth.kop` | 8 | Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401. |
 | [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 6 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
 | [`Http`](api-net.md#http) | `lib/net/Http.kop` | 27 | Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik. |
-| [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 33 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
+| [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 34 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
 | [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 6 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
 | [`Mime`](api-net.md#mime) | `lib/net/Mime.kop` | 1 | Pemetaan ekstensi file → header Content-Type. |
 | [`Resolv`](api-net.md#resolv) | `lib/net/Resolv.kop` | 5 | Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout. |

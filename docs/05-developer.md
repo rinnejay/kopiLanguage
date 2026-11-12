@@ -85,8 +85,8 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
 - Pemanggilan `a.m(args)` dibuat oleh `call_node()` menjadi `EX_CALL`
   dengan `str="a.m"`. Untuk ekspresi berbentuk lain, `postfix()` menulis
   ulang menjadi `Arrays.m(receiver,args)`; **type_expr** kemudian
-  membelokkan ke `Str.*` bila receiver String (lihat
-  `is_str_method`/`str_method_target`).
+  membelokkan ke `Str.*` bila receiver `String`, atau `Bytes.*` bila
+  receiver `int[]` (lihat `is_str_method`/`str_method_target`).
 - Scope: array `scope[1024]`, `nextslot`; tiap blok menyimpan/memulihkan
   `nscope`. Variabel lokal wajib punya inisialisasi.
 - `resolve_stmt` menetapkan `s->ival` = slot, `s->dty`; `type_expr`
@@ -113,10 +113,12 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
   register caller-saved yang masih dibutuhkan setelah panggilan.
 - Entry `main`: alokasi arena global 32 MB via `malloc`, simpan argc/argv,
   lalu panggil `main` Kopi.
-- Blok `malloc<...>` memakai helper `kop_arena_enter`/`kop_arena_leave`:
-  handler menyimpan (base, cap, used) arena luar, mengalokasi arena baru,
-  lalu memulihkannya (dan `free`) saat blok selesai. `kopalloc` membaca
-  batas dari `kop_arena_cap`, bukan konstanta 32 MB.
+- Blok `malloc` memakai helper `kop_arena_enter`/`kop_arena_leave`:
+  handler menyimpan (base, cap, used, flag mmap/auto) arena luar, lalu
+  menyiapkan arena baru. Ukuran 0 = **otomatis**: `mmap` 4096 MB dengan
+  `MAP_NORESERVE` (RAM sesuai halaman yang disentuh); ukuran eksplisit =
+  `malloc`. Saat keluar, arena auto di-`munmap`, arena eksplisit di-`free`.
+  `kopalloc` membaca batas dari `kop_arena_cap`, bukan konstanta 32 MB.
 
 ### x86-64 (`gen_x64.c`)
 
@@ -135,9 +137,30 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
   agar semantik sama dengan native.
 - `OP_NET` + field `bi` memetakan builtin `Net.*` ke syscall host.
 - Heap global 32 MB (`HEAPLEN` = 4M elemen 64-bit); `new` men-zero-kan.
-  Blok `malloc<...>` mengalokasi heap sendiri (`OP_RENTER`) dan
-  membebaskannya (`OP_RLEAVE`); `heap_cap` menyesuaikan batas aktif.
+  Blok `malloc` mengalokasi heap sendiri (`OP_RENTER`) dan membebaskannya
+  (`OP_RLEAVE`); ukuran 0 = auto (`mmap` 4096 MB), selain itu `malloc`.
+  `heap_cap` menyesuaikan batas aktif; `heap_mmapped`/`heap_auto`
+  menentukan `munmap` vs `free` dan pesan OOM.
+- v1.22: loop panas memakai superinstruksi (`OP_LOOP`, `OP_CMP_JMP*`,
+  `OP_OP_STORE`, `OP_IDXR_L`, `OP_IDXW_L`, `OP_BIN_L`) + lipat konstanta;
+  emitter ada di `gen_vm_fuse.inc`.
 - Label = indeks instruksi (`newlab/mark`), bukan string.
+
+### Struktur berkas (v1.22)
+
+Berkas besar dipecah menjadi fragmen `.inc` yang tetap **satu unit
+kompilasi** (di-`#include`), sehingga state `static` tidak perlu
+diekspor dan tidak ada biaya dispatch tambahan:
+
+| Induk | Fragmen |
+|---|---|
+| `src/parse.c` | `parse_stmt.inc`, `parse_class.inc`, `parse_expr.inc`, `parse_scope.inc`, `parse_type.inc`, `parse_resolve.inc` |
+| `src/gen_a64.c` | `gen_a64_expr.inc`, `gen_a64_rt.inc` |
+| `src/gen_x64.c` | `gen_x64_expr.inc`, `gen_x64_rt.inc` |
+| `src/gen_vm.c` | `gen_vm_fuse.inc`, `gen_vm_expr.inc` |
+| `vm/kopivm.c` | `vm_core.inc`, `vm_ops_base.inc`, `vm_ops_net.inc`, `vm_ops_num.inc`, `vm_ops_fast.inc` |
+
+`make` sudah memantau fragmen: mengubah `.inc` otomatis membangun ulang.
 
 ## 7. Menambah fitur bahasa (checklist)
 
@@ -175,6 +198,25 @@ sempat, tolak di parser dengan pesan jelas.
 
 Contoh yang bisa ditiru: `Net.pollfd`, `Net.settimeout`,
 `Net.recv1`, `Net.localport`.
+
+### Pustaka teks vs buffer (v1.23)
+
+- `lib/core/Str.kop` — **hanya `String`**: parameter dan hasil teks tidak
+  memakai `int[]`. Berisi trim/case, potong/cari, split/join/lines/words,
+  padding, konversi skalar (`fromShort/fromFloat/...`, `toLong/toBool/...`),
+  hex, dan utilitas UTF-8.
+- `lib/core/Bytes.kop` — **hanya `int[]`**: buffer I/O biner, jaringan,
+  kriptografi (`cat/slice/indexOf/trim/hex/...`).
+- Pustaka teks lain sudah `String` di API publik: `File`, `Path`,
+  `Time.format`, `Log`, `Url`, `Mime`, `Http` (baris/header/body request),
+  `Dns`, `Resolv`, `Auth`, `Jwt`, `Session`, `Json`, dan kunci `MapStr`.
+  Buffer respons/HTTP, TCP/TLS, hash, cipher, DER, dan tape JSON internal
+  tetap `int[]`.
+- Pindah representasi eksplisit: `Net.strbytes(String) → int[]`,
+  `Net.mkstr(int[]) → String` (atau `Bytes.of` / `Bytes.text`).
+- Gula metode di parser memilih kelas dari tipe penerima: `T_STR → Str`,
+  `T_ARI → Bytes` (lihat `parse_type.inc`), jadi `buf.trim()` dan
+  `teks.trim()` sama-sama bekerja dengan impor masing-masing.
 
 ## 9. Menambah pustaka `.kop`
 

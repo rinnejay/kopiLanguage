@@ -8,8 +8,8 @@ class Main {
     public static void main(String[] args) {
         int addr = Tcp.loopback();               // 127.0.0.1
         int port = 9910;
-        int[] host = Net.bytes("127.0.0.1");
-        int[] path = Net.bytes("/");
+        String host = "127.0.0.1";
+        String path = "/";
 
         // seluruh respons (header + body) malah tereksplisit memisah
         int[] buf = new int[8192];

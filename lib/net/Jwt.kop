@@ -6,19 +6,20 @@
 // Batas: hanya HS256; verifikasi tanda tangan + bentuk, belum `exp`/`iat`
 // otomatis (pemanggil dapat memeriksa payload JSON sendiri).
 
+import Bytes;
 import Str;
 import Hash;
 import Cipher;
 
 class Jwt {
 
-    static int[] HEADER() {
-        return Net.bytes("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
+    static String HEADER() {
+        return "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
     }
 
-    /* base64url tanpa padding */
-    static int[] b64(int[] raw) {
-        int[] e = Cipher.b64enc(raw);
+    /* base64url tanpa padding (biner → teks) */
+    static String b64(int[] raw) {
+        String e = Cipher.b64enc(raw);
         int n = e.length;
         while (n > 0 && e[n - 1] == 61) n--;          /* buang '=' */
         int[] out = new int[n];
@@ -28,10 +29,10 @@ class Jwt {
             if (c == 47) c = 95;                       /* '/' → '_' */
             out[i] = c;
         }
-        return out;
+        return Net.mkstr(out);
     }
 
-    static int[] unb64(int[] s) {
+    static int[] unb64(String s) {
         int[] t = new int[s.length + 4];
         for (int i = 0; i < s.length; i++) {
             int c = s[i];
@@ -40,15 +41,15 @@ class Jwt {
             t[i] = c;
         }
         for (int i = s.length; i < s.length + 4; i++) t[i] = 61;
-        return Cipher.b64dec(t);
+        return Cipher.b64dec(Net.mkstr(t));
     }
 
-    static int[] sign(int[] payload, int[] secret) {
-        int[] h = b64(HEADER());
-        int[] p = b64(payload);
-        int[] input = Str.cat(Str.cat(h, Net.bytes(".")), p);
-        int[] sig = b64(Hash.hmac(secret, input));
-        return Str.cat(Str.cat(input, Net.bytes(".")), sig);
+    static String sign(String payload, String secret) {
+        String h = b64(Net.strbytes(HEADER()));
+        String p = b64(Net.strbytes(payload));
+        int[] input = Bytes.cat(Bytes.cat(Net.strbytes(h), Net.bytes(".")), Net.strbytes(p));
+        String sig = b64(Hash.hmac(secret, input));
+        return h + "." + p + "." + sig;
     }
 
     /* bandingkan dua array byte secara konstan (panjang sama) */
@@ -60,7 +61,7 @@ class Jwt {
     }
 
     /* hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah */
-    static int verify(int[] token, int[] secret, int[] payloadOut) {
+    static int verify(String token, String secret, int[] payloadOut) {
         int d1 = -1;
         int d2 = -1;
         for (int i = 0; i < token.length; i++) {
@@ -70,11 +71,11 @@ class Jwt {
             }
         }
         if (d1 <= 0 || d2 <= d1) return -1;
-        int[] h = Str.slice(token, 0, d1);
-        int[] p = Str.slice(token, d1 + 1, d2 - d1 - 1);
-        int[] s = Str.slice(token, d2 + 1, token.length - d2 - 1);
-        int[] input = Str.cat(Str.cat(h, Net.bytes(".")), p);
-        int[] sig = b64(Hash.hmac(secret, input));
+        String h = Str.sub(token, 0, d1);
+        String p = Str.sub(token, d1 + 1, d2 - d1 - 1);
+        String s = Str.sub(token, d2 + 1, token.length - d2 - 1);
+        int[] input = Bytes.cat(Bytes.cat(Net.strbytes(h), Net.bytes(".")), Net.strbytes(p));
+        String sig = b64(Hash.hmac(secret, input));
         boolean ok = same(sig, s);
         if (payloadOut.length > 0) {
             int[] raw = unb64(p);
@@ -88,7 +89,7 @@ class Jwt {
     }
 
     /* payload JSON dari token tanpa verifikasi (hati-hati) */
-    static int[] payloadOf(int[] token) {
+    static String payloadOf(String token) {
         int d1 = -1;
         int d2 = -1;
         for (int i = 0; i < token.length; i++) {
@@ -97,7 +98,7 @@ class Jwt {
                 else if (d2 < 0) d2 = i;
             }
         }
-        if (d2 <= d1) return new int[0];
-        return unb64(Str.slice(token, d1 + 1, d2 - d1 - 1));
+        if (d2 <= d1) return "";
+        return Net.mkstr(unb64(Str.sub(token, d1 + 1, d2 - d1 - 1)));
     }
 }

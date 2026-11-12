@@ -1,6 +1,6 @@
-// Url.kop — utilitas URL/URI (RFC 3986) murni Kopi (v1.9.2).
+// Url.kop — utilitas URL/URI (RFC 3986) murni Kopi (v1.23).
 //
-// Semua string adalah byte-as-int (int[]), sama seperti String native.
+// Semua parameter/hasil teks memakai String.
 // Fungsi:
 //   encode/decode        percent-encoding (encode: unreserved saja)
 //   formEncode/formDecode  application/x-www-form-urlencoded ('+' = spasi)
@@ -10,6 +10,7 @@
 //   normalize(path)      buang segmen "." dan ".."
 //   ip4(dotted)          "a.b.c.d" → alamat IPv4 (0 bila bukan IPv4)
 
+import Bytes;
 import Str;
 
 class Url {
@@ -34,13 +35,13 @@ class Url {
         return false;
     }
 
-    static int find(int[] s, int b, int from) {
+    static int find(String s, int b, int from) {
         for (int i = from; i < s.length; i++) if (s[i] == b) return i;
         return -1;
     }
 
     /* percent-encode semua kecuali unreserved */
-    static int[] encode(int[] s) {
+    static String encode(String s) {
         int[] out = new int[s.length * 3];
         int o = 0;
         for (int i = 0; i < s.length; i++) {
@@ -53,11 +54,11 @@ class Url {
                 out[o] = hexc(c % 16); o++;
             }
         }
-        return Str.slice(out, 0, o);
+        return Net.mkstr(Bytes.slice(out, 0, o));
     }
 
     /* percent-decode; '+' diperlakukan sebagai spasi */
-    static int[] decode(int[] s) {
+    static String decode(String s) {
         int[] out = new int[s.length];
         int o = 0;
         int i = 0;
@@ -72,12 +73,12 @@ class Url {
                 } else { out[o] = c; o++; i++; }
             } else { out[o] = c; o++; i++; }
         }
-        return Str.slice(out, 0, o);
+        return Net.mkstr(Bytes.slice(out, 0, o));
     }
 
     /* form-urlencoded: spasi → '+', lalu encode sisanya */
-    static int[] formEncode(int[] s) {
-        int[] e = encode(s);
+    static String formEncode(String s) {
+        String e = encode(s);
         int[] r = new int[e.length];
         int o = 0;
         int i = 0;
@@ -86,31 +87,27 @@ class Url {
                 r[o] = 43; o++; i = i + 3;          /* "%20" → '+' */
             } else { r[o] = e[i]; o++; i++; }
         }
-        return Str.slice(r, 0, o);
+        return Net.mkstr(Bytes.slice(r, 0, o));
     }
 
-    static int[] formDecode(int[] s) { return decode(s); }
+    static String formDecode(String s) { return decode(s); }
 
     /* nama=nilai (keduanya di-encode sebagai form) */
-    static int[] pair(int[] name, int[] val) {
-        int[] out = formEncode(name);
-        out = Str.cat(out, Net.bytes("="));
-        out = Str.cat(out, formEncode(val));
-        return out;
+    static String pair(String name, String val) {
+        return formEncode(name) + "=" + formEncode(val);
     }
 
     /* gabungkan query: q kosong → p; selain itu q + "&" + p */
-    static int[] appendQuery(int[] q, int[] p) {
+    static String appendQuery(String q, String p) {
         if (q.length == 0) return p;
         if (p.length == 0) return q;
-        int[] out = Str.cat(q, Net.bytes("&"));
-        return Str.cat(out, p);
+        return q + "&" + p;
     }
 
     /* ── penguraian ───────────────────────────────────────────── */
 
     /* indeks ':' skema (ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ':') */
-    static int schemeEnd(int[] u) {
+    static int schemeEnd(String u) {
         int c = find(u, 58, 0);                     /* ':' */
         if (c <= 0) return -1;
         int a = u[0];
@@ -125,16 +122,16 @@ class Url {
         return c;
     }
 
-    static boolean hasScheme(int[] u) { return schemeEnd(u) >= 0; }
+    static boolean hasScheme(String u) { return schemeEnd(u) >= 0; }
 
-    static int[] scheme(int[] u) {
+    static String scheme(String u) {
         int c = schemeEnd(u);
-        if (c < 0) return new int[0];
-        return Str.slice(u, 0, c);
+        if (c < 0) return "";
+        return Str.sub(u, 0, c);
     }
 
     /* awal otoritas "//" setelah skema; -1 bila tidak ada */
-    static int authStart(int[] u) {
+    static int authStart(String u) {
         int c = schemeEnd(u);
         if (c < 0) return -1;
         if (c + 2 >= u.length) return -1;
@@ -142,7 +139,7 @@ class Url {
         return c + 3;
     }
 
-    static int authEnd(int[] u) {
+    static int authEnd(String u) {
         int st = authStart(u);
         if (st < 0) return -1;
         int i = st;
@@ -154,33 +151,33 @@ class Url {
         return u.length;
     }
 
-    static int[] authority(int[] u) {
+    static String authority(String u) {
         int st = authStart(u);
-        if (st < 0) return new int[0];
-        return Str.slice(u, st, authEnd(u) - st);
+        if (st < 0) return "";
+        return Str.sub(u, st, authEnd(u) - st);
     }
 
-    static int[] host(int[] u) {
-        int[] a = authority(u);
+    static String host(String u) {
+        String a = authority(u);
         int at = find(a, 64, 0);                    /* '@' userinfo */
-        if (at >= 0) a = Str.slice(a, at + 1, a.length - at - 1);
+        if (at >= 0) a = Str.sub(a, at + 1, a.length - at - 1);
         int c = find(a, 58, 0);                     /* ':' port */
         if (c < 0) return a;
-        return Str.slice(a, 0, c);
+        return Str.sub(a, 0, c);
     }
 
-    static int portOf(int[] u, int def) {
-        int[] a = authority(u);
+    static int portOf(String u, int def) {
+        String a = authority(u);
         int at = find(a, 64, 0);
-        if (at >= 0) a = Str.slice(a, at + 1, a.length - at - 1);
+        if (at >= 0) a = Str.sub(a, at + 1, a.length - at - 1);
         int c = find(a, 58, 0);
         if (c < 0) return def;
-        int[] p = Str.slice(a, c + 1, a.length - c - 1);
+        String p = Str.sub(a, c + 1, a.length - c - 1);
         if (p.length == 0) return def;
         return Str.toInt(p);
     }
 
-    static int pathStart(int[] u) {
+    static int pathStart(String u) {
         int e = authEnd(u);
         if (e < 0) {
             int c = schemeEnd(u);
@@ -195,34 +192,35 @@ class Url {
         return -1;
     }
 
-    static int[] path(int[] u) {
+    static String path(String u) {
         int st = pathStart(u);
-        if (st < 0) return new int[0];
+        if (st < 0) return "";
         int e = st;
         while (e < u.length && u[e] != 63 && u[e] != 35) e++;
-        return Str.slice(u, st, e - st);
+        return Str.sub(u, st, e - st);
     }
 
-    static int[] query(int[] u) {
+    static String query(String u) {
         int q = find(u, 63, 0);
-        if (q < 0) return new int[0];
+        if (q < 0) return "";
         int e = find(u, 35, q + 1);
         if (e < 0) e = u.length;
-        return Str.slice(u, q + 1, e - q - 1);
+        return Str.sub(u, q + 1, e - q - 1);
     }
 
-    static int[] fragment(int[] u) {
+    static String fragment(String u) {
         int f = find(u, 35, 0);
-        if (f < 0) return new int[0];
-        return Str.slice(u, f + 1, u.length - f - 1);
+        if (f < 0) return "";
+        return Str.sub(u, f + 1, u.length - f - 1);
     }
 
     /* empat oktet "a.b.c.d" → ip; 0 bila tidak valid */
-    static int ip4(int[] s) {
-        if (Str.splitCount(s, 46) != 4) return 0;
+    static int ip4(String s) {
+        int[] b = Net.strbytes(s);
+        if (Bytes.splitCount(b, 46) != 4) return 0;
         int[] v = new int[4];
         for (int i = 0; i < 4; i++) {
-            int[] p = Str.splitAt(s, 46, i);
+            int[] p = Bytes.splitAt(b, 46, i);
             if (p.length == 0 || p.length > 3) return 0;
             int x = 0;
             for (int k = 0; k < p.length; k++) {
@@ -237,7 +235,7 @@ class Url {
 
     /* ── normalisasi jalur (RFC 3986 §5.2.4, versi sederhana) ──── */
 
-    static int[] normalize(int[] p) {
+    static String normalize(String p) {
         int[] out = new int[p.length + 2];
         int o = 0;
         int[] st = new int[p.length / 2 + 4];
@@ -268,76 +266,66 @@ class Url {
             r[0] = 47;
             for (int k = 0; k < o; k++) r[k + 1] = out[k];
         } else {
-            r = Str.slice(out, 0, o);
+            r = Bytes.slice(out, 0, o);
         }
-        return r;
+        return Net.mkstr(r);
     }
 
-    static int[] dropFragment(int[] u) {
+    static String dropFragment(String u) {
         int f = find(u, 35, 0);
         if (f < 0) return u;
-        return Str.slice(u, 0, f);
+        return Str.sub(u, 0, f);
     }
 
     /* resolusi referensi relatif terhadap base absolut */
-    static int[] resolve(int[] base, int[] rel) {
+    static String resolve(String base, String rel) {
         if (rel.length == 0) return dropFragment(base);
         if (hasScheme(rel)) return rel;
         if (rel.length >= 2 && rel[0] == 47 && rel[1] == 47) {
-            int[] out = scheme(base);
-            out = Str.cat(out, Net.bytes(":"));
-            return Str.cat(out, rel);
+            String out = scheme(base);
+            return out + ":" + rel;
         }
         if (rel[0] == 47) {                          /* absolut-path */
-            int[] out = scheme(base);
-            if (out.length > 0) out = Str.cat(out, Net.bytes(":"));
-            int[] a = authority(base);
-            if (a.length > 0) {
-                out = Str.cat(out, Net.bytes("//"));
-                out = Str.cat(out, a);
-            }
-            return Str.cat(out, normalize(rel));
+            String out = scheme(base);
+            if (out.length > 0) out = out + ":";
+            String a = authority(base);
+            if (a.length > 0) out = out + "//" + a;
+            return out + normalize(rel);
         }
         if (rel[0] == 63) {                          /* ?query */
-            int[] out = base;
+            String out = base;
             int q = find(out, 63, 0);
             int f = find(out, 35, 0);
             int cut = out.length;
             if (q >= 0 && q < cut) cut = q;
             if (f >= 0 && f < cut) cut = f;
-            return Str.cat(Str.slice(out, 0, cut), rel);
+            return Str.sub(out, 0, cut) + rel;
         }
         if (rel[0] == 35) {                          /* #frag */
-            int[] out = dropFragment(base);
-            return Str.cat(out, rel);
+            return dropFragment(base) + rel;
         }
         int q = find(rel, 63, 0);
         int f = find(rel, 35, 0);
         int cut = rel.length;
         if (q >= 0 && q < cut) cut = q;
         if (f >= 0 && f < cut) cut = f;
-        int[] rp = Str.slice(rel, 0, cut);
-        int[] suffix = Str.slice(rel, cut, rel.length - cut);
+        String rp = Str.sub(rel, 0, cut);
+        String suffix = Str.sub(rel, cut, rel.length - cut);
 
-        int[] bp = path(base);
+        String bp = path(base);
         int slash = -1;
         for (int i = bp.length - 1; i >= 0; i--) {
             if (bp[i] == 47) { slash = i; break; }
         }
-        int[] dir = Net.bytes("/");
-        if (slash >= 0) dir = Str.slice(bp, 0, slash + 1);
-        int[] merged = Str.cat(dir, rp);
-        merged = normalize(merged);
+        String dir = "/";
+        if (slash >= 0) dir = Str.sub(bp, 0, slash + 1);
+        String merged = normalize(dir + rp);
 
-        int[] out = scheme(base);
-        if (out.length > 0) out = Str.cat(out, Net.bytes(":"));
-        int[] a = authority(base);
-        if (a.length > 0) {
-            out = Str.cat(out, Net.bytes("//"));
-            out = Str.cat(out, a);
-        }
-        out = Str.cat(out, merged);
-        out = Str.cat(out, suffix);
+        String out = scheme(base);
+        if (out.length > 0) out = out + ":";
+        String a = authority(base);
+        if (a.length > 0) out = out + "//" + a;
+        out = out + merged + suffix;
         return out;
     }
 }

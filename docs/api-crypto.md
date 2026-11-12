@@ -104,9 +104,9 @@ Base64, hex, dan cipher klasik (RC4, Vigenère, XOR) untuk eksperimen/kompatibil
 ```java
 import Cipher;
 
-int[] b = Cipher.b64enc(Net.bytes("halo"));
-System.out.println(b);              // aGFsbw==
-System.out.println(Cipher.b64dec(b)); // halo
+String b = Cipher.b64enc(Net.bytes("halo"));
+System.out.println(b);                           // aGFsbw==
+System.out.println(Net.mkstr(Cipher.b64dec(b))); // halo
 ```
 
 **Catatan**
@@ -118,12 +118,12 @@ System.out.println(Cipher.b64dec(b)); // halo
 | `static int[] rc4(int[] data, int[] key)` | enc/dec bisa: fungsi sama (xor nirl). kunci: array byte-as-int (praktik umum: kunci 5..16 byte). hasil: array baru sepanjang data. |
 | `static int[] vigenere(int[] txt, int[] key)` | enkripsi Vigenère (ASCII) |
 | `static int[] unvigenere(int[] txt, int[] key)` | dekripsi Vigenère |
-| `static int[] b64enc(int[] data)` | data byte-as-int → teks base64 (byte-as-int), padding '=' |
-| `static int[] b64dec(int[] txt)` | teks base64 → byte-as-int; '=' diabaikan, karakter asing → 0 |
-| `static int[] hexenc(int[] data)` | data → hex lowercase, 2 karakter per byte |
+| `static String b64enc(int[] data)` | data byte-as-int → teks base64 (String), padding '=' |
+| `static int[] b64dec(String txt)` | teks base64 → byte-as-int; '=' diabaikan, karakter asing → 0 |
+| `static String hexenc(int[] data)` | data → hex lowercase (String), 2 karakter per byte |
 | `static int hexdig(int n)` | 0..15 → '0'..'9','a'..'f' |
 | `static int hexval(int c)` | nilai hex digit ASCII → 0..15, -1 bila bukan digit hex |
-| `static int[] hexdec(int[] txt)` | teks hex (panjang ganjil dibatasi 0 di akhir) → byte-as-int |
+| `static int[] hexdec(String txt)` | teks hex (panjang ganjil dibatasi 0 di akhir) → byte-as-int |
 | `static int crc16(int[] data)` | CRC-16-CCITT (poly 0x1021, init 0xFFFF) — vektor terkenal: "123456789" → 0x29B1 |
 | `static int adler32(int[] data)` | Adler-32 (RFC 1950): A=1, B=0, mod 65521 dan b·65536+a. Untuk masukan besar b bisa melewati 2^31 — cukup untuk deret kecil |
 

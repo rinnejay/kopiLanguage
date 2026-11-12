@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="02-bahasa-kopi-tutorial-lengkap">02 — Bahasa Kopi: tutorial lengkap<a class="anchor" href="#02-bahasa-kopi-tutorial-lengkap" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bentuk-program">1. Bentuk program</a></li><li class="toc-h2"><a href="#2-komentar">2. Komentar</a></li><li class="toc-h2"><a href="#3-tipe">3. Tipe</a></li><li class="toc-h3"><a href="#cast-promosi">Cast &amp; promosi</a></li><li class="toc-h2"><a href="#4-variabel-scope">4. Variabel &amp; scope</a></li><li class="toc-h2"><a href="#5-operator">5. Operator</a></li><li class="toc-h2"><a href="#6-kontrol-alir">6. Kontrol alir</a></li><li class="toc-h3"><a href="#switch-v1-19">switch (v1.19)</a></li><li class="toc-h2"><a href="#7-array">7. Array</a></li><li class="toc-h3"><a href="#metode-fungsional-array-gula">Metode fungsional array (gula)</a></li><li class="toc-h2"><a href="#8-string">8. String</a></li><li class="toc-h3"><a href="#metode-instance-butuh-import-str">Metode instance (butuh import Str;)</a></li><li class="toc-h3"><a href="#template-string-backtick">Template string (backtick)</a></li><li class="toc-h2"><a href="#9-fungsi">9. Fungsi</a></li><li class="toc-h2"><a href="#10-lambda-fn">10. Lambda &amp; fn</a></li><li class="toc-h2"><a href="#11-class-sebagai-namespace">11. Class sebagai namespace</a></li><li class="toc-h2"><a href="#12-class-instance">12. Class instance</a></li><li class="toc-h2"><a href="#13-json-literal">13. JSON literal</a></li><li class="toc-h2"><a href="#14-memori-malloc-arena-per-blok-tanpa-gc">14. Memori: malloc&lt;...&gt; { ... }, arena per blok, tanpa GC</a></li><li class="toc-h3"><a href="#aturan-keamanan">Aturan keamanan</a></li><li class="toc-h3"><a href="#memmark-memreset-manual-opsional">memMark / memReset manual (opsional)</a></li><li class="toc-h2"><a href="#15-keluar-kode-status">15. Keluar &amp; kode status</a></li><li class="toc-h3"><a href="#error-runtime-nomor-baris-stack-trace">Error runtime: nomor baris + stack trace</a></li><li class="toc-h2"><a href="#16-contoh-tur-lengkap">16. Contoh tur lengkap</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bentuk-program">1. Bentuk program</a></li><li class="toc-h2"><a href="#2-komentar">2. Komentar</a></li><li class="toc-h2"><a href="#3-tipe">3. Tipe</a></li><li class="toc-h3"><a href="#cast-promosi">Cast &amp; promosi</a></li><li class="toc-h2"><a href="#4-variabel-scope">4. Variabel &amp; scope</a></li><li class="toc-h2"><a href="#5-operator">5. Operator</a></li><li class="toc-h2"><a href="#6-kontrol-alir">6. Kontrol alir</a></li><li class="toc-h3"><a href="#switch-v1-19">switch (v1.19)</a></li><li class="toc-h2"><a href="#7-array">7. Array</a></li><li class="toc-h3"><a href="#metode-fungsional-array-gula">Metode fungsional array (gula)</a></li><li class="toc-h2"><a href="#8-string">8. String</a></li><li class="toc-h3"><a href="#konversi-skalar">Konversi skalar</a></li><li class="toc-h3"><a href="#metode-instance-butuh-import-str">Metode instance (butuh import Str;)</a></li><li class="toc-h3"><a href="#buffer-byte-bytes">Buffer byte: Bytes</a></li><li class="toc-h3"><a href="#template-string-backtick">Template string (backtick)</a></li><li class="toc-h2"><a href="#9-fungsi">9. Fungsi</a></li><li class="toc-h2"><a href="#10-lambda-fn">10. Lambda &amp; fn</a></li><li class="toc-h2"><a href="#11-class-sebagai-namespace">11. Class sebagai namespace</a></li><li class="toc-h2"><a href="#12-class-instance">12. Class instance</a></li><li class="toc-h2"><a href="#13-json-literal">13. JSON literal</a></li><li class="toc-h2"><a href="#14-memori-malloc-arena-per-blok-tanpa-gc">14. Memori: malloc&lt;...&gt; { ... }, arena per blok, tanpa GC</a></li><li class="toc-h3"><a href="#aturan-keamanan">Aturan keamanan</a></li><li class="toc-h3"><a href="#memmark-memreset-manual-opsional">memMark / memReset manual (opsional)</a></li><li class="toc-h2"><a href="#15-keluar-kode-status">15. Keluar &amp; kode status</a></li><li class="toc-h3"><a href="#error-runtime-nomor-baris-stack-trace">Error runtime: nomor baris + stack trace</a></li><li class="toc-h2"><a href="#16-contoh-tur-lengkap">16. Contoh tur lengkap</a></li></ul></nav>
 <p>Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.20. Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).</p>
 <hr>
 <h2 id="1-bentuk-program">1. Bentuk program<a class="anchor" href="#1-bentuk-program" aria-label="tautan">#</a></h2>
@@ -207,7 +207,7 @@ a[0] = 7;
 for (int i = 0; i &lt; a.length; i++) a[i] = i * i;
 
 int[] b = a;                  // alias, bukan salinan
-int[] c = Str.copy(a);        // salinan (byte-array helper)</code></pre>
+int[] c = Bytes.copy(a);      // salinan buffer (import Bytes;)</code></pre>
 <ul>
 <li>Indeks di luar <code>0..length-1</code> menghentikan program dengan pesan <code>array tidak valid (indeks/ukuran salah)</code>.</li>
 <li>Array bisa diparamkan/dikembalikan; ukuran tetap setelah dibuat.</li>
@@ -255,9 +255,43 @@ String t = Net.mkstr(buf);     // byte → teks baru (materialisasi)</code></pre
 <ul>
 <li><code>String → int[]</code> masih bebas (String adalah view byte, ala <code>[]byte(s)</code> di Go).</li>
 <li><code>int[] → String</code> <strong>wajib</strong> <code>Net.mkstr(...)</code> — buffer byte tidak lagi otomatis dianggap teks; <code>int[] w = u;</code> (u String) ditolak compiler.</li>
-<li>Fungsi pembangun teks (<code>Str.trim</code>, <code>Str.upper</code>, <code>Str.fromInt</code>, <code>Str.fromLong</code>, <code>Str.fromDouble</code>, <code>Str.boolText</code>, <code>Str.repeat</code>, <code>Str.padLeft</code>, <code>Str.splitAt</code>, ...) kini mengembalikan <code>String</code>. <code>Str.substring</code> bernama <code>Str.sub</code> (kembalikan <code>String</code>); <code>Str.slice</code> tetap <code>int[]</code> untuk buffer I/O.</li>
+<li>Sejak <strong>v1.23</strong> pustaka dibagi dua: <strong><code>Str</code> hanya untuk <code>String</code></strong> (tidak ada <code>int[]</code> di API publik) dan <strong><code>Bytes</code> untuk buffer <code>int[]</code></strong> (<code>Bytes.cat/slice/indexOf/trim/hex/...</code>). <code>Str.slice</code> mengembalikan <code>String</code>; potongan buffer memakai <code>Bytes.slice</code>.</li>
+<li>Gula metode memilih pustaka dari tipe penerima: <code>String</code> → <code>Str</code>, <code>int[]</code> → <code>Bytes</code> (jadi <code>buf.trim()</code> butuh <code>import Bytes;</code>).</li>
 <li><code>println(int[])</code> tetap mencetak buffer byte sebagai teks (debug).</li>
 </ul>
+<h3 id="konversi-skalar">Konversi skalar<a class="anchor" href="#konversi-skalar" aria-label="tautan">#</a></h3>
+<p>Kopi belum punya overloading, jadi varian tipe memakai nama eksplisit — parameter dan hasilnya selalu skalar (<code>String</code>, <code>long</code>, <code>short</code>, <code>byte</code>, <code>uint*</code>, <code>float</code>, <code>double</code>, <code>boolean</code>), bukan array:</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Arah</th>
+<th>Fungsi</th>
+</tr></thead><tbody>
+<tr>
+<td>→ teks</td>
+<td><code>fromInt</code>, <code>fromLong</code>, <code>fromShort</code>, <code>fromByte</code>, <code>fromUInt8/16/32/64</code>, <code>fromFloat</code>, <code>fromDouble</code>, <code>fromBool</code>/<code>boolText</code>, <code>fromChar</code></td>
+</tr>
+<tr>
+<td>teks →</td>
+<td><code>toInt</code>, <code>toLong</code>, <code>toShort</code>, <code>toByte</code>, <code>toUInt8/16/32/64</code>, <code>toFloat</code>, <code>toDouble</code>, <code>toBool</code></td>
+</tr>
+<tr>
+<td>basis lain</td>
+<td><code>parseInt(s, radix)</code>, <code>parseLong(s, radix)</code></td>
+</tr>
+<tr>
+<td>validasi</td>
+<td><code>isDigits</code>, <code>isNumber</code>, <code>isHex</code></td>
+</tr>
+<tr>
+<td>hex</td>
+<td><code>toHex</code>, <code>fromHex</code></td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-java">System.out.println(Str.fromShort(-12));      // -12
+System.out.println(Str.fromUInt32(4000000000U));
+System.out.println(Str.fromFloat(1.5F));     // 1.5
+short n = Str.toShort("42");
+boolean ok = Str.toBool("YES");              // true</code></pre>
 <h3 id="metode-instance-butuh-import-str">Metode instance (butuh <code>import Str;</code>)<a class="anchor" href="#metode-instance-butuh-import-str" aria-label="tautan">#</a></h3>
 <pre><code class="language-java">import Str;
 
@@ -265,23 +299,45 @@ String t = "  Kopi Bahasa  ";
 t.trim()                 // "Kopi Bahasa"
 t.upper()                // "KOPI BAHASA"
 t.lower()
-t.trim().substring(0, 4) // "Kopi"
+t.capitalize()           // "Kopi Bahasa"
+t.swapCase()             // "kOPI bAHASA"
+t.trim().substring(0, 4) // "Kopi"  (mulai, panjang)
+t.sub(5, 6)              // "Bahasa"
+t.left(4)                // "Kopi"
+t.right(6)               // "Bahasa"
 "arena".charAt(2)        // 101
 "game server".indexOf("server")   // 5
 "game server".indexOf("x")        // -1
 "kopi".contains("op")    // true
 "kopi".startsWith("ko")
 "kopi".endsWith("pi")
-"kopi".equals("kopi")
 "Kopi".equalsIgnoreCase("kOPI")
+"a=b=c".count("=")       // 2
 "".isEmpty()
 "ab".repeat(3)           // "ababab"
+"abc".reverse()          // "cba"
+"a-b-c".replace("-", "+")// "a+b+c"
 "123".toInt()            // 123
-"a,b".replaceSeq(",", ";")
+"9000000000".toLong()
 "7".padLeft(3, 48)       // "007"
-"teks".countByte(101)
-"é".utf8Count()</code></pre>
-<p>Metode ini hanya gula parser menjadi <code>Str.&lt;nama&gt;(receiver, ...)</code>. Bila <code>Str</code> belum diimpor, compiler memberi pesan: <em>metode String 'x' butuh 'import Str;'</em>.</p>
+"ab".center(6, 46)       // "..ab.."
+"abcdefgh".ellipsis(6)   // "abc..."
+"a,b,c".split(",")       // String[] → Str.join(parts, "|")
+"a::b::c".split("::")
+"satu\ndua".lines()
+" satu  dua ".words()
+"é".utf8Count()          // 1
+Str.utf8Slice("héllo", 1, 2) // "él"
+Str.utf8Reverse("hé")        // "éh"</code></pre>
+<p>Metode ini hanya gula parser menjadi <code>Str.&lt;nama&gt;(receiver, ...)</code>. Bila <code>Str</code> belum diimpor, compiler memberi pesan: <em>metode String 'x' butuh 'import Str;'</em>. Untuk buffer <code>int[]</code>, gula yang sama memakai <code>Bytes</code> (mis. <code>buf.trim()</code> → <code>Bytes.trim(buf)</code>).</p>
+<h3 id="buffer-byte-bytes">Buffer byte: <code>Bytes</code><a class="anchor" href="#buffer-byte-bytes" aria-label="tautan">#</a></h3>
+<pre><code class="language-java">import Bytes;
+
+int[] b = Net.strbytes("  Kopi  ");
+System.out.println(Net.mkstr(Bytes.trim(b)));    // "Kopi"
+int[] c = Bytes.cat(Bytes.of("a"), Bytes.of("b"));
+String t = Bytes.text(c);                        // "ab"</code></pre>
+<p><code>Bytes</code> menyediakan <code>len/isEmpty/eq/cmp/copy/cat/slice/at/find/indexOf/ lastIndexOf/contains/startsWith/endsWith/count/countByte/trim/upper/lower/ repeat/reverse/replaceByte/replaceSeq/padLeft/padRight/splitCount/splitAt/ fromInt/fromLong/toInt/isDigits/equalsIgnoreCase/hex/print/line</code>, semuanya dengan <code>int[]</code>. Untuk teks gunakan <code>Str</code>.</p>
 <h3 id="template-string-backtick">Template string (backtick)<a class="anchor" href="#template-string-backtick" aria-label="tautan">#</a></h3>
 <pre><code class="language-java">import Str;
 
@@ -439,22 +495,24 @@ class Main {
 <li><code>Json.parse</code> untuk teks JSON dari luar; <code>Json.write</code> untuk serialisasi.</li>
 </ul>
 <h2 id="14-memori-malloc-arena-per-blok-tanpa-gc">14. Memori: <code>malloc&lt;...&gt; { ... }</code>, arena per blok, tanpa GC<a class="anchor" href="#14-memori-malloc-arena-per-blok-tanpa-gc" aria-label="tautan">#</a></h2>
-<p>Semua alokasi dinamis (array, string hasil operasi) masuk <strong>arena bump allocator</strong>. Di luar blok <code>malloc</code>, arena global berukuran <strong>32 MB</strong>. Sejak <strong>v1.20</strong> compiler mengurus pembebasan otomatis lewat blok <code>malloc</code>; sejak <strong>v1.21</strong> setiap blok punya <strong>arena sendiri</strong> dan ukurannya bisa ditentukan:</p>
+<p>Semua alokasi dinamis (array, string hasil operasi) masuk <strong>arena bump allocator</strong>. Di luar blok <code>malloc</code>, arena global berukuran <strong>32 MB</strong>. Sejak <strong>v1.20</strong> compiler mengurus pembebasan otomatis lewat blok <code>malloc</code>; sejak <strong>v1.22</strong> blok tanpa <code>&lt;...&gt;</code> <strong>otomatis</strong> menyediakan arena sampai <strong>4096 MB</strong>. Runtime memakai <code>mmap(MAP_NORESERVE)</code>: alamat maya besar dipesan murah, dan RAM fisik baru terpakai saat halaman benar-benar ditulis — jadi tidak perlu menebak ukuran:</p>
 <pre><code class="language-java">malloc {
-    int[] sementara = new int[10000];   // arena blok 32 MB (default)
+    int[] sementara = new int[5000000];  // 40 MB — otomatis, muat
     String tmp = Str.upper(text);
-}                                      // arena blok dibebaskan OTOMATIS
+}                                        // arena dibebaskan OTOMATIS
 
-malloc&lt;64mb&gt; {
-    int[] besar = new int[4000000];     // arena blok 64 MB
+malloc&lt;64mb&gt; {                           // batas keras 64 MB
+    int[] besar = new int[4000000];
 }
 
-malloc&lt;512kb&gt; {                         // satuan: b, kb, mb, gb
-    int[] kecil = new int[60000];       // 480 KB — muat
+malloc&lt;512kb&gt; {                           // satuan: b, kb, mb, gb
+    int[] kecil = new int[60000];         // 480 KB — muat
 }</code></pre>
-<p>Ukuran harus bilangan bulat lebih dari 0, minimal <strong>1 kb</strong>, maksimum <strong>4096 MB</strong>; tanpa satuan dianggap <strong>MB</strong> (<code>malloc&lt;64&gt;</code> = 64 MB). Bila alokasi di dalam blok melewati batasnya, program berhenti dengan error yang menyebut batasnya:</p>
+<p>Tanpa <code>&lt;...&gt;</code> tidak ada batas yang perlu dihitung (batas atas 4096 MB). Ukuran eksplisit harus bilangan bulat lebih dari 0, minimal <strong>1 kb</strong>, maksimum <strong>4096 MB</strong>; tanpa satuan dianggap <strong>MB</strong> (<code>malloc&lt;64&gt;</code> = 64 MB). Bila alokasi melewati batas blok eksplisit, program berhenti dengan error yang menyebut batasnya:</p>
 <pre><code>kopivm: error: arena malloc habis — batas 1 MB terlampaui (naikkan malloc&lt;...&gt;)</code></pre>
-<p>Native (a64/x64) mencetak <code>kopi: arena malloc habis — batas 1 MB terlampaui</code>. Blok bersarang boleh memakai ukuran berbeda; arena dalam dibebaskan lebih dulu, lalu arena luar dipulihkan.</p>
+<p>Untuk arena otomatis, pesannya menyebut batas otomatis:</p>
+<pre><code>kopivm: error: arena malloc habis — batas otomatis 4096 MB terlampaui (pakai malloc&lt;N&gt; untuk batas lain)</code></pre>
+<p>Native (a64/x64) memakai pesan yang sama. Blok bersarang boleh memakai ukuran berbeda; arena dalam dibebaskan lebih dulu, lalu arena luar dipulihkan.</p>
 <p>Compiler memasang arena baru saat masuk blok dan membebaskannya di <strong>semua jalur keluar</strong>:</p>
 <ul>
 <li>akhir blok,</li>
@@ -494,7 +552,7 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <li><code>memReset(mark)</code> membebaskan <strong>semua</strong> alokasi setelah mark — jangan menyimpan pointer hasil alokasi setelah mark lalu memakainya lagi.</li>
 <li><code>new int[n]</code> selalu men-zero-kan elemen, termasuk memori daur ulang.</li>
 <li>Tanpa reset, program batch panjang bisa kehabisan arena; <code>malloc{}</code> atau reset per request/iterasi menghindarinya.</li>
-<li>Melebihi batas arena (32 MB default atau ukuran <code>malloc&lt;...&gt;</code>) → <code>arena malloc habis — batas N MB terlampaui</code> + exit 1 (bukan crash).</li>
+<li>Melebihi batas arena (4096 MB untuk <code>malloc{}</code> otomatis atau ukuran <code>malloc&lt;...&gt;</code>) → <code>arena malloc habis — batas N MB terlampaui</code> + exit 1 (bukan crash).</li>
 <li><code>memMark</code>/<code>memReset</code> bekerja pada arena yang <strong>sedang aktif</strong>; di dalam <code>malloc&lt;...&gt;</code>, mark/reset berlaku untuk arena blok itu.</li>
 </ol>
 <p>Contoh lengkap yang bisa dijalankan (diuji di suite): <code>examples/malloc.kop</code>.</p>
