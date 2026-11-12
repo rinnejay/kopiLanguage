@@ -1,2 +1,12 @@
 __pycache__/
 *.pyc
+
+# Android IDE — artefak build (bukan sumber)
+android/sdk/
+android/build/
+android/dist/
+android/jniLibs/
+android/app/res/
+android/debug.keystore
+*.apk
+*.idsig

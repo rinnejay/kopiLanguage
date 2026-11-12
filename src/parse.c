@@ -1097,6 +1097,9 @@ static void wrap_conv(Node *aa, const char *fn) {
 }
 
 static Node *parse_tstr(const char *raw, int line) {
+    /* ekspresi di dalam `{...}` memakai nama berkas asli, bukan "<template>",
+       agar pesan error bisa ditunjuk ke berkas/baris yang benar. */
+    const char *self = g_linefile ? g_linefile : "<template>";
     int n = (int)strlen(raw);
     char *lit = xmalloc((size_t)n + 1);
     int ln = 0;
@@ -1135,7 +1138,7 @@ static Node *parse_tstr(const char *raw, int line) {
             memcpy(sub, raw + i + 1, (size_t)sublen);
             sub[sublen] = 0;
             int nt = 0;
-            Tok *tt = lex_text(sub, "<template>", line, &nt);
+            Tok *tt = lex_text(sub, self, line, &nt);
             Tok *savets = ts;
             int saveti = ti;
             ts = tt;
@@ -1145,6 +1148,7 @@ static Node *parse_tstr(const char *raw, int line) {
                 die("baris %d: template: ekspresi '{...}' tidak valid", line);
             ts = savets;
             ti = saveti;
+            g_linefile = self;
             tstr_append(&head, &tail, ex);
             i = close + 1;
             continue;

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.rinnejay.kopiide"
+    android:versionCode="2"
+    android:versionName="1.0.1">
+
+    <!-- Akses folder proyek di /storage/emulated/0/KopiProject -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+    <!-- disiapkan untuk fitur dokumentasi/unduhan daring -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!--
+        targetSdk 28 disengaja: Android 10+ melarang app targetSdk >= 29
+        mengeksekusi biner dari data dir. Termux memakai trik yang sama.
+        Ini yang membuat libkopicc.so / libkopivm.so bisa dijalankan
+        dari files/lib tanpa "Permission denied".
+    -->
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="28" />
+
+    <application
+        android:label="Kopi IDE"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:extractNativeLibs="true"
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true"
+        android:largeHeap="true"
+        android:allowBackup="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="Kopi IDE"
+            android:icon="@mipmap/ic_launcher"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

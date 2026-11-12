@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#181a1f">
+<title>Kopi IDE</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="topbar">
+  <button id="btnMenu" class="ibtn" title="File">☰</button>
+  <div id="projName" class="grow">Kopi IDE</div>
+  <button id="btnNew" class="ibtn" title="Proyek baru">＋</button>
+  <button id="btnSave" class="ibtn" title="Simpan">💾</button>
+  <button id="btnBuild" class="tbtn" title="Build">Build</button>
+  <button id="btnRun" class="tbtn run" title="Jalankan">▶</button>
+</header>
+
+<div id="storagebar" class="hidden">
+  <span>Akses folder proyek belum diizinkan.</span>
+  <button id="btnGrant">Izinkan</button>
+</div>
+
+<div id="main">
+  <aside id="sidebar">
+    <div class="side-head">
+      <span class="side-title">PROYEK</span>
+      <span class="grow"></span>
+      <button id="btnRefresh" class="ibtn sm" title="Muat ulang">⟳</button>
+      <button id="btnNew2" class="ibtn sm" title="Proyek baru">＋</button>
+    </div>
+    <div id="tree" class="tree"></div>
+    <div class="side-foot">
+      <div id="sidePath" class="mono small ellipsis"></div>
+      <div id="sideInfo" class="small dim"></div>
+      <button id="btnTest" class="testbtn">Tes biner</button>
+    </div>
+  </aside>
+  <div id="scrim" class="hidden"></div>
+
+  <section id="editorWrap">
+    <div id="editorBox">
+      <div id="gutter"></div>
+      <pre id="hl" aria-hidden="true"><code id="hlcode"></code></pre>
+      <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"></textarea>
+      <div id="complete" class="hidden"></div>
+      <div id="empty" class="empty">
+        <div class="logo">☕</div>
+        <div class="empty-title">Kopi IDE</div>
+        <div class="empty-sub">Pilih berkas di sidebar,<br>atau buat proyek baru dengan ＋</div>
+      </div>
+    </div>
+    <div id="statusbar">
+      <span id="stFile">—</span>
+      <span class="grow"></span>
+      <button id="btnAuto" class="statusbtn" title="Saran kode">auto</button>
+      <span id="stPos">Ln 1, Col 1</span>
+      <span id="stZoom">100%</span>
+    </div>
+  </section>
+</div>
+
+<section id="panel" class="open">
+  <div id="panelHandle"><span></span></div>
+  <div id="panelTabs">
+    <button data-tab="out" class="tab active">Output</button>
+    <button data-tab="prob" class="tab">Masalah <b id="probCount" class="badge hidden">0</b></button>
+    <span class="grow"></span>
+    <button id="btnClear" class="ibtn sm" title="Bersihkan">⌫</button>
+    <button id="btnPanel" class="ibtn sm" title="Buka/tutup">▾</button>
+  </div>
+  <pre id="log" class="pane active"></pre>
+  <div id="problems" class="pane"></div>
+</section>
+
+<div id="toast" class="hidden"></div>
+
+<div id="modal" class="hidden">
+  <div class="mcard">
+    <div id="mtitle">Judul</div>
+    <div id="mhint" class="small dim"></div>
+    <input id="minput" type="text" autocomplete="off" spellcheck="false">
+    <div class="mbtns">
+      <button id="mcancel">Batal</button>
+      <button id="mok" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="highlight.js"></script>
+<script src="complete.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
