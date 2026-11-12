@@ -44,4 +44,37 @@ class Pbkdf2 {
         }
         return out;
     }
+
+    /* PBKDF2-HMAC-SHA512 (RFC 8018): digest 64 byte */
+    static int[] sha512(int[] pass, int[] salt, int iter, int dkLen) {
+        if (iter < 1) iter = 1;
+        if (dkLen < 1) dkLen = 1;
+        int[] pass2 = Bytes.copy(pass);
+        int[] salt2 = Bytes.copy(salt);
+        int[] t = new int[64];
+        int[] ucur = new int[64];
+        int[] out = new int[dkLen];
+        int mark = Net.memMark();
+        int blocks = (dkLen + 63) / 64;
+        int o = 0;
+        for (int b = 1; b <= blocks; b++) {
+            int[] msg = new int[salt2.length + 4];
+            for (int i = 0; i < salt2.length; i++) msg[i] = salt2[i];
+            msg[salt2.length] = (b >>> 24) & 255;
+            msg[salt2.length + 1] = (b >>> 16) & 255;
+            msg[salt2.length + 2] = (b >>> 8) & 255;
+            msg[salt2.length + 3] = b & 255;
+
+            int[] u = Hash.hmacSha512(pass2, msg);
+            for (int i = 0; i < 64; i++) { ucur[i] = u[i]; t[i] = u[i]; }
+            for (int n = 1; n < iter; n++) {
+                u = Hash.hmacSha512(pass2, ucur);
+                for (int i = 0; i < 64; i++) { ucur[i] = u[i]; t[i] = t[i] ^ u[i]; }
+                Net.memReset(mark);
+            }
+            for (int i = 0; i < 64 && o < dkLen; i++) { out[o] = t[i]; o++; }
+            Net.memReset(mark);
+        }
+        return out;
+    }
 }

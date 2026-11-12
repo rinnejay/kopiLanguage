@@ -1,19 +1,34 @@
-// Jwt.kop — JWT HS256 (RFC 7519) minimal, murni Kopi (v1.23).
+// Jwt.kop — JWT HS256/HS384/HS512 (RFC 7519) + validasi klaim, murni Kopi (v1.28).
 //
 // format: base64url(header) "." base64url(payload) "." base64url(HMAC)
-// header dipatok {"alg":"HS256","typ":"JWT"}.
+// header: {"alg":"HS256|HS384|HS512","typ":"JWT"}
 //
-// Batas: hanya HS256; verifikasi tanda tangan + bentuk, belum `exp`/`iat`
-// otomatis (pemanggil dapat memeriksa payload JSON sendiri).
+// Fungsi:
+//   sign(payload, secret)          → HS256 (kompatibel ke belakang)
+//   signHs384 / signHs512          → HMAC dengan SHA-384 / SHA-512
+//   signAlg(payload, secret, alg)  → pilih algoritma
+//   verify(token, secret, out)     → HS256 saja: 1 sah, 0 tanda tangan salah,
+//                                    -1 bentuk token salah
+//   verifyAlg(token, secret, out)  → dispatch sesuai header (HS256/384/512)
+//   checkClaims(payloadJson, now)  → 1 klaim waktu ok, 0 kedaluwarsa/belum
+//   verifyWithClaims(token, secret, out, now) → gabungan verifikasi + klaim
+//
+// Batas: belum RS256/ES256 (butuh RSA/ECDSA), belum cek aud/iss.
 
 import Str;
 import Hash;
 import Cipher;
+import Json;
 
 class Jwt {
 
     static String HEADER() {
         return "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+    }
+
+    /* header untuk algoritma tertentu */
+    static String headerFor(String alg) {
+        return "{\"alg\":\"" + alg + "\",\"typ\":\"JWT\"}";
     }
 
     /* base64url tanpa padding (biner → teks) */
@@ -30,9 +45,30 @@ class Jwt {
         return Cipher.b64dec(t);
     }
 
+    /* tanda tangan HMAC sesuai algoritma */
+    private static int[] mac(String alg, int[] key, int[] raw) {
+        if (alg == "HS384") return Hash.hmacSha384(key, raw);
+        if (alg == "HS512") return Hash.hmacSha512(key, raw);
+        return Hash.hmac(key, raw);
+    }
+
+    /* tanda tangan token sesuai algoritma header */
+    static String signAlg(String payload, String secret, String alg) {
+        String input = b64(Net.strbytes(headerFor(alg))) + "." + b64(Net.strbytes(payload));
+        int[] sig = mac(alg, Net.strbytes(secret), Net.strbytes(input));
+        return input + "." + b64(sig);
+    }
+
     static String sign(String payload, String secret) {
-        String input = b64(Net.strbytes(HEADER())) + "." + b64(Net.strbytes(payload));
-        return input + "." + b64(Hash.hmac(secret, input));
+        return signAlg(payload, secret, "HS256");
+    }
+
+    static String signHs384(String payload, String secret) {
+        return signAlg(payload, secret, "HS384");
+    }
+
+    static String signHs512(String payload, String secret) {
+        return signAlg(payload, secret, "HS512");
     }
 
     /* bandingkan dua array byte secara konstan (panjang sama) */
@@ -43,22 +79,62 @@ class Jwt {
         return d == 0;
     }
 
-    /* hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah */
-    static int verify(String token, String secret, int[] payloadOut) {
-        int d1 = -1;
-        int d2 = -1;
+    /* posisi dua titik pemisah */
+    private static int[] dots(String token) {
+        int[] r = new int[2];
+        r[0] = -1;
+        r[1] = -1;
         for (int i = 0; i < token.length; i++) {
             if (token[i] == 46) {
-                if (d1 < 0) d1 = i;
-                else if (d2 < 0) d2 = i;
+                if (r[0] < 0) r[0] = i;
+                else if (r[1] < 0) r[1] = i;
             }
         }
-        if (d1 <= 0 || d2 <= d1) return -1;
-        String h = Str.sub(token, 0, d1);
-        String p = Str.sub(token, d1 + 1, d2 - d1 - 1);
-        String s = Str.sub(token, d2 + 1, token.length - d2 - 1);
-        String sig = b64(Hash.hmac(secret, h + "." + p));
-        boolean ok = same(sig, s);
+        return r;
+    }
+
+    /* algoritma dari header token (HS256/HS384/HS512; "" bila tak dikenal) */
+    static String algOf(String token) {
+        int[] d = dots(token);
+        if (d[0] <= 0) return "";
+        String head = Net.mkstr(unb64(Str.sub(token, 0, d[0])));
+        if (Str.contains(head, "HS384")) return "HS384";
+        if (Str.contains(head, "HS512")) return "HS512";
+        if (Str.contains(head, "HS256")) return "HS256";
+        return "";
+    }
+
+    /* hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah/alg tak didukung */
+    static int verifyAlg(String token, String secret, int[] payloadOut) {
+        int[] d = dots(token);
+        if (d[0] <= 0 || d[1] <= d[0]) return -1;
+        String h = Str.sub(token, 0, d[0]);
+        String p = Str.sub(token, d[0] + 1, d[1] - d[0] - 1);
+        String s = Str.sub(token, d[1] + 1, token.length - d[1] - 1);
+        String alg = algOf(token);
+        if (alg == "") return -1;
+        int[] sig = mac(alg, Net.strbytes(secret), Net.strbytes(h + "." + p));
+        boolean ok = same(b64(sig), s);
+        if (payloadOut.length > 0) {
+            int[] raw = unb64(p);
+            for (int i = 0; i < payloadOut.length; i++) {
+                if (i < raw.length) payloadOut[i] = raw[i];
+                else payloadOut[i] = 0;
+            }
+        }
+        if (ok) return 1;
+        return 0;
+    }
+
+    /* hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah */
+    static int verify(String token, String secret, int[] payloadOut) {
+        int[] d = dots(token);
+        if (d[0] <= 0 || d[1] <= d[0]) return -1;
+        String h = Str.sub(token, 0, d[0]);
+        String p = Str.sub(token, d[0] + 1, d[1] - d[0] - 1);
+        String s = Str.sub(token, d[1] + 1, token.length - d[1] - 1);
+        int[] sig = Hash.hmac(Net.strbytes(secret), Net.strbytes(h + "." + p));
+        boolean ok = same(b64(sig), s);
         if (payloadOut.length > 0) {
             int[] raw = unb64(p);
             for (int i = 0; i < payloadOut.length; i++) {
@@ -72,15 +148,27 @@ class Jwt {
 
     /* payload JSON dari token tanpa verifikasi (hati-hati) */
     static String payloadOf(String token) {
-        int d1 = -1;
-        int d2 = -1;
-        for (int i = 0; i < token.length; i++) {
-            if (token[i] == 46) {
-                if (d1 < 0) d1 = i;
-                else if (d2 < 0) d2 = i;
-            }
-        }
-        if (d2 <= d1) return "";
-        return Net.mkstr(unb64(Str.sub(token, d1 + 1, d2 - d1 - 1)));
+        int[] d = dots(token);
+        if (d[1] <= d[0]) return "";
+        return Net.mkstr(unb64(Str.sub(token, d[0] + 1, d[1] - d[0] - 1)));
+    }
+
+    /* cek klaim waktu pada payload JSON.
+     * hasil: 1 ok, 0 kedaluwarsa (exp) atau belum berlaku (nbf). */
+    static int checkClaims(String payloadJson, long nowSec) {
+        int[] obj = Json.parse(payloadJson);
+        long exp = Json.getLong(obj, "exp", -1L);
+        long nbf = Json.getLong(obj, "nbf", -1L);
+        if (exp >= 0 && nowSec >= exp) return 0;
+        if (nbf >= 0 && nowSec < nbf) return 0;
+        return 1;
+    }
+
+    /* verifikasi tanda tangan + klaim waktu */
+    static int verifyWithClaims(String token, String secret, int[] payloadOut, long nowSec) {
+        int r = verifyAlg(token, secret, payloadOut);
+        if (r != 1) return r;
+        if (checkClaims(payloadOf(token), nowSec) != 1) return 0;
+        return 1;
     }
 }

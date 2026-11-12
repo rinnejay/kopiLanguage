@@ -222,7 +222,7 @@ HttpServer.send(c, resp);
 
 ## Jwt
 
-`lib/net/Jwt.kop` · 6 fungsi
+`lib/net/Jwt.kop` · 14 fungsi
 
 JWT HS256: tanda tangan, verifikasi, ambil payload.
 
@@ -239,12 +239,20 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah
 
 | Fungsi | Keterangan |
 |---|---|
+| `static String headerFor(String alg)` | header untuk algoritma tertentu |
 | `static String b64(int[] raw)` | base64url tanpa padding (biner → teks) |
 | `static int[] unb64(String s)` | (internal) base64url decode |
+| `static String signAlg(String payload, String secret, String alg)` | tanda tangan token sesuai algoritma header |
 | `static String sign(String payload, String secret)` | tanda tangani payload dengan HS256 → token |
+| `static String signHs384(String payload, String secret)` | — |
+| `static String signHs512(String payload, String secret)` | — |
 | `static boolean same(int[] a, int[] b)` | bandingkan dua array byte secara konstan (panjang sama) |
+| `static String algOf(String token)` | algoritma dari header token (HS256/HS384/HS512; "" bila tak dikenal) |
+| `static int verifyAlg(String token, String secret, int[] payloadOut)` | hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah/alg tak didukung |
 | `static int verify(String token, String secret, int[] payloadOut)` | hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah |
 | `static String payloadOf(String token)` | payload JSON dari token tanpa verifikasi (hati-hati) |
+| `static int checkClaims(String payloadJson, long nowSec)` | cek klaim waktu pada payload JSON. hasil: 1 ok, 0 kedaluwarsa (exp) atau belum berlaku (nbf). |
+| `static int verifyWithClaims(String token, String secret, int[] payloadOut, long nowSec)` | verifikasi tanda tangan + klaim waktu |
 
 **Konstanta**
 

@@ -400,6 +400,29 @@ class Hash {
         return sha512(omsg);
     }
 
+    /* HMAC-SHA384 (RFC 2104); kunci > 128 byte di-hash dulu */
+    static int[] hmacSha384(int[] key, int[] msg) {
+        int[] k = key;
+        int block = 128;
+        if (k.length > block) k = sha384(k);
+        int[] ki = new int[block];
+        int[] ko = new int[block];
+        for (int i = 0; i < block; i++) {
+            int v = 0;
+            if (i < k.length) v = k[i];
+            ki[i] = v ^ 54;
+            ko[i] = v ^ 92;
+        }
+        int[] imsg = new int[block + msg.length];
+        for (int i = 0; i < block; i++) imsg[i] = ki[i];
+        for (int i = 0; i < msg.length; i++) imsg[block + i] = msg[i];
+        int[] ih = sha384(imsg);
+        int[] omsg = new int[block + 48];
+        for (int i = 0; i < block; i++) omsg[i] = ko[i];
+        for (int i = 0; i < 48; i++) omsg[block + i] = ih[i];
+        return sha384(omsg);
+    }
+
     static int[] toHex(int[] dig) {
         int[] out = new int[dig.length * 2];
         int o = 0;

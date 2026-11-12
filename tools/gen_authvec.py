@@ -29,6 +29,18 @@ out.append("0")
 out.append("-1")
 out.append(payload.decode())
 
+# JWT HS384 / HS512 + klaim waktu
+for alg, digest in (("HS384", hashlib.sha384), ("HS512", hashlib.sha512)):
+    hdr = ('{"alg":"%s","typ":"JWT"}' % alg).encode()
+    signing = b64u(hdr) + "." + b64u(payload)
+    out.append(signing + "." + b64u(hmac.new(secret, signing.encode(), digest).digest()))
+out += ["1", "0", "1"]
+out += ["1", "0", "0", "1"]
+
+# PBKDF2-HMAC-SHA512
+out.append(hashlib.pbkdf2_hmac("sha512", b"password", b"salt", 1, 32).hex())
+out.append(hashlib.pbkdf2_hmac("sha512", b"password", b"salt", 4096, 32).hex())
+
 out += ["1", "42", "-1", "1", "-1", "1", "0", "tok.abc", "Bearer",
         'WWW-Authenticate: Basic realm="admin"\r', ""]
 print("\n".join(out))

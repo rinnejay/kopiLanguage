@@ -589,7 +589,7 @@ HttpServer.send(c, resp);</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="jwt">Jwt<a class="anchor" href="#jwt" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Jwt.kop</code> · 6 fungsi</p>
+<p><code>lib/net/Jwt.kop</code> · 14 fungsi</p>
 <p>JWT HS256: tanda tangan, verifikasi, ambil payload.</p>
 <pre><code class="language-java">import Jwt;
 
@@ -605,6 +605,10 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
+<td><code>static String headerFor(String alg)</code></td>
+<td>header untuk algoritma tertentu</td>
+</tr>
+<tr>
 <td><code>static String b64(int[] raw)</code></td>
 <td>base64url tanpa padding (biner → teks)</td>
 </tr>
@@ -613,12 +617,32 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <td>(internal) base64url decode</td>
 </tr>
 <tr>
+<td><code>static String signAlg(String payload, String secret, String alg)</code></td>
+<td>tanda tangan token sesuai algoritma header</td>
+</tr>
+<tr>
 <td><code>static String sign(String payload, String secret)</code></td>
 <td>tanda tangani payload dengan HS256 → token</td>
 </tr>
 <tr>
+<td><code>static String signHs384(String payload, String secret)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String signHs512(String payload, String secret)</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static boolean same(int[] a, int[] b)</code></td>
 <td>bandingkan dua array byte secara konstan (panjang sama)</td>
+</tr>
+<tr>
+<td><code>static String algOf(String token)</code></td>
+<td>algoritma dari header token (HS256/HS384/HS512; "" bila tak dikenal)</td>
+</tr>
+<tr>
+<td><code>static int verifyAlg(String token, String secret, int[] payloadOut)</code></td>
+<td>hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah/alg tak didukung</td>
 </tr>
 <tr>
 <td><code>static int verify(String token, String secret, int[] payloadOut)</code></td>
@@ -627,6 +651,14 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <tr>
 <td><code>static String payloadOf(String token)</code></td>
 <td>payload JSON dari token tanpa verifikasi (hati-hati)</td>
+</tr>
+<tr>
+<td><code>static int checkClaims(String payloadJson, long nowSec)</code></td>
+<td>cek klaim waktu pada payload JSON. hasil: 1 ok, 0 kedaluwarsa (exp) atau belum berlaku (nbf).</td>
+</tr>
+<tr>
+<td><code>static int verifyWithClaims(String token, String secret, int[] payloadOut, long nowSec)</code></td>
+<td>verifikasi tanda tangan + klaim waktu</td>
 </tr>
 </tbody></table></div>
 <p><strong>Konstanta</strong></p>

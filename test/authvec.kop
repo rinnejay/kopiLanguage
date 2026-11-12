@@ -25,6 +25,20 @@ class Main {
         System.out.println(Jwt.verify("abc", secret, out));
         System.out.println(Jwt.payloadOf(token));
 
+        String t384 = Jwt.signHs384("{\"sub\":\"budi\",\"n\":1}", secret);
+        System.out.println(t384);
+        String t512 = Jwt.signHs512("{\"sub\":\"budi\",\"n\":1}", secret);
+        System.out.println(t512);
+        System.out.println(Jwt.verifyAlg(t384, secret, out));
+        System.out.println(Jwt.verifyAlg(t384, "salah", out));
+        System.out.println(Jwt.verifyAlg(t512, secret, out));
+        System.out.println(Jwt.checkClaims("{\"exp\":100}", 50));
+        System.out.println(Jwt.checkClaims("{\"exp\":100}", 150));
+        System.out.println(Jwt.checkClaims("{\"nbf\":200}", 100));
+        System.out.println(Jwt.checkClaims("{\"sub\":\"x\"}", 100));
+        System.out.println(Cipher.hexenc(Pbkdf2.sha512(Net.bytes("password"), Net.bytes("salt"), 1, 32)));
+        System.out.println(Cipher.hexenc(Pbkdf2.sha512(Net.bytes("password"), Net.bytes("salt"), 4096, 32)));
+
         int[] ids = MapStr.make(16, 256);
         int[] exps = MapStr.make(16, 256);
         System.out.println(Session.put(ids, exps, "id1", 42, 10, 100));

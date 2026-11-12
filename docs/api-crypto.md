@@ -263,7 +263,7 @@ System.out.println(Cipher.hexenc(sealed));
 
 ## Hash
 
-`lib/crypto/Hash.kop` · 11 fungsi
+`lib/crypto/Hash.kop` · 12 fungsi
 
 SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS.
 
@@ -291,6 +291,7 @@ System.out.println(Cipher.hexenc(Hash.sha1(Net.bytes("abc"))));
 | `static int[] sha512(int[] msg)` | SHA-512 (FIPS 180-4): pesan byte-as-int → digest 64 byte |
 | `static int[] sha384(int[] msg)` | SHA-384 (FIPS 180-4): pesan byte-as-int → digest 48 byte |
 | `static int[] hmacSha512(int[] key, int[] msg)` | HMAC-SHA512 (RFC 2104); kunci > 128 byte di-hash dulu |
+| `static int[] hmacSha384(int[] key, int[] msg)` | HMAC-SHA384 (RFC 2104); kunci > 128 byte di-hash dulu |
 | `static int[] toHex(int[] dig)` | digest → teks hex lowercase |
 | `static int eq(int[] a, int[] b)` | perbandingan konstan dua digest |
 | `static int rotl(int x, int n)` | (internal) rotasi kiri n bit |
@@ -329,7 +330,7 @@ int[] okm = Kdf.hkdf(secret, salt, info, 32);
 
 ## Pbkdf2
 
-`lib/crypto/Pbkdf2.kop` · 1 fungsi
+`lib/crypto/Pbkdf2.kop` · 2 fungsi
 
 PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi.
 
@@ -349,6 +350,7 @@ int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);
 | Fungsi | Keterangan |
 |---|---|
 | `static int[] sha256(int[] pass, int[] salt, int iter, int dkLen)` | derive key PBKDF2-HMAC-SHA256 (pass, salt, iterasi, panjang) |
+| `static int[] sha512(int[] pass, int[] salt, int iter, int dkLen)` | PBKDF2-HMAC-SHA512 (RFC 8018): digest 64 byte |
 
 ---
 

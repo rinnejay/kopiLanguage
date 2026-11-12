@@ -53,7 +53,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 17 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
 | [`Http`](api-net.md#http) | `lib/net/Http.kop` | 44 | Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik. |
 | [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 47 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
-| [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 6 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
+| [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 14 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
 | [`Mime`](api-net.md#mime) | `lib/net/Mime.kop` | 1 | Pemetaan ekstensi file → header Content-Type. |
 | [`Multipart`](api-net.md#multipart) | `lib/net/Multipart.kop` | 17 | — |
 | [`Resolv`](api-net.md#resolv) | `lib/net/Resolv.kop` | 5 | Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout. |
@@ -79,9 +79,9 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Crypto`](api-crypto.md#crypto) | `lib/crypto/Crypto.kop` | 18 | Kumpulan utilitas bit/hash/cipher lama yang dipakai modul kripto lain (kompatibilitas v1). |
 | [`Der`](api-crypto.md#der) | `lib/crypto/Der.kop` | 4 | Parser ASN.1 DER minimal untuk mengekstrak SubjectPublicKeyInfo (pin TLS). |
 | [`Gcm`](api-crypto.md#gcm) | `lib/crypto/Gcm.kop` | 10 | AES-GCM (NIST SP 800-38D): enkripsi autentik dengan tag 16 byte. |
-| [`Hash`](api-crypto.md#hash) | `lib/crypto/Hash.kop` | 11 | SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS. |
+| [`Hash`](api-crypto.md#hash) | `lib/crypto/Hash.kop` | 12 | SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS. |
 | [`Kdf`](api-crypto.md#kdf) | `lib/crypto/Kdf.kop` | 8 | HKDF-SHA256 (RFC 5869) dan ExpandLabel TLS 1.3 (RFC 8446 §7.1). |
-| [`Pbkdf2`](api-crypto.md#pbkdf2) | `lib/crypto/Pbkdf2.kop` | 1 | PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi. |
+| [`Pbkdf2`](api-crypto.md#pbkdf2) | `lib/crypto/Pbkdf2.kop` | 2 | PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi. |
 | [`Pem`](api-crypto.md#pem) | `lib/crypto/Pem.kop` | 3 | Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner. |
 | [`Poly`](api-crypto.md#poly) | `lib/crypto/Poly.kop` | 10 | Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit. |
 | [`Rand`](api-crypto.md#rand) | `lib/crypto/Rand.kop` | 1 | Byte acak kriptografis dari `/dev/urandom`. |
