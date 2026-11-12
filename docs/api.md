@@ -6,7 +6,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|
 | **Core** | `lib/core/` | `Args`, `Arrays`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket`, `WsClient` |
-| **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Poly`, `Rand`, `X25519` |
+| **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `X25519`, `X509` |
 
 ## Daftar modul
 
@@ -82,9 +82,11 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Hash`](api-crypto.md#hash) | `lib/crypto/Hash.kop` | 11 | SHA-1/256/384/512 dan HMAC-SHA256/SHA512 murni Kopi untuk integritas, JWT, PBKDF2, dan TLS. |
 | [`Kdf`](api-crypto.md#kdf) | `lib/crypto/Kdf.kop` | 8 | HKDF-SHA256 (RFC 5869) dan ExpandLabel TLS 1.3 (RFC 8446 §7.1). |
 | [`Pbkdf2`](api-crypto.md#pbkdf2) | `lib/crypto/Pbkdf2.kop` | 1 | PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi. |
+| [`Pem`](api-crypto.md#pem) | `lib/crypto/Pem.kop` | 3 | Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner. |
 | [`Poly`](api-crypto.md#poly) | `lib/crypto/Poly.kop` | 10 | Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit. |
 | [`Rand`](api-crypto.md#rand) | `lib/crypto/Rand.kop` | 1 | Byte acak kriptografis dari `/dev/urandom`. |
 | [`X25519`](api-crypto.md#x25519) | `lib/crypto/X25519.kop` | 2 | Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3. |
+| [`X509`](api-crypto.md#x509) | `lib/crypto/X509.kop` | 11 | Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik. |
 
 ## Cara menerapkan
 

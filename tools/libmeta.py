@@ -179,6 +179,17 @@ META = {
         "notes": ["stderr tidak di-buffer; aman untuk supervisor."],
     },
 
+    "Pem": {
+        "purpose": "Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner.",
+        "example": 'import Pem;\n\nint[] der = Pem.decode(pemTeks);\nString kembali = Pem.encode(der, "CERTIFICATE");',
+        "notes": ["`decode` mengembalikan array kosong bila teks bukan PEM."],
+    },
+    "X509": {
+        "purpose": "Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik.",
+        "example": 'import X509;\nimport Pem;\nimport Cipher;\n\nint[] der = Pem.decode(pemTeks);\nSystem.out.println(X509.subject(der));\nSystem.out.println(Cipher.hexenc(X509.pin(der)));',
+        "notes": ["Waktu berlaku dikembalikan sebagai detik epoch.",
+                  "`pin` = SHA-256(DER SPKI), cocok untuk pin TLS 1.3."],
+    },
     "Aes": {
         "purpose": "AES-128/192/256 (FIPS-197) plus mode CTR, murni Kopi, untuk enkripsi blok dan keystream.",
         "example": 'import Aes;\nimport Cipher;\n\nint[] key = Net.bytes("kunci-16-byte-oke");\nint[] ct = Aes.encryptBlock(key, Net.bytes("0123456789abcdef"));\nSystem.out.println(Cipher.hexenc(ct));',
@@ -637,6 +648,24 @@ EXTRA = {
         "uncaesar": "dekripsi Caesar (ASCII)",
     }},
     "Der": {"descs": {"sliceOf": "(internal) potong array"}},
+    "Pem": {"descs": {
+        "decode": "PEM → DER (byte biner)",
+        "encode": "DER → PEM dengan label",
+        "label": "label armor, mis. \"CERTIFICATE\"",
+    }},
+    "X509": {"descs": {
+        "subject": "subject Name sebagai teks, mis. \"CN=kopi.test,O=Kopi\"",
+        "issuer": "issuer Name sebagai teks",
+        "serial": "byte INTEGER nomor seri",
+        "serialHex": "nomor seri sebagai hex",
+        "notBefore": "mulai berlaku (detik epoch)",
+        "notAfter": "berakhir berlaku (detik epoch)",
+        "spki": "DER SubjectPublicKeyInfo",
+        "pin": "SHA-256(DER SPKI) untuk pin TLS",
+        "pubKey": "byte kunci publik (isi BIT STRING SPKI)",
+        "sigAlg": "OID algoritma tanda tangan",
+        "oid": "OID → teks dotted",
+    }},
     "Aes": {"descs": {
         "encryptBlock": "enkripsi satu blok 16 byte (AES-128/192/256)",
         "decryptBlock": "dekripsi satu blok 16 byte",

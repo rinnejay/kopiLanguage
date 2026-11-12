@@ -1,0 +1,327 @@
+/* X509.kop — parsing sertifikat X.509 (RFC 5280) minimal, murni Kopi (v1.26).
+ *
+ * Struktur yang dibaca:
+ *   Certificate ::= SEQUENCE {
+ *     tbsCertificate SEQUENCE {
+ *       [0] version (opsional), serialNumber INTEGER,
+ *       signature AlgorithmIdentifier SEQUENCE,
+ *       issuer Name SEQUENCE, validity SEQUENCE,
+ *       subject Name SEQUENCE, subjectPublicKeyInfo SEQUENCE, ... }
+ *     signatureAlgorithm SEQUENCE, signatureValue BIT STRING }
+ *
+ * Name ::= SEQUENCE OF RelativeDistinguishedName
+ * RelativeDistinguishedName ::= SET OF AttributeTypeAndValue
+ * AttributeTypeAndValue ::= SEQUENCE { type OID, value ANY }
+ *
+ * Bergantung Der.kop (TLV), Hash.kop (pin), Str.kop (teks).
+ *
+ * Fungsi:
+ *   subject(der) / issuer(der)  → "CN=...,O=...,C=ID"
+ *   serial(der)                 → byte INTEGER (mentah)
+ *   serialHex(der)              → hex teks
+ *   notBefore(der) / notAfter(der) → detik epoch (long)
+ *   spki(der)                   → DER SubjectPublicKeyInfo
+ *   pin(der)                    → SHA-256(DER SPKI) (untuk pin TLS)
+ *   pubKey(der)                 → byte kunci publik (isi BIT STRING SPKI)
+ *   sigAlg(der)                 → OID tanda tangan, mis. "1.2.840.113549.1.1.11"
+ */
+
+import Cipher;
+import Der;
+import Hash;
+import Str;
+
+class X509 {
+
+    /* ── posisi field tbsCertificate ───────────────────────────────
+     * hasil: 0/1 serial (pos,len), 2/3 issuer, 4/5 validity,
+     *        6/7 subject, 8/9 SPKI (pos awal TLV, panjang total) */
+    private static int[] fields(int[] der) {
+        int[] res = new int[10];
+        int[] o = new int[4];
+        Der.tlv(der, 0, o);
+        if (o[0] != 48) return res;
+        Der.tlv(der, o[2], o);
+        if (o[0] != 48) return res;
+        int end = o[3];
+        int p = o[2];
+        int seq = 0;
+        while (p < end) {
+            int start = p;
+            Der.tlv(der, p, o);
+            if (o[0] < 0) return res;
+            if (o[0] >= 160) {
+                p = o[3];
+            } else if (o[0] == 2) {
+                res[0] = o[2];
+                res[1] = o[1];
+                p = o[3];
+            } else if (o[0] == 48) {
+                seq = seq + 1;
+                if (seq == 2) {
+                    res[2] = o[2];
+                    res[3] = o[1];
+                } else if (seq == 3) {
+                    res[4] = o[2];
+                    res[5] = o[1];
+                } else if (seq == 4) {
+                    res[6] = o[2];
+                    res[7] = o[1];
+                } else if (seq == 5) {
+                    res[8] = start;
+                    res[9] = o[3] - start;
+                }
+                p = o[3];
+            } else {
+                p = o[3];
+            }
+        }
+        return res;
+    }
+
+    /* ── OID ─────────────────────────────────────────────────────── */
+
+    /* OID (content) → teks dotted, mis. "2.5.4.3" */
+    static String oid(int[] der, int pos, int len) {
+        if (len < 1) return "";
+        int first = der[pos] & 255;
+        int a = first / 40;
+        int b = first % 40;
+        if (a > 2) {
+            a = 2;
+            b = first - 80;
+        }
+        String s = Str.fromLong(a) + "." + Str.fromLong(b);
+        int i = 1;
+        while (i < len) {
+            int v = 0;
+            int cnt = 0;
+            while (i < len) {
+                int by = der[pos + i] & 255;
+                v = v * 128 + (by % 128);
+                cnt = cnt + 1;
+                i = i + 1;
+                if (by < 128) break;
+            }
+            s = s + "." + Str.fromLong(v);
+            if (cnt == 0) break;
+        }
+        return s;
+    }
+
+    /* nama singkat OID yang umum */
+    private static String oidName(String d) {
+        if (d == "2.5.4.3") return "CN";
+        if (d == "2.5.4.4") return "SN";
+        if (d == "2.5.4.5") return "serialNumber";
+        if (d == "2.5.4.6") return "C";
+        if (d == "2.5.4.7") return "L";
+        if (d == "2.5.4.8") return "ST";
+        if (d == "2.5.4.9") return "STREET";
+        if (d == "2.5.4.10") return "O";
+        if (d == "2.5.4.11") return "OU";
+        if (d == "2.5.4.12") return "title";
+        if (d == "2.5.4.42") return "GN";
+        if (d == "0.9.2342.19200300.100.1.25") return "DC";
+        if (d == "0.9.2342.19200300.100.1.1") return "UID";
+        if (d == "1.2.840.113549.1.9.1") return "emailAddress";
+        return d;
+    }
+
+    /* ── Name (issuer / subject) ─────────────────────────────────── */
+
+    private static String nameOf(int[] der, int pos, int len) {
+        String out = "";
+        int end = pos + len;
+        int p = pos;
+        boolean first = true;
+        while (p < end) {
+            int[] o = new int[4];
+            Der.tlv(der, p, o);
+            if (o[0] != 49) break;             /* bukan SET → berhenti */
+            int setEnd = o[3];
+            int q = o[2];
+            while (q < setEnd) {
+                int[] o2 = new int[4];
+                Der.tlv(der, q, o2);
+                if (o2[0] != 48) break;
+                int atvEnd = o2[3];
+                int r = o2[2];
+                int[] o3 = new int[4];
+                Der.tlv(der, r, o3);
+                if (o3[0] != 6) break;
+                String key = oidName(oid(der, o3[2], o3[1]));
+                r = o3[3];
+                int[] o4 = new int[4];
+                Der.tlv(der, r, o4);
+                String val = Net.mkstr(Der.sliceOf(der, o4[2], o4[1]));
+                if (!first) out = out + ",";
+                out = out + key + "=" + val;
+                first = false;
+                q = o2[3];
+            }
+            p = o[3];
+        }
+        return out;
+    }
+
+    /* ── API ─────────────────────────────────────────────────────── */
+
+    static String subject(int[] der) {
+        int[] f = fields(der);
+        if (f[7] == 0) return "";
+        return nameOf(der, f[6], f[7]);
+    }
+
+    static String issuer(int[] der) {
+        int[] f = fields(der);
+        if (f[3] == 0) return "";
+        return nameOf(der, f[2], f[3]);
+    }
+
+    /* byte INTEGER serial (tanah) */
+    static int[] serial(int[] der) {
+        int[] f = fields(der);
+        if (f[1] == 0) return new int[0];
+        return Der.sliceOf(der, f[0], f[1]);
+    }
+
+    static String serialHex(int[] der) {
+        int[] s = serial(der);
+        if (s.length == 0) return "";
+        return Cipher.hexenc(s);
+    }
+
+    /* SPKI DER utuh */
+    static int[] spki(int[] der) {
+        int[] f = fields(der);
+        if (f[9] == 0) return new int[0];
+        return Der.sliceOf(der, f[8], f[9]);
+    }
+
+    /* pin TLS: SHA-256 dari DER SPKI */
+    static int[] pin(int[] der) {
+        int[] s = spki(der);
+        if (s.length == 0) return new int[0];
+        return Hash.sha256(s);
+    }
+
+    /* byte kunci publik (isi BIT STRING di dalam SPKI) */
+    static int[] pubKey(int[] der) {
+        int[] s = spki(der);
+        if (s.length == 0) return new int[0];
+        int[] o = new int[4];
+        Der.tlv(s, 0, o);
+        if (o[0] != 48) return new int[0];
+        Der.tlv(s, o[2], o);                  /* AlgorithmIdentifier */
+        if (o[0] != 48) return new int[0];
+        Der.tlv(s, o[3], o);                  /* BIT STRING */
+        if (o[0] != 3) return new int[0];
+        if (o[1] < 1) return new int[0];
+        return Der.sliceOf(s, o[2] + 1, o[1] - 1);
+    }
+
+    /* OID algoritma tanda tangan (dari tbs) */
+    static String sigAlg(int[] der) {
+        int[] o = new int[4];
+        Der.tlv(der, 0, o);
+        if (o[0] != 48) return "";
+        Der.tlv(der, o[2], o);
+        if (o[0] != 48) return "";
+        int end = o[3];
+        int p = o[2];
+        int seq = 0;
+        while (p < end) {
+            Der.tlv(der, p, o);
+            if (o[0] < 0) return "";
+            if (o[0] == 48) {
+                seq = seq + 1;
+                if (seq == 1) {
+                    int[] o3 = new int[4];
+                    Der.tlv(der, o[2], o3);  /* OID (anak pertama AlgorithmIdentifier) */
+                    if (o3[0] != 6) return "";
+                    return oid(der, o3[2], o3[1]);
+                }
+            }
+            p = o[3];
+        }
+        return "";
+    }
+
+    /* ── waktu (UTCTime / GeneralizedTime) ───────────────────────── */
+
+    private static int d2(int[] der, int i) {
+        return (der[i] - 48) * 10 + (der[i + 1] - 48);
+    }
+
+    /* hari sejak 1970-01-01 (algoritma Howard Hinnant) */
+    private static long daysFromCivil(int y, int m, int d) {
+        long yy = (long)y;
+        if (m <= 2) yy = yy - 1;
+        long era = yy / 400;
+        if (yy < 0 && yy % 400 != 0) era = era - 1;
+        long yoe = yy - era * 400;
+        long mp = (long)m;
+        if (m > 2) mp = mp - 3;
+        else mp = mp + 9;
+        long doy = (153 * mp + 2) / 5 + (long)d - 1;
+        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return era * 146097 + doe - 719468;
+    }
+
+    /* tag 0x17 UTCTime / 0x18 GeneralizedTime → epoch detik */
+    private static long timeOf(int[] der, int pos, int len, int tag) {
+        if (len < 11) return 0;
+        int year = 0;
+        int mon = 0;
+        int day = 0;
+        if (tag == 23) {                       /* UTCTime: YYMMDDHHMMSSZ */
+            int yy = d2(der, pos);
+            if (yy < 50) year = 2000 + yy;
+            else year = 1900 + yy;
+            mon = d2(der, pos + 2);
+            day = d2(der, pos + 4);
+        } else {                               /* GeneralizedTime: YYYYMMDDHHMMSSZ */
+            year = d2(der, pos) * 100 + d2(der, pos + 2);
+            mon = d2(der, pos + 4);
+            day = d2(der, pos + 6);
+        }
+        int hh = 0;
+        int mm = 0;
+        int ss = 0;
+        if (tag == 23) {                       /* UTCTime: YYMMDDHHMM[SS]Z */
+            hh = d2(der, pos + 6);
+            mm = d2(der, pos + 8);
+            if (len >= 13) ss = d2(der, pos + 10);
+        } else {                               /* GeneralizedTime: YYYYMMDDHHMM[SS]Z */
+            hh = d2(der, pos + 8);
+            mm = d2(der, pos + 10);
+            if (len >= 15) ss = d2(der, pos + 12);
+        }
+        long days = daysFromCivil(year, mon, day);
+        return days * 86400L + (long)hh * 3600L + (long)mm * 60L + (long)ss;
+    }
+
+    /* detik epoch mulai berlaku */
+    static long notBefore(int[] der) {
+        int[] f = fields(der);
+        if (f[5] == 0) return 0;
+        int[] o = new int[4];
+        Der.tlv(der, f[4], o);                /* notBefore (isi SEQUENCE validity) */
+        if (o[0] != 23 && o[0] != 24) return 0;
+        return timeOf(der, o[2], o[1], o[0]);
+    }
+
+    /* detik epoch berakhir */
+    static long notAfter(int[] der) {
+        int[] f = fields(der);
+        if (f[5] == 0) return 0;
+        int[] o = new int[4];
+        Der.tlv(der, f[4], o);                /* notBefore */
+        if (o[0] != 23 && o[0] != 24) return 0;
+        int[] o3 = new int[4];
+        Der.tlv(der, o[3], o3);               /* notAfter */
+        if (o3[0] != 23 && o3[0] != 24) return 0;
+        return timeOf(der, o3[2], o3[1], o3[0]);
+    }
+}

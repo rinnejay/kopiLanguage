@@ -13,7 +13,7 @@ import HttpServer;
 |---|---|
 | `lib/core/` | `Str` `Bytes` `Math` `Digits` `Stats` `Matrix` `Arrays` `Json` `Map` `MapStr` `Set` `Deque` `File` `Path` `Time` `Log` |
 | `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` |
-| `lib/crypto/` | `Crypto` `Cipher` `Hash` `Aes` `Gcm` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
+| `lib/crypto/` | `Crypto` `Cipher` `Hash` `Aes` `Gcm` `Pem` `X509` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
 
 > **Referensi API lengkap** (signature semua fungsi diekstrak langsung dari
 > source): [Referensi pustaka](api.md) → [Core](api-core.md) ·
@@ -258,6 +258,7 @@ server dan belum verifikasi ECDSA CertificateVerify.
 | `Rand` | `bytes(n)` dari `/dev/urandom` |
 | `Aead`, `ChaCha`, `Poly` | ChaCha20-Poly1305 (TLS record) |
 | `Aes`, `Gcm` | AES-128/192/256 (FIPS-197) + AES-GCM (SP 800-38D) |
+| `Pem`, `X509` | armor PEM + parsing sertifikat X.509 (RFC 5280) |
 | `Big`, `X25519` | aritmetika medan 2²⁵⁵−19 & X25519 |
 | `Der` | parser DER minimal + pin SPKI |
 

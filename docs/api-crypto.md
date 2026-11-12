@@ -352,6 +352,31 @@ int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);
 
 ---
 
+## Pem
+
+`lib/crypto/Pem.kop` · 3 fungsi
+
+Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner.
+
+```java
+import Pem;
+
+int[] der = Pem.decode(pemTeks);
+String kembali = Pem.encode(der, "CERTIFICATE");
+```
+
+**Catatan**
+
+- `decode` mengembalikan array kosong bila teks bukan PEM.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static String label(String pem)` | label armor, mis. "CERTIFICATE" |
+| `static int[] decode(String pem)` | PEM → DER (byte biner) |
+| `static String encode(int[] der, String label)` | DER → PEM dengan label |
+
+---
+
 ## Poly
 
 `lib/crypto/Poly.kop` · 10 fungsi
@@ -413,5 +438,42 @@ int[] shared = X25519.shared(mySecret, peerPublic);
 |---|---|
 | `static int[] x25519(int[] k32, int[] u32)` | X25519(k, u) — kedua arg byte-as-int 32 (scalar, u-coord) |
 | `static int[] pub(int[] sk)` | kunci publik: u = 9 (little-endian: byte[0] = 9) |
+
+---
+
+## X509
+
+`lib/crypto/X509.kop` · 11 fungsi
+
+Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik.
+
+```java
+import X509;
+import Pem;
+import Cipher;
+
+int[] der = Pem.decode(pemTeks);
+System.out.println(X509.subject(der));
+System.out.println(Cipher.hexenc(X509.pin(der)));
+```
+
+**Catatan**
+
+- Waktu berlaku dikembalikan sebagai detik epoch.
+- `pin` = SHA-256(DER SPKI), cocok untuk pin TLS 1.3.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static String oid(int[] der, int pos, int len)` | OID → teks dotted |
+| `static String subject(int[] der)` | subject Name sebagai teks, mis. "CN=kopi.test,O=Kopi" |
+| `static String issuer(int[] der)` | issuer Name sebagai teks |
+| `static int[] serial(int[] der)` | byte INTEGER nomor seri |
+| `static String serialHex(int[] der)` | nomor seri sebagai hex |
+| `static int[] spki(int[] der)` | DER SubjectPublicKeyInfo |
+| `static int[] pin(int[] der)` | SHA-256(DER SPKI) untuk pin TLS |
+| `static int[] pubKey(int[] der)` | byte kunci publik (isi BIT STRING SPKI) |
+| `static String sigAlg(int[] der)` | OID algoritma tanda tangan |
+| `static long notBefore(int[] der)` | mulai berlaku (detik epoch) |
+| `static long notAfter(int[] der)` | berakhir berlaku (detik epoch) |
 
 ---

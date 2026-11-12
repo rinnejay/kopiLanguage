@@ -51,6 +51,10 @@ python3 tools/gen_aesvec.py "$T/kopi/aesvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n' > "$T/kopi/aesvec.ref"
 check aesvec "$T/kopi/aesvec.kop"
 
+# ─── X.509: parse sertifikat (fixture openssl; oracle gen_x509vec.py) ─────
+python3 tools/gen_x509vec.py "$T/kopi/x509vec.kop" "$T/kopi/x509vec.ref" >/dev/null
+check x509vec "$T/kopi/x509vec.kop"
+
 # ─── Big: smoke + field penuh (ground truth python; gen_febig.py) ────────
 printf '56088\n0\n1\n0\n' > "$T/kopi/bigsmoke.ref"
 check bigsmoke test/bigsmoke.kop
@@ -654,6 +658,12 @@ cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
 for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec aesvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec arrayfn arrchk jsontest; do
     [ -f "$T/kopi/$t.x64.s" ] || continue
+    ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
+    cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
+done
+# x64: syntax check modul kripto baru
+for t in aesvec x509vec; do
+    [ -f "$T/kopi/$t.kop" ] || continue
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0
 done

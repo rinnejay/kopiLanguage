@@ -47,7 +47,7 @@
 <tr>
 <td><strong>Crypto</strong></td>
 <td><code>lib/crypto/</code></td>
-<td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Poly</code>, <code>Rand</code>, <code>X25519</code></td>
+<td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Pem</code>, <code>Poly</code>, <code>Rand</code>, <code>X25519</code>, <code>X509</code></td>
 </tr>
 </tbody></table></div>
 <h2 id="daftar-modul">Daftar modul<a class="anchor" href="#daftar-modul" aria-label="tautan">#</a></h2>
@@ -426,6 +426,12 @@
 <td>PBKDF2-HMAC-SHA256 untuk menyimpan kata sandi dengan iterasi tinggi.</td>
 </tr>
 <tr>
+<td><a href="api-crypto.html#pem"><code>Pem</code></a></td>
+<td><code>lib/crypto/Pem.kop</code></td>
+<td>3</td>
+<td>Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner.</td>
+</tr>
+<tr>
 <td><a href="api-crypto.html#poly"><code>Poly</code></a></td>
 <td><code>lib/crypto/Poly.kop</code></td>
 <td>10</td>
@@ -442,6 +448,12 @@
 <td><code>lib/crypto/X25519.kop</code></td>
 <td>2</td>
 <td>Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3.</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#x509"><code>X509</code></a></td>
+<td><code>lib/crypto/X509.kop</code></td>
+<td>11</td>
+<td>Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik.</td>
 </tr>
 </tbody></table></div>
 <h2 id="cara-menerapkan">Cara menerapkan<a class="anchor" href="#cara-menerapkan" aria-label="tautan">#</a></h2>

@@ -1,0 +1,56 @@
+/* Pem.kop — armor PEM (RFC 7468) untuk DER, murni di bahasa Kopi (v1.26).
+ *
+ * Bergantung Cipher.kop (base64) dan Str.kop (manipulasi teks).
+ *
+ * Fungsi:
+ *   decode(pem)            → DER (int[] byte); array kosong bila bukan PEM
+ *   label(pem)             → label di "-----BEGIN ..." (mis. "CERTIFICATE")
+ *   encode(der, label)     → teks PEM
+ */
+
+import Cipher;
+import Str;
+
+class Pem {
+
+    /* label dari armor: "CERTIFICATE", "PUBLIC KEY", ... */
+    static String label(String pem) {
+        int i = Str.indexOf(pem, "-----BEGIN ", 0);
+        if (i < 0) return "";
+        int j = Str.indexOf(pem, "-----", i + 11);
+        if (j < 0) return "";
+        return Str.trim(Str.sub(pem, i + 11, j - (i + 11)));
+    }
+
+    /* PEM → DER; kosong bila tidak ada armor atau base64 rusak */
+    static int[] decode(String pem) {
+        int i = Str.indexOf(pem, "-----BEGIN ", 0);
+        if (i < 0) return new int[0];
+        int j = Str.indexOf(pem, "-----", i + 11);
+        if (j < 0) return new int[0];
+        int k = Str.indexOf(pem, "-----END ", j);
+        if (k < 0) return new int[0];
+        String b64 = Str.sub(pem, j + 5, k - (j + 5));
+        b64 = Str.replace(b64, "\n", "");
+        b64 = Str.replace(b64, "\r", "");
+        b64 = Str.replace(b64, " ", "");
+        b64 = Str.replace(b64, "\t", "");
+        return Cipher.b64dec(b64);
+    }
+
+    /* DER → PEM (baris base64 dilipat 64 karakter) */
+    static String encode(int[] der, String label) {
+        String b64 = Cipher.b64enc(der);
+        String out = "-----BEGIN " + label + "-----\n";
+        int n = b64.length;
+        int pos = 0;
+        while (pos < n) {
+            int take = 64;
+            if (pos + take > n) take = n - pos;
+            out = out + Str.sub(b64, pos, take) + "\n";
+            pos = pos + take;
+        }
+        out = out + "-----END " + label + "-----\n";
+        return out;
+    }
+}
