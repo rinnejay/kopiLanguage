@@ -1,0 +1,169 @@
+// malloc.kop — contoh pemakaian blok `malloc { ... }` (v1.20).
+//
+// Prinsip: semua yang dialokasikan di dalam blok (new int[], String hasil
+// operasi, dll.) hidup HANYA selama blok itu. Compiler memasang penanda
+// arena saat masuk dan membebaskannya lagi di akhir blok — juga saat
+// break, continue, dan return. Jadi tidak perlu Net.memMark/memReset.
+//
+// Kompilasi & jalankan:
+//   ./kopicc examples/malloc.kop -t a64 -o /tmp/malloc.s && cc /tmp/malloc.s -o /tmp/malloc && /tmp/malloc
+//   ./kopicc examples/malloc.kop -t vm  -o /tmp/malloc.kbc && ./kopivm /tmp/malloc.kbc
+import Str;
+
+class Main {
+
+    // ── 1. Fungsi yang memakai memori sementara lalu mengembalikan NILAI ──
+    // Boleh `return` dari dalam malloc{} asalkan nilainya bertipe nilai
+    // (int/long/bool/double), bukan rujukan (String/array/objek).
+    static int jumlahKuadrat(int n) {
+        int total = 0;
+        malloc {
+            int[] kuadrat = new int[n];
+            for (int i = 0; i < n; i++) kuadrat[i] = i * i;
+            for (int i = 0; i < n; i++) total = total + kuadrat[i];
+        }                                     // kuadrat dibebaskan di sini
+        return total;
+    }
+
+    // ── 2. Return nilai dari dalam blok: arena tetap dibebaskan ──
+    static long kaliBesar(long a, long b) {
+        malloc {
+            int[] buffer = new int[100000];   // 800 KB sementara
+            buffer[0] = 0;
+            return a * b + buffer[0];
+        }
+    }
+
+    // ── 3. Loop panas: alokasi besar berulang tanpa kehabisan arena ──
+    // Tanpa malloc{} ini akan menabrak batas arena 32 MB.
+    static int hitungBongkarMuat(int iterasi) {
+        int sukses = 0;
+        for (int k = 0; k < iterasi; k++) {
+            malloc {
+                int[] buf = new int[175000];        // 1,4 MB
+                buf[0] = k;
+                buf[174999] = k * 2;
+                String tag = Str.fromInt(buf[174999]);  // String juga arena
+                if (tag.length > 0) sukses = sukses + 1;
+            }
+        }
+        return sukses;
+    }
+
+    public static void main(String[] args) {
+        // ── A. Pemakaian dasar: data sementara di dalam blok ──
+        int hasil = 0;
+        malloc {
+            int[] data = new int[8];
+            for (int i = 0; i < 8; i++) data[i] = i + 1;
+            for (int i = 0; i < 8; i++) hasil = hasil + data[i];
+        }   // setelah ini `data` tidak boleh dipakai lagi (sudah dibebaskan)
+        System.out.println(hasil);                 // 36
+
+        // ── B. Nilai keluar lewat variabel/tabel LUAR; rujukan tidak ──
+        int[] ringkasan = new int[3];              // hidup di luar blok
+        malloc {
+            int[] sementara = new int[16];
+            sementara[0] = 70;
+            sementara[1] = 80;
+            ringkasan[0] = sementara[0] + sementara[1];   // tulis NILAI: boleh
+            ringkasan[1] = sementara.length;              // baca panjang: boleh
+            String pesan = Str.upper("kopi");
+            ringkasan[2] = pesan.length;                  // simpan panjangnya saja
+        }
+        System.out.println(ringkasan[0]);          // 150
+        System.out.println(ringkasan[1]);          // 16
+        System.out.println(ringkasan[2]);          // 4
+
+        // ── C. Membaca rujukan luar di dalam blok: boleh ──
+        String nama = "kopi lang";
+        malloc {
+            String besar = Str.upper(nama);
+            System.out.println(besar);             // KOPI LANG
+            int[] salinanByte = Net.strbytes(nama); // int[] sementara
+            System.out.println(salinanByte.length); // 9
+        }
+
+        // ── D. break / continue yang keluar blok ikut membebaskan arena ──
+        int jejak = 0;
+        for (int i = 0; i < 100; i++) {
+            malloc {
+                int[] besar = new int[250000];     // 2 MB
+                besar[0] = i;
+                jejak = jejak + besar[0];
+                if (i == 2) continue;              // keluar blok → bebas
+            }
+            malloc {
+                int[] besar = new int[250000];
+                jejak = jejak + 1;
+                if (i == 3) break;                 // keluar blok + loop → bebas
+            }
+        }
+        System.out.println(jejak);                 // 0+1+2+3 +1+1 = 9
+
+        // ── E. break milik loop DI DALAM blok: isi blok tetap hidup ──
+        malloc {
+            int[] tetap = new int[4];
+            tetap[0] = 7;
+            for (int i = 0; i < 10; i++) { break; }        // tidak keluar blok
+            System.out.println(tetap[0]);          // 7 — masih valid
+        }
+
+        // ── F. Blok bersarang: lapisan dalam bebas dulu, luar tetap utuh ──
+        malloc {
+            int[] luar = new int[100000];
+            luar[0] = 1;
+            malloc {
+                int[] dalam = new int[100000];
+                dalam[0] = 2;
+                System.out.println(luar[0] + dalam[0]);   // 3
+            }                                          // `dalam` bebas
+            System.out.println(luar[0]);               // 1 — masih valid
+        }
+
+        // ── G. Pola server: reset per request tanpa memMark/memReset ──
+        // Setiap iterasi memproses "request" dengan buffer besar; arena
+        // selalu kembali bersih tanpa satu pun panggilan manual.
+        for (int req = 0; req < 5; req++) {
+            malloc {
+                int[] body = new int[100000];          // 800 KB / request
+                body[0] = req;
+                String log = `request {req} diproses`; // template = String arena
+                if (log.length > 20) body[1] = 1;
+            }
+        }
+        System.out.println("server: 5 request tanpa memReset");
+
+        // ── H. Fungsi pembantu yang memakai malloc di dalam ──
+        System.out.println(jumlahKuadrat(10));     // 285
+        System.out.println(kaliBesar(2000000000L, 3)); // 6000000000
+        System.out.println(hitungBongkarMuat(40)); // 40 (40 × 1,4 MB = 56 MB > 32 MB)
+
+        // ── I. memMark/memReset manual masih tersedia (opsional) ──
+        int mark = Net.memMark();
+        int[] manual = new int[1000];
+        manual[0] = 42;
+        System.out.println(manual[0]);             // 42
+        Net.memReset(mark);                        // bebas seperti biasa
+
+        System.out.println("selesai");
+
+        // Yang DILARANG compiler (masing-masing jadi error saat kompilasi):
+        //
+        //   String luar;
+        //   malloc { luar = Str.upper("x"); }        // rujukan ke variabel luar
+        //
+        //   int[] hasilArr = new int[2];
+        //   malloc { hasilArr[0] = "x"; }            // String ke elemen array luar
+        //
+        //   static String f() {
+        //       malloc { return Str.upper("x"); }    // return rujukan
+        //   }
+        //
+        //   K obj = new K();
+        //   malloc { obj.nama = "x"; }               // String ke field luar
+        //
+        // Untuk kasus itu: simpan NILAI (panjang/isi byte), atau alokasikan
+        // hasilnya di luar blok dan isi dari dalam.
+    }
+}

@@ -99,8 +99,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **136/136** (v1.20) — a64 + VM + sintaks x64 + dokumen HTML
-  (148 PASS termasuk cek x64 yang tidak masuk counter).
+- Suite: **138/138** (v1.20) — a64 + VM + sintaks x64 + dokumen HTML
+  (150 PASS termasuk cek x64 yang tidak masuk counter).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal

@@ -486,6 +486,7 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <li>Tanpa reset, program batch panjang bisa kehabisan arena; <code>malloc{}</code> atau reset per request/iterasi menghindarinya.</li>
 <li>Lebih dari 32 MB → <code>kopi: arena memori habis</code> + exit 1 (bukan crash).</li>
 </ol>
+<p>Contoh lengkap yang bisa dijalankan (diuji di suite): <code>examples/malloc.kop</code>.</p>
 <p>Catatan jujur: <code>malloc{}</code> adalah <strong>region scope</strong>, bukan GC. Rujukan yang diselundupkan lewat jalur yang tak terlihat compiler (mis. method lain menyimpan parameter ke variabel global) tetap tanggung jawab programmer; pola itu belum dijaga pemeriksa.</p>
 <h2 id="15-keluar-kode-status">15. Keluar &amp; kode status<a class="anchor" href="#15-keluar-kode-status" aria-label="tautan">#</a></h2>
 <pre><code class="language-java">Net.exit(0);      // keluar seketika; tidak ada finally/atexit</code></pre>

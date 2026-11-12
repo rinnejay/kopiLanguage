@@ -1424,6 +1424,13 @@ check regiontest test/regiontest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/regiontest64.s" -o /dev/null \
     && echo "PASS  regiontest [x64]" || { echo "FAIL  regiontest [x64]"; FAIL=$((FAIL+1)); }
 # diagnostik escape: rujukan tidak boleh keluar malloc{}
+# contoh resmi examples/malloc.kop ikut diuji (output = dokumentasi hidup)
+printf '36\n150\n16\n4\nKOPI LANG\n9\n9\n7\n3\n1\nserver: 5 request tanpa memReset\n285\n6000000000\n40\n42\nselesai\n' > "$T/kopi/mallex.ref"
+check mallex examples/malloc.kop
+./kopicc examples/malloc.kop -t x64 -o "$T/kopi/mallex64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/mallex64.s" -o /dev/null \
+    && echo "PASS  mallex [x64]" || { echo "FAIL  mallex [x64]"; FAIL=$((FAIL+1)); }
+
 cat > "$T/kopi/rgesc.kop" <<'EOF'
 class Main {
     public static void main(String[] args) {

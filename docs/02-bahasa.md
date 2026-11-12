@@ -565,6 +565,8 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark
    atau reset per request/iterasi menghindarinya.
 5. Lebih dari 32 MB → `kopi: arena memori habis` + exit 1 (bukan crash).
 
+Contoh lengkap yang bisa dijalankan (diuji di suite): `examples/malloc.kop`.
+
 Catatan jujur: `malloc{}` adalah **region scope**, bukan GC. Rujukan
 yang diselundupkan lewat jalur yang tak terlihat compiler (mis. method
 lain menyimpan parameter ke variabel global) tetap tanggung jawab
