@@ -19,8 +19,8 @@ class Dns {
 
     /* ── menyusun permintaan ───────────────────────────────────── */
 
-    /* nama "kopi.test" (byte-as-int, pemisah titik ASCII 46)
-     * → QNAME: panjang·oktet ... lalu terminator 0 */
+    /* nama "kopi.test" (String, pemisah titik ASCII 46)
+     * → QNAME biner: panjang·oktet ... lalu terminator 0 */
     static int[] qname(String dotted) {
         int[] tmp = new int[dotted.length + 2];
         int o = 0;

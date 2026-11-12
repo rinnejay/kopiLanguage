@@ -50,7 +50,7 @@ Dns.lookup(serverIp, 53, "example.com", hasil, 512);
 
 | Fungsi | Keterangan |
 |---|---|
-| `static int[] qname(String dotted)` | nama "kopi.test" (byte-as-int, pemisah titik ASCII 46) → QNAME: panjang·oktet ... lalu terminator 0 |
+| `static int[] qname(String dotted)` | nama "kopi.test" (String, pemisah titik ASCII 46) → QNAME biner: panjang·oktet ... lalu terminator 0 |
 | `static int[] query(String dottedName, int qtype)` | permintaan penuh: header + QNAME + QTYPE + QCLASS=1 (IN) |
 | `static int skipName(int[] m, int i)` | lewati nama di dalam pesan: label (hitung byte) atau pointer 2 byte (≥ 0xC0); kembalikan indeks sesudah nama |
 | `static int rcodeOf(int[] resp)` | nilai RCODE dari flag byte ke-4 |
@@ -81,7 +81,7 @@ System.out.println(Http.payload(r));
 
 | Fungsi | Keterangan |
 |---|---|
-| `static String req(String host, String path)` | susun baris permintaan GET lengkap: "GET <path> HTTP/1.0\r\nHost: <host>\r\n\r\n" (Net.bytes literal sama di-dedup compiler ke satu isi cpool) |
+| `static String req(String host, String path)` | susun baris permintaan GET lengkap: "GET <path> HTTP/1.0\r\nHost: <host>\r\n\r\n" |
 | `static int statusOf(int[] resp)` | kode status HTTP dari baris pertama ("HTTP/1.0 200 OK"), -1 bila tidak cocol dengan format baris status |
 | `static int[] bodyOf(int[] resp)` | isi (body) respons: semua byte setelah pemisah CRLF CRLF. tanpa pemisah (jawaban tak utuh) → seluruh respons dibalikkan. |
 | `static int getInto(int addr, int port, String host, String path, int[] buf)` | kirim GET dan muat SELURUH respons (header + body) ke buf. sukses → total byte respons (≥ 0); gagal → kode negatif. buf terlalu kecil → respons terpotong (batas v1 tercatat). |
@@ -94,7 +94,7 @@ System.out.println(Http.payload(r));
 | `static int bodyStart(int[] resp)` | indeks awal body (setelah CRLF CRLF), -1 bila tidak ada |
 | `static int[] headerBlock(int[] resp)` | potongan header mentah (tanpa baris status & tanpa CRLF CRLF) |
 | `static int lowerc(int c)` | (internal) huruf kecil ASCII |
-| `static boolean nameEq(int[] line, int at, String name)` | (internal) nama header cocok pada posisi |
+| `static boolean nameEq(String line, int at, String name)` | (internal) nama header cocok pada posisi |
 | `static String headerValue(int[] resp, String name)` | nilai header (tanpa spasi tepi), array kosong bila tidak ada. perbandingan nama case-insensitive; baris pertama yang cocok dipakai. |
 | `static boolean hasHeader(int[] resp, String name)` | true bila respons punya header name |
 | `static int hexVal(int c)` | ═══ v1.9.2: HTTP/1.1 — chunked, redirect, form, auth ═══════ |
@@ -113,7 +113,7 @@ System.out.println(Http.payload(r));
 
 ## HttpServer
 
-`lib/net/HttpServer.kop` · 34 fungsi
+`lib/net/HttpServer.kop` · 35 fungsi
 
 Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie, chunked.
 
@@ -134,7 +134,6 @@ HttpServer.send(c, resp);
 
 | Fungsi | Keterangan |
 |---|---|
-| `static int findByte(int[] s, int b, int from, int to)` | (internal) cari byte dalam rentang |
 | `static int[] readRequest(int fd, int max)` | baca request (header + body sesuai Content-Length). hasil = seluruh byte request; array kosong bila EOF/galat. |
 | `static int[] requestLine(int[] req)` | baris pertama request (method target versi) |
 | `static String method(int[] req)` | method request (GET/POST/...) |
@@ -144,6 +143,8 @@ HttpServer.send(c, resp);
 | `static String version(int[] req)` | versi HTTP dari baris request |
 | `static int findChar(String s, int b, int from, int to)` | cari byte pada String dalam rentang [from,to) |
 | `static String headerValue(int[] req, String name)` | nilai header pertama bernama name |
+| `static int lowerc(int c)` | — |
+| `static boolean nameAt(String line, int ls, int le, String name)` | true bila baris diawali `name` lalu ':' (case-insensitive) |
 | `static int contentLength(int[] req)` | nilai Content-Length (0 bila tidak ada) |
 | `static int[] body(int[] req)` | isi body request |
 | `static int hexv(int c)` | (internal) hex char → nilai |
@@ -550,6 +551,6 @@ if (WebSocket.isUpgrade(req)) {
 
 | Nama | Keterangan |
 |---|---|
-| `static int[] GUID()` | GUID RFC 6455 untuk handshake |
+| `static String GUID()` | GUID RFC 6455 untuk handshake |
 
 ---

@@ -216,20 +216,25 @@ class Url {
 
     /* empat oktet "a.b.c.d" → ip; 0 bila tidak valid */
     static int ip4(String s) {
-        int[] b = Net.strbytes(s);
-        if (Bytes.splitCount(b, 46) != 4) return 0;
         int[] v = new int[4];
-        for (int i = 0; i < 4; i++) {
-            int[] p = Bytes.splitAt(b, 46, i);
-            if (p.length == 0 || p.length > 3) return 0;
-            int x = 0;
-            for (int k = 0; k < p.length; k++) {
-                if (p[k] < 48 || p[k] > 57) return 0;
-                x = x * 10 + (p[k] - 48);
+        int part = 0;
+        int x = 0;
+        int digits = 0;
+        for (int i = 0; i < s.length; i++) {
+            int c = s[i];
+            if (c == 46) {                              /* '.' */
+                if (digits == 0 || part >= 3) return 0;
+                v[part] = x; part++; x = 0; digits = 0;
+            } else if (c >= 48 && c <= 57) {
+                x = x * 10 + (c - 48);
+                digits++;
+                if (digits > 3 || x > 255) return 0;
+            } else {
+                return 0;
             }
-            if (x > 255) return 0;
-            v[i] = x;
         }
+        if (digits == 0 || part != 3) return 0;
+        v[3] = x;
         return v[0] * 16777216 + v[1] * 65536 + v[2] * 256 + v[3];
     }
 

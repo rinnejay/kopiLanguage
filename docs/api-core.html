@@ -997,7 +997,7 @@ System.out.println(Map.size(m));      // 1</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="mapstr">MapStr<a class="anchor" href="#mapstr" aria-label="tautan">#</a></h2>
-<p><code>lib/core/MapStr.kop</code> · 13 fungsi</p>
+<p><code>lib/core/MapStr.kop</code> · 14 fungsi</p>
 <p>Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan tabel kecil.</p>
 <pre><code class="language-java">import MapStr;
 
@@ -1043,12 +1043,16 @@ System.out.println(MapStr.get(m, "Content-Type")); // 1</code></pre>
 <td>ambil nilai atau default bila tidak ada</td>
 </tr>
 <tr>
-<td><code>static boolean put(int[] m, String keyStr, int v)</code></td>
+<td><code>static boolean put(int[] m, String key, int v)</code></td>
 <td>simpan pasangan</td>
 </tr>
 <tr>
 <td><code>static boolean remove(int[] m, String key)</code></td>
 <td>hapus elemen</td>
+</tr>
+<tr>
+<td><code>static boolean removeAt(int[] m, int slot)</code></td>
+<td>hapus berdasarkan slot yang sudah diketahui (mis. saat sweep)</td>
 </tr>
 <tr>
 <td><code>static void clear(int[] m)</code></td>

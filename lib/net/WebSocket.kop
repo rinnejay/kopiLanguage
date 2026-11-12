@@ -9,33 +9,32 @@
 // Contoh server gema: examples/ws/WsEcho.kop
 
 import Bytes;
+import Str;
 import Hash;
 import Cipher;
 import HttpServer;
 
 class WebSocket {
 
-    static int[] GUID() { return Net.bytes("258EAFA5-E914-47DA-95CA-C5AB0DC85B11"); }
+    static String GUID() { return "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"; }
 
     /* Sec-WebSocket-Accept = base64(SHA1(key + GUID)) */
     static String accept(String key) {
-        int[] raw = Bytes.cat(key, GUID());
-        return Cipher.b64enc(Hash.sha1(raw));
+        return Cipher.b64enc(Hash.sha1(key + GUID()));
     }
 
     static boolean isUpgrade(int[] req) {
         String up = HttpServer.headerValue(req, "Upgrade");
         String key = HttpServer.headerValue(req, "Sec-WebSocket-Key");
-        return Bytes.equalsIgnoreCase(up, Net.bytes("websocket")) && key.length > 0;
+        return Str.equalsIgnoreCase(up, "websocket") && key.length > 0;
     }
 
     /* respons 101 Switching Protocols */
     static int[] handshake(int[] req) {
         String key = HttpServer.headerValue(req, "Sec-WebSocket-Key");
-        int[] s = Net.bytes("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ");
-        s = Bytes.cat(s, accept(key));
-        s = Bytes.cat(s, Net.bytes("\r\n\r\n"));
-        return s;
+        return Net.strbytes("HTTP/1.1 101 Switching Protocols\r\n"
+                          + "Upgrade: websocket\r\nConnection: Upgrade\r\n"
+                          + "Sec-WebSocket-Accept: " + accept(key) + "\r\n\r\n");
     }
 
     /* ── frame server (tanpa mask) ─────────────────────────────── */

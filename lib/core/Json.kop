@@ -70,15 +70,21 @@ class Json {
         return v;
     }
 
-    static int[] num(String text) {
+    /* konstruktor inti bekerja pada byte supaya parser tidak bolak-balik
+     * String ↔ int[]; API publik menerima String. */
+    private static int[] numBytes(int[] text) {
         int[] v = two(NUMV(), text.length);
         return cat(v, text);
     }
 
-    static int[] str(String s) {
+    private static int[] strBytes(int[] s) {
         int[] v = two(STRV(), s.length);
         return cat(v, s);
     }
+
+    static int[] num(String text) { return numBytes(Net.strbytes(text)); }
+
+    static int[] str(String s) { return strBytes(Net.strbytes(s)); }
 
     static int[] arr0() {
         return two(ARRV(), 0);
@@ -135,12 +141,15 @@ class Json {
         return 0;
     }
 
-    /* teks mentah untuk number/string */
-    static String asText(int[] v) {
+    /* potongan teks mentah number/string pada tape */
+    private static int[] textBytes(int[] v) {
         int t = typeOf(v);
-        if (t == NUMV() || t == STRV()) return Net.mkstr(slice(v, 2, v[1]));
-        return "";
+        if (t == NUMV() || t == STRV()) return slice(v, 2, v[1]);
+        return new int[0];
     }
+
+    /* teks mentah untuk number/string */
+    static String asText(int[] v) { return Net.mkstr(textBytes(v)); }
 
     /* jumlah elemen array / pasangan objek */
     static int count(int[] v) {
@@ -157,7 +166,7 @@ class Json {
         return slice(arr, p, skip(arr, p) - p);
     }
 
-    static boolean keyEq(int[] t, int at, int len, String key) {
+    private static boolean keyEqBytes(int[] t, int at, int len, int[] key) {
         if (len != key.length) return false;
         for (int i = 0; i < len; i++) {
             if (t[at + i] != key[i]) return false;
@@ -165,7 +174,11 @@ class Json {
         return true;
     }
 
-    static int[] get(int[] obj, String key) {
+    static boolean keyEq(int[] t, int at, int len, String key) {
+        return keyEqBytes(t, at, len, Net.strbytes(key));
+    }
+
+    private static int[] getBytes(int[] obj, int[] key) {
         if (typeOf(obj) != OBJV()) return new int[0];
         int c = obj[1];
         int p = 2;
@@ -176,18 +189,24 @@ class Json {
             p = p + kl;
             int vs = p;
             int ve = skip(obj, p);
-            if (keyEq(obj, ks, kl, key)) return slice(obj, vs, ve - vs);
+            if (keyEqBytes(obj, ks, kl, key)) return slice(obj, vs, ve - vs);
             p = ve;
         }
         return new int[0];
     }
 
+    static int[] get(int[] obj, String key) { return getBytes(obj, Net.strbytes(key)); }
+
     static boolean has(int[] obj, String key) {
-        return get(obj, key).length > 0;
+        return getBytes(obj, Net.strbytes(key)).length > 0;
     }
 
     /* objek baru dengan key diganti/ditambah (immutable) */
     static int[] put(int[] obj, String key, int[] val) {
+        return putBytes(obj, Net.strbytes(key), val);
+    }
+
+    private static int[] putBytes(int[] obj, int[] key, int[] val) {
         if (typeOf(obj) != OBJV()) return obj;
         int c = obj[1];
         int p = 2;
@@ -201,7 +220,7 @@ class Json {
             int vs = p;
             int ve = skip(obj, p);
             int[] vv = val;
-            if (keyEq(obj, ks, kl, key)) {
+            if (keyEqBytes(obj, ks, kl, key)) {
                 vv = val;
                 found = 1;
             } else {
@@ -222,6 +241,10 @@ class Json {
     }
 
     static int[] del(int[] obj, String key) {
+        return delBytes(obj, Net.strbytes(key));
+    }
+
+    private static int[] delBytes(int[] obj, int[] key) {
         if (typeOf(obj) != OBJV()) return obj;
         int c = obj[1];
         int p = 2;
@@ -234,7 +257,7 @@ class Json {
             p = p + kl;
             int vs = p;
             int ve = skip(obj, p);
-            if (!keyEq(obj, ks, kl, key)) {
+            if (!keyEqBytes(obj, ks, kl, key)) {
                 out = cat(out, one(kl));
                 out = cat(out, slice(obj, ks, kl));
                 out = cat(out, slice(obj, vs, ve - vs));
@@ -275,7 +298,7 @@ class Json {
     /* integer dari teks number (bagian pecahan dipotong); wrap int32 */
     static int asInt(int[] v) {
         if (typeOf(v) == BOOLV()) return v[1];
-        int[] t = Net.strbytes(asText(v));
+        int[] t = textBytes(v);
         int i = 0;
         int neg = 0;
         if (i < t.length && t[i] == 45) { neg = 1; i++; }
@@ -292,7 +315,7 @@ class Json {
 
     /* double dari teks number (dukung pecahan & eksponen) */
     static double asDouble(int[] v) {
-        int[] t = Net.strbytes(asText(v));
+        int[] t = textBytes(v);
         int i = 0;
         int neg = 0;
         if (i < t.length && t[i] == 45) { neg = 1; i++; }
@@ -438,7 +461,7 @@ class Json {
         if (c == 34) {
             int[] s = pstr(t, pos);
             if (s.length == 0 && pos[0] < t.length && t[pos[0]-1] != 34) return new int[0];
-            return str(Net.mkstr(s));
+            return strBytes(s);
         }
         if (c == 123) {                     /* object */
             pos[0] = pos[0] + 1;
@@ -454,7 +477,7 @@ class Json {
                 pos[0] = pos[0] + 1;
                 int[] val = pval(t, pos);
                 if (val.length == 0) return new int[0];
-                obj = put(obj, Net.mkstr(key), val);
+                obj = putBytes(obj, key, val);
                 pws(t, pos);
                 if (pos[0] < t.length && t[pos[0]] == 44) { pos[0] = pos[0] + 1; continue; }
                 if (pos[0] < t.length && t[pos[0]] == 125) { pos[0] = pos[0] + 1; return obj; }
@@ -485,7 +508,7 @@ class Json {
             pos[0] = pos[0] + 1;
         }
         if (pos[0] == s0) return new int[0];
-        return num(Net.mkstr(slice(t, s0, pos[0] - s0)));
+        return numBytes(slice(t, s0, pos[0] - s0));
     }
 
     /* API publik: teks JSON → tape */

@@ -94,7 +94,7 @@ Dns.lookup(serverIp, 53, "example.com", hasil, 512);</code></pre>
 </tr></thead><tbody>
 <tr>
 <td><code>static int[] qname(String dotted)</code></td>
-<td>nama "kopi.test" (byte-as-int, pemisah titik ASCII 46) → QNAME: panjang·oktet ... lalu terminator 0</td>
+<td>nama "kopi.test" (String, pemisah titik ASCII 46) → QNAME biner: panjang·oktet ... lalu terminator 0</td>
 </tr>
 <tr>
 <td><code>static int[] query(String dottedName, int qtype)</code></td>
@@ -139,7 +139,7 @@ System.out.println(Http.payload(r));</code></pre>
 </tr></thead><tbody>
 <tr>
 <td><code>static String req(String host, String path)</code></td>
-<td>susun baris permintaan GET lengkap: "GET &lt;path&gt; HTTP/1.0\r\nHost: &lt;host&gt;\r\n\r\n" (Net.bytes literal sama di-dedup compiler ke satu isi cpool)</td>
+<td>susun baris permintaan GET lengkap: "GET &lt;path&gt; HTTP/1.0\r\nHost: &lt;host&gt;\r\n\r\n"</td>
 </tr>
 <tr>
 <td><code>static int statusOf(int[] resp)</code></td>
@@ -190,7 +190,7 @@ System.out.println(Http.payload(r));</code></pre>
 <td>(internal) huruf kecil ASCII</td>
 </tr>
 <tr>
-<td><code>static boolean nameEq(int[] line, int at, String name)</code></td>
+<td><code>static boolean nameEq(String line, int at, String name)</code></td>
 <td>(internal) nama header cocok pada posisi</td>
 </tr>
 <tr>
@@ -248,7 +248,7 @@ System.out.println(Http.payload(r));</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="httpserver">HttpServer<a class="anchor" href="#httpserver" aria-label="tautan">#</a></h2>
-<p><code>lib/net/HttpServer.kop</code> · 34 fungsi</p>
+<p><code>lib/net/HttpServer.kop</code> · 35 fungsi</p>
 <p>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie, chunked.</p>
 <pre><code class="language-java">import HttpServer;
 
@@ -267,10 +267,6 @@ HttpServer.send(c, resp);</code></pre>
 <th>Fungsi</th>
 <th>Keterangan</th>
 </tr></thead><tbody>
-<tr>
-<td><code>static int findByte(int[] s, int b, int from, int to)</code></td>
-<td>(internal) cari byte dalam rentang</td>
-</tr>
 <tr>
 <td><code>static int[] readRequest(int fd, int max)</code></td>
 <td>baca request (header + body sesuai Content-Length). hasil = seluruh byte request; array kosong bila EOF/galat.</td>
@@ -306,6 +302,14 @@ HttpServer.send(c, resp);</code></pre>
 <tr>
 <td><code>static String headerValue(int[] req, String name)</code></td>
 <td>nilai header pertama bernama name</td>
+</tr>
+<tr>
+<td><code>static int lowerc(int c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean nameAt(String line, int ls, int le, String name)</code></td>
+<td>true bila baris diawali <code>name</code> lalu ':' (case-insensitive)</td>
 </tr>
 <tr>
 <td><code>static int contentLength(int[] req)</code></td>
@@ -1087,7 +1091,7 @@ if (WebSocket.isUpgrade(req)) {
 <th>Keterangan</th>
 </tr></thead><tbody>
 <tr>
-<td><code>static int[] GUID()</code></td>
+<td><code>static String GUID()</code></td>
 <td>GUID RFC 6455 untuk handshake</td>
 </tr>
 </tbody></table></div>

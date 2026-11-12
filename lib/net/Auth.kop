@@ -3,7 +3,6 @@
 //   String v = HttpServer.headerValue(req, "Authorization");
 //   if (Auth.checkBasic(v, "budi", "rahasia")) { ... }
 
-import Bytes;
 import Str;
 import Cipher;
 

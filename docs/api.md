@@ -22,7 +22,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Json`](api-core.md#json) | `lib/core/Json.kop` | 57 | Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape `int[]`; literal bahasa memakai… |
 | [`Log`](api-core.md#log) | `lib/core/Log.kop` | 4 | Logging ke stderr dengan timestamp UTC dan level. |
 | [`Map`](api-core.md#map) | `lib/core/Map.kop` | 13 | Hash map int→int dengan open addressing dan `grow` eksplisit. |
-| [`MapStr`](api-core.md#mapstr) | `lib/core/MapStr.kop` | 13 | Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan… |
+| [`MapStr`](api-core.md#mapstr) | `lib/core/MapStr.kop` | 14 | Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan… |
 | [`Math`](api-core.md#math) | `lib/core/Math.kop` | 72 | Matematika integer 32-bit: bit, pangkat/akar/log, FPB/modular, prima, kombinatorika, dan geometri. |
 | [`Matrix`](api-core.md#matrix) | `lib/core/Matrix.kop` | 15 | Matriks persegi yang disimpan sebagai `int[]` datar (baris demi baris): aritmetika, transpose, trace,… |
 | [`Path`](api-core.md#path) | `lib/core/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
@@ -38,7 +38,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Auth`](api-net.md#auth) | `lib/net/Auth.kop` | 8 | Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401. |
 | [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 6 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
 | [`Http`](api-net.md#http) | `lib/net/Http.kop` | 27 | Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik. |
-| [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 34 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
+| [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 35 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
 | [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 6 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
 | [`Mime`](api-net.md#mime) | `lib/net/Mime.kop` | 1 | Pemetaan ekstensi file → header Content-Type. |
 | [`Resolv`](api-net.md#resolv) | `lib/net/Resolv.kop` | 5 | Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout. |

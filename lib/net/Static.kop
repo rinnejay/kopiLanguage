@@ -1,7 +1,7 @@
 // Static.kop — penyajian file statis minimal di atas File (v1.9.2).
 import File;
-import Path;
 import Bytes;
+import Str;
 import HttpServer;
 import Mime;
 
@@ -12,7 +12,7 @@ class Static {
 
     /* sajikan file; tolak path traversal "..". */
     static int[] serve(String path) {
-        if (Bytes.contains(path, Net.bytes(".."))) return HttpServer.forbidden();
+        if (Str.contains(path, "..")) return HttpServer.forbidden();
         int fd = File.openRead(path);
         if (fd < 0) return HttpServer.notFound();
         int sz = File.size(fd);
@@ -28,14 +28,14 @@ class Static {
 
     /* varian keep-alive */
     static int[] serveKA(String path, int keep) {
-        if (Bytes.contains(path, Net.bytes(".."))) {
+        if (Str.contains(path, "..")) {
             return HttpServer.responseKA(403, "text/plain; charset=utf-8",
-                                         Net.bytes("forbidden\n"), keep);
+                                         "forbidden\n", keep);
         }
         int fd = File.openRead(path);
         if (fd < 0) {
             return HttpServer.responseKA(404, "text/plain; charset=utf-8",
-                                         Net.bytes("not found\n"), keep);
+                                         "not found\n", keep);
         }
         int sz = File.size(fd);
         if (sz < 0) sz = 0;

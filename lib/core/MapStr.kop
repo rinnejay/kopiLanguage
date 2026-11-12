@@ -88,10 +88,10 @@ class MapStr {
         return true;
     }
 
-    static boolean put(int[] m, String keyStr, int v) {
-        int[] key = Net.strbytes(keyStr);
+    static boolean put(int[] m, String key, int v) {
+        int[] kb = Net.strbytes(key);
         int c = m[0];
-        int h = hash(key);
+        int h = hash(kb);
         int i = h & (c - 1);
         int tomb = -1;
         for (int n = 0; n < c; n++) {
@@ -99,24 +99,28 @@ class MapStr {
             if (hh == 0) {
                 int at = i;
                 if (tomb >= 0) at = tomb;
-                return place(m, at, key, h, v);
+                return place(m, at, kb, h, v);
             }
             if (hh == TOMB()) {
                 if (tomb < 0) tomb = i;
-            } else if (same(m, i, key, h)) {
+            } else if (same(m, i, kb, h)) {
                 m[4 + 3 * c + i] = v;
                 return true;
             }
             i = (i + 1) & (c - 1);
         }
-        if (tomb >= 0) return place(m, tomb, key, h, v);
+        if (tomb >= 0) return place(m, tomb, kb, h, v);
         return false;
     }
 
     static boolean remove(int[] m, String key) {
-        int i = find(m, Net.strbytes(key));
-        if (i < 0) return false;
-        m[4 + i] = TOMB();
+        return removeAt(m, find(m, Net.strbytes(key)));
+    }
+
+    /* hapus berdasarkan slot yang sudah diketahui (mis. saat sweep) */
+    static boolean removeAt(int[] m, int slot) {
+        if (slot < 0 || slot >= m[0] || !used(m, slot)) return false;
+        m[4 + slot] = TOMB();
         m[1] = m[1] - 1;
         return true;
     }

@@ -411,7 +411,7 @@ System.out.println(Map.size(m));      // 1
 
 ## MapStr
 
-`lib/core/MapStr.kop` · 13 fungsi
+`lib/core/MapStr.kop` · 14 fungsi
 
 Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan tabel kecil.
 
@@ -437,8 +437,9 @@ System.out.println(MapStr.get(m, "Content-Type")); // 1
 | `static boolean has(int[] m, String key)` | true bila elemen/kunci ada |
 | `static int get(int[] m, String key)` | ambil nilai |
 | `static int getOr(int[] m, String key, int def)` | ambil nilai atau default bila tidak ada |
-| `static boolean put(int[] m, String keyStr, int v)` | simpan pasangan |
+| `static boolean put(int[] m, String key, int v)` | simpan pasangan |
 | `static boolean remove(int[] m, String key)` | hapus elemen |
+| `static boolean removeAt(int[] m, int slot)` | hapus berdasarkan slot yang sudah diketahui (mis. saat sweep) |
 | `static void clear(int[] m)` | kosongkan isi |
 | `static boolean used(int[] m, int i)` | (internal) slot i terisi |
 | `static int valAtSlot(int[] m, int i)` | (internal) nilai pada slot i |

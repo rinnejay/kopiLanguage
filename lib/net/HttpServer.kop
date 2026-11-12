@@ -24,15 +24,6 @@ class HttpServer {
     static int[] CRLF2() { return Net.bytes("\r\n\r\n"); }
     static int[] SP() { return Net.bytes(" "); }
 
-    static int findByte(int[] s, int b, int from, int to) {
-        int i = from;
-        while (i < to) {
-            if (s[i] == b) return i;
-            i++;
-        }
-        return -1;
-    }
-
     /* baca request (header + body sesuai Content-Length).
      * hasil = seluruh byte request; array kosong bila EOF/galat. */
     static int[] readRequest(int fd, int max) {
@@ -120,22 +111,33 @@ class HttpServer {
         int he = Bytes.indexOf(req, CRLF2(), 0);
         if (he < 0) he = req.length;
         int p = Bytes.indexOf(req, CRLF(), 0);
-        if (p < 0 || p + 2 > he) return new int[0];
-        p = p + 2;
-        while (p < he) {
-            int e = Bytes.indexOf(req, CRLF(), p);
-            if (e < 0 || e > he) e = he;
-            int c = findByte(req, 58, p, e);              /* ':' */
-            if (c > p) {
-                int[] nm = Bytes.slice(req, p, c - p);
-                if (Bytes.equalsIgnoreCase(nm, name)) {
-                    int[] val = Bytes.slice(req, c + 1, e - c - 1);
-                    return Net.mkstr(Bytes.trim(val));
-                }
-            }
-            p = e + 2;
+        if (p < 0 || p + 2 > he) return "";
+        String block = Net.mkstr(Bytes.slice(req, p + 2, he - p - 2));
+        int i = 0;
+        while (i < block.length) {
+            int ls = i;
+            while (i < block.length && block[i] != 13 && block[i] != 10) i++;
+            int le = i;
+            if (nameAt(block, ls, le, name))
+                return Str.trim(Str.sub(block, ls + name.length + 1,
+                                        le - ls - name.length - 1));
+            while (i < block.length && (block[i] == 13 || block[i] == 10)) i++;
         }
         return "";
+    }
+
+    static int lowerc(int c) {
+        if (c >= 65 && c <= 90) return c + 32;
+        return c;
+    }
+
+    /* true bila baris diawali `name` lalu ':' (case-insensitive) */
+    static boolean nameAt(String line, int ls, int le, String name) {
+        if (ls + name.length >= le) return false;
+        if (line[ls + name.length] != 58) return false;
+        for (int i = 0; i < name.length; i++)
+            if (lowerc(line[ls + i]) != lowerc(name[i])) return false;
+        return true;
     }
 
     static int contentLength(int[] req) {
@@ -235,36 +237,23 @@ class HttpServer {
     }
 
     static int[] responseKA(int code, String ctype, int[] body, int keep) {
-        int[] s = Net.bytes("HTTP/1.1 ");
-        s = Bytes.cat(s, Bytes.fromInt(code));
-        s = Bytes.cat(s, Net.bytes(" "));
-        s = Bytes.cat(s, statusText(code));
-        s = Bytes.cat(s, Net.bytes("\r\nContent-Type: "));
-        s = Bytes.cat(s, ctype);
-        s = Bytes.cat(s, Net.bytes("\r\nContent-Length: "));
-        s = Bytes.cat(s, Bytes.fromInt(body.length));
-        if (keep != 0) s = Bytes.cat(s, Net.bytes("\r\nConnection: keep-alive\r\n\r\n"));
-        else s = Bytes.cat(s, Net.bytes("\r\nConnection: close\r\n\r\n"));
-        s = Bytes.cat(s, body);
-        return s;
+        String h = "HTTP/1.1 " + Str.fromInt(code) + " " + statusText(code)
+                 + "\r\nContent-Type: " + ctype
+                 + "\r\nContent-Length: " + Str.fromInt(body.length);
+        if (keep != 0) h = h + "\r\nConnection: keep-alive";
+        else h = h + "\r\nConnection: close";
+        return Bytes.cat(Net.strbytes(h + "\r\n\r\n"), body);
     }
 
     /* respons dengan header tambahan (mis. Set-Cookie) */
     static int[] respond(int code, String ctype, int[] body, String extra, int keep) {
-        int[] s = Net.bytes("HTTP/1.1 ");
-        s = Bytes.cat(s, Bytes.fromInt(code));
-        s = Bytes.cat(s, Net.bytes(" "));
-        s = Bytes.cat(s, statusText(code));
-        s = Bytes.cat(s, Net.bytes("\r\nContent-Type: "));
-        s = Bytes.cat(s, ctype);
-        s = Bytes.cat(s, Net.bytes("\r\nContent-Length: "));
-        s = Bytes.cat(s, Bytes.fromInt(body.length));
-        s = Bytes.cat(s, Net.bytes("\r\n"));
-        if (extra.length > 0) s = Bytes.cat(s, extra);
-        if (keep != 0) s = Bytes.cat(s, Net.bytes("Connection: keep-alive\r\n\r\n"));
-        else s = Bytes.cat(s, Net.bytes("Connection: close\r\n\r\n"));
-        s = Bytes.cat(s, body);
-        return s;
+        String h = "HTTP/1.1 " + Str.fromInt(code) + " " + statusText(code)
+                 + "\r\nContent-Type: " + ctype
+                 + "\r\nContent-Length: " + Str.fromInt(body.length) + "\r\n";
+        if (extra.length > 0) h = h + extra;
+        if (keep != 0) h = h + "Connection: keep-alive\r\n";
+        else h = h + "Connection: close\r\n";
+        return Bytes.cat(Net.strbytes(h + "\r\n"), body);
     }
 
     static int[] response(int code, String ctype, int[] body) {
@@ -280,7 +269,7 @@ class HttpServer {
 
     static int[] responseFor(int[] req, int code, String ctype, int[] body, int keep) {
         int[] r = responseKA(code, ctype, body, keep);
-        if (methodIs(req, Net.bytes("HEAD"))) return headOnly(r);
+        if (methodIs(req, "HEAD")) return headOnly(r);
         return r;
     }
 
@@ -313,7 +302,7 @@ class HttpServer {
     static boolean keepAlive(int[] req) {
         String v = headerValue(req, "Connection");
         String ver = version(req);
-        if (Str.contains(ver, "1.1")) return v != "close";
+        if (Str.contains(ver, "1.1")) return !Str.equalsIgnoreCase(v, "close");
         return Str.equalsIgnoreCase(v, "keep-alive");
     }
 
@@ -338,18 +327,9 @@ class HttpServer {
 
     /* baris Set-Cookie; maxAge < 0 → tanpa Max-Age */
     static String setCookie(String name, String value, String path, int maxAge) {
-        int[] s = Net.bytes("Set-Cookie: ");
-        s = Bytes.cat(s, name);
-        s = Bytes.cat(s, Net.bytes("="));
-        s = Bytes.cat(s, value);
-        s = Bytes.cat(s, Net.bytes("; Path="));
-        s = Bytes.cat(s, path);
-        if (maxAge >= 0) {
-            s = Bytes.cat(s, Net.bytes("; Max-Age="));
-            s = Bytes.cat(s, Bytes.fromInt(maxAge));
-        }
-        s = Bytes.cat(s, Net.bytes("\r\n"));
-        return Net.mkstr(s);
+        String s = "Set-Cookie: " + name + "=" + value + "; Path=" + path;
+        if (maxAge >= 0) s = s + "; Max-Age=" + Str.fromInt(maxAge);
+        return s + "\r\n";
     }
 
     /* decode body chunked (permintaan upload) */

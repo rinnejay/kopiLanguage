@@ -13,7 +13,6 @@
  * Konstanta byte demi kejelasan: 13 = '\r', 32 = ' ', 48..57 = digit.
  */
 
-import Bytes;
 import Str;
 import Tcp;
 import Url;
@@ -24,14 +23,9 @@ class Http {
     /* ── permintaan ─────────────────────────────────────────────── */
 
     /* susun baris permintaan GET lengkap:
-     *   "GET <path> HTTP/1.0\r\nHost: <host>\r\n\r\n"
-     * (Net.bytes literal sama di-dedup compiler ke satu isi cpool)     */
+     *   "GET <path> HTTP/1.0\r\nHost: <host>\r\n\r\n" */
     static String req(String host, String path) {
-        int[] out = Tcp.cat(Net.bytes("GET "), path);
-        out = Tcp.cat(out, Net.bytes(" HTTP/1.0\r\nHost: "));
-        out = Tcp.cat(out, host);
-        out = Tcp.cat(out, Net.bytes("\r\n\r\n"));
-        return Net.mkstr(out);
+        return "GET " + path + " HTTP/1.0\r\nHost: " + host + "\r\n\r\n";
     }
 
     /* ── respons ────────────────────────────────────────────────── */
@@ -89,12 +83,9 @@ class Http {
                         int[] body, int[] buf) {
         int fd = Tcp.open(addr, port);
         if (fd < 0) return fd;
-        int[] head = Tcp.cat(Net.bytes("POST "), path);
-        head = Tcp.cat(head, Net.bytes(" HTTP/1.0\r\nHost: "));
-        head = Tcp.cat(head, host);
-        head = Tcp.cat(head, Net.bytes("\r\nContent-Type: text/plain\r\nContent-Length: "));
-        head = Tcp.cat(head, Tcp.num(body.length));
-        head = Tcp.cat(head, Net.bytes("\r\n\r\n"));
+        String head = "POST " + path + " HTTP/1.0\r\nHost: " + host
+                    + "\r\nContent-Type: text/plain\r\nContent-Length: "
+                    + Str.fromInt(body.length) + "\r\n\r\n";
         int r = Tcp.sendBuf(fd, head);
         if (r == 0) r = Tcp.sendBuf(fd, body);
         if (r < 0) {
@@ -129,19 +120,10 @@ class Http {
      * HTTP/1.0: server menutup koneksi setelah respons. */
     static String reqEx(String method, String host, String path,
                         String headers, int[] body) {
-        int[] out = Tcp.cat(method, Net.bytes(" "));
-        out = Tcp.cat(out, path);
-        out = Tcp.cat(out, Net.bytes(" HTTP/1.0\r\nHost: "));
-        out = Tcp.cat(out, host);
-        out = Tcp.cat(out, Net.bytes("\r\n"));
-        if (headers.length > 0) out = Tcp.cat(out, headers);
-        if (body.length > 0) {
-            out = Tcp.cat(out, Net.bytes("Content-Length: "));
-            out = Tcp.cat(out, Tcp.num(body.length));
-            out = Tcp.cat(out, Net.bytes("\r\n"));
-        }
-        out = Tcp.cat(out, Net.bytes("\r\n"));
-        return Net.mkstr(out);
+        String out = method + " " + path + " HTTP/1.0\r\nHost: " + host + "\r\n";
+        if (headers.length > 0) out = out + headers;
+        if (body.length > 0) out = out + "Content-Length: " + Str.fromInt(body.length) + "\r\n";
+        return out + "\r\n";
     }
 
     /* satu putaran penuh dengan method/header/body bebas. */
@@ -164,14 +146,14 @@ class Http {
     /* GET dengan header tambahan */
     static int getWith(int addr, int port, String host, String path,
                        String headers, int[] buf) {
-        return requestInto(addr, port, Net.bytes("GET"), host, path,
+        return requestInto(addr, port, "GET", host, path,
                            headers, new int[0], buf);
     }
 
     /* POST dengan header tambahan + body */
     static int postWith(int addr, int port, String host, String path,
                         String headers, int[] body, int[] buf) {
-        return requestInto(addr, port, Net.bytes("POST"), host, path,
+        return requestInto(addr, port, "POST", host, path,
                            headers, body, buf);
     }
 
@@ -201,7 +183,7 @@ class Http {
         return c;
     }
 
-    static boolean nameEq(int[] line, int at, String name) {
+    static boolean nameEq(String line, int at, String name) {
         if (at + name.length > line.length) return false;
         for (int i = 0; i < name.length; i++) {
             if (lowerc(line[at + i]) != lowerc(name[i])) return false;
@@ -212,7 +194,7 @@ class Http {
     /* nilai header (tanpa spasi tepi), array kosong bila tidak ada.
      * perbandingan nama case-insensitive; baris pertama yang cocok dipakai. */
     static String headerValue(int[] resp, String name) {
-        int[] block = headerBlock(resp);
+        String block = Net.mkstr(headerBlock(resp));
         int i = 0;
         while (i < block.length) {
             int ls = i;
@@ -222,11 +204,7 @@ class Http {
                 block[ls + name.length] == 58) {          /* ':' */
                 int vs = ls + name.length + 1;
                 while (vs < le && (block[vs] == 32 || block[vs] == 9)) vs++;
-                int ve = le;
-                while (ve > vs && (block[ve - 1] == 32 || block[ve - 1] == 9)) ve--;
-                int[] out = new int[ve - vs];
-                for (int k = 0; k < out.length; k++) out[k] = block[vs + k];
-                return Net.mkstr(out);
+                return Str.trim(Str.sub(block, vs, le - vs));
             }
             /* lewati CRLF */
             while (i < block.length && (block[i] == 13 || block[i] == 10)) i++;
@@ -249,7 +227,7 @@ class Http {
 
     /* cari token (case-insensitive) di nilai header */
     static boolean hasToken(int[] resp, String name, String tok) {
-        int[] v = headerValue(resp, name);
+        String v = headerValue(resp, name);
         if (v.length == 0) return false;
         int n = tok.length;
         for (int i = 0; i + n <= v.length; i++) {
@@ -301,7 +279,7 @@ class Http {
     /* body sebenarnya: chunked → decode; Content-Length → potong */
     static int[] payload(int[] resp) {
         int[] b = bodyOf(resp);
-        if (hasToken(resp, Net.bytes("Transfer-Encoding"), Net.bytes("chunked")))
+        if (hasToken(resp, "Transfer-Encoding", "chunked"))
             return dechunk(b);
         String cl = headerValue(resp, "Content-Length");
         if (cl.length > 0) {
@@ -318,21 +296,13 @@ class Http {
     /* susun permintaan HTTP/1.1 (keep=1 → keep-alive, else close) */
     static String req11(String method, String hostHdr, String path,
                         String headers, int[] body, int keep) {
-        int[] out = Tcp.cat(method, Net.bytes(" "));
-        out = Tcp.cat(out, path);
-        out = Tcp.cat(out, Net.bytes(" HTTP/1.1\r\nHost: "));
-        out = Tcp.cat(out, hostHdr);
-        out = Tcp.cat(out, Net.bytes("\r\n"));
-        if (headers.length > 0) out = Tcp.cat(out, headers);
-        if (body.length > 0 || method.length == 4) {
-            out = Tcp.cat(out, Net.bytes("Content-Length: "));
-            out = Tcp.cat(out, Tcp.num(body.length));
-            out = Tcp.cat(out, Net.bytes("\r\n"));
-        }
-        if (keep != 0) out = Tcp.cat(out, Net.bytes("Connection: keep-alive\r\n"));
-        else out = Tcp.cat(out, Net.bytes("Connection: close\r\n"));
-        out = Tcp.cat(out, Net.bytes("\r\n"));
-        return Net.mkstr(out);
+        String out = method + " " + path + " HTTP/1.1\r\nHost: " + hostHdr + "\r\n";
+        if (headers.length > 0) out = out + headers;
+        if (body.length > 0 || method.length == 4)
+            out = out + "Content-Length: " + Str.fromInt(body.length) + "\r\n";
+        if (keep != 0) out = out + "Connection: keep-alive\r\n";
+        else out = out + "Connection: close\r\n";
+        return out + "\r\n";
     }
 
     /* satu transaksi; timeoutMs > 0 memasang SO_RCVTIMEO/SO_SNDTIMEO */
@@ -399,12 +369,7 @@ class Http {
 
     /* header "Authorization: Basic ..." dari user:pass */
     static String basic(String user, String pass) {
-        int[] raw = Tcp.cat(user, Net.bytes(":"));
-        raw = Tcp.cat(raw, pass);
-        int[] out = Net.bytes("Authorization: Basic ");
-        out = Tcp.cat(out, Cipher.b64enc(raw));
-        out = Tcp.cat(out, Net.bytes("\r\n"));
-        return Net.mkstr(out);
+        return "Authorization: Basic " + Cipher.b64enc(user + ":" + pass) + "\r\n";
     }
 
     static int[] formPost(int addr, int port, String hostHdr, String path,

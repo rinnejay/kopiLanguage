@@ -9,6 +9,7 @@
 
 import File;
 import Bytes;
+import Str;
 import Dns;
 import Udp;
 import Tcp;
@@ -21,20 +22,20 @@ class Resolv {
     static int[] parse(String text) {
         int[] out = new int[16];
         int n = 0;
-        int lines = Bytes.splitCount(text, 10);
-        for (int li = 0; li < lines; li++) {
-            int[] ln = Bytes.trim(Bytes.splitAt(text, 10, li));
-            if (ln.length < 12) continue;
-            if (!Bytes.startsWith(ln, Net.bytes("nameserver"))) continue;
-            int i = 10;
-            while (i < ln.length && (ln[i] == 32 || ln[i] == 9)) i++;
-            int[] ip = Bytes.trim(Bytes.slice(ln, i, ln.length - i));
-            int a = Bytes.toInt(Bytes.splitAt(ip, 46, 0));
-            int b = Bytes.toInt(Bytes.splitAt(ip, 46, 1));
-            int c = Bytes.toInt(Bytes.splitAt(ip, 46, 2));
-            int d = Bytes.toInt(Bytes.splitAt(ip, 46, 3));
-            if (a < 0 || b < 0 || c < 0 || d < 0) continue;
-            if (Bytes.splitCount(ip, 46) != 4) continue;
+        String[] lines = Str.lines(text);
+        for (int li = 0; li < lines.length; li++) {
+            String ln = Str.trim(lines[li]);
+            if (!Str.startsWith(ln, "nameserver")) continue;
+            String ip = Str.trim(Str.sub(ln, 10, ln.length - 10));
+            String[] p = Str.split(ip, ".");
+            if (p.length != 4) continue;
+            if (!Str.isDigits(p[0]) || !Str.isDigits(p[1]) ||
+                !Str.isDigits(p[2]) || !Str.isDigits(p[3])) continue;
+            int a = Str.toInt(p[0]);
+            int b = Str.toInt(p[1]);
+            int c = Str.toInt(p[2]);
+            int d = Str.toInt(p[3]);
+            if (a > 255 || b > 255 || c > 255 || d > 255) continue;
             if (n < out.length) { out[n] = Tcp.ip(a, b, c, d); n++; }
         }
         int[] r = new int[n];

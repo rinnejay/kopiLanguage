@@ -1,4 +1,4 @@
-// Jwt.kop — JWT HS256 (RFC 7519) minimal, murni Kopi (v1.10.0).
+// Jwt.kop — JWT HS256 (RFC 7519) minimal, murni Kopi (v1.23).
 //
 // format: base64url(header) "." base64url(payload) "." base64url(HMAC)
 // header dipatok {"alg":"HS256","typ":"JWT"}.
@@ -6,7 +6,6 @@
 // Batas: hanya HS256; verifikasi tanda tangan + bentuk, belum `exp`/`iat`
 // otomatis (pemanggil dapat memeriksa payload JSON sendiri).
 
-import Bytes;
 import Str;
 import Hash;
 import Cipher;
@@ -19,37 +18,21 @@ class Jwt {
 
     /* base64url tanpa padding (biner → teks) */
     static String b64(int[] raw) {
-        String e = Cipher.b64enc(raw);
+        String e = Str.replace(Str.replace(Cipher.b64enc(raw), "+", "-"), "/", "_");
         int n = e.length;
         while (n > 0 && e[n - 1] == 61) n--;          /* buang '=' */
-        int[] out = new int[n];
-        for (int i = 0; i < n; i++) {
-            int c = e[i];
-            if (c == 43) c = 45;                       /* '+' → '-' */
-            if (c == 47) c = 95;                       /* '/' → '_' */
-            out[i] = c;
-        }
-        return Net.mkstr(out);
+        return Str.sub(e, 0, n);
     }
 
     static int[] unb64(String s) {
-        int[] t = new int[s.length + 4];
-        for (int i = 0; i < s.length; i++) {
-            int c = s[i];
-            if (c == 45) c = 43;
-            if (c == 95) c = 47;
-            t[i] = c;
-        }
-        for (int i = s.length; i < s.length + 4; i++) t[i] = 61;
-        return Cipher.b64dec(Net.mkstr(t));
+        String t = Str.replace(Str.replace(s, "-", "+"), "_", "/");
+        while (t.length % 4 != 0) t = t + "=";
+        return Cipher.b64dec(t);
     }
 
     static String sign(String payload, String secret) {
-        String h = b64(Net.strbytes(HEADER()));
-        String p = b64(Net.strbytes(payload));
-        int[] input = Bytes.cat(Bytes.cat(Net.strbytes(h), Net.bytes(".")), Net.strbytes(p));
-        String sig = b64(Hash.hmac(secret, input));
-        return h + "." + p + "." + sig;
+        String input = b64(Net.strbytes(HEADER())) + "." + b64(Net.strbytes(payload));
+        return input + "." + b64(Hash.hmac(secret, input));
     }
 
     /* bandingkan dua array byte secara konstan (panjang sama) */
@@ -74,8 +57,7 @@ class Jwt {
         String h = Str.sub(token, 0, d1);
         String p = Str.sub(token, d1 + 1, d2 - d1 - 1);
         String s = Str.sub(token, d2 + 1, token.length - d2 - 1);
-        int[] input = Bytes.cat(Bytes.cat(Net.strbytes(h), Net.bytes(".")), Net.strbytes(p));
-        String sig = b64(Hash.hmac(secret, input));
+        String sig = b64(Hash.hmac(secret, h + "." + p));
         boolean ok = same(sig, s);
         if (payloadOut.length > 0) {
             int[] raw = unb64(p);
