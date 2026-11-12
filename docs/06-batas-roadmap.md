@@ -10,6 +10,7 @@ diuji, ditulis "belum".
 | Belum ada | Dampak | Workaround sekarang |
 |---|---|---|
 | ~~Instance class~~ **✅ v1.12–1.15** (field, `new`, method `this`, identitas referensi; field `long`/`String`/class; **constructor**) | sisa: tanpa inheritance/vtable; field `double`/`float` menyusul | dispatch statis; tanpa overload constructor |
+| ~~Field instance bertipe array~~ **✅ v1.29** (`int[]`, `long[]`, `String[]`; termasuk penugasan `p.field[i] = v`) | sisa: field `double[]`/`float[]` | simpan dulu ke variabel bila perlu |
 | GC / free | arena global 32 MB; `malloc { ... }` otomatis (mmap hingga 4096 MB, RAM sesuai kebutuhan) atau `malloc<N>` batas keras 1 kb–4096 MB; `memMark/memReset` manual opsional | region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler); batas blok dicek runtime |
 | ~~Array bertipe (`String[]`, `long[]`)~~ **✅ v1.16** (elemen 64-bit slot; identitas referensi berlaku) | sisa: `double[]`; metode fungsional masih khusus `int[]` | array `long[]`/`String[]` pakai loop `for` biasa |
 | ~~String = `int[]`~~ **✅ v1.17** (String opaque; interop eksplisit `Net.mkstr`/`Net.strbytes`) | ~~byte-per-slot~~ **✅ v1.18 packed** (1 byte/karakter); **✅ v1.23** `Str` hanya `String`, buffer biner di `Bytes` | alokasi String 5× lebih hemat; API teks tak lagi memakai array |
@@ -113,6 +114,8 @@ Batas angka:
 
 1. ~~Instance class~~ **✅ v1.12–1.15** (field + `new` + method `this` +
    identitas referensi + field `long`/`String`/class + constructor).
+   **✅ v1.29**: field instance bertipe array (`int[]`/`long[]`/`String[]`)
+   + penugasan indeks pada field (`p.field[i] = v`).
    Tahap lanjut: field `double`/`float`, overload constructor,
    vtable/inheritance.
    - **Keputusan desain**: Kopi tidak meniru Java sepenuhnya. Alih-alih

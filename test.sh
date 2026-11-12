@@ -55,6 +55,10 @@ check aesvec "$T/kopi/aesvec.kop"
 python3 tools/gen_x509vec.py "$T/kopi/x509vec.kop" "$T/kopi/x509vec.ref" >/dev/null
 check x509vec "$T/kopi/x509vec.kop"
 
+# ─── lib/io (Reader, Writer) + Uuid + Csv (oracle gen_iovec.py) ────────────
+python3 tools/gen_iovec.py > "$T/kopi/iovec.ref"
+check iovec test/iovec.kop
+
 # ─── Big: smoke + field penuh (ground truth python; gen_febig.py) ────────
 printf '56088\n0\n1\n0\n' > "$T/kopi/bigsmoke.ref"
 check bigsmoke test/bigsmoke.kop

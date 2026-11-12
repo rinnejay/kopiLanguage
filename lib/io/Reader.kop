@@ -1,0 +1,140 @@
+/* Reader.kop — pembaca berkas berbuffer (v1.29).
+ *
+ * Pembaca teks/byte dari deskripsi file. Buffer 4 KiB; dipakai untuk
+ * membaca berkas besar tanpa memuat seluruh isi ke memori.
+ *
+ * Catatan bahasa: field instance boleh bertipe array sejak v1.29, jadi
+ * buffer disimpan langsung sebagai field `int[]`.
+ *
+ * Contoh:
+ *   Reader r = Reader.open("data.txt");
+ *   if (r.valid()) {
+ *     String baris = r.readLine();
+ *     while (baris.length > 0) { ...; baris = r.readLine(); }
+ *     r.close();
+ *   }
+ */
+
+import File;
+import Text;
+
+class Reader {
+
+    int fd;
+    int[] buf;
+    int pos;
+    int len;
+    boolean eofSeen;
+
+    Reader(int f) {
+        this.fd = f;
+        this.buf = new int[4096];
+        this.pos = 0;
+        this.len = 0;
+        this.eofSeen = false;
+    }
+
+    /* buka file untuk dibaca.
+     * Kopi tak punya literal null → hasil selalu objek Reader; bila file
+     * tak bisa dibuka, fd = -1 dan `valid()` bernilai false. */
+    static Reader open(String path) {
+        int fd = File.openRead(path);
+        return new Reader(fd);
+    }
+
+    /* true bila file berhasil dibuka */
+    boolean valid() {
+        return this.fd >= 0;
+    }
+
+    /* isi buffer; false kalau sudah EOF */
+    boolean fill() {
+        if (this.pos < this.len) return true;
+        if (this.eofSeen) return false;
+        int got = File.readInto(this.fd, this.buf);
+        if (got <= 0) {
+            this.eofSeen = true;
+            this.pos = 0;
+            this.len = 0;
+            return false;
+        }
+        this.pos = 0;
+        this.len = got;
+        return true;
+    }
+
+    /* satu byte; -1 kalau EOF */
+    int readByte() {
+        if (!this.fill()) return -1;
+        int v = this.buf[this.pos] & 255;
+        this.pos = this.pos + 1;
+        return v;
+    }
+
+    /* true kalau tidak ada byte lagi */
+    boolean eof() {
+        return !this.fill();
+    }
+
+    /* satu baris tanpa newline; "" kalau EOF */
+    String readLine() {
+        int[] out = Text.make(64);
+        boolean got = false;
+        while (true) {
+            int c = this.readByte();
+            if (c < 0) break;
+            got = true;
+            if (c == 10) break;
+            out = Text.appendByte(out, c);
+        }
+        if (!got) return "";
+        /* buang '\r' di akhir baris (CRLF): truncate membuang n byte terakhir */
+        int n = Text.len(out);
+        if (n > 0) {
+            int last = out[2 + n - 1];
+            if ((last & 255) == 13) out = Text.truncate(out, 1);
+        }
+        return Text.build(out);
+    }
+
+    /* seluruh sisa isi sebagai teks */
+    String readAll() {
+        int[] out = Text.make(1024);
+        while (true) {
+            int c = this.readByte();
+            if (c < 0) break;
+            out = Text.appendByte(out, c);
+        }
+        return Text.build(out);
+    }
+
+    /* n byte; hasil boleh lebih pendek kalau EOF */
+    int[] readBytes(int n) {
+        int[] out = new int[n > 0 ? n : 0];
+        int got = 0;
+        while (got < out.length) {
+            int c = this.readByte();
+            if (c < 0) break;
+            out[got] = c;
+            got = got + 1;
+        }
+        if (got == out.length) return out;
+        int[] shorter = new int[got];
+        for (int i = 0; i < got; i++) shorter[i] = out[i];
+        return shorter;
+    }
+
+    /* jumlah byte yang belum dibaca (perkiraan) */
+    int available() {
+        if (this.pos < this.len) return this.len - this.pos;
+        return 0;
+    }
+
+    void close() {
+        if (this.fd >= 0) {
+            File.close(this.fd);
+            this.fd = -1;
+        }
+        this.eofSeen = true;
+    }
+}

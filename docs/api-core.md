@@ -255,6 +255,33 @@ Modul pustaka Kopi.
 
 ---
 
+## Csv
+
+`lib/core/Csv.kop` · 5 fungsi
+
+Baca & tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF.
+
+```java
+import Csv;
+
+String[] row = Csv.parseRow("a,"b,c"");
+System.out.println(Csv.formatRow(row));
+```
+
+**Catatan**
+
+- `parseRow` menangani satu baris; pakai `lines` untuk memisahkan baris.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static String[] parseRow(String line)` | pecah satu baris CSV menjadi field |
+| `static String formatRow(String[] fields)` | susun field menjadi satu baris CSV |
+| `static String[] lines(String text)` | pecah teks menjadi baris |
+| `static int countRows(String text)` | jumlah baris dalam teks |
+| `static int[] rowLengths(String text)` | jumlah field tiap baris |
+
+---
+
 ## Deque
 
 `lib/core/Deque.kop` · 11 fungsi
@@ -1290,5 +1317,33 @@ Time.sleepMs(10);
 | `static int diffHours(int a, int b)` | — |
 | `static String duration(int sec)` | — |
 | `static String nowISO()` | — |
+
+---
+
+## Uuid
+
+`lib/core/Uuid.kop` · 6 fungsi
+
+UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID.
+
+```java
+import Uuid;
+
+String id = Uuid.v4();
+System.out.println(Uuid.valid(id));
+```
+
+**Catatan**
+
+- Format 8-4-4-4-12; versi 4 & varian RFC 4122.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static String v4()` | UUID acak versi 4 |
+| `static String nil()` | UUID kosong |
+| `static String format(int[] b)` | 16 byte → teks UUID |
+| `static int[] parse(String s)` | teks UUID → 16 byte |
+| `static boolean valid(String s)` | true bila teks UUID valid |
+| `static int version(String s)` | versi UUID (1..5) |
 
 ---

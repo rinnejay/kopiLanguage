@@ -125,7 +125,11 @@ static void resolve_stmt(Node *s) {
         Ty et = type_expr(s->c);
         Ty ft = (Ty)f->ty;
         int ok;
-        if (ft == T_BOOL)
+        if (!f->cls && ty_is_arr(ft)) {
+            /* v1.29: field bertipe array — tipe elemen harus sama */
+            ok = (et == ft);
+        }
+        else if (ft == T_BOOL)
             ok = et == T_BOOL;
         else if (ft == T_ARI) {
             /* referensi objek; cek nama class bila bisa ditentukan */

@@ -301,7 +301,8 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tldr\tx0, [x1, x9, lsl #3]");
         {   /* slot 64-bit (long/String/objek): jangan pangkas ke 32-bit */
             Ty et = (Ty)e->dty;
-            if (ty_width(et) != 64 && et != T_ARI && et != T_STR && et != T_FN)
+            if (ty_width(et) != 64 && et != T_ARI && et != T_STR && et != T_FN &&
+                et != T_LNGARR && et != T_STRARR)
                 emit("\tmov\tw0, w0");      /* nilai int tetap 32-bit */
         }
         return 0;

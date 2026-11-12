@@ -1,0 +1,185 @@
+/* Csv.kop — baca & tulis CSV (RFC 4180) murni Kopi (v1.29).
+ *
+ * Aturan RFC 4180 yang didukung:
+ *   - pemisah koma, baris diakhiri CRLF atau LF
+ *   - field diapit tanda kutip bila berisi koma, kutip, atau newline
+ *   - tanda kutip di dalam field ditulis dua kali ("" → ")
+ *
+ * Fungsi:
+ *   parseRow(line)   → String[] field satu baris (bukan array multi-dimensi)
+ *   formatRow(fields)→ teks satu baris CSV
+ *   lines(text)      → String[] baris (tanpa baris kosong di akhir)
+ *   countRows(text)  → jumlah baris
+ *   rowLengths(text) → int[] jumlah field per baris
+ */
+
+import Str;
+
+class Csv {
+
+    /* field satu baris CSV; kuotasi dihormati */
+    static String[] parseRow(String line) {
+        String[] out = new String[8];
+        int n = 0;
+        int[] cur = new int[32];
+        int cn = 0;
+        boolean quoted = false;
+        boolean inQuote = false;
+        int i = 0;
+        while (i < line.length) {
+            int c = line.charAt(i);
+            if (inQuote) {
+                if (c == 34) {                       /* '"' */
+                    if (i + 1 < line.length && line.charAt(i + 1) == 34) {
+                        cur = append(cur, cn, 34); cn = cn + 1;
+                        i = i + 2;
+                        continue;
+                    }
+                    inQuote = false;
+                    i = i + 1;
+                    continue;
+                }
+                cur = append(cur, cn, c); cn = cn + 1;
+                i = i + 1;
+                continue;
+            }
+            if (c == 34 && cn == 0) {               /* buka kutip */
+                inQuote = true;
+                quoted = true;
+                i = i + 1;
+                continue;
+            }
+            if (c == 44) {                          /* koma → field baru */
+                out = put(out, n, Net.mkstr(slice(cur, cn)));
+                n = n + 1;
+                cn = 0;
+                i = i + 1;
+                continue;
+            }
+            cur = append(cur, cn, c); cn = cn + 1;
+            i = i + 1;
+        }
+        out = put(out, n, Net.mkstr(slice(cur, cn)));
+        n = n + 1;
+        if (quoted) {
+            /* biarkan apa adanya; pemanggil boleh salah kutip */
+        }
+        return trimTo(out, n);
+    }
+
+    private static int[] append(int[] b, int n, int c) {
+        if (n >= b.length) {
+            int[] bigger = new int[b.length * 2];
+            for (int i = 0; i < n; i++) bigger[i] = b[i];
+            return bigger;
+        }
+        b[n] = c;
+        return b;
+    }
+
+    private static int[] slice(int[] b, int n) {
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) out[i] = b[i];
+        return out;
+    }
+
+    private static String[] put(String[] a, int n, String s) {
+        if (n >= a.length) {
+            String[] bigger = new String[a.length * 2];
+            for (int i = 0; i < n; i++) bigger[i] = a[i];
+            bigger[n] = s;
+            return bigger;
+        }
+        a[n] = s;
+        return a;
+    }
+
+    private static String[] trimTo(String[] a, int n) {
+        if (n == a.length) return a;
+        String[] out = new String[n];
+        for (int i = 0; i < n; i++) out[i] = a[i];
+        return out;
+    }
+
+    /* satu karakter sebagai teks (array literal belum didukung di Kopi) */
+    private static String chr(int c) {
+        int[] b = new int[1];
+        b[0] = c;
+        return Net.mkstr(b);
+    }
+
+    /* satu baris CSV dari beberapa field */
+    static String formatRow(String[] fields) {
+        String out = "";
+        for (int i = 0; i < fields.length; i++) {
+            if (i > 0) out = out + ",";
+            out = out + quote(fields[i]);
+        }
+        return out;
+    }
+
+    /* bungkus field bila perlu (koma, kutip, newline, atau spasi tepi) */
+    private static String quote(String s) {
+        boolean need = false;
+        for (int i = 0; i < s.length; i++) {
+            int c = s.charAt(i);
+            if (c == 44 || c == 34 || c == 10 || c == 13) { need = true; break; }
+        }
+        if (s.length > 0) {
+            int first = s.charAt(0);
+            int last = s.charAt(s.length - 1);
+            if (first == 32 || last == 32) need = true;
+        }
+        if (!need) return s;
+        String out = "\"";
+        for (int i = 0; i < s.length; i++) {
+            int c = s.charAt(i);
+            if (c == 34) out = out + "\"\"";
+            else out = out + chr(c);
+        }
+        return out + "\"";
+    }
+
+    /* pecah teks menjadi baris (CRLF/LF); tanpa baris kosong di akhir */
+    static String[] lines(String text) {
+        String[] out = new String[8];
+        int n = 0;
+        int[] cur = new int[64];
+        int cn = 0;
+        int i = 0;
+        while (i < text.length) {
+            int c = text.charAt(i);
+            if (c == 10) {
+                out = put(out, n, Net.mkstr(slice(cur, cn)));
+                n = n + 1;
+                cn = 0;
+                i = i + 1;
+                continue;
+            }
+            if (c == 13) {
+                i = i + 1;
+                continue;
+            }
+            cur = append(cur, cn, c); cn = cn + 1;
+            i = i + 1;
+        }
+        if (cn > 0) {
+            out = put(out, n, Net.mkstr(slice(cur, cn)));
+            n = n + 1;
+        }
+        return trimTo(out, n);
+    }
+
+    /* jumlah baris */
+    static int countRows(String text) {
+        return lines(text).length;
+    }
+
+    /* jumlah field tiap baris */
+    static int[] rowLengths(String text) {
+        String[] ls = lines(text);
+        int[] out = new int[ls.length];
+        for (int i = 0; i < ls.length; i++) out[i] = parseRow(ls[i]).length;
+        return out;
+    }
+}

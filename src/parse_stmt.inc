@@ -159,6 +159,27 @@ static Node *stmt_single(void) {
         if (t2 == '=') return parse_assignment(line, 1);
         /* p.field = v; / p.field1.field2 = v; — penugasan field instance */
         if (t2 == '.' && tokat(2, T_ID)) {
+            /* v1.29: p.field[i] = v — indeks pada field bertipe array */
+            if (tokat(3, '[')) {
+                Node *s = newnode(ST_IDXASG, line);
+                Node *obj = newnode(EX_VAR, line);
+                obj->str = xs(t->text);
+                advance();                 /* nama objek */
+                advance();                 /* '.' */
+                const char *f1 = xs(peek()->text);
+                expect(T_ID, "nama field");
+                Node *base = newnode(EX_FLD, line);
+                base->a = obj;
+                base->str = f1;
+                s->a = base;
+                expect('[', "'[' pada p.field[i]");
+                s->b = expr();
+                expect(']', "']' pada p.field[i]");
+                expect('=', "'=' pada p.field[i] = v");
+                s->c = expr();
+                expect(';', "';' setelah p.field[i] = v");
+                return s;
+            }
             int isasg = 0, nfdot = 2;
             if (tokat(3, '=')) isasg = 1;
             else if (tokat(3, '.') && tokat(4, T_ID) && tokat(5, '=')) { isasg = 1; nfdot = 3; }

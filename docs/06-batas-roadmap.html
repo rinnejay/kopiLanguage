@@ -42,6 +42,11 @@
 <td>dispatch statis; tanpa overload constructor</td>
 </tr>
 <tr>
+<td>~~Field instance bertipe array~~ <strong>✅ v1.29</strong> (<code>int[]</code>, <code>long[]</code>, <code>String[]</code>; termasuk penugasan <code>p.field[i] = v</code>)</td>
+<td>sisa: field <code>double[]</code>/<code>float[]</code></td>
+<td>simpan dulu ke variabel bila perlu</td>
+</tr>
+<tr>
 <td>GC / free</td>
 <td>arena global 32 MB; <code>malloc { ... }</code> otomatis (mmap hingga 4096 MB, RAM sesuai kebutuhan) atau <code>malloc&lt;N&gt;</code> batas keras 1 kb–4096 MB; <code>memMark/memReset</code> manual opsional</td>
 <td>region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler); batas blok dicek runtime</td>
@@ -271,7 +276,9 @@
 </ul>
 <h2 id="7-roadmap-urutan-usulan">7. Roadmap (urutan usulan)<a class="anchor" href="#7-roadmap-urutan-usulan" aria-label="tautan">#</a></h2>
 <ol>
-<li>~~Instance class~~ <strong>✅ v1.12–1.15</strong> (field + <code>new</code> + method <code>this</code> + identitas referensi + field <code>long</code>/<code>String</code>/class + constructor). Tahap lanjut: field <code>double</code>/<code>float</code>, overload constructor, vtable/inheritance.<ul>
+<li>~~Instance class~~ <strong>✅ v1.12–1.15</strong> (field + <code>new</code> + method <code>this</code> + identitas referensi + field <code>long</code>/<code>String</code>/class + constructor). <strong>✅ v1.29</strong>: field instance bertipe array (<code>int[]</code>/<code>long[]</code>/<code>String[]</code>) Tahap lanjut: field <code>double</code>/<code>float</code>, overload constructor, vtable/inheritance.<ul>
+<li>penugasan indeks pada field (<code>p.field[i] = v</code>).</li>
+</ul><ul>
 <li><strong>Keputusan desain</strong>: Kopi tidak meniru Java sepenuhnya. Alih-alih <code>interface</code>, Kopi akan memakai <strong><code>struct</code> ala C</strong> — agregat data + metode namespace / fungsi bebas — agar bahasanya terasa natural di antara C dan Java, bukan klon Java. Polymorphism (bila jadi) lewat struct ber-pola vtable sederhana, bukan hierarki tipe Java.</li>
 </ul></li>
 <li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>

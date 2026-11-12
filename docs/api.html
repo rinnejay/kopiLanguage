@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-pustaka">Referensi pustaka<a class="anchor" href="#referensi-pustaka" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — buka referensi</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — buka referensi</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — buka referensi</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — buka referensi</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — buka referensi</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — buka referensi</a></li><li class="toc-h3"><a href="#io-buka-referensi-api-io-md">IO — buka referensi</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
 <p>Ringkasan semua modul di <code>lib/</code>. Setiap modul adalah class Kopi dengan method static; impor memakai nama class.</p>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -37,7 +37,7 @@
 <tr>
 <td><strong>Core</strong></td>
 <td><code>lib/core/</code></td>
-<td><code>Args</code>, <code>Arrays</code>, <code>Bytes</code>, <code>Cbor</code>, <code>Compress</code>, <code>Config</code>, <code>Cookie</code>, <code>Deque</code>, <code>Digits</code>, <code>Env</code>, <code>File</code>, <code>Json</code>, <code>List</code>, <code>ListStr</code>, <code>Log</code>, <code>Map</code>, <code>MapSS</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>MessagePack</code>, <code>Path</code>, <code>Router</code>, <code>Set</code>, <code>SetStr</code>, <code>Stats</code>, <code>Str</code>, <code>Test</code>, <code>Text</code>, <code>Time</code></td>
+<td><code>Args</code>, <code>Arrays</code>, <code>Bytes</code>, <code>Cbor</code>, <code>Compress</code>, <code>Config</code>, <code>Cookie</code>, <code>Csv</code>, <code>Deque</code>, <code>Digits</code>, <code>Env</code>, <code>File</code>, <code>Json</code>, <code>List</code>, <code>ListStr</code>, <code>Log</code>, <code>Map</code>, <code>MapSS</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>MessagePack</code>, <code>Path</code>, <code>Router</code>, <code>Set</code>, <code>SetStr</code>, <code>Stats</code>, <code>Str</code>, <code>Test</code>, <code>Text</code>, <code>Time</code>, <code>Uuid</code></td>
 </tr>
 <tr>
 <td><strong>Net</strong></td>
@@ -48,6 +48,11 @@
 <td><strong>Crypto</strong></td>
 <td><code>lib/crypto/</code></td>
 <td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Pem</code>, <code>Poly</code>, <code>Rand</code>, <code>X25519</code>, <code>X509</code></td>
+</tr>
+<tr>
+<td><strong>IO</strong></td>
+<td><code>lib/io/</code></td>
+<td><code>Reader</code>, <code>Writer</code></td>
 </tr>
 </tbody></table></div>
 <h2 id="daftar-modul">Daftar modul<a class="anchor" href="#daftar-modul" aria-label="tautan">#</a></h2>
@@ -100,6 +105,12 @@
 <td><code>lib/core/Cookie.kop</code></td>
 <td>16</td>
 <td>—</td>
+</tr>
+<tr>
+<td><a href="api-core.html#csv"><code>Csv</code></a></td>
+<td><code>lib/core/Csv.kop</code></td>
+<td>5</td>
+<td>Baca &amp; tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF.</td>
 </tr>
 <tr>
 <td><a href="api-core.html#deque"><code>Deque</code></a></td>
@@ -238,6 +249,12 @@
 <td><code>lib/core/Time.kop</code></td>
 <td>32</td>
 <td>Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#uuid"><code>Uuid</code></a></td>
+<td><code>lib/core/Uuid.kop</code></td>
+<td>6</td>
+<td>UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID.</td>
 </tr>
 </tbody></table></div>
 <h3 id="net-buka-referensi-api-net-md">Net — <a href="api-net.html">buka referensi</a><a class="anchor" href="#net-buka-referensi-api-net-md" aria-label="tautan">#</a></h3>
@@ -454,6 +471,27 @@
 <td><code>lib/crypto/X509.kop</code></td>
 <td>11</td>
 <td>Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik.</td>
+</tr>
+</tbody></table></div>
+<h3 id="io-buka-referensi-api-io-md">IO — <a href="api-io.html">buka referensi</a><a class="anchor" href="#io-buka-referensi-api-io-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-io.html#reader"><code>Reader</code></a></td>
+<td><code>lib/io/Reader.kop</code></td>
+<td>1</td>
+<td>Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.</td>
+</tr>
+<tr>
+<td><a href="api-io.html#writer"><code>Writer</code></a></td>
+<td><code>lib/io/Writer.kop</code></td>
+<td>2</td>
+<td>Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.</td>
 </tr>
 </tbody></table></div>
 <h2 id="cara-menerapkan">Cara menerapkan<a class="anchor" href="#cara-menerapkan" aria-label="tautan">#</a></h2>

@@ -35,6 +35,7 @@ NONAV = [
     ("api-core.md", "api-core.html", "Referensi API — Core", ""),
     ("api-net.md", "api-net.html", "Referensi API — Net", ""),
     ("api-crypto.md", "api-crypto.html", "Referensi API — Crypto", ""),
+    ("api-io.md", "api-io.html", "Referensi API — IO", ""),
 ]
 
 GITHUB = "https://github.com/rinnejay/kopiLanguage"

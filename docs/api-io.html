@@ -1,0 +1,89 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi API — IO · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-api-io">Referensi API — IO<a class="anchor" href="#referensi-api-io" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#reader">Reader</a></li><li class="toc-h2"><a href="#writer">Writer</a></li></ul></nav>
+<p>Pembaca &amp; penulis berkas berbuffer. Semua signature di bawah diekstrak langsung dari source <code>lib/io/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="reader">Reader<a class="anchor" href="#reader" aria-label="tautan">#</a></h2>
+<p><code>lib/io/Reader.kop</code> · 1 fungsi</p>
+<p>Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.</p>
+<pre><code class="language-java">import Reader;
+
+Reader r = Reader.open("data.txt");
+String baris = r.readLine();
+r.close();</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>Reader.open</code> mengembalikan null bila file tidak ada.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static Reader open(String path)</code></td>
+<td>buka file untuk dibaca (null bila gagal)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="writer">Writer<a class="anchor" href="#writer" aria-label="tautan">#</a></h2>
+<p><code>lib/io/Writer.kop</code> · 2 fungsi</p>
+<p>Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.</p>
+<pre><code class="language-java">import Writer;
+
+Writer w = Writer.open("out.txt");
+w.writeLine("halo");
+w.close();</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>close()</code> melakukan flush lalu menutup file.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static Writer open(String path)</code></td>
+<td>buat/truncate file untuk ditulis</td>
+</tr>
+<tr>
+<td><code>static Writer append(String path)</code></td>
+<td>buka file untuk ditambahkan di akhir</td>
+</tr>
+</tbody></table></div>
+<hr>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.20 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-io.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

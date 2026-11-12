@@ -31,7 +31,8 @@ static Field *class_field(Class *c, const char *name) {
 static int field_ty_ok(Ty t) {
     return t == T_INT || t == T_BOOL || t == T_BYTE ||
            t == T_SHORT || t == T_UINT8 || t == T_UINT16 ||
-           t == T_LONG || t == T_STR;   /* slot fisik 64-bit, v1.14 */
+           t == T_LONG || t == T_STR ||   /* slot fisik 64-bit, v1.14 */
+           ty_is_arr(t);                  /* v1.29: field array (pointer 64-bit) */
 }
 
 static void parse_class(void) {
@@ -142,8 +143,8 @@ static void parse_class(void) {
                 die("baris %d: static field belum didukung — pakai method konstanta (static int W())", mn->line);
             if (!field_ty_ok(ret) && !retcls)
                 die("baris %d: field '%s' bertipe ini belum didukung — "
-                    "didukung: int/boolean/byte/short/uint8/uint16/long/String "
-                    "dan tipe class (double/float menyusul)",
+                    "didukung: int/boolean/byte/short/uint8/uint16/long/String, "
+                    "array, dan tipe class (double/float menyusul)",
                     mn->line, mn->text);
             if (at('=')) {
                 advance();

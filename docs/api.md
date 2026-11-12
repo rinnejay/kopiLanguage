@@ -4,9 +4,10 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Kelompok | Folder | Modul |
 |---|---|---|
-| **Core** | `lib/core/` | `Args`, `Arrays`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time` |
+| **Core** | `lib/core/` | `Args`, `Arrays`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket`, `WsClient` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `X25519`, `X509` |
+| **IO** | `lib/io/` | `Reader`, `Writer` |
 
 ## Daftar modul
 
@@ -21,6 +22,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Compress`](api-core.md#compress) | `lib/core/Compress.kop` | 29 | — |
 | [`Config`](api-core.md#config) | `lib/core/Config.kop` | 9 | — |
 | [`Cookie`](api-core.md#cookie) | `lib/core/Cookie.kop` | 16 | — |
+| [`Csv`](api-core.md#csv) | `lib/core/Csv.kop` | 5 | Baca & tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF. |
 | [`Deque`](api-core.md#deque) | `lib/core/Deque.kop` | 11 | Antrean dua ujung (ring buffer) berkapasitas tetap: push/pop depan-belakang. |
 | [`Digits`](api-core.md#digits) | `lib/core/Digits.kop` | 11 | Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain. |
 | [`Env`](api-core.md#env) | `lib/core/Env.kop` | 11 | — |
@@ -44,6 +46,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Test`](api-core.md#test) | `lib/core/Test.kop` | 16 | — |
 | [`Text`](api-core.md#text) | `lib/core/Text.kop` | 19 | — |
 | [`Time`](api-core.md#time) | `lib/core/Time.kop` | 32 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
+| [`Uuid`](api-core.md#uuid) | `lib/core/Uuid.kop` | 6 | UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID. |
 
 ### Net — [buka referensi](api-net.md)
 
@@ -87,6 +90,13 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Rand`](api-crypto.md#rand) | `lib/crypto/Rand.kop` | 1 | Byte acak kriptografis dari `/dev/urandom`. |
 | [`X25519`](api-crypto.md#x25519) | `lib/crypto/X25519.kop` | 2 | Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3. |
 | [`X509`](api-crypto.md#x509) | `lib/crypto/X509.kop` | 11 | Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik. |
+
+### IO — [buka referensi](api-io.md)
+
+| Modul | File | Fungsi | Ringkasan |
+|---|---|---|---|
+| [`Reader`](api-io.md#reader) | `lib/io/Reader.kop` | 1 | Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori. |
+| [`Writer`](api-io.md#writer) | `lib/io/Writer.kop` | 2 | Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh. |
 
 ## Cara menerapkan
 

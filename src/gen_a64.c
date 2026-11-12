@@ -215,7 +215,8 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_IDXASG: {
         /* nilai slot: 32-bit (int dsb.) atau 64-bit (long/String/objek) */
         Ty vt = (Ty)s->c->dty;
-        int v64 = ty_width(vt) == 64 || vt == T_ARI || vt == T_STR || vt == T_FN;
+        int v64 = ty_width(vt) == 64 || vt == T_ARI || vt == T_STR || vt == T_FN ||
+                  vt == T_LNGARR || vt == T_STRARR;   /* v1.29: array = pointer 64-bit */
         gen_expr(m, s->c);               /* nilai */
         push_val(v64);
         gen_expr(m, s->a);               /* x0 = array */

@@ -1,0 +1,97 @@
+/* Uuid.kop — UUID versi 4 (RFC 4122) & format/parse UUID, murni Kopi (v1.29).
+ *
+ * Fungsi:
+ *   v4()        → UUID acak (format 8-4-4-4-12)
+ *   nil()       → UUID kosong "00000000-0000-0000-0000-000000000000"
+ *   format(b)   → 16 byte → teks UUID
+ *   parse(s)    → teks UUID → 16 byte; array kosong bila tidak valid
+ *   valid(s)    → true bila teks UUID valid
+ *   version(s)  → versi UUID (1..5; 0 bila tidak valid)
+ */
+
+import Rand;
+import Str;
+
+class Uuid {
+
+    /* byte ASCII satu digit heksadesimal */
+    private static int hexChar(int c) {
+        if (c < 10) return 48 + c;
+        return 87 + c;
+    }
+
+    /* heksadesimal lowercase 2 digit */
+    private static String hex2(int v) {
+        int[] b = new int[2];
+        b[0] = hexChar((v >>> 4) & 15);
+        b[1] = hexChar(v & 15);
+        return Net.mkstr(b);
+    }
+
+    /* UUID acak versi 4 */
+    static String v4() {
+        int[] b = Rand.bytes(16);
+        if (b.length < 16) return nil();
+        return format(b);
+    }
+
+    /* UUID kosong */
+    static String nil() {
+        return "00000000-0000-0000-0000-000000000000";
+    }
+
+    /* 16 byte → teks UUID (versi & varian dipasang) */
+    static String format(int[] b) {
+        if (b.length < 16) return nil();
+        int[] x = new int[16];
+        for (int i = 0; i < 16; i++) x[i] = b[i] & 255;
+        x[6] = (x[6] & 15) | 64;          /* versi 4 */
+        x[8] = (x[8] & 63) | 128;         /* varian RFC 4122 */
+        String s = "";
+        for (int i = 0; i < 16; i++) {
+            if (i == 4 || i == 6 || i == 8 || i == 10) s = s + "-";
+            s = s + hex2(x[i]);
+        }
+        return s;
+    }
+
+    /* teks UUID → 16 byte; kosong bila tidak valid */
+    static int[] parse(String s) {
+        int[] out = new int[16];
+        int n = 0;
+        int i = 0;
+        while (i < s.length && n < 16) {
+            int c = s.charAt(i);
+            if (c == 45) { i = i + 1; continue; }   /* '-' */
+            if (i + 1 >= s.length) return new int[0];
+            int hi = hexVal(s.charAt(i));
+            int lo = hexVal(s.charAt(i + 1));
+            if (hi < 0 || lo < 0) return new int[0];
+            out[n] = hi * 16 + lo;
+            n = n + 1;
+            i = i + 2;
+        }
+        if (n != 16) return new int[0];
+        return out;
+    }
+
+    private static int hexVal(int c) {
+        /* literal 'x' di Kopi adalah String → pakai kode byte langsung */
+        if (c >= 48 && c <= 57) return c - 48;         /* '0'..'9' */
+        if (c >= 97 && c <= 102) return c - 97 + 10;   /* 'a'..'f' */
+        if (c >= 65 && c <= 70) return c - 65 + 10;    /* 'A'..'F' */
+        return -1;
+    }
+
+    /* true bila teks UUID valid (36 karakter, 4 tanda hubung) */
+    static boolean valid(String s) {
+        return parse(s).length == 16;
+    }
+
+    /* versi UUID; 0 bila tidak valid */
+    static int version(String s) {
+        int[] b = parse(s);
+        if (b.length < 16) return 0;
+        return (b[6] >>> 4) & 15;
+    }
+}

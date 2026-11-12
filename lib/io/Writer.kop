@@ -1,0 +1,87 @@
+/* Writer.kop — penulis berkas berbuffer (v1.29).
+ *
+ * Buffer 4 KiB; data ditulis ke disk saat buffer penuh atau saat flush().
+ * Field instance boleh bertipe array sejak v1.29, jadi buffer disimpan
+ * langsung sebagai field `int[]`.
+ *
+ * Contoh:
+ *   Writer w = Writer.open("out.txt");
+ *   w.writeLine("halo");
+ *   w.close();          // flush + tutup
+ */
+
+import File;
+
+class Writer {
+
+    int fd;
+    int[] buf;
+    int n;
+    boolean closed;
+
+    Writer(int f) {
+        this.fd = f;
+        this.buf = new int[4096];
+        this.n = 0;
+        this.closed = false;
+    }
+
+    /* buat/truncate file (fd = -1 bila gagal → `valid()` false) */
+    static Writer open(String path) {
+        int fd = File.create(path);
+        return new Writer(fd);
+    }
+
+    /* tambah di akhir file */
+    static Writer append(String path) {
+        int fd = File.append(path);
+        return new Writer(fd);
+    }
+
+    /* true bila file berhasil dibuka */
+    boolean valid() {
+        return this.fd >= 0;
+    }
+
+    /* tulis byte ke buffer; flush bila penuh */
+    void put(int c) {
+        if (this.closed) return;
+        this.buf[this.n] = c & 255;
+        this.n = this.n + 1;
+        if (this.n >= this.buf.length) this.flush();
+    }
+
+    void write(String s) {
+        int[] b = Net.strbytes(s);
+        for (int i = 0; i < b.length; i++) this.put(b[i] & 255);
+    }
+
+    void writeLine(String s) {
+        this.write(s);
+        this.put(10);
+    }
+
+    void writeBytes(int[] data) {
+        for (int i = 0; i < data.length; i++) this.put(data[i] & 255);
+    }
+
+    /* tulis buffer ke disk */
+    void flush() {
+        if (this.n <= 0) return;
+        int[] tmp = new int[this.n];
+        for (int i = 0; i < this.n; i++) tmp[i] = this.buf[i];
+        File.writeAll(this.fd, tmp);
+        this.n = 0;
+    }
+
+    /* flush lalu tutup */
+    void close() {
+        if (this.closed) return;
+        this.flush();
+        if (this.fd >= 0) {
+            File.close(this.fd);
+            this.fd = -1;
+        }
+        this.closed = true;
+    }
+}

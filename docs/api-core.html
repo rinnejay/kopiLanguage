@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
@@ -702,6 +702,44 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));</code></pre>
 <tr>
 <td><code>static String httpDate(int epoch)</code></td>
 <td>"Thu, 12 Nov 2026 00:00:00 GMT" (RFC 1123)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="csv">Csv<a class="anchor" href="#csv" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Csv.kop</code> · 5 fungsi</p>
+<p>Baca &amp; tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF.</p>
+<pre><code class="language-java">import Csv;
+
+String[] row = Csv.parseRow("a,"b,c"");
+System.out.println(Csv.formatRow(row));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>parseRow</code> menangani satu baris; pakai <code>lines</code> untuk memisahkan baris.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String[] parseRow(String line)</code></td>
+<td>pecah satu baris CSV menjadi field</td>
+</tr>
+<tr>
+<td><code>static String formatRow(String[] fields)</code></td>
+<td>susun field menjadi satu baris CSV</td>
+</tr>
+<tr>
+<td><code>static String[] lines(String text)</code></td>
+<td>pecah teks menjadi baris</td>
+</tr>
+<tr>
+<td><code>static int countRows(String text)</code></td>
+<td>jumlah baris dalam teks</td>
+</tr>
+<tr>
+<td><code>static int[] rowLengths(String text)</code></td>
+<td>jumlah field tiap baris</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -3435,6 +3473,48 @@ Time.sleepMs(10);</code></pre>
 <tr>
 <td><code>static String nowISO()</code></td>
 <td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="uuid">Uuid<a class="anchor" href="#uuid" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Uuid.kop</code> · 6 fungsi</p>
+<p>UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID.</p>
+<pre><code class="language-java">import Uuid;
+
+String id = Uuid.v4();
+System.out.println(Uuid.valid(id));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Format 8-4-4-4-12; versi 4 &amp; varian RFC 4122.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String v4()</code></td>
+<td>UUID acak versi 4</td>
+</tr>
+<tr>
+<td><code>static String nil()</code></td>
+<td>UUID kosong</td>
+</tr>
+<tr>
+<td><code>static String format(int[] b)</code></td>
+<td>16 byte → teks UUID</td>
+</tr>
+<tr>
+<td><code>static int[] parse(String s)</code></td>
+<td>teks UUID → 16 byte</td>
+</tr>
+<tr>
+<td><code>static boolean valid(String s)</code></td>
+<td>true bila teks UUID valid</td>
+</tr>
+<tr>
+<td><code>static int version(String s)</code></td>
+<td>versi UUID (1..5)</td>
 </tr>
 </tbody></table></div>
 <hr>
