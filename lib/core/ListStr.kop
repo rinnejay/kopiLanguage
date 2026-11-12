@@ -1,0 +1,205 @@
+// ListStr.kop — array String dinamis (v1.24).
+//
+// String disimpan dalam kolam byte; setiap elemen hanya menyimpan
+// offset+panjang. Layout int[]:
+//   [0]=ukuran [1]=kapasitas [2]=kolam terpakai [3]=kapasitas kolam
+//   offset[cap] @4, panjang[cap] @4+cap, kolam byte @4+2*cap
+//
+//   int[] xs = ListStr.make(4, 128);
+//   xs = ListStr.add(xs, "satu");
+//   xs = ListStr.add(xs, "dua");
+//   System.out.println(ListStr.get(xs, 1));   // dua
+
+import Str;
+
+class ListStr {
+
+    static int base(int[] xs) { return 4 + 2 * xs[1]; }
+
+    static int[] make(int cap, int poolCap) {
+        if (cap < 1) cap = 1;
+        if (poolCap < 8) poolCap = 8;
+        int[] xs = new int[4 + 2 * cap + poolCap];
+        xs[1] = cap;
+        xs[3] = poolCap;
+        return xs;
+    }
+
+    static int[] from(String[] src) {
+        int pc = 16;
+        for (int i = 0; i < src.length; i++) pc = pc + src[i].length;
+        int[] xs = make(src.length, pc);
+        for (int i = 0; i < src.length; i++) {
+            int b = base(xs);
+            int at = xs[2];
+            for (int k = 0; k < src[i].length; k++) xs[b + at + k] = src[i][k] & 255;
+            xs[4 + i] = at;
+            xs[4 + xs[1] + i] = src[i].length;
+            xs[2] = at + src[i].length;
+        }
+        xs[0] = src.length;
+        return xs;
+    }
+
+    static int size(int[] xs) { return xs[0]; }
+    static int cap(int[] xs) { return xs[1]; }
+    static boolean isEmpty(int[] xs) { return xs[0] == 0; }
+
+    static String get(int[] xs, int i) {
+        if (i < 0 || i >= xs[0]) return "";
+        int b = base(xs);
+        int off = xs[4 + i];
+        int n = xs[4 + xs[1] + i];
+        int[] out = new int[n];
+        for (int k = 0; k < n; k++) out[k] = xs[b + off + k];
+        return Net.mkstr(out);
+    }
+
+    static String getOr(int[] xs, int i, String def) {
+        if (i < 0 || i >= xs[0]) return def;
+        return get(xs, i);
+    }
+
+    static int[] growCap(int[] xs, int need) {
+        int c = xs[1];
+        while (c < xs[0] + need) c = c * 2;
+        int[] n = new int[4 + 2 * c + xs[3]];
+        int ob = 4 + 2 * xs[1];
+        int nb = 4 + 2 * c;
+        for (int i = 0; i < xs[0]; i++) {
+            n[4 + i] = xs[4 + i];
+            n[4 + c + i] = xs[4 + xs[1] + i];
+        }
+        for (int i = 0; i < xs[2]; i++) n[nb + i] = xs[ob + i];
+        n[0] = xs[0];
+        n[1] = c;
+        n[2] = xs[2];
+        n[3] = xs[3];
+        return n;
+    }
+
+    static int[] growPool(int[] xs, int need) {
+        int c = xs[3];
+        while (c < xs[2] + need) c = c * 2;
+        int[] n = new int[4 + 2 * xs[1] + c];
+        int b = base(xs);
+        for (int i = 0; i < 4 + 2 * xs[1]; i++) n[i] = xs[i];
+        for (int i = 0; i < xs[2]; i++) n[b + i] = xs[b + i];
+        n[3] = c;
+        return n;
+    }
+
+    /* salin `s` ke kolam; hasil = offset (array xs mungkin baru) */
+    private static int[] putPool(int[] xs, String s, int[] outOffset) {
+        xs = growPool(xs, s.length);
+        int b = base(xs);
+        int at = xs[2];
+        for (int i = 0; i < s.length; i++) xs[b + at + i] = s[i] & 255;
+        xs[2] = at + s.length;
+        outOffset[0] = at;
+        return xs;
+    }
+
+    static int[] add(int[] xs, String s) {
+        xs = growCap(xs, 1);
+        int[] off = new int[1];
+        xs = putPool(xs, s, off);
+        int i = xs[0];
+        xs[4 + i] = off[0];
+        xs[4 + xs[1] + i] = s.length;
+        xs[0] = i + 1;
+        return xs;
+    }
+
+    static int[] addAll(int[] xs, String[] vs) {
+        for (int i = 0; i < vs.length; i++) xs = add(xs, vs[i]);
+        return xs;
+    }
+
+    static boolean setAt(int[] xs, int i, String s) {
+        if (i < 0 || i >= xs[0]) return false;
+        int b = base(xs);
+        int oldOff = xs[4 + i];
+        int oldLen = xs[4 + xs[1] + i];
+        if (oldLen == s.length) {
+            for (int k = 0; k < s.length; k++) xs[b + oldOff + k] = s[k] & 255;
+            return true;
+        }
+        /* panjang berbeda: tulis salinan baru, ruang lama jadi sampah kolam */
+        int at = xs[2];
+        int need = s.length;
+        if (at + need > xs[3]) return false;      /* panggil growPool dulu */
+        for (int k = 0; k < need; k++) xs[b + at + k] = s[k] & 255;
+        xs[2] = at + need;
+        xs[4 + i] = at;
+        xs[4 + xs[1] + i] = need;
+        return true;
+    }
+
+    static int[] insertAt(int[] xs, int i, String s) {
+        if (i < 0) i = 0;
+        if (i > xs[0]) i = xs[0];
+        xs = growCap(xs, 1);
+        int[] off = new int[1];
+        xs = putPool(xs, s, off);
+        for (int k = xs[0]; k > i; k--) {
+            xs[4 + k] = xs[4 + k - 1];
+            xs[4 + xs[1] + k] = xs[4 + xs[1] + k - 1];
+        }
+        xs[4 + i] = off[0];
+        xs[4 + xs[1] + i] = s.length;
+        xs[0] = xs[0] + 1;
+        return xs;
+    }
+
+    static int[] removeAt(int[] xs, int i) {
+        if (i < 0 || i >= xs[0]) return xs;
+        for (int k = i; k + 1 < xs[0]; k++) {
+            xs[4 + k] = xs[4 + k + 1];
+            xs[4 + xs[1] + k] = xs[4 + xs[1] + k + 1];
+        }
+        xs[0] = xs[0] - 1;
+        return xs;
+    }
+
+    static int[] removeValue(int[] xs, String s) {
+        int i = indexOf(xs, s);
+        if (i < 0) return xs;
+        return removeAt(xs, i);
+    }
+
+    static int indexOf(int[] xs, String s) {
+        for (int i = 0; i < xs[0]; i++) if (Str.eq(get(xs, i), s)) return i;
+        return -1;
+    }
+
+    static int lastIndexOf(int[] xs, String s) {
+        for (int i = xs[0] - 1; i >= 0; i--) if (Str.eq(get(xs, i), s)) return i;
+        return -1;
+    }
+
+    static boolean contains(int[] xs, String s) { return indexOf(xs, s) >= 0; }
+
+    static void clear(int[] xs) { xs[0] = 0; xs[2] = 0; }
+
+    static String[] toArray(int[] xs) {
+        String[] out = new String[xs[0]];
+        for (int i = 0; i < xs[0]; i++) out[i] = get(xs, i);
+        return out;
+    }
+
+    static int[] copy(int[] xs) { return from(toArray(xs)); }
+
+    static String[] reverse(int[] xs) {
+        String[] out = toArray(xs);
+        int i = 0;
+        int j = out.length - 1;
+        while (i < j) {
+            String t = out[i]; out[i] = out[j]; out[j] = t;
+            i++; j--;
+        }
+        return out;
+    }
+
+    static String join(int[] xs, String sep) { return Str.join(toArray(xs), sep); }
+}

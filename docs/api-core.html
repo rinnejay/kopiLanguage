@@ -26,9 +26,59 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#time">Time</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Args.kop</code> · 10 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int count()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String at(int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String[] all()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isFlag(String a)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean hasFlag(String flag)</code></td>
+<td>cocokkan "--nama", "-n", atau "--nama=nilai"</td>
+</tr>
+<tr>
+<td><code>static String value(String flag, String def)</code></td>
+<td>nilai "--nama=nilai", "--nama nilai", atau "-n=nilai"</td>
+</tr>
+<tr>
+<td><code>static int intValue(String flag, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String[] positionals()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String command()</code></td>
+<td>perintah = positional pertama, "" bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static String[] flags()</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
 <h2 id="arrays">Arrays<a class="anchor" href="#arrays" aria-label="tautan">#</a></h2>
 <p><code>lib/core/Arrays.kop</code> · 23 fungsi</p>
 <p>Operasi array <code>int[]</code>: agregat, potong/gabung, sort, pencarian, dan gaya fungsional (lambda).</p>
@@ -355,6 +405,252 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));</code></pre>
 </tr>
 </tbody></table></div>
 <hr>
+<h2 id="compress">Compress<a class="anchor" href="#compress" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Compress.kop</code> · 29 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] push(int[] a, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] push16(int[] a, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] push32(int[] a, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get16(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get32(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get32be(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int crc32(int[] data)</code></td>
+<td>CRC-32 (polinom 0xEDB88320)</td>
+</tr>
+<tr>
+<td><code>static int adler32(int[] data)</code></td>
+<td>Adler-32 (RFC 1950)</td>
+</tr>
+<tr>
+<td><code>static int[] deflateRaw(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] zlib(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] gzip(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void align(int[] st)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int bit(int[] in, int[] st)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int bits(int[] in, int[] st, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int byteAt(int[] in, int[] st)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] huff(int[] lengths)</code></td>
+<td>hasil: [0]=maxBits, count[len] @1+len, simbol mulai @max+2</td>
+</tr>
+<tr>
+<td><code>static int decode(int[] in, int[] st, int[] t)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] fixedLit()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] fixedDist()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int lenBase(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int lenExtra(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int distBase(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int distExtra(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int inflateInto(int[] in, int from, int to, int[] out, int cap)</code></td>
+<td>tulis hasil ke out; -1 bila galat atau melebihi kapasitas</td>
+</tr>
+<tr>
+<td><code>static int[] inflateRaw(int[] data, int cap)</code></td>
+<td>deflate mentah dengan kapasitas keluaran eksplisit</td>
+</tr>
+<tr>
+<td><code>static int[] unzlib(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] gunzip(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String gunzipText(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] gzipText(String s)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="config">Config<a class="anchor" href="#config" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Config.kop</code> · 9 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] parse(String text)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] parseFile(String path)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String get(int[] cfg, String key)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(int[] cfg, String key, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int getInt(int[] cfg, String key, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean getBool(int[] cfg, String key, boolean def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean has(int[] cfg, String key)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static String[] keys(int[] cfg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] section(int[] cfg, String name)</code></td>
+<td>ambil semua kunci dalam satu seksi, tanpa prefiks "seksi."</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="cookie">Cookie<a class="anchor" href="#cookie" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Cookie.kop</code> · 16 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] parse(String header)</code></td>
+<td>header "Cookie: a=1; b=2" → peta nama→nilai</td>
+</tr>
+<tr>
+<td><code>static String get(int[] jar, String name)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(int[] jar, String name, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static boolean has(int[] jar, String name)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static String[] names(int[] jar)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String make(String name, String value)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static String withPath(String c, String p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withDomain(String c, String d)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withMaxAge(String c, int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withExpires(String c, int epoch)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withFlags(String c, boolean httpOnly, boolean secure)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withSameSite(String c, String mode)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String headerFull(String name, String value, String path, int maxAge, boolean httpOnly, boolean secure, String sameSite)</code></td>
+<td>Set-Cookie lengkap; maxAge &lt; 0 berarti tanpa Max-Age</td>
+</tr>
+<tr>
+<td><code>static String header(String c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String expired(String name, String path)</code></td>
+<td>cookie yang menghapus (Max-Age=0)</td>
+</tr>
+<tr>
+<td><code>static String httpDate(int epoch)</code></td>
+<td>"Thu, 12 Nov 2026 00:00:00 GMT" (RFC 1123)</td>
+</tr>
+</tbody></table></div>
+<hr>
 <h2 id="deque">Deque<a class="anchor" href="#deque" aria-label="tautan">#</a></h2>
 <p><code>lib/core/Deque.kop</code> · 11 fungsi</p>
 <p>Antrean dua ujung (ring buffer) berkapasitas tetap: push/pop depan-belakang.</p>
@@ -478,6 +774,60 @@ Digits.printBase(255, 16);                    // ff</code></pre>
 </tr>
 </tbody></table></div>
 <hr>
+<h2 id="env">Env<a class="anchor" href="#env" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Env.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String get(String name)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(String name, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static boolean has(String name)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static int getInt(String name, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean getBool(String name, boolean def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String home()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String user()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String shell()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String tmpdir()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String pwd()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String lang()</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
 <h2 id="file">File<a class="anchor" href="#file" aria-label="tautan">#</a></h2>
 <p><code>lib/core/File.kop</code> · 15 fungsi</p>
 <p>I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.</p>
@@ -595,7 +945,7 @@ File.close(r);</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="json">Json<a class="anchor" href="#json" aria-label="tautan">#</a></h2>
-<p><code>lib/core/Json.kop</code> · 57 fungsi</p>
+<p><code>lib/core/Json.kop</code> · 72 fungsi</p>
 <p>Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape <code>int[]</code>; literal bahasa memakai <code>json {...}</code> / <code>json [...]</code>.</p>
 <pre><code class="language-java">import Json;
 
@@ -830,8 +1180,68 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 <td>nilai pasangan ke-i pada objek</td>
 </tr>
 <tr>
+<td><code>static int getInt(int[] obj, String key, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long getLong(int[] obj, String key, long def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static double getDouble(int[] obj, String key, double def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean getBool(int[] obj, String key, boolean def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String getString(int[] obj, String key, String def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] getArray(int[] obj, String key, int[] def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] getObject(int[] obj, String key, int[] def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] atOr(int[] arr, int idx, int[] def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String typeName(int[] v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] path(int[] root, String expr)</code></td>
+<td>bagian path</td>
+</tr>
+<tr>
+<td><code>static boolean hasPath(int[] root, String expr)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String pad2(int depth)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String wrp(int[] v, int depth)</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static String write(int[] v)</code></td>
 <td>API publik: serialisasi ke teks</td>
+</tr>
+<tr>
+<td><code>static String writePretty(int[] v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int writePrettyInto(int[] v, int[] buf)</code></td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>static void print(int[] v)</code></td>
@@ -874,8 +1284,224 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
 </tr>
 </tbody></table></div>
 <hr>
+<h2 id="list">List<a class="anchor" href="#list" aria-label="tautan">#</a></h2>
+<p><code>lib/core/List.kop</code> · 25 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] make(int cap)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int[] from(int[] src)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int size(int[] xs)</code></td>
+<td>jumlah elemen saat ini</td>
+</tr>
+<tr>
+<td><code>static int cap(int[] xs)</code></td>
+<td>kapasitas saat ini</td>
+</tr>
+<tr>
+<td><code>static boolean isEmpty(int[] xs)</code></td>
+<td>true bila kosong</td>
+</tr>
+<tr>
+<td><code>static int get(int[] xs, int i)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static int getOr(int[] xs, int i, int def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static boolean setAt(int[] xs, int i, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] grow(int[] xs, int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] add(int[] xs, int v)</code></td>
+<td>tambahkan elemen</td>
+</tr>
+<tr>
+<td><code>static int[] addAll(int[] xs, int[] vs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] insertAt(int[] xs, int i, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] removeAt(int[] xs, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] removeValue(int[] xs, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int indexOf(int[] xs, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int lastIndexOf(int[] xs, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean contains(int[] xs, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int count(int[] xs, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void clear(int[] xs)</code></td>
+<td>kosongkan isi</td>
+</tr>
+<tr>
+<td><code>static int[] copy(int[] xs)</code></td>
+<td>salinan (array baru)</td>
+</tr>
+<tr>
+<td><code>static int[] toArray(int[] xs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] reverse(int[] xs)</code></td>
+<td>salinan terbalik</td>
+</tr>
+<tr>
+<td><code>static int sum(int[] xs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int max(int[] xs)</code></td>
+<td>nilai terbesar</td>
+</tr>
+<tr>
+<td><code>static int min(int[] xs)</code></td>
+<td>nilai terkecil</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="liststr">ListStr<a class="anchor" href="#liststr" aria-label="tautan">#</a></h2>
+<p><code>lib/core/ListStr.kop</code> · 24 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int base(int[] xs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] make(int cap, int poolCap)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int[] from(String[] src)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int size(int[] xs)</code></td>
+<td>jumlah elemen saat ini</td>
+</tr>
+<tr>
+<td><code>static int cap(int[] xs)</code></td>
+<td>kapasitas saat ini</td>
+</tr>
+<tr>
+<td><code>static boolean isEmpty(int[] xs)</code></td>
+<td>true bila kosong</td>
+</tr>
+<tr>
+<td><code>static String get(int[] xs, int i)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(int[] xs, int i, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int[] growCap(int[] xs, int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] growPool(int[] xs, int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] add(int[] xs, String s)</code></td>
+<td>tambahkan elemen</td>
+</tr>
+<tr>
+<td><code>static int[] addAll(int[] xs, String[] vs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean setAt(int[] xs, int i, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] insertAt(int[] xs, int i, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] removeAt(int[] xs, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] removeValue(int[] xs, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int indexOf(int[] xs, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int lastIndexOf(int[] xs, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean contains(int[] xs, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void clear(int[] xs)</code></td>
+<td>kosongkan isi</td>
+</tr>
+<tr>
+<td><code>static String[] toArray(int[] xs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] copy(int[] xs)</code></td>
+<td>salinan (array baru)</td>
+</tr>
+<tr>
+<td><code>static String[] reverse(int[] xs)</code></td>
+<td>salinan terbalik</td>
+</tr>
+<tr>
+<td><code>static String join(int[] xs, String sep)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
 <h2 id="log">Log<a class="anchor" href="#log" aria-label="tautan">#</a></h2>
-<p><code>lib/core/Log.kop</code> · 4 fungsi</p>
+<p><code>lib/core/Log.kop</code> · 18 fungsi</p>
 <p>Logging ke stderr dengan timestamp UTC dan level.</p>
 <pre><code class="language-java">import Log;
 
@@ -905,6 +1531,89 @@ Log.error("db", "gagal konek");</code></pre>
 <tr>
 <td><code>static void error(String tag, String msg)</code></td>
 <td>log ERROR</td>
+</tr>
+<tr>
+<td><code>static String levelName(int level)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean enabled(int minLevel, int level)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void emitTo(int fd, int minLevel, int level, String tag, String msg)</code></td>
+<td>tulis ke deskriptor tertentu (2 = stderr, 1 = stdout)</td>
+</tr>
+<tr>
+<td><code>static void debug(String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void infoMin(int minLevel, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void warnMin(int minLevel, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void errorMin(int minLevel, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String lineOf(int level, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean toFile(String path, int minLevel, int level, String tag, String msg)</code></td>
+<td>tulis ke file (append) bila level lolos; true bila ditulis</td>
+</tr>
+<tr>
+<td><code>static int fileSize(String path)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean rotate(String path, int maxBytes, int keep)</code></td>
+<td>rotasi sederhana: path → path.1 → path.2 ... (keep=0 tanpa arsip)</td>
+</tr>
+<tr>
+<td><code>static boolean toFileRotating(String path, int maxBytes, int keep, int minLevel, int level, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String jsonLine(int level, String tag, String msg)</code></td>
+<td>satu baris JSON: {"ts":...,"level":"INFO","tag":"...","msg":"..."}</td>
+</tr>
+<tr>
+<td><code>static boolean jsonToFile(String path, int level, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int DEBUG()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int INFO()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int WARN()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int ERROR()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int OFF()</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -993,6 +1702,103 @@ System.out.println(Map.size(m));      // 1</code></pre>
 <tr>
 <td><code>static int TOMB()</code></td>
 <td>marker slot terhapus</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="mapss">MapSS<a class="anchor" href="#mapss" aria-label="tautan">#</a></h2>
+<p><code>lib/core/MapSS.kop</code> · 19 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] make(int cap, int poolCap)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int cap(int[] m)</code></td>
+<td>kapasitas saat ini</td>
+</tr>
+<tr>
+<td><code>static int size(int[] m)</code></td>
+<td>jumlah elemen saat ini</td>
+</tr>
+<tr>
+<td><code>static int poolUsed(int[] m)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isEmpty(int[] m)</code></td>
+<td>true bila kosong</td>
+</tr>
+<tr>
+<td><code>static boolean has(int[] m, String key)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static String get(int[] m, String key)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(int[] m, String key, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static boolean put(int[] m, String key, String val)</code></td>
+<td>simpan pasangan</td>
+</tr>
+<tr>
+<td><code>static boolean remove(int[] m, String key)</code></td>
+<td>hapus elemen</td>
+</tr>
+<tr>
+<td><code>static boolean removeAt(int[] m, int slot)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void clear(int[] m)</code></td>
+<td>kosongkan isi</td>
+</tr>
+<tr>
+<td><code>static boolean used(int[] m, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String keyAtSlot(int[] m, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String valAtSlot(int[] m, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String[] keys(int[] m)</code></td>
+<td>daftar kunci sesuai urutan slot (melewati tombstone)</td>
+</tr>
+<tr>
+<td><code>static String[] values(int[] m)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] growTo(int[] m, int cap, int poolCap)</code></td>
+<td>salin seluruh pasangan ke peta baru dengan kapasitas lebih besar</td>
+</tr>
+<tr>
+<td><code>static String joinKeys(int[] m, String sep)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int TOMB()</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -1520,6 +2326,72 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b</code></pre>
 </tr>
 </tbody></table></div>
 <hr>
+<h2 id="router">Router<a class="anchor" href="#router" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Router.kop</code> · 14 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int base(int[] r)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] make(int cap, int poolCap)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int size(int[] r)</code></td>
+<td>jumlah elemen saat ini</td>
+</tr>
+<tr>
+<td><code>static int cap(int[] r)</code></td>
+<td>kapasitas saat ini</td>
+</tr>
+<tr>
+<td><code>static int[] growCap(int[] r, int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] growPool(int[] r, int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] add(int[] r, String method, String pattern, int id)</code></td>
+<td>tambah rute; id bebas ditentukan pemanggil</td>
+</tr>
+<tr>
+<td><code>static String methodAt(int[] r, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String patternAt(int[] r, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int idAt(int[] r, int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean matchPattern(String pat, String path, int[] params, boolean capture)</code></td>
+<td>cocokkan satu pola; isi params bila tidak null</td>
+</tr>
+<tr>
+<td><code>static int matchInto(int[] r, String method, String path, int[] params)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int match(int[] r, String method, String path)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int allowMask(int[] r, String path)</code></td>
+<td>id rute yang metodenya cocok (untuk header Allow), -1 bila kosong</td>
+</tr>
+</tbody></table></div>
+<hr>
 <h2 id="set">Set<a class="anchor" href="#set" aria-label="tautan">#</a></h2>
 <p><code>lib/core/Set.kop</code> · 8 fungsi</p>
 <p>Himpunan int di atas Map: tambah/hapus/uji keanggotaan.</p>
@@ -1564,6 +2436,60 @@ System.out.println(Set.has(s, 4));  // true</code></pre>
 <tr>
 <td><code>static void forEach(int[] s, fn f)</code></td>
 <td>panggil f(x) untuk tiap elemen</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="setstr">SetStr<a class="anchor" href="#setstr" aria-label="tautan">#</a></h2>
+<p><code>lib/core/SetStr.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] make(int cap, int poolCap)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int size(int[] s)</code></td>
+<td>jumlah elemen saat ini</td>
+</tr>
+<tr>
+<td><code>static int cap(int[] s)</code></td>
+<td>kapasitas saat ini</td>
+</tr>
+<tr>
+<td><code>static boolean isEmpty(int[] s)</code></td>
+<td>true bila kosong</td>
+</tr>
+<tr>
+<td><code>static boolean add(int[] s, String v)</code></td>
+<td>tambahkan elemen</td>
+</tr>
+<tr>
+<td><code>static boolean has(int[] s, String v)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static boolean remove(int[] s, String v)</code></td>
+<td>hapus elemen</td>
+</tr>
+<tr>
+<td><code>static void clear(int[] s)</code></td>
+<td>kosongkan isi</td>
+</tr>
+<tr>
+<td><code>static String[] values(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean containsAll(int[] s, String[] vs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addAll(int[] s, String[] vs)</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -2097,8 +3023,168 @@ System.out.println(Str.join(Str.split("a,b", ","), "|")); // a|b</code></pre>
 </tr>
 </tbody></table></div>
 <hr>
+<h2 id="test">Test<a class="anchor" href="#test" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Test.kop</code> · 16 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] make()</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int passed(int[] t)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int failed(int[] t)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void ok(int[] t, boolean cond, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void fail(int[] t, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void eqInt(int[] t, int got, int want, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void neInt(int[] t, int got, int bad, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void eqLong(int[] t, long got, long want, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void eqStr(int[] t, String got, String want, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void eqBool(int[] t, boolean got, boolean want, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void near(int[] t, double got, double want, double eps, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void true_(int[] t, boolean cond, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void false_(int[] t, boolean cond, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int report(int[] t, String tag)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int code(int[] t)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void reset(int[] t)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="text">Text<a class="anchor" href="#text" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Text.kop</code> · 19 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] make(int cap)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int len(int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int cap(int[] b)</code></td>
+<td>kapasitas saat ini</td>
+</tr>
+<tr>
+<td><code>static boolean isEmpty(int[] b)</code></td>
+<td>true bila kosong</td>
+</tr>
+<tr>
+<td><code>static int[] reserve(int[] b, int need)</code></td>
+<td>pastikan ruang untuk <code>need</code> byte lagi; kembalikan buffer (mungkin baru)</td>
+</tr>
+<tr>
+<td><code>static int[] appendByte(int[] b, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] append(int[] b, String s)</code></td>
+<td>buka untuk menambah di akhir</td>
+</tr>
+<tr>
+<td><code>static int[] appendBytes(int[] b, int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] appendInt(int[] b, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] appendLong(int[] b, long v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] appendDouble(int[] b, double v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] appendBool(int[] b, boolean v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] appendLine(int[] b, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] newline(int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] repeatByte(int[] b, int c, int n)</code></td>
+<td>ulang byte yang sama <code>n</code> kali</td>
+</tr>
+<tr>
+<td><code>static int[] truncate(int[] b, int n)</code></td>
+<td>buang <code>n</code> byte terakhir (di-clamp)</td>
+</tr>
+<tr>
+<td><code>static void clear(int[] b)</code></td>
+<td>kosongkan isi</td>
+</tr>
+<tr>
+<td><code>static String build(int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String toString(int[] b)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
 <h2 id="time">Time<a class="anchor" href="#time" aria-label="tautan">#</a></h2>
-<p><code>lib/core/Time.kop</code> · 6 fungsi</p>
+<p><code>lib/core/Time.kop</code> · 32 fungsi</p>
 <p>Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.</p>
 <pre><code class="language-java">import Time;
 
@@ -2137,6 +3223,110 @@ Time.sleepMs(10);</code></pre>
 <tr>
 <td><code>static String format(int sec)</code></td>
 <td>format "YYYY-MM-DD HH:MM:SS" UTC</td>
+</tr>
+<tr>
+<td><code>static boolean isLeap(int y)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int daysInMonth(int y, int m)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int daysFromCivil(int y, int m, int d)</code></td>
+<td>tanggal → jumlah hari sejak 1970-01-01 (algoritma Hinnant)</td>
+</tr>
+<tr>
+<td><code>static int fromCivil(int y, int m, int d, int hh, int mm, int ss)</code></td>
+<td>epoch dari komponen UTC; -1 bila komponen tidak valid</td>
+</tr>
+<tr>
+<td><code>static int[] civilZone(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int startOfDay(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int startOfMonth(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int parseOffset(String s, int at)</code></td>
+<td>"+07:00" / "-0530" → detik; 0 bila polos/Z</td>
+</tr>
+<tr>
+<td><code>static int parseISO(String s)</code></td>
+<td>"2026-11-12", "2026-11-12T08:30:00", "...Z", "...+07:00"</td>
+</tr>
+<tr>
+<td><code>static int parseISOOr(String s, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String isoDate(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String isoTime(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String formatISO(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String formatISOZone(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String formatZone(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addSeconds(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addMinutes(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addHours(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addDays(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addMonths(int sec, int n)</code></td>
+<td>tambah bulan kalender dengan clamp akhir bulan</td>
+</tr>
+<tr>
+<td><code>static int diffSeconds(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int diffDays(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int diffMinutes(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int diffHours(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String duration(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String nowISO()</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>

@@ -1,0 +1,158 @@
+// Router.kop — pencocokan rute HTTP sederhana (v1.24).
+//
+// Rute disimpan dalam int[] (kapasitas tetap) dan tidak memakai closure:
+//   int[] r = Router.make(16, 512);
+//   r = Router.add(r, "GET", "/halo/:nama", 1);
+//   r = Router.add(r, "GET", "/file/*", 2);
+//   int[] p = MapSS.make(8, 128);
+//   int id = Router.matchInto(r, "GET", "/halo/budi", p);
+//   // id=1, p["nama"]="budi"
+//
+// Pola: segmen `:nama` menangkap satu segmen; `*` menangkap sisa path.
+
+import Str;
+import MapSS;
+
+class Router {
+
+    static int base(int[] r) { return 4 + 5 * r[1]; }
+
+    static int[] make(int cap, int poolCap) {
+        if (cap < 2) cap = 2;
+        if (poolCap < 32) poolCap = 32;
+        int[] r = new int[4 + 5 * cap + poolCap];
+        r[1] = cap;
+        r[3] = poolCap;
+        return r;
+    }
+
+    static int size(int[] r) { return r[0]; }
+    static int cap(int[] r) { return r[1]; }
+
+    static int[] growCap(int[] r, int need) {
+        int c = r[1];
+        while (c < r[0] + need) c = c * 2;
+        int[] n = new int[4 + 5 * c + r[3]];
+        int ob = base(r);
+        int nb = 4 + 5 * c;
+        for (int i = 0; i < r[0]; i++) {
+            n[4 + i] = r[4 + i];
+            n[4 + c + i] = r[4 + r[1] + i];
+            n[4 + 2 * c + i] = r[4 + 2 * r[1] + i];
+            n[4 + 3 * c + i] = r[4 + 3 * r[1] + i];
+            n[4 + 4 * c + i] = r[4 + 4 * r[1] + i];
+        }
+        for (int i = 0; i < r[2]; i++) n[nb + i] = r[ob + i];
+        n[0] = r[0]; n[1] = c; n[2] = r[2]; n[3] = r[3];
+        return n;
+    }
+
+    static int[] growPool(int[] r, int need) {
+        int c = r[3];
+        while (c < r[2] + need) c = c * 2;
+        int[] n = new int[4 + 5 * r[1] + c];
+        int b = base(r);
+        for (int i = 0; i < 4 + 5 * r[1]; i++) n[i] = r[i];
+        for (int i = 0; i < r[2]; i++) n[b + i] = r[b + i];
+        n[3] = c;
+        return n;
+    }
+
+    private static int[] putPool(int[] r, String s, int[] offOut) {
+        r = growPool(r, s.length);
+        int b = base(r);
+        int at = r[2];
+        for (int i = 0; i < s.length; i++) r[b + at + i] = s[i] & 255;
+        r[2] = at + s.length;
+        offOut[0] = at;
+        return r;
+    }
+
+    /* tambah rute; id bebas ditentukan pemanggil */
+    static int[] add(int[] r, String method, String pattern, int id) {
+        r = growCap(r, 1);
+        int[] mo = new int[1];
+        int[] po = new int[1];
+        r = putPool(r, method, mo);
+        r = putPool(r, pattern, po);
+        int i = r[0];
+        int c = r[1];
+        r[4 + i] = mo[0];
+        r[4 + c + i] = method.length;
+        r[4 + 2 * c + i] = po[0];
+        r[4 + 3 * c + i] = pattern.length;
+        r[4 + 4 * c + i] = id;
+        r[0] = i + 1;
+        return r;
+    }
+
+    private static String strAt(int[] r, int off, int len) {
+        int b = base(r);
+        int[] out = new int[len];
+        for (int i = 0; i < len; i++) out[i] = r[b + off + i];
+        return Net.mkstr(out);
+    }
+
+    static String methodAt(int[] r, int i) {
+        int c = r[1];
+        return strAt(r, r[4 + i], r[4 + c + i]);
+    }
+
+    static String patternAt(int[] r, int i) {
+        int c = r[1];
+        return strAt(r, r[4 + 2 * c + i], r[4 + 3 * c + i]);
+    }
+
+    static int idAt(int[] r, int i) { return r[4 + 4 * r[1] + i]; }
+
+    /* cocokkan satu pola; isi params bila tidak null */
+    static boolean matchPattern(String pat, String path, int[] params, boolean capture) {
+        int pi = 0;
+        int si = 0;
+        while (pi < pat.length) {
+            int pc = pat[pi];
+            if (pc == 42) {                              /* '*' sisa path */
+                if (capture) MapSS.put(params, "*", Str.sub(path, si, path.length - si));
+                return true;
+            }
+            if (pc == 58) {                              /* ':' nama segmen */
+                pi++;
+                int n0 = pi;
+                while (pi < pat.length && pat[pi] != 47) pi++;
+                String name = Str.sub(pat, n0, pi - n0);
+                int s0 = si;
+                while (si < path.length && path[si] != 47) si++;   /* '/' */
+                if (capture) MapSS.put(params, name, Str.sub(path, s0, si - s0));
+                continue;
+            }
+            if (si >= path.length) return false;
+            if (path[si] != pc) return false;
+            pi++; si++;
+        }
+        return si == path.length;
+    }
+
+    static int matchInto(int[] r, String method, String path, int[] params) {
+        for (int i = 0; i < r[0]; i++) {
+            String m = methodAt(r, i);
+            if (!Str.eq(m, "*") && !Str.equalsIgnoreCase(m, method)) continue;
+            if (!matchPattern(patternAt(r, i), path, params, true)) continue;
+            return idAt(r, i);
+        }
+        return -1;
+    }
+
+    static int match(int[] r, String method, String path) {
+        return matchInto(r, method, path, MapSS.make(2, 8));
+    }
+
+    /* id rute yang metodenya cocok (untuk header Allow), -1 bila kosong */
+    static int allowMask(int[] r, String path) {
+        int mask = 0;
+        if (match(r, "GET", path) >= 0) mask = mask | 1;
+        if (match(r, "POST", path) >= 0) mask = mask | 2;
+        if (match(r, "PUT", path) >= 0) mask = mask | 4;
+        if (match(r, "DELETE", path) >= 0) mask = mask | 8;
+        return mask;
+    }
+}

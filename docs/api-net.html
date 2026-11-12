@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-net">Referensi API — Net<a class="anchor" href="#referensi-api-net" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#auth">Auth</a></li><li class="toc-h2"><a href="#dns">Dns</a></li><li class="toc-h2"><a href="#http">Http</a></li><li class="toc-h2"><a href="#httpserver">HttpServer</a></li><li class="toc-h2"><a href="#jwt">Jwt</a></li><li class="toc-h2"><a href="#mime">Mime</a></li><li class="toc-h2"><a href="#resolv">Resolv</a></li><li class="toc-h2"><a href="#rfc">Rfc</a></li><li class="toc-h2"><a href="#session">Session</a></li><li class="toc-h2"><a href="#static">Static</a></li><li class="toc-h2"><a href="#tcp">Tcp</a></li><li class="toc-h2"><a href="#tls">Tls</a></li><li class="toc-h2"><a href="#udp">Udp</a></li><li class="toc-h2"><a href="#url">Url</a></li><li class="toc-h2"><a href="#websocket">WebSocket</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#auth">Auth</a></li><li class="toc-h2"><a href="#dns">Dns</a></li><li class="toc-h2"><a href="#http">Http</a></li><li class="toc-h2"><a href="#httpserver">HttpServer</a></li><li class="toc-h2"><a href="#jwt">Jwt</a></li><li class="toc-h2"><a href="#mime">Mime</a></li><li class="toc-h2"><a href="#multipart">Multipart</a></li><li class="toc-h2"><a href="#resolv">Resolv</a></li><li class="toc-h2"><a href="#rfc">Rfc</a></li><li class="toc-h2"><a href="#session">Session</a></li><li class="toc-h2"><a href="#static">Static</a></li><li class="toc-h2"><a href="#tcp">Tcp</a></li><li class="toc-h2"><a href="#tls">Tls</a></li><li class="toc-h2"><a href="#udp">Udp</a></li><li class="toc-h2"><a href="#url">Url</a></li><li class="toc-h2"><a href="#websocket">WebSocket</a></li><li class="toc-h2"><a href="#wsclient">WsClient</a></li></ul></nav>
 <p>TCP/UDP, HTTP, WebSocket, URL, auth, DNS, TLS. Semua signature di bawah diekstrak langsung dari source <code>lib/net/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="auth">Auth<a class="anchor" href="#auth" aria-label="tautan">#</a></h2>
@@ -76,7 +76,7 @@ if (!Auth.checkBasic(h, user, pass)) { /* 401 */ }</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="dns">Dns<a class="anchor" href="#dns" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Dns.kop</code> · 6 fungsi</p>
+<p><code>lib/net/Dns.kop</code> · 17 fungsi</p>
 <p>Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.</p>
 <pre><code class="language-java">import Dns;
 
@@ -113,13 +113,57 @@ Dns.lookup(serverIp, 53, "example.com", hasil, 512);</code></pre>
 <td>telaah pesan DNS mentah (tanpa awalan panjang TCP) menjadi A. hasil[0]=RCODE, hasil[1..4]=oktet IPv4 (atau -1).</td>
 </tr>
 <tr>
+<td><code>static String readName(int[] m, int i)</code></td>
+<td>nama pada posisi i (mengikuti pointer kompresi)</td>
+</tr>
+<tr>
+<td><code>static int[] findRR(int[] buf, int want)</code></td>
+<td>posisi awal RDATA record pertama bertipe <code>want</code>; {-1} bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int rrTypeCount(int[] buf, int want)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int parseAAAA(int[] buf, int[] hasil)</code></td>
+<td>hasil[0]=RCODE, hasil[1..16]=16 byte IPv6 (atau -1)</td>
+</tr>
+<tr>
+<td><code>static String hex4(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String ipv6Text(int[] hasil)</code></td>
+<td>IPv6 kanonik (8 grup 16-bit heksadesimal, tanpa kompresi nol)</td>
+</tr>
+<tr>
+<td><code>static String cname(int[] buf)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int mxPref(int[] buf)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String mxHost(int[] buf)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String txt(int[] buf)</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static int lookup(int addr, int port, String dottedName, int[] hasil, int cap)</code></td>
 <td>kirim kueri A (qtype=1) ke addr:port (TCP, awalan panjang 2 byte) dan telaah balasannya melalui hasil: hasil[0] = RCODE (0 = NOERROR, 3 = NXDOMAIN, ...), hasil[1..4] = oktet IPv…</td>
+</tr>
+<tr>
+<td><code>static int[] lookupType(int addr, int port, String dottedName, int qtype, int cap)</code></td>
+<td>kueri mentah tipe bebas; hasil = payload DNS (tanpa awalan TCP)</td>
 </tr>
 </tbody></table></div>
 <hr>
 <h2 id="http">Http<a class="anchor" href="#http" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Http.kop</code> · 27 fungsi</p>
+<p><code>lib/net/Http.kop</code> · 44 fungsi</p>
 <p>Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.</p>
 <pre><code class="language-java">import Tcp;
 import Http;
@@ -218,8 +262,16 @@ System.out.println(Http.payload(r));</code></pre>
 <td>body sebenarnya: chunked → decode; Content-Length → potong</td>
 </tr>
 <tr>
+<td><code>static int[] payloadDecoded(int[] resp)</code></td>
+<td>body setelah dekompresi Content-Encoding (gzip/deflate)</td>
+</tr>
+<tr>
 <td><code>static String req11(String method, String hostHdr, String path, String headers, int[] body, int keep)</code></td>
 <td>susun permintaan HTTP/1.1 (keep=1 → keep-alive, else close)</td>
+</tr>
+<tr>
+<td><code>static int[] exchangeDo(int fd, String method, String hostHdr, String path, String headers, int[] body, int cap, int timeoutMs)</code></td>
+<td>satu transaksi (core); timeoutMs &gt; 0 memasang SO_RCVTIMEO/SO_SNDTIMEO</td>
 </tr>
 <tr>
 <td><code>static int[] exchange(int addr, int port, String method, String hostHdr, String path, String headers, int[] body, int cap)</code></td>
@@ -230,25 +282,85 @@ System.out.println(Http.payload(r));</code></pre>
 <td>GET + respons lengkap (status, header, body)</td>
 </tr>
 <tr>
-<td><code>static int[] follow(int addr, int port, String hostHdr, String path, int maxHops, int cap)</code></td>
+<td><code>static int[] getFullT(int addr, int port, String hostHdr, String path, int cap, int timeoutMs)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] followT(int addr, int port, String hostHdr, String path, int maxHops, int cap, int timeoutMs)</code></td>
 <td>ikuti 301/302/303/307/308 (maks maxHops, host harus sama)</td>
+</tr>
+<tr>
+<td><code>static int[] follow(int addr, int port, String hostHdr, String path, int maxHops, int cap)</code></td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>static String basic(String user, String pass)</code></td>
 <td>header "Authorization: Basic ..." dari user:pass</td>
 </tr>
 <tr>
+<td><code>static int[] formPostT(int addr, int port, String hostHdr, String path, String form, int cap, int timeoutMs)</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static int[] formPost(int addr, int port, String hostHdr, String path, String form, int cap)</code></td>
 <td>POST application/x-www-form-urlencoded</td>
+</tr>
+<tr>
+<td><code>static int[] jsonPostT(int addr, int port, String hostHdr, String path, String jsonBody, int cap, int timeoutMs)</code></td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>static int[] jsonPost(int addr, int port, String hostHdr, String path, String jsonBody, int cap)</code></td>
 <td>POST application/json</td>
 </tr>
+<tr>
+<td><code>static String[] headerLines(int[] resp)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int headerCount(int[] resp)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String headerNameAt(int[] resp, int idx)</code></td>
+<td>nama header pada baris ke-i (sebelum ':'), "" bila bukan header</td>
+</tr>
+<tr>
+<td><code>static String headerValueAt(int[] resp, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String headerLineAt(int[] resp, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String headerAll(int[] resp, String name, String sep)</code></td>
+<td>semua nilai header bernama sama, digabung dengan <code>sep</code></td>
+</tr>
+<tr>
+<td><code>static String multipartType(String boundary)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String multipartBody(String boundary, String[] names, String[] values)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] multipartPost(int addr, int port, String hostHdr, String path, String boundary, String[] names, String[] values, int cap)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] exchangeTlsDo(int[] ctx, String method, String hostHdr, String path, String headers, int[] body, int cap, int timeoutMs)</code></td>
+<td>pin = 32 byte SHA-256 SPKI, atau array kosong untuk TOFU. Mengembalikan respons mentah; [0] negatif bila gagal.</td>
+</tr>
+<tr>
+<td><code>static int[] getTls(int addr, int port, String hostHdr, String path, int cap, int[] pin, int timeoutMs)</code></td>
+<td>—</td>
+</tr>
 </tbody></table></div>
 <hr>
 <h2 id="httpserver">HttpServer<a class="anchor" href="#httpserver" aria-label="tautan">#</a></h2>
-<p><code>lib/net/HttpServer.kop</code> · 35 fungsi</p>
+<p><code>lib/net/HttpServer.kop</code> · 47 fungsi</p>
 <p>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie, chunked.</p>
 <pre><code class="language-java">import HttpServer;
 
@@ -404,6 +516,54 @@ HttpServer.send(c, resp);</code></pre>
 <td>body permintaan: chunked bila Transfer-Encoding: chunked</td>
 </tr>
 <tr>
+<td><code>static int[] readRequestLimit(int fd, int max, int limit)</code></td>
+<td>seperti readRequest tetapi <code>max</code> dibatasi <code>limit</code> byte</td>
+</tr>
+<tr>
+<td><code>static boolean bodyOver(int[] req, int limit)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] tooLarge()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String boundaryOf(int[] req)</code></td>
+<td>boundary dari header Content-Type multipart</td>
+</tr>
+<tr>
+<td><code>static int multipartCount(int[] req)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String multipartName(int[] req, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String multipartFilename(int[] req, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] multipartData(int[] req, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String multipartValue(int[] req, String name)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] rangeOf(int[] req, int total)</code></td>
+<td>Range: bytes=awal-akhir / awal- / -sufiks → {start,end} inklusif</td>
+</tr>
+<tr>
+<td><code>static int[] partial(String ctype, int[] data, int start, int end)</code></td>
+<td>respons 206 Partial Content dengan Content-Range</td>
+</tr>
+<tr>
+<td><code>static int[] partialFor(int[] req, String ctype, int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static int send(int fd, int[] resp)</code></td>
 <td>kirim respons ke koneksi; jumlah byte</td>
 </tr>
@@ -495,6 +655,95 @@ String ct = Mime.of("app.js"); // application/javascript</code></pre>
 <tr>
 <td><code>static String of(String path)</code></td>
 <td>Content-Type berdasarkan ekstensi</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="multipart">Multipart<a class="anchor" href="#multipart" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Multipart.kop</code> · 17 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String contentType(String boundary)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int findSeq(int[] hay, int[] ndl, int from)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] partAt(int[] body, String boundary, int idx)</code></td>
+<td>posisi [headers, contentStart, contentEnd] part ke-idx; kosong bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int count(int[] body, String boundary)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String disposition(int[] body, String boundary, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String contentTypeAt(int[] body, String boundary, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String attr(String disp, String key)</code></td>
+<td>ambil atribut name="..." / filename="..." dari Content-Disposition</td>
+</tr>
+<tr>
+<td><code>static String nameAt(int[] body, String boundary, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String filenameAt(int[] body, String boundary, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] dataAt(int[] body, String boundary, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String value(int[] body, String boundary, String name)</code></td>
+<td>data teks field pertama dengan nama tertentu; "" bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int[] make()</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static int[] addField(int[] b, String boundary, String name, String value)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] addFile(int[] b, String boundary, String name, String filename, String ctype, int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] finish(int[] b, String boundary)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String body(int[] b, String boundary)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] bodyBytes(int[] b, String boundary)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] CRLF()</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -620,7 +869,7 @@ int uid2 = Session.get(ids, exps, sid, Net.time());</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="static">Static<a class="anchor" href="#static" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Static.kop</code> · 3 fungsi</p>
+<p><code>lib/net/Static.kop</code> · 7 fungsi</p>
 <p>Penyajian file statis + MIME; menolak path traversal <code>..</code>.</p>
 <pre><code class="language-java">import Static;
 
@@ -641,6 +890,22 @@ int[] resp = Static.serve("public/index.html");</code></pre>
 <tr>
 <td><code>static int[] serve(String path)</code></td>
 <td>sajikan file; tolak path traversal "..".</td>
+</tr>
+<tr>
+<td><code>static String etag(int[] body)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean notModified(int[] req, String tag)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] serveReqKA(int[] req, String path, int keep)</code></td>
+<td>respons file dengan ETag, Range, dan 304 (v1.24)</td>
+</tr>
+<tr>
+<td><code>static int[] serveReq(int[] req, String path)</code></td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>static int[] serveKA(String path, int keep)</code></td>
@@ -1093,6 +1358,76 @@ if (WebSocket.isUpgrade(req)) {
 <tr>
 <td><code>static String GUID()</code></td>
 <td>GUID RFC 6455 untuk handshake</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="wsclient">WsClient<a class="anchor" href="#wsclient" aria-label="tautan">#</a></h2>
+<p><code>lib/net/WsClient.kop</code> · 15 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] recvN(int fd, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String recvUntil(int fd, String marker, int max)</code></td>
+<td>baca sampai penanda (mis. CRLF CRLF) atau max byte</td>
+</tr>
+<tr>
+<td><code>static String randomKey()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] connect(int ip, int port, String host, String path)</code></td>
+<td>hasil ctx: [0]=fd, [1]=ok(0/1), [2]=tertutup</td>
+</tr>
+<tr>
+<td><code>static int sendFrame(int[] ctx, int op, int[] payload)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int sendText(int[] ctx, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int sendBinary(int[] ctx, int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int sendPing(int[] ctx, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int sendPong(int[] ctx, String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int closeClient(int[] ctx, int code)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] recv(int[] ctx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int opcode(int[] f)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] payload(int[] f)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String recvText(int[] ctx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isClosed(int[] ctx)</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>

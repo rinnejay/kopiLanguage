@@ -1,5 +1,6 @@
-// Time.kop — waktu & tanggal (UTC) di atas builtin Net v1.23.
+// Time.kop — waktu & tanggal (UTC + offset zona) v1.24.
 // epoch = detik Unix (int; batas 2038), monoMs = milidetik monotonik (long).
+// Semua fungsi menerima offset zona dalam detik (mis. +7*3600 untuk WIB).
 import Str;
 
 class Time {
@@ -51,4 +52,227 @@ class Time {
         o = o + ":" + Str.padLeft(Str.fromInt(c[5]), 2, 48);
         return o;
     }
+
+    /* ── kalender ──────────────────────────────────────────────── */
+
+    static boolean isLeap(int y) {
+        if (y % 4 != 0) return false;
+        if (y % 100 != 0) return true;
+        return y % 400 == 0;
+    }
+
+    static int daysInMonth(int y, int m) {
+        if (m == 2) { if (isLeap(y)) return 29; return 28; }
+        if (m == 4 || m == 6 || m == 9 || m == 11) return 30;
+        if (m >= 1 && m <= 12) return 31;
+        return 0;
+    }
+
+    /* tanggal → jumlah hari sejak 1970-01-01 (algoritma Hinnant) */
+    static int daysFromCivil(int y, int m, int d) {
+        int yy = y;
+        if (m <= 2) yy = yy - 1;
+        int era = yy / 400;
+        if (yy < 0 && yy % 400 != 0) era = era - 1;
+        int yoe = yy - era * 400;                       /* 0..399 */
+        int mp = m + 9;
+        if (m > 2) mp = m - 3;
+        int doy = (153 * mp + 2) / 5 + d - 1;           /* 0..365 */
+        int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+        return era * 146097 + doe - 719468;
+    }
+
+    /* epoch dari komponen UTC; -1 bila komponen tidak valid */
+    static int fromCivil(int y, int m, int d, int hh, int mm, int ss) {
+        if (m < 1 || m > 12) return -1;
+        if (d < 1 || d > daysInMonth(y, m)) return -1;
+        if (hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59) return -1;
+        return daysFromCivil(y, m, d) * 86400 + hh * 3600 + mm * 60 + ss;
+    }
+
+    /* ── offset zona ───────────────────────────────────────────── */
+
+    static int[] civilZone(int sec, int off) { return civil(sec + off); }
+
+    static int startOfDay(int sec, int off) {
+        int local = sec + off;
+        int day = local / 86400;
+        if (local < 0 && local % 86400 != 0) day = day - 1;
+        return day * 86400 - off;
+    }
+
+    static int startOfMonth(int sec, int off) {
+        int[] c = civilZone(sec, off);
+        return fromCivil(c[0], c[1], 1, 0, 0, 0) - off;
+    }
+
+    /* "+07:00" / "-0530" → detik; 0 bila polos/Z */
+    static int parseOffset(String s, int at) {
+        if (at >= s.length) return 0;
+        int c = s[at];
+        if (c == 90 || c == 122) return 0;              /* Z / z */
+        if (c != 43 && c != 45) return -1;              /* + / - */
+        int sign = 1;
+        if (c == 45) sign = -1;
+        int i = at + 1;
+        int hh = 0;
+        int mm = 0;
+        int n = 0;
+        while (i < s.length && n < 2 && s[i] >= 48 && s[i] <= 57) {
+            hh = hh * 10 + (s[i] - 48); i++; n++;
+        }
+        if (i < s.length && s[i] == 58) i++;
+        n = 0;
+        while (i < s.length && n < 2 && s[i] >= 48 && s[i] <= 57) {
+            mm = mm * 10 + (s[i] - 48); i++; n++;
+        }
+        if (hh > 23 || mm > 59) return -1;
+        return sign * (hh * 3600 + mm * 60);
+    }
+
+    /* ── ISO-8601 ──────────────────────────────────────────────── */
+
+    /* "2026-11-12", "2026-11-12T08:30:00", "...Z", "...+07:00" */
+    static int parseISO(String s) {
+        if (s.length < 10) return -1;
+        if (s[4] != 45 || s[7] != 45) return -1;
+        String ys = Str.sub(s, 0, 4);
+        String ms = Str.sub(s, 5, 2);
+        String ds = Str.sub(s, 8, 2);
+        if (!Str.isDigits(ys) || !Str.isDigits(ms) || !Str.isDigits(ds)) return -1;
+        int y = Str.toInt(ys);
+        int mo = Str.toInt(ms);
+        int d = Str.toInt(ds);
+        int hh = 0;
+        int mi = 0;
+        int ss = 0;
+        int i = 10;
+        if (i < s.length) {
+            if (s[i] == 84 || s[i] == 116) {            /* T / t */
+                i++;
+                if (i + 2 > s.length) return -1;
+                String hs = Str.sub(s, i, 2);
+                if (!Str.isDigits(hs)) return -1;
+                hh = Str.toInt(hs); i = i + 2;
+                if (i < s.length && s[i] == 58) i++;
+                if (i + 2 > s.length) return -1;
+                String mis = Str.sub(s, i, 2);
+                if (!Str.isDigits(mis)) return -1;
+                mi = Str.toInt(mis); i = i + 2;
+                if (i < s.length && s[i] == 58) {
+                    i++;
+                    if (i + 2 > s.length) return -1;
+                    String sss = Str.sub(s, i, 2);
+                    if (!Str.isDigits(sss)) return -1;
+                    ss = Str.toInt(sss); i = i + 2;
+                }
+                /* pecahan detik diabaikan */
+                if (i < s.length && s[i] == 46) {
+                    i++;
+                    while (i < s.length && s[i] >= 48 && s[i] <= 57) i++;
+                }
+            } else if (s[i] != 90 && s[i] != 122 && s[i] != 43 && s[i] != 45) {
+                return -1;
+            }
+        }
+        int base = fromCivil(y, mo, d, hh, mi, ss);
+        if (base < 0) return -1;
+        int off = parseOffset(s, i);
+        if (off < 0) return -1;
+        return base - off;
+    }
+
+    static int parseISOOr(String s, int def) {
+        int v = parseISO(s);
+        if (v < 0) return def;
+        return v;
+    }
+
+    static String isoDate(int sec) {
+        int[] c = civil(sec);
+        return Str.padLeft(Str.fromInt(c[0]), 4, 48)
+             + "-" + Str.padLeft(Str.fromInt(c[1]), 2, 48)
+             + "-" + Str.padLeft(Str.fromInt(c[2]), 2, 48);
+    }
+
+    static String isoTime(int sec) {
+        int[] c = civil(sec);
+        return Str.padLeft(Str.fromInt(c[3]), 2, 48)
+             + ":" + Str.padLeft(Str.fromInt(c[4]), 2, 48)
+             + ":" + Str.padLeft(Str.fromInt(c[5]), 2, 48);
+    }
+
+    static String formatISO(int sec) { return isoDate(sec) + "T" + isoTime(sec) + "Z"; }
+
+    static String formatISOZone(int sec, int off) {
+        if (off == 0) return formatISO(sec);
+        int[] c = civil(sec + off);
+        int a = off;
+        String sign = "+";
+        if (a < 0) { sign = "-"; a = -a; }
+        int hh = a / 3600;
+        int mm = (a % 3600) / 60;
+        return Str.padLeft(Str.fromInt(c[0]), 4, 48)
+             + "-" + Str.padLeft(Str.fromInt(c[1]), 2, 48)
+             + "-" + Str.padLeft(Str.fromInt(c[2]), 2, 48)
+             + "T" + Str.padLeft(Str.fromInt(c[3]), 2, 48)
+             + ":" + Str.padLeft(Str.fromInt(c[4]), 2, 48)
+             + ":" + Str.padLeft(Str.fromInt(c[5]), 2, 48)
+             + sign + Str.padLeft(Str.fromInt(hh), 2, 48)
+             + ":" + Str.padLeft(Str.fromInt(mm), 2, 48);
+    }
+
+    static String formatZone(int sec, int off) {
+        int[] c = civil(sec + off);
+        String o = Str.padLeft(Str.fromInt(c[0]), 4, 48)
+                 + "-" + Str.padLeft(Str.fromInt(c[1]), 2, 48)
+                 + "-" + Str.padLeft(Str.fromInt(c[2]), 2, 48)
+                 + " " + Str.padLeft(Str.fromInt(c[3]), 2, 48)
+                 + ":" + Str.padLeft(Str.fromInt(c[4]), 2, 48)
+                 + ":" + Str.padLeft(Str.fromInt(c[5]), 2, 48);
+        return o;
+    }
+
+    /* ── aritmetika ────────────────────────────────────────────── */
+
+    static int addSeconds(int sec, int n) { return sec + n; }
+    static int addMinutes(int sec, int n) { return sec + n * 60; }
+    static int addHours(int sec, int n) { return sec + n * 3600; }
+    static int addDays(int sec, int n) { return sec + n * 86400; }
+
+    /* tambah bulan kalender dengan clamp akhir bulan */
+    static int addMonths(int sec, int n) {
+        int[] c = civil(sec);
+        int total = (c[0] * 12) + (c[1] - 1) + n;
+        int y = total / 12;
+        int m = total % 12 + 1;
+        if (m <= 0) { m = m + 12; y = y - 1; }
+        int d = c[2];
+        int dim = daysInMonth(y, m);
+        if (d > dim) d = dim;
+        return fromCivil(y, m, d, c[3], c[4], c[5]);
+    }
+
+    static int diffSeconds(int a, int b) { return a - b; }
+    static int diffDays(int a, int b) { return (a - b) / 86400; }
+    static int diffMinutes(int a, int b) { return (a - b) / 60; }
+    static int diffHours(int a, int b) { return (a - b) / 3600; }
+
+    static String duration(int sec) {
+        int s = sec;
+        if (s < 0) s = -s;
+        int d = s / 86400;
+        int h = (s % 86400) / 3600;
+        int m = (s % 3600) / 60;
+        int r = s % 60;
+        String o = "";
+        if (d > 0) o = o + Str.fromInt(d) + "d ";
+        if (h > 0 || d > 0) o = o + Str.padLeft(Str.fromInt(h), 2, 48) + ":";
+        o = o + Str.padLeft(Str.fromInt(m), 2, 48)
+              + ":" + Str.padLeft(Str.fromInt(r), 2, 48);
+        if (sec < 0) o = "-" + o;
+        return o;
+    }
+
+    static String nowISO() { return formatISO(epoch()); }
 }

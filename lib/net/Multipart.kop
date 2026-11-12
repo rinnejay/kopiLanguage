@@ -1,0 +1,202 @@
+// Multipart.kop — multipart/form-data (v1.24).
+//
+// Pembentuk:
+//   int[] b = Multipart.make();
+//   b = Multipart.addField(b, "BATAS", "nama", "Budi");
+//   b = Multipart.addFile(b, "BATAS", "foto", "a.bin", "application/octet-stream", data);
+//   String body = Multipart.body(b, "BATAS");
+//
+// Pembaca (sisi server):
+//   int n = Multipart.count(reqBody, boundary);
+//   String name = Multipart.nameAt(reqBody, boundary, 0);
+//   int[] data  = Multipart.dataAt(reqBody, boundary, 0);
+
+import Str;
+import Text;
+import Bytes;
+
+class Multipart {
+
+    static String contentType(String boundary) {
+        return "multipart/form-data; boundary=" + boundary;
+    }
+
+    static int[] CRLF() { return Net.bytes("\r\n"); }
+
+    static int findSeq(int[] hay, int[] ndl, int from) {
+        if (ndl.length == 0) return -1;
+        int i = from;
+        while (i + ndl.length <= hay.length) {
+            boolean ok = true;
+            for (int k = 0; k < ndl.length; k++) {
+                if (hay[i + k] != ndl[k]) { ok = false; break; }
+            }
+            if (ok) return i;
+            i++;
+        }
+        return -1;
+    }
+
+    /* batas awal part (setelah CRLF) atau -1 */
+    private static int partStart(int[] body, int[] dash, int from) {
+        int p = findSeq(body, dash, from);
+        if (p < 0) return -1;
+        p = p + dash.length;
+        if (p + 2 <= body.length && body[p] == 45 && body[p + 1] == 45) return -1;  /* "--" akhir */
+        if (p + 2 <= body.length && body[p] == 13 && body[p + 1] == 10) p = p + 2;
+        return p;
+    }
+
+    private static int headersEnd(int[] body, int start) {
+        int e = findSeq(body, Net.bytes("\r\n\r\n"), start);
+        return e;
+    }
+
+    private static int contentEnd(int[] body, int[] sep, int start) {
+        return findSeq(body, sep, start);
+    }
+
+    /* posisi [headers, contentStart, contentEnd] part ke-idx; kosong bila tidak ada */
+    static int[] partAt(int[] body, String boundary, int idx) {
+        int[] dash = Net.strbytes("--" + boundary);
+        int[] sep = Net.strbytes("\r\n--" + boundary);
+        int p = partStart(body, dash, 0);
+        int i = 0;
+        while (p >= 0) {
+            int he = headersEnd(body, p);
+            if (he < 0) return new int[0];
+            int cs = he + 4;
+            int ce = contentEnd(body, sep, cs);
+            if (ce < 0) ce = body.length;
+            if (i == idx) {
+                int[] r = new int[3];
+                r[0] = p;
+                r[1] = cs;
+                r[2] = ce;
+                return r;
+            }
+            p = partStart(body, dash, ce + 2);
+            i++;
+        }
+        return new int[0];
+    }
+
+    static int count(int[] body, String boundary) {
+        int[] dash = Net.strbytes("--" + boundary);
+        int[] sep = Net.strbytes("\r\n--" + boundary);
+        int p = partStart(body, dash, 0);
+        int n = 0;
+        while (p >= 0) {
+            int he = headersEnd(body, p);
+            if (he < 0) break;
+            int ce = contentEnd(body, sep, he + 4);
+            if (ce < 0) ce = body.length;
+            n++;
+            p = partStart(body, dash, ce + 2);
+        }
+        return n;
+    }
+
+    private static String headerOf(int[] body, int[] part, String name) {
+        if (part.length == 0) return "";
+        int hs = part[0];
+        int he = headersEnd(body, hs);
+        if (he < 0) return "";
+        int[] raw = new int[he - hs];
+        for (int i = 0; i < raw.length; i++) raw[i] = body[hs + i];
+        String block = Net.mkstr(raw);
+        String[] ls = Str.lines(block);
+        for (int i = 0; i < ls.length; i++) {
+            int c = Str.indexOf(ls[i], ":", 0);
+            if (c <= 0) continue;
+            String nm = Str.trim(Str.sub(ls[i], 0, c));
+            if (!Str.equalsIgnoreCase(nm, name)) continue;
+            return Str.trim(Str.sub(ls[i], c + 1, ls[i].length - c - 1));
+        }
+        return "";
+    }
+
+    static String disposition(int[] body, String boundary, int idx) {
+        int[] p = partAt(body, boundary, idx);
+        return headerOf(body, p, "Content-Disposition");
+    }
+
+    static String contentTypeAt(int[] body, String boundary, int idx) {
+        int[] p = partAt(body, boundary, idx);
+        return headerOf(body, p, "Content-Type");
+    }
+
+    /* ambil atribut name="..." / filename="..." dari Content-Disposition */
+    static String attr(String disp, String key) {
+        String pat = key + "=\"";
+        int p = Str.indexOf(disp, pat, 0);
+        if (p < 0) return "";
+        p = p + pat.length;
+        int e = Str.indexOf(disp, "\"", p);
+        if (e < 0) return "";
+        return Str.sub(disp, p, e - p);
+    }
+
+    static String nameAt(int[] body, String boundary, int idx) {
+        return attr(disposition(body, boundary, idx), "name");
+    }
+
+    static String filenameAt(int[] body, String boundary, int idx) {
+        return attr(disposition(body, boundary, idx), "filename");
+    }
+
+    static int[] dataAt(int[] body, String boundary, int idx) {
+        int[] p = partAt(body, boundary, idx);
+        if (p.length == 0) return new int[0];
+        return Bytes.slice(body, p[1], p[2] - p[1]);
+    }
+
+    /* data teks field pertama dengan nama tertentu; "" bila tidak ada */
+    static String value(int[] body, String boundary, String name) {
+        int n = count(body, boundary);
+        for (int i = 0; i < n; i++) {
+            if (Str.eq(nameAt(body, boundary, i), name)) {
+                int[] d = dataAt(body, boundary, i);
+                return Net.mkstr(d);
+            }
+        }
+        return "";
+    }
+
+    /* ── pembentuk ─────────────────────────────────────────────── */
+
+    static int[] make() { return Text.make(256); }
+
+    static int[] addField(int[] b, String boundary, String name, String value) {
+        b = Text.append(b, "--" + boundary + "\r\n");
+        b = Text.append(b, "Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n");
+        b = Text.append(b, value);
+        return Text.append(b, "\r\n");
+    }
+
+    static int[] addFile(int[] b, String boundary, String name, String filename,
+                         String ctype, int[] data) {
+        b = Text.append(b, "--" + boundary + "\r\n");
+        b = Text.append(b, "Content-Disposition: form-data; name=\"" + name
+                            + "\"; filename=\"" + filename + "\"\r\n");
+        b = Text.append(b, "Content-Type: " + ctype + "\r\n\r\n");
+        b = Text.appendBytes(b, data);
+        return Text.append(b, "\r\n");
+    }
+
+    static int[] finish(int[] b, String boundary) {
+        return Text.append(b, "--" + boundary + "--\r\n");
+    }
+
+    static String body(int[] b, String boundary) {
+        int[] f = finish(b, boundary);
+        return Text.build(f);
+    }
+
+    static int[] bodyBytes(int[] b, String boundary) {
+        int[] f = finish(b, boundary);
+        int[] out = new int[Text.len(f)];
+        for (int i = 0; i < out.length; i++) out[i] = f[2 + i];
+        return out;
+    }
+}

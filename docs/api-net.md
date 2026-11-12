@@ -32,7 +32,7 @@ if (!Auth.checkBasic(h, user, pass)) { /* 401 */ }
 
 ## Dns
 
-`lib/net/Dns.kop` · 6 fungsi
+`lib/net/Dns.kop` · 17 fungsi
 
 Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.
 
@@ -55,13 +55,24 @@ Dns.lookup(serverIp, 53, "example.com", hasil, 512);
 | `static int skipName(int[] m, int i)` | lewati nama di dalam pesan: label (hitung byte) atau pointer 2 byte (≥ 0xC0); kembalikan indeks sesudah nama |
 | `static int rcodeOf(int[] resp)` | nilai RCODE dari flag byte ke-4 |
 | `static int parseA(int[] buf, int[] hasil)` | telaah pesan DNS mentah (tanpa awalan panjang TCP) menjadi A. hasil[0]=RCODE, hasil[1..4]=oktet IPv4 (atau -1). |
+| `static String readName(int[] m, int i)` | nama pada posisi i (mengikuti pointer kompresi) |
+| `static int[] findRR(int[] buf, int want)` | posisi awal RDATA record pertama bertipe `want`; {-1} bila tidak ada |
+| `static int rrTypeCount(int[] buf, int want)` | — |
+| `static int parseAAAA(int[] buf, int[] hasil)` | hasil[0]=RCODE, hasil[1..16]=16 byte IPv6 (atau -1) |
+| `static String hex4(int v)` | — |
+| `static String ipv6Text(int[] hasil)` | IPv6 kanonik (8 grup 16-bit heksadesimal, tanpa kompresi nol) |
+| `static String cname(int[] buf)` | — |
+| `static int mxPref(int[] buf)` | — |
+| `static String mxHost(int[] buf)` | — |
+| `static String txt(int[] buf)` | — |
 | `static int lookup(int addr, int port, String dottedName, int[] hasil, int cap)` | kirim kueri A (qtype=1) ke addr:port (TCP, awalan panjang 2 byte) dan telaah balasannya melalui hasil: hasil[0] = RCODE (0 = NOERROR, 3 = NXDOMAIN, ...), hasil[1..4] = oktet IPv… |
+| `static int[] lookupType(int addr, int port, String dottedName, int qtype, int cap)` | kueri mentah tipe bebas; hasil = payload DNS (tanpa awalan TCP) |
 
 ---
 
 ## Http
 
-`lib/net/Http.kop` · 27 fungsi
+`lib/net/Http.kop` · 44 fungsi
 
 Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.
 
@@ -101,19 +112,36 @@ System.out.println(Http.payload(r));
 | `static boolean hasToken(int[] resp, String name, String tok)` | cari token (case-insensitive) di nilai header |
 | `static int[] dechunk(int[] raw)` | decode Transfer-Encoding: chunked (hex-size CRLF data CRLF ... 0) |
 | `static int[] payload(int[] resp)` | body sebenarnya: chunked → decode; Content-Length → potong |
+| `static int[] payloadDecoded(int[] resp)` | body setelah dekompresi Content-Encoding (gzip/deflate) |
 | `static String req11(String method, String hostHdr, String path, String headers, int[] body, int keep)` | susun permintaan HTTP/1.1 (keep=1 → keep-alive, else close) |
+| `static int[] exchangeDo(int fd, String method, String hostHdr, String path, String headers, int[] body, int cap, int timeoutMs)` | satu transaksi (core); timeoutMs > 0 memasang SO_RCVTIMEO/SO_SNDTIMEO |
 | `static int[] exchange(int addr, int port, String method, String hostHdr, String path, String headers, int[] body, int cap)` | satu transaksi; timeoutMs > 0 memasang SO_RCVTIMEO/SO_SNDTIMEO |
 | `static int[] getFull(int addr, int port, String hostHdr, String path, int cap)` | GET + respons lengkap (status, header, body) |
-| `static int[] follow(int addr, int port, String hostHdr, String path, int maxHops, int cap)` | ikuti 301/302/303/307/308 (maks maxHops, host harus sama) |
+| `static int[] getFullT(int addr, int port, String hostHdr, String path, int cap, int timeoutMs)` | — |
+| `static int[] followT(int addr, int port, String hostHdr, String path, int maxHops, int cap, int timeoutMs)` | ikuti 301/302/303/307/308 (maks maxHops, host harus sama) |
+| `static int[] follow(int addr, int port, String hostHdr, String path, int maxHops, int cap)` | — |
 | `static String basic(String user, String pass)` | header "Authorization: Basic ..." dari user:pass |
+| `static int[] formPostT(int addr, int port, String hostHdr, String path, String form, int cap, int timeoutMs)` | — |
 | `static int[] formPost(int addr, int port, String hostHdr, String path, String form, int cap)` | POST application/x-www-form-urlencoded |
+| `static int[] jsonPostT(int addr, int port, String hostHdr, String path, String jsonBody, int cap, int timeoutMs)` | — |
 | `static int[] jsonPost(int addr, int port, String hostHdr, String path, String jsonBody, int cap)` | POST application/json |
+| `static String[] headerLines(int[] resp)` | — |
+| `static int headerCount(int[] resp)` | — |
+| `static String headerNameAt(int[] resp, int idx)` | nama header pada baris ke-i (sebelum ':'), "" bila bukan header |
+| `static String headerValueAt(int[] resp, int idx)` | — |
+| `static String headerLineAt(int[] resp, int idx)` | — |
+| `static String headerAll(int[] resp, String name, String sep)` | semua nilai header bernama sama, digabung dengan `sep` |
+| `static String multipartType(String boundary)` | — |
+| `static String multipartBody(String boundary, String[] names, String[] values)` | — |
+| `static int[] multipartPost(int addr, int port, String hostHdr, String path, String boundary, String[] names, String[] values, int cap)` | — |
+| `static int[] exchangeTlsDo(int[] ctx, String method, String hostHdr, String path, String headers, int[] body, int cap, int timeoutMs)` | pin = 32 byte SHA-256 SPKI, atau array kosong untuk TOFU. Mengembalikan respons mentah; [0] negatif bila gagal. |
+| `static int[] getTls(int addr, int port, String hostHdr, String path, int cap, int[] pin, int timeoutMs)` | — |
 
 ---
 
 ## HttpServer
 
-`lib/net/HttpServer.kop` · 35 fungsi
+`lib/net/HttpServer.kop` · 47 fungsi
 
 Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie, chunked.
 
@@ -168,6 +196,18 @@ HttpServer.send(c, resp);
 | `static int hexv2(int c)` | decode body chunked (permintaan upload) |
 | `static int[] dechunk(int[] raw)` | uraikan body chunked menjadi data biasa |
 | `static int[] bodyAny(int[] req)` | body permintaan: chunked bila Transfer-Encoding: chunked |
+| `static int[] readRequestLimit(int fd, int max, int limit)` | seperti readRequest tetapi `max` dibatasi `limit` byte |
+| `static boolean bodyOver(int[] req, int limit)` | — |
+| `static int[] tooLarge()` | — |
+| `static String boundaryOf(int[] req)` | boundary dari header Content-Type multipart |
+| `static int multipartCount(int[] req)` | — |
+| `static String multipartName(int[] req, int idx)` | — |
+| `static String multipartFilename(int[] req, int idx)` | — |
+| `static int[] multipartData(int[] req, int idx)` | — |
+| `static String multipartValue(int[] req, String name)` | — |
+| `static int[] rangeOf(int[] req, int total)` | Range: bytes=awal-akhir / awal- / -sufiks → {start,end} inklusif |
+| `static int[] partial(String ctype, int[] data, int start, int end)` | respons 206 Partial Content dengan Content-Range |
+| `static int[] partialFor(int[] req, String ctype, int[] data)` | — |
 | `static int send(int fd, int[] resp)` | kirim respons ke koneksi; jumlah byte |
 
 **Konstanta**
@@ -229,6 +269,40 @@ String ct = Mime.of("app.js"); // application/javascript
 | Fungsi | Keterangan |
 |---|---|
 | `static String of(String path)` | Content-Type berdasarkan ekstensi |
+
+---
+
+## Multipart
+
+`lib/net/Multipart.kop` · 17 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static String contentType(String boundary)` | — |
+| `static int findSeq(int[] hay, int[] ndl, int from)` | — |
+| `static int[] partAt(int[] body, String boundary, int idx)` | posisi [headers, contentStart, contentEnd] part ke-idx; kosong bila tidak ada |
+| `static int count(int[] body, String boundary)` | — |
+| `static String disposition(int[] body, String boundary, int idx)` | — |
+| `static String contentTypeAt(int[] body, String boundary, int idx)` | — |
+| `static String attr(String disp, String key)` | ambil atribut name="..." / filename="..." dari Content-Disposition |
+| `static String nameAt(int[] body, String boundary, int idx)` | — |
+| `static String filenameAt(int[] body, String boundary, int idx)` | — |
+| `static int[] dataAt(int[] body, String boundary, int idx)` | — |
+| `static String value(int[] body, String boundary, String name)` | data teks field pertama dengan nama tertentu; "" bila tidak ada |
+| `static int[] make()` | buat struktur baru dengan kapasitas awal |
+| `static int[] addField(int[] b, String boundary, String name, String value)` | — |
+| `static int[] addFile(int[] b, String boundary, String name, String filename, String ctype, int[] data)` | — |
+| `static int[] finish(int[] b, String boundary)` | — |
+| `static String body(int[] b, String boundary)` | — |
+| `static int[] bodyBytes(int[] b, String boundary)` | — |
+
+**Konstanta**
+
+| Nama | Keterangan |
+|---|---|
+| `static int[] CRLF()` | — |
 
 ---
 
@@ -319,7 +393,7 @@ int uid2 = Session.get(ids, exps, sid, Net.time());
 
 ## Static
 
-`lib/net/Static.kop` · 3 fungsi
+`lib/net/Static.kop` · 7 fungsi
 
 Penyajian file statis + MIME; menolak path traversal `..`.
 
@@ -337,6 +411,10 @@ int[] resp = Static.serve("public/index.html");
 |---|---|
 | `static String mime(String path)` | kompatibilitas: dulu ada di Static, kini delegasi ke Mime |
 | `static int[] serve(String path)` | sajikan file; tolak path traversal "..". |
+| `static String etag(int[] body)` | — |
+| `static boolean notModified(int[] req, String tag)` | — |
+| `static int[] serveReqKA(int[] req, String path, int keep)` | respons file dengan ETag, Range, dan 304 (v1.24) |
+| `static int[] serveReq(int[] req, String path)` | — |
 | `static int[] serveKA(String path, int keep)` | varian keep-alive |
 
 ---
@@ -552,5 +630,31 @@ if (WebSocket.isUpgrade(req)) {
 | Nama | Keterangan |
 |---|---|
 | `static String GUID()` | GUID RFC 6455 untuk handshake |
+
+---
+
+## WsClient
+
+`lib/net/WsClient.kop` · 15 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] recvN(int fd, int n)` | — |
+| `static String recvUntil(int fd, String marker, int max)` | baca sampai penanda (mis. CRLF CRLF) atau max byte |
+| `static String randomKey()` | — |
+| `static int[] connect(int ip, int port, String host, String path)` | hasil ctx: [0]=fd, [1]=ok(0/1), [2]=tertutup |
+| `static int sendFrame(int[] ctx, int op, int[] payload)` | — |
+| `static int sendText(int[] ctx, String s)` | — |
+| `static int sendBinary(int[] ctx, int[] b)` | — |
+| `static int sendPing(int[] ctx, String s)` | — |
+| `static int sendPong(int[] ctx, String s)` | — |
+| `static int closeClient(int[] ctx, int code)` | — |
+| `static int[] recv(int[] ctx)` | — |
+| `static int opcode(int[] f)` | — |
+| `static int[] payload(int[] f)` | — |
+| `static String recvText(int[] ctx)` | — |
+| `static boolean isClosed(int[] ctx)` | — |
 
 ---

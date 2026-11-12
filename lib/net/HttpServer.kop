@@ -17,6 +17,7 @@
 
 import Bytes;
 import Str;
+import Multipart;
 
 class HttpServer {
 
@@ -378,6 +379,121 @@ class HttpServer {
             return dechunk(Bytes.slice(req, he + 4, req.length - he - 4));
         }
         return body(req);
+    }
+
+    /* ── batas body, range, multipart (v1.24) ─────────────────── */
+
+    /* seperti readRequest tetapi `max` dibatasi `limit` byte */
+    static int[] readRequestLimit(int fd, int max, int limit) {
+        if (limit > 0 && max > limit) max = limit;
+        return readRequest(fd, max);
+    }
+
+    static boolean bodyOver(int[] req, int limit) {
+        return contentLength(req) > limit;
+    }
+
+    static int[] tooLarge() { return text(413, "payload too large\n"); }
+
+    /* boundary dari header Content-Type multipart */
+    static String boundaryOf(int[] req) {
+        String ct = headerValue(req, "Content-Type");
+        int p = Str.indexOf(ct, "boundary=", 0);
+        if (p < 0) return "";
+        p = p + 9;
+        String b = Str.trim(Str.sub(ct, p, ct.length - p));
+        if (b.length >= 2 && b[0] == 34) {              /* '"' */
+            int e = Str.indexOf(b, "\"", 1);
+            if (e > 0) return Str.sub(b, 1, e - 1);
+        }
+        int semi = Str.indexOf(b, ";", 0);
+        if (semi >= 0) b = Str.trim(Str.sub(b, 0, semi));
+        return b;
+    }
+
+    static int multipartCount(int[] req) {
+        String b = boundaryOf(req);
+        if (b.length == 0) return 0;
+        return Multipart.count(bodyAny(req), b);
+    }
+
+    static String multipartName(int[] req, int idx) {
+        String b = boundaryOf(req);
+        if (b.length == 0) return "";
+        return Multipart.nameAt(bodyAny(req), b, idx);
+    }
+
+    static String multipartFilename(int[] req, int idx) {
+        String b = boundaryOf(req);
+        if (b.length == 0) return "";
+        return Multipart.filenameAt(bodyAny(req), b, idx);
+    }
+
+    static int[] multipartData(int[] req, int idx) {
+        String b = boundaryOf(req);
+        if (b.length == 0) return new int[0];
+        return Multipart.dataAt(bodyAny(req), b, idx);
+    }
+
+    static String multipartValue(int[] req, String name) {
+        String b = boundaryOf(req);
+        if (b.length == 0) return "";
+        return Multipart.value(bodyAny(req), b, name);
+    }
+
+    /* Range: bytes=awal-akhir / awal- / -sufiks → {start,end} inklusif */
+    static int[] rangeOf(int[] req, int total) {
+        if (total <= 0) return new int[0];
+        String v = headerValue(req, "Range");
+        if (!Str.startsWith(v, "bytes=")) return new int[0];
+        v = Str.trim(Str.sub(v, 6, v.length - 6));
+        int dash = Str.indexOf(v, "-", 0);
+        if (dash < 0) return new int[0];
+        String a = Str.trim(Str.sub(v, 0, dash));
+        String b = Str.trim(Str.sub(v, dash + 1, v.length - dash - 1));
+        int start = 0;
+        int end = total - 1;
+        if (a.length == 0) {
+            if (!Str.isDigits(b)) return new int[0];
+            int n = Str.toInt(b);
+            if (n <= 0) return new int[0];
+            start = total - n;
+            if (start < 0) start = 0;
+        } else {
+            if (!Str.isDigits(a)) return new int[0];
+            start = Str.toInt(a);
+            if (b.length > 0) {
+                if (!Str.isDigits(b)) return new int[0];
+                end = Str.toInt(b);
+            }
+            if (start >= total) return new int[0];
+            if (end >= total) end = total - 1;
+            if (end < start) return new int[0];
+        }
+        int[] r = new int[2];
+        r[0] = start;
+        r[1] = end;
+        return r;
+    }
+
+    /* respons 206 Partial Content dengan Content-Range */
+    static int[] partial(String ctype, int[] data, int start, int end) {
+        if (start < 0) start = 0;
+        if (end >= data.length) end = data.length - 1;
+        if (end < start) return response(416, "text/plain; charset=utf-8", "range tidak valid\n");
+        int[] part = Bytes.slice(data, start, end - start + 1);
+        String extra = "Content-Range: bytes " + Str.fromInt(start) + "-"
+                     + Str.fromInt(end) + "/" + Str.fromInt(data.length)
+                     + "\r\nAccept-Ranges: bytes\r\n";
+        return respond(206, ctype, part, extra, 0);
+    }
+
+    static int[] partialFor(int[] req, String ctype, int[] data) {
+        int[] r = rangeOf(req, data.length);
+        if (r.length == 0) return responseFor(req, 200, ctype, data, 0);
+        int[] out = partial(ctype, data, r[0], r[1]);
+        if (methodIs(req, "HEAD")) return headOnly(out);
+        return out;
     }
 
     static int send(int fd, int[] resp) {

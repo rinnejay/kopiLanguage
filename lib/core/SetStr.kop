@@ -1,0 +1,37 @@
+// SetStr.kop — himpunan String (v1.24), dibangun di atas MapSS.
+
+import MapSS;
+
+class SetStr {
+
+    static int[] make(int cap, int poolCap) { return MapSS.make(cap, poolCap); }
+
+    static int size(int[] s) { return MapSS.size(s); }
+    static int cap(int[] s) { return MapSS.cap(s); }
+    static boolean isEmpty(int[] s) { return MapSS.isEmpty(s); }
+
+    static boolean add(int[] s, String v) {
+        if (MapSS.has(s, v)) return false;
+        if (!MapSS.put(s, v, "1")) return false;
+        return true;
+    }
+
+    static boolean has(int[] s, String v) { return MapSS.has(s, v); }
+
+    static boolean remove(int[] s, String v) { return MapSS.remove(s, v); }
+
+    static void clear(int[] s) { MapSS.clear(s); }
+
+    static String[] values(int[] s) { return MapSS.keys(s); }
+
+    static boolean containsAll(int[] s, String[] vs) {
+        for (int i = 0; i < vs.length; i++) if (!has(s, vs[i])) return false;
+        return true;
+    }
+
+    static int addAll(int[] s, String[] vs) {
+        int n = 0;
+        for (int i = 0; i < vs.length; i++) if (add(s, vs[i])) n++;
+        return n;
+    }
+}

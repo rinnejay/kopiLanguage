@@ -1,0 +1,98 @@
+// Args.kop — pembacaan argumen CLI (v1.24).
+//
+// Net.argc()/Net.argv() tidak menyertakan nama program; indeks 0 adalah
+// argumen pengguna pertama.
+//
+//   // dipanggil: app --out=hasil.txt -v file1 file2
+//   boolean v = Args.hasFlag("-v");
+//   String out = Args.value("--out", "a.txt");
+//   String[] pos = Args.positionals();
+
+import Str;
+
+class Args {
+
+    static int count() { return Net.argc(); }
+
+    static String at(int i) {
+        if (i < 0 || i >= Net.argc()) return "";
+        return Net.argv(i);
+    }
+
+    static String[] all() {
+        int n = Net.argc();
+        String[] out = new String[n];
+        for (int i = 0; i < n; i++) out[i] = Net.argv(i);
+        return out;
+    }
+
+    static boolean isFlag(String a) {
+        if (a.length == 0) return false;
+        return a[0] == 45;                              /* '-' */
+    }
+
+    /* cocokkan "--nama", "-n", atau "--nama=nilai" */
+    static boolean hasFlag(String flag) {
+        for (int i = 0; i < Net.argc(); i++) {
+            String a = Net.argv(i);
+            if (Str.eq(a, flag)) return true;
+            if (flag.length > 0 && Str.startsWith(a, flag) &&
+                a.length > flag.length && a[flag.length] == 61) return true;  /* '=' */
+        }
+        return false;
+    }
+
+    /* nilai "--nama=nilai", "--nama nilai", atau "-n=nilai" */
+    static String value(String flag, String def) {
+        for (int i = 0; i < Net.argc(); i++) {
+            String a = Net.argv(i);
+            if (Str.eq(a, flag)) {
+                if (i + 1 < Net.argc()) return Net.argv(i + 1);
+                return def;
+            }
+            if (flag.length > 0 && Str.startsWith(a, flag) &&
+                a.length > flag.length && a[flag.length] == 61)
+                return Str.sub(a, flag.length + 1, a.length - flag.length - 1);
+        }
+        return def;
+    }
+
+    static int intValue(String flag, int def) {
+        String v = value(flag, "");
+        if (!Str.isNumber(v)) return def;
+        return Str.toInt(v);
+    }
+
+    static String[] positionals() {
+        int n = Net.argc();
+        String[] tmp = new String[n];
+        int k = 0;
+        for (int i = 0; i < n; i++) {
+            String a = Net.argv(i);
+            if (!isFlag(a)) { tmp[k] = a; k++; }
+        }
+        String[] out = new String[k];
+        for (int i = 0; i < k; i++) out[i] = tmp[i];
+        return out;
+    }
+
+    /* perintah = positional pertama, "" bila tidak ada */
+    static String command() {
+        String[] p = positionals();
+        if (p.length == 0) return "";
+        return p[0];
+    }
+
+    static String[] flags() {
+        int n = Net.argc();
+        String[] tmp = new String[n];
+        int k = 0;
+        for (int i = 0; i < n; i++) {
+            String a = Net.argv(i);
+            if (isFlag(a)) { tmp[k] = a; k++; }
+        }
+        String[] out = new String[k];
+        for (int i = 0; i < k; i++) out[i] = tmp[i];
+        return out;
+    }
+}

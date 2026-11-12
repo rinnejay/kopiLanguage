@@ -1,0 +1,181 @@
+// WsClient.kop — klien WebSocket (RFC 6455) minimal (v1.24).
+//
+//   int[] ws = WsClient.connect(ip, 80, "contoh.test", "/ws");
+//   if (ws[1] == 1) {
+//       WsClient.sendText(ws, "halo");
+//       String balas = WsClient.recvText(ws);
+//       WsClient.closeClient(ws, 1000);
+//   }
+//
+// Frame klien selalu di-mask; frame server tanpa mask. Payload < 64 KiB.
+
+import Str;
+import Bytes;
+import Hash;
+import Cipher;
+import Rand;
+import Tcp;
+import WebSocket;
+
+class WsClient {
+
+    static int[] recvN(int fd, int n) {
+        int[] out = new int[n];
+        int got = 0;
+        while (got < n) {
+            int b = Net.rdb(fd);
+            if (b < 0) break;
+            out[got] = b;
+            got++;
+        }
+        if (got < n) return Bytes.slice(out, 0, got);
+        return out;
+    }
+
+    /* baca sampai penanda (mis. CRLF CRLF) atau max byte */
+    static String recvUntil(int fd, String marker, int max) {
+        int[] out = new int[max];
+        int got = 0;
+        int found = -1;
+        while (got < max) {
+            int b = Net.rdb(fd);
+            if (b < 0) break;
+            out[got] = b;
+            got++;
+            if (got >= marker.length) {
+                boolean ok = true;
+                for (int i = 0; i < marker.length; i++) {
+                    if (out[got - marker.length + i] != marker[i]) { ok = false; break; }
+                }
+                if (ok) { found = got; break; }
+            }
+        }
+        if (found < 0) found = got;
+        return Net.mkstr(Bytes.slice(out, 0, found));
+    }
+
+    static String randomKey() {
+        int[] k = Rand.bytes(16);
+        return Cipher.b64enc(k);
+    }
+
+    /* hasil ctx: [0]=fd, [1]=ok(0/1), [2]=tertutup */
+    static int[] connect(int ip, int port, String host, String path) {
+        int[] ctx = new int[3];
+        int fd = Tcp.open(ip, port);
+        ctx[0] = fd;
+        if (fd < 0) return ctx;
+        String key = randomKey();
+        String req = "GET " + path + " HTTP/1.1\r\n"
+                   + "Host: " + host + "\r\n"
+                   + "Upgrade: websocket\r\nConnection: Upgrade\r\n"
+                   + "Sec-WebSocket-Key: " + key + "\r\n"
+                   + "Sec-WebSocket-Version: 13\r\n\r\n";
+        int r = Tcp.sendBuf(fd, req);
+        if (r < 0) { Net.close(fd); return ctx; }
+        String resp = recvUntil(fd, "\r\n\r\n", 8192);
+        if (!Str.contains(resp, " 101 ")) { Net.close(fd); return ctx; }
+        String want = "Sec-WebSocket-Accept: " + WebSocket.accept(key);
+        if (!Str.contains(resp, want)) { Net.close(fd); return ctx; }
+        ctx[1] = 1;
+        return ctx;
+    }
+
+    /* ── kirim frame (selalu masked) ───────────────────────────── */
+
+    static int sendFrame(int[] ctx, int op, int[] payload) {
+        if (ctx[1] != 1 || ctx[0] < 0) return -1;
+        int n = payload.length;
+        if (n > 65535) return -1;
+        int extra = 0;
+        if (n > 125) extra = 2;
+        int[] mask = Rand.bytes(4);
+        int[] out = new int[2 + extra + 4 + n];
+        out[0] = 128 | (op & 15);
+        if (n <= 125) out[1] = 128 | n;
+        else {
+            out[1] = 128 | 126;
+            out[2] = (n >> 8) & 255;
+            out[3] = n & 255;
+        }
+        int mp = 2 + extra;
+        for (int i = 0; i < 4; i++) out[mp + i] = mask[i] & 255;
+        for (int i = 0; i < n; i++)
+            out[mp + 4 + i] = (payload[i] ^ mask[i % 4]) & 255;
+        int r = Tcp.sendBuf(ctx[0], out);
+        if (r < 0) return r;
+        return n;
+    }
+
+    static int sendText(int[] ctx, String s) { return sendFrame(ctx, 1, Net.strbytes(s)); }
+    static int sendBinary(int[] ctx, int[] b) { return sendFrame(ctx, 2, b); }
+    static int sendPing(int[] ctx, String s) { return sendFrame(ctx, 9, Net.strbytes(s)); }
+    static int sendPong(int[] ctx, String s) { return sendFrame(ctx, 10, Net.strbytes(s)); }
+
+    static int closeClient(int[] ctx, int code) {
+        int[] p = new int[2];
+        p[0] = (code >> 8) & 255;
+        p[1] = code & 255;
+        int r = sendFrame(ctx, 8, p);
+        ctx[2] = 1;
+        Net.close(ctx[0]);
+        return r;
+    }
+
+    /* ── terima satu frame: {op, panjang, payload...} ─────────── */
+
+    static int[] recv(int[] ctx) {
+        if (ctx[1] != 1 || ctx[0] < 0) return new int[0];
+        int[] h = recvN(ctx[0], 2);
+        if (h.length < 2) return new int[0];
+        int op = h[0] & 15;
+        int masked = 0;
+        if ((h[1] & 128) != 0) masked = 1;
+        int len = h[1] & 127;
+        if (len == 126) {
+            int[] e = recvN(ctx[0], 2);
+            if (e.length < 2) return new int[0];
+            len = (e[0] & 255) * 256 + (e[1] & 255);
+        } else if (len == 127) {
+            int[] e = recvN(ctx[0], 8);
+            if (e.length < 8) return new int[0];
+            len = 0;
+            for (int i = 4; i < 8; i++) len = len * 256 + (e[i] & 255);
+        }
+        int[] mask = new int[4];
+        if (masked != 0) {
+            int[] m = recvN(ctx[0], 4);
+            if (m.length < 4) return new int[0];
+            for (int i = 0; i < 4; i++) mask[i] = m[i] & 255;
+        }
+        int[] pay = recvN(ctx[0], len);
+        if (pay.length < len) return new int[0];
+        if (masked != 0)
+            for (int i = 0; i < len; i++) pay[i] = (pay[i] ^ mask[i % 4]) & 255;
+        int[] out = new int[2 + len];
+        out[0] = op;
+        out[1] = len;
+        for (int i = 0; i < len; i++) out[2 + i] = pay[i];
+        if (op == 8) ctx[2] = 1;
+        return out;
+    }
+
+    static int opcode(int[] f) {
+        if (f.length < 2) return -1;
+        return f[0];
+    }
+
+    static int[] payload(int[] f) {
+        if (f.length < 2) return new int[0];
+        return Bytes.slice(f, 2, f[1]);
+    }
+
+    static String recvText(int[] ctx) {
+        int[] f = recv(ctx);
+        if (f.length < 2) return "";
+        if (f[0] != 1) return "";
+        return Net.mkstr(Bytes.slice(f, 2, f[1]));
+    }
+
+    static boolean isClosed(int[] ctx) { return ctx[2] != 0; }
+}

@@ -15,6 +15,9 @@
  * hanya jawaban A pertama yang diambil.
  */
 
+import Str;
+import Tcp;
+
 class Dns {
 
     /* ── menyusun permintaan ───────────────────────────────────── */
@@ -100,6 +103,142 @@ class Dns {
         return 0;
     }
 
+    /* ── record lain: AAAA / CNAME / MX / TXT (v1.24) ──────────── */
+
+    /* nama pada posisi i (mengikuti pointer kompresi) */
+    static String readName(int[] m, int i) {
+        String out = "";
+        int pos = i;
+        int jumps = 0;
+        while (pos >= 0 && pos < m.length && jumps < 64) {
+            int l = m[pos] & 255;
+            if (l == 0) break;
+            if (l >= 192) {
+                if (pos + 1 >= m.length) break;
+                int ptr = ((l & 63) << 8) | (m[pos + 1] & 255);
+                pos = ptr;
+                jumps++;
+                continue;
+            }
+            if (pos + 1 + l > m.length) break;
+            if (out.length > 0) out = out + ".";
+            for (int k = 0; k < l; k++) out = out + Str.fromChar(m[pos + 1 + k] & 255);
+            pos = pos + 1 + l;
+        }
+        return out;
+    }
+
+    /* posisi awal RDATA record pertama bertipe `want`; {-1} bila tidak ada */
+    static int[] findRR(int[] buf, int want) {
+        int[] out = new int[2];
+        out[0] = -1;
+        if (buf.length < 12 || rcodeOf(buf) != 0) return out;
+        int an = buf[6] * 256 + buf[7];
+        int i = skipName(buf, 12) + 4;
+        for (int k = 0; k < an; k++) {
+            if (i + 10 > buf.length) break;
+            int ns = skipName(buf, i);
+            if (ns + 10 > buf.length) break;
+            int tipe = buf[ns] * 256 + buf[ns + 1];
+            int rdl = buf[ns + 8] * 256 + buf[ns + 9];
+            int rd = ns + 10;
+            if (rd + rdl > buf.length) break;
+            if (tipe == want) {
+                out[0] = rd;
+                out[1] = rdl;
+                return out;
+            }
+            i = rd + rdl;
+        }
+        return out;
+    }
+
+    static int rrTypeCount(int[] buf, int want) {
+        if (buf.length < 12 || rcodeOf(buf) != 0) return 0;
+        int an = buf[6] * 256 + buf[7];
+        int i = skipName(buf, 12) + 4;
+        int n = 0;
+        for (int k = 0; k < an; k++) {
+            if (i + 10 > buf.length) break;
+            int ns = skipName(buf, i);
+            if (ns + 10 > buf.length) break;
+            int tipe = buf[ns] * 256 + buf[ns + 1];
+            int rdl = buf[ns + 8] * 256 + buf[ns + 9];
+            if (tipe == want) n++;
+            i = ns + 10 + rdl;
+        }
+        return n;
+    }
+
+    /* hasil[0]=RCODE, hasil[1..16]=16 byte IPv6 (atau -1) */
+    static int parseAAAA(int[] buf, int[] hasil) {
+        for (int i = 0; i < hasil.length; i++) hasil[i] = -1;
+        if (buf.length < 12) return -9;
+        hasil[0] = rcodeOf(buf);
+        if (hasil[0] != 0) return 0;
+        int[] p = findRR(buf, 28);
+        if (p[0] < 0 || p[1] != 16) return 0;
+        for (int i = 0; i < 16; i++) hasil[1 + i] = buf[p[0] + i] & 255;
+        return 0;
+    }
+
+    static String hex4(int v) {
+        String out = "";
+        for (int sh = 12; sh >= 0; sh = sh - 4) {
+            int d = (v >> sh) & 15;
+            if (d < 10) out = out + Str.fromChar(48 + d);
+            else out = out + Str.fromChar(87 + d);
+        }
+        return out;
+    }
+
+    /* IPv6 kanonik (8 grup 16-bit heksadesimal, tanpa kompresi nol) */
+    static String ipv6Text(int[] hasil) {
+        if (hasil[0] != 0 || hasil[1] < 0) return "";
+        String out = "";
+        for (int g = 0; g < 8; g++) {
+            int v = hasil[1 + 2 * g] * 256 + hasil[2 + 2 * g];
+            if (g > 0) out = out + ":";
+            out = out + hex4(v);
+        }
+        return out;
+    }
+
+    static String cname(int[] buf) {
+        int[] p = findRR(buf, 5);
+        if (p[0] < 0) return "";
+        return readName(buf, p[0]);
+    }
+
+    static int mxPref(int[] buf) {
+        int[] p = findRR(buf, 15);
+        if (p[0] < 0 || p[1] < 2) return -1;
+        return buf[p[0]] * 256 + buf[p[0] + 1];
+    }
+
+    static String mxHost(int[] buf) {
+        int[] p = findRR(buf, 15);
+        if (p[0] < 0 || p[1] < 2) return "";
+        return readName(buf, p[0] + 2);
+    }
+
+    static String txt(int[] buf) {
+        int[] p = findRR(buf, 16);
+        if (p[0] < 0) return "";
+        String out = "";
+        int i = p[0];
+        int end = p[0] + p[1];
+        while (i < end && i < buf.length) {
+            int l = buf[i] & 255;
+            i++;
+            for (int k = 0; k < l && i < end && i < buf.length; k++) {
+                out = out + Str.fromChar(buf[i] & 255);
+                i++;
+            }
+        }
+        return out;
+    }
+
     /* ── tanya resolver ─────────────────────────────────────────── */
 
     /* kirim kueri A (qtype=1) ke addr:port (TCP, awalan panjang 2 byte)
@@ -131,5 +270,27 @@ class Dns {
         if (n != tlen) return -9;         /* balas terpotong */
 
         return parseA(buf, hasil);
+    }
+
+    /* kueri mentah tipe bebas; hasil = payload DNS (tanpa awalan TCP) */
+    static int[] lookupType(int addr, int port, String dottedName, int qtype, int cap) {
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) return new int[0];
+        int[] q = query(dottedName, qtype);
+        int w = Net.wrb(fd, q.length / 256);
+        if (w == 0) w = Net.wrb(fd, q.length % 256);
+        if (w < 0) { Net.close(fd); return new int[0]; }
+        int r = Tcp.sendBuf(fd, q);
+        if (r < 0) { Net.close(fd); return new int[0]; }
+        int[] buf = new int[cap];
+        int b1 = Net.rdb(fd);
+        if (b1 < 0) { Net.close(fd); return new int[0]; }
+        int b2 = Net.rdb(fd);
+        if (b2 < 0) b2 = 0;
+        int tlen = b1 * 256 + b2;
+        int n = Tcp.recvN(fd, buf, tlen);
+        Net.close(fd);
+        if (n != tlen) return new int[0];
+        return buf;
     }
 }

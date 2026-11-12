@@ -20,6 +20,8 @@
  * objek/array) didesugar compiler menjadi pemanggilan `Json.*`.
  */
 
+import Str;
+
 class Json {
 
     static int NULLV()  { return 0; }
@@ -606,8 +608,154 @@ class Json {
         return slice(obj, p, skip(obj, p) - p);
     }
 
+    /* ── getter bertipe dengan nilai default ───────────────────── */
+
+    static int getInt(int[] obj, String key, int def) {
+        int[] v = get(obj, key);
+        if (v.length == 0) return def;
+        int t = typeOf(v);
+        if (t == NUMV() || t == BOOLV()) return asInt(v);
+        return def;
+    }
+
+    static long getLong(int[] obj, String key, long def) {
+        int[] v = get(obj, key);
+        if (v.length == 0) return def;
+        int t = typeOf(v);
+        if (t == NUMV()) return Str.toLong(asText(v));
+        if (t == BOOLV()) return (long)asBool(v);
+        return def;
+    }
+
+    static double getDouble(int[] obj, String key, double def) {
+        int[] v = get(obj, key);
+        if (v.length == 0) return def;
+        if (typeOf(v) == NUMV()) return asDouble(v);
+        return def;
+    }
+
+    static boolean getBool(int[] obj, String key, boolean def) {
+        int[] v = get(obj, key);
+        if (v.length == 0) return def;
+        int t = typeOf(v);
+        if (t == BOOLV()) return asBool(v) != 0;
+        if (t == NUMV()) return asInt(v) != 0;
+        return def;
+    }
+
+    static String getString(int[] obj, String key, String def) {
+        int[] v = get(obj, key);
+        if (v.length == 0 || typeOf(v) != STRV()) return def;
+        return asText(v);
+    }
+
+    static int[] getArray(int[] obj, String key, int[] def) {
+        int[] v = get(obj, key);
+        if (v.length == 0 || typeOf(v) != ARRV()) return def;
+        return v;
+    }
+
+    static int[] getObject(int[] obj, String key, int[] def) {
+        int[] v = get(obj, key);
+        if (v.length == 0 || typeOf(v) != OBJV()) return def;
+        return v;
+    }
+
+    static int[] atOr(int[] arr, int idx, int[] def) {
+        if (typeOf(arr) != ARRV() || idx < 0 || idx >= arr[1]) return def;
+        return at(arr, idx);
+    }
+
+    static String typeName(int[] v) {
+        int t = typeOf(v);
+        if (t == NULLV()) return "null";
+        if (t == BOOLV()) return "bool";
+        if (t == NUMV()) return "number";
+        if (t == STRV()) return "string";
+        if (t == ARRV()) return "array";
+        if (t == OBJV()) return "object";
+        return "invalid";
+    }
+
+    /* ── akses path: "a.b[0].c" ────────────────────────────────── */
+
+    static int[] path(int[] root, String expr) {
+        int[] cur = root;
+        int i = 0;
+        while (i < expr.length) {
+            if (expr[i] == 46) { i++; continue; }        /* '.' */
+            int s0 = i;
+            while (i < expr.length && expr[i] != 46 && expr[i] != 91) i++;
+            if (i > s0) {
+                cur = get(cur, Str.sub(expr, s0, i - s0));
+                if (cur.length == 0) return cur;
+            }
+            while (i < expr.length && expr[i] == 91) {   /* '[' */
+                i++;
+                int n0 = i;
+                while (i < expr.length && expr[i] != 93) i++;
+                if (i >= expr.length) return new int[0];
+                String ns = Str.sub(expr, n0, i - n0);
+                if (!Str.isDigits(ns)) return new int[0];
+                cur = at(cur, Str.toInt(ns));
+                if (cur.length == 0) return cur;
+                i++;                                     /* ']' */
+            }
+        }
+        return cur;
+    }
+
+    static boolean hasPath(int[] root, String expr) {
+        int[] v = path(root, expr);
+        return v.length > 0;
+    }
+
+    /* ── penulis pretty (indentasi 2 spasi) ────────────────────── */
+
+    static String pad2(int depth) {
+        String p = "";
+        for (int i = 0; i < depth; i++) p = p + "  ";
+        return p;
+    }
+
+    static String wrp(int[] v, int depth) {
+        int t = typeOf(v);
+        if (t == ARRV()) {
+            if (v[1] == 0) return "[]";
+            String o = "[\n";
+            for (int i = 0; i < v[1]; i++) {
+                o = o + pad2(depth + 1) + wrp(at(v, i), depth + 1);
+                if (i + 1 < v[1]) o = o + ",";
+                o = o + "\n";
+            }
+            return o + pad2(depth) + "]";
+        }
+        if (t == OBJV()) {
+            if (v[1] == 0) return "{}";
+            String o = "{\n";
+            for (int i = 0; i < v[1]; i++) {
+                o = o + pad2(depth + 1) + Net.mkstr(quote(keyAt(v, i))) + ": "
+                  + wrp(valAt(v, i), depth + 1);
+                if (i + 1 < v[1]) o = o + ",";
+                o = o + "\n";
+            }
+            return o + pad2(depth) + "}";
+        }
+        if (t == STRV()) return Net.mkstr(quote(asText(v)));
+        return Net.mkstr(wr(v));
+    }
+
     /* API publik: serialisasi ke teks */
     static String write(int[] v) { return Net.mkstr(wr(v)); }
+
+    static String writePretty(int[] v) { return wrp(v, 0); }
+
+    static int writePrettyInto(int[] v, int[] buf) {
+        String s = wrp(v, 0);
+        if (buf.length < s.length) return -1;
+        for (int i = 0; i < s.length; i++) buf[i] = s[i];
+        return s.length;
+    }
 
     /* tulis ke stdout (fd 1) byte demi byte — melengkapi println(int) */
     static void print(int[] v) {

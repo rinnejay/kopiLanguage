@@ -1,0 +1,116 @@
+// Cookie.kop — parsing dan pembentukan cookie HTTP (v1.24).
+//
+//   int[] jar = Cookie.parse("a=1; b=dua");
+//   System.out.println(Cookie.get(jar, "b"));      // dua
+//
+//   String c = Cookie.make("sesi", "abc123");
+//   c = Cookie.withPath(c, "/");
+//   c = Cookie.withMaxAge(c, 3600);
+//   c = Cookie.withFlags(c, true, true);            // HttpOnly, Secure
+//   c = Cookie.withSameSite(c, "Lax");
+//   String h = Cookie.header(c);                    // Set-Cookie: ...
+
+import Str;
+import MapSS;
+import Time;
+
+class Cookie {
+
+    /* header "Cookie: a=1; b=2" → peta nama→nilai */
+    static int[] parse(String header) {
+        int n = Str.countByte(header, 59) + 4;          /* ';' */
+        int[] m = MapSS.make(n, header.length + 16);
+        int i = 0;
+        while (i < header.length) {
+            while (i < header.length && (header[i] == 32 || header[i] == 9 || header[i] == 59)) i++;
+            int s0 = i;
+            while (i < header.length && header[i] != 61 && header[i] != 59) i++;   /* '=' ';' */
+            int s1 = i;
+            String name = Str.trim(Str.sub(header, s0, s1 - s0));
+            String val = "";
+            if (i < header.length && header[i] == 61) {
+                i++;
+                int v0 = i;
+                while (i < header.length && header[i] != 59) i++;
+                val = Str.trim(Str.sub(header, v0, i - v0));
+                if (val.length >= 2 && val[0] == 34 && val[val.length - 1] == 34)
+                    val = Str.sub(val, 1, val.length - 2);
+            }
+            if (name.length > 0) MapSS.put(m, name, val);
+        }
+        return m;
+    }
+
+    static String get(int[] jar, String name) { return MapSS.get(jar, name); }
+
+    static String getOr(int[] jar, String name, String def) { return MapSS.getOr(jar, name, def); }
+
+    static boolean has(int[] jar, String name) { return MapSS.has(jar, name); }
+
+    static String[] names(int[] jar) { return MapSS.keys(jar); }
+
+    /* ── pembentukan ───────────────────────────────────────────── */
+
+    static String make(String name, String value) { return name + "=" + value; }
+
+    static String withPath(String c, String p) { return c + "; Path=" + p; }
+
+    static String withDomain(String c, String d) { return c + "; Domain=" + d; }
+
+    static String withMaxAge(String c, int sec) {
+        return c + "; Max-Age=" + Str.fromInt(sec);
+    }
+
+    static String withExpires(String c, int epoch) {
+        return c + "; Expires=" + httpDate(epoch);
+    }
+
+    static String withFlags(String c, boolean httpOnly, boolean secure) {
+        String o = c;
+        if (httpOnly) o = o + "; HttpOnly";
+        if (secure) o = o + "; Secure";
+        return o;
+    }
+
+    static String withSameSite(String c, String mode) {
+        return c + "; SameSite=" + mode;
+    }
+
+    /* Set-Cookie lengkap; maxAge < 0 berarti tanpa Max-Age */
+    static String headerFull(String name, String value, String path, int maxAge,
+                            boolean httpOnly, boolean secure, String sameSite) {
+        String c = make(name, value);
+        if (path.length > 0) c = withPath(c, path);
+        if (maxAge >= 0) c = withMaxAge(c, maxAge);
+        c = withFlags(c, httpOnly, secure);
+        if (sameSite.length > 0) c = withSameSite(c, sameSite);
+        return "Set-Cookie: " + c + "\r\n";
+    }
+
+    static String header(String c) { return "Set-Cookie: " + c + "\r\n"; }
+
+    /* cookie yang menghapus (Max-Age=0) */
+    static String expired(String name, String path) {
+        String c = make(name, "");
+        if (path.length > 0) c = withPath(c, path);
+        return withMaxAge(c, 0);
+    }
+
+    /* "Thu, 12 Nov 2026 00:00:00 GMT" (RFC 1123) */
+    static String httpDate(int epoch) {
+        String[] days = Str.split("Min,Sen,Sel,Rab,Kam,Jum,Sab", ",");
+        String[] mons = Str.split("Jan,Feb,Mar,Apr,Mei,Jun,Jul,Agu,Sep,Okt,Nov,Des", ",");
+        int[] c = Time.civil(epoch);
+        int w = Time.weekday(epoch);
+        int m = c[1] - 1;
+        String day = "Min";
+        String mon = "Jan";
+        if (w >= 0 && w < days.length) day = days[w];
+        if (m >= 0 && m < mons.length) mon = mons[m];
+        return day + ", " + Str.padLeft(Str.fromInt(c[2]), 2, 48) + " " + mon + " "
+             + Str.padLeft(Str.fromInt(c[0]), 4, 48) + " "
+             + Str.padLeft(Str.fromInt(c[3]), 2, 48) + ":"
+             + Str.padLeft(Str.fromInt(c[4]), 2, 48) + ":"
+             + Str.padLeft(Str.fromInt(c[5]), 2, 48) + " GMT";
+    }
+}

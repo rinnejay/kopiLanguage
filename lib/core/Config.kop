@@ -1,0 +1,87 @@
+// Config.kop — pembaca konfigurasi INI sederhana (v1.24).
+//
+//   [server]
+//   host = 127.0.0.1
+//   port = 8080
+//
+// Kunci disimpan sebagai "server.host", "server.port"; kunci tanpa
+// seksi tetap polos. Komentar diawali '#' atau ';'.
+
+import Str;
+import MapSS;
+import File;
+
+class Config {
+
+    static int[] parse(String text) {
+        int lines = Str.countByte(text, 10) + 2;
+        int[] m = MapSS.make(lines + 8, text.length + 32);
+        String[] ls = Str.lines(text);
+        String section = "";
+        for (int i = 0; i < ls.length; i++) {
+            String ln = Str.trim(ls[i]);
+            if (ln.length == 0) continue;
+            int c0 = ln[0];
+            if (c0 == 35 || c0 == 59) continue;          /* '#' ';' */
+            if (c0 == 91) {                              /* '[' */
+                int e = Str.indexOf(ln, "]", 0);
+                if (e > 1) section = Str.trim(Str.sub(ln, 1, e - 1));
+                continue;
+            }
+            int eq = Str.indexOf(ln, "=", 0);
+            if (eq < 0) eq = Str.indexOf(ln, ":", 0);
+            if (eq <= 0) continue;
+            String k = Str.trim(Str.sub(ln, 0, eq));
+            String v = Str.trim(Str.sub(ln, eq + 1, ln.length - eq - 1));
+            /* buang komentar di ujung nilai (kecuali dalam kutip) */
+            if (v.length > 0 && v[0] != 34 && v[0] != 39) {
+                int h = Str.indexOf(v, " #", 0);
+                if (h < 0) h = Str.indexOf(v, " ;", 0);
+                if (h >= 0) v = Str.trim(Str.sub(v, 0, h));
+            }
+            if (v.length >= 2 && (v[0] == 34 || v[0] == 39) && v[v.length - 1] == v[0])
+                v = Str.sub(v, 1, v.length - 2);
+            String key = k;
+            if (section.length > 0) key = section + "." + k;
+            MapSS.put(m, key, v);
+        }
+        return m;
+    }
+
+    static int[] parseFile(String path) { return parse(File.readText(path)); }
+
+    static String get(int[] cfg, String key) { return MapSS.get(cfg, key); }
+
+    static String getOr(int[] cfg, String key, String def) { return MapSS.getOr(cfg, key, def); }
+
+    static int getInt(int[] cfg, String key, int def) {
+        String v = MapSS.getOr(cfg, key, "");
+        if (!Str.isNumber(v)) return def;
+        return Str.toInt(v);
+    }
+
+    static boolean getBool(int[] cfg, String key, boolean def) {
+        String v = Str.lower(MapSS.getOr(cfg, key, ""));
+        if (v == "1" || v == "true" || v == "yes" || v == "on") return true;
+        if (v == "0" || v == "false" || v == "no" || v == "off") return false;
+        return def;
+    }
+
+    static boolean has(int[] cfg, String key) { return MapSS.has(cfg, key); }
+
+    static String[] keys(int[] cfg) { return MapSS.keys(cfg); }
+
+    /* ambil semua kunci dalam satu seksi, tanpa prefiks "seksi." */
+    static int[] section(int[] cfg, String name) {
+        String[] ks = MapSS.keys(cfg);
+        String p = name + ".";
+        int n = 0;
+        for (int i = 0; i < ks.length; i++) if (Str.startsWith(ks[i], p)) n++;
+        int[] m = MapSS.make(n + 4, name.length * n + 64);
+        for (int i = 0; i < ks.length; i++) {
+            if (!Str.startsWith(ks[i], p)) continue;
+            MapSS.put(m, Str.sub(ks[i], p.length, ks[i].length - p.length), MapSS.get(cfg, ks[i]));
+        }
+        return m;
+    }
+}

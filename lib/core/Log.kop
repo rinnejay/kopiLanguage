@@ -1,5 +1,8 @@
 // Log.kop — logging sederhana ke stderr (fd 2) v1.23.
 import Time;
+import File;
+import Json;
+import Str;
 
 class Log {
     static void emit(String level, String tag, String msg) {
@@ -10,4 +13,99 @@ class Log {
     static void info(String tag, String msg) { emit("INFO", tag, msg); }
     static void warn(String tag, String msg) { emit("WARN", tag, msg); }
     static void error(String tag, String msg) { emit("ERROR", tag, msg); }
+
+    /* ── level, tujuan file, rotasi, log terstruktur (v1.24) ───── */
+
+    static int DEBUG() { return 0; }
+    static int INFO()  { return 1; }
+    static int WARN()  { return 2; }
+    static int ERROR() { return 3; }
+    static int OFF()   { return 4; }
+
+    static String levelName(int level) {
+        if (level == 0) return "DEBUG";
+        if (level == 1) return "INFO";
+        if (level == 2) return "WARN";
+        if (level == 3) return "ERROR";
+        return "OFF";
+    }
+
+    static boolean enabled(int minLevel, int level) { return level >= minLevel; }
+
+    /* tulis ke deskriptor tertentu (2 = stderr, 1 = stdout) */
+    static void emitTo(int fd, int minLevel, int level, String tag, String msg) {
+        if (!enabled(minLevel, level)) return;
+        String s = "[" + Time.formatISO(Time.epoch()) + "] "
+                 + levelName(level) + " " + tag + ": " + msg + "\n";
+        Net.sendb(fd, s);
+    }
+
+    static void debug(String tag, String msg) { emitTo(2, 0, 0, tag, msg); }
+    static void infoMin(int minLevel, String tag, String msg) { emitTo(2, minLevel, 1, tag, msg); }
+    static void warnMin(int minLevel, String tag, String msg) { emitTo(2, minLevel, 2, tag, msg); }
+    static void errorMin(int minLevel, String tag, String msg) { emitTo(2, minLevel, 3, tag, msg); }
+
+    static String lineOf(int level, String tag, String msg) {
+        return "[" + Time.formatISO(Time.epoch()) + "] "
+             + levelName(level) + " " + tag + ": " + msg + "\n";
+    }
+
+    /* tulis ke file (append) bila level lolos; true bila ditulis */
+    static boolean toFile(String path, int minLevel, int level, String tag, String msg) {
+        if (!enabled(minLevel, level)) return false;
+        int fd = File.append(path);
+        if (fd < 0) return false;
+        File.writeAll(fd, lineOf(level, tag, msg));
+        File.close(fd);
+        return true;
+    }
+
+    static int fileSize(String path) {
+        int fd = File.openRead(path);
+        if (fd < 0) return -1;
+        int n = File.size(fd);
+        File.close(fd);
+        return n;
+    }
+
+    /* rotasi sederhana: path → path.1 → path.2 ... (keep=0 tanpa arsip) */
+    static boolean rotate(String path, int maxBytes, int keep) {
+        int n = fileSize(path);
+        if (n < 0 || n < maxBytes) return false;
+        if (keep <= 0) {
+            File.remove(path);
+            return true;
+        }
+        File.remove(path + "." + Str.fromInt(keep));
+        for (int i = keep - 1; i >= 1; i--) {
+            String a = path + "." + Str.fromInt(i);
+            String b = path + "." + Str.fromInt(i + 1);
+            File.renameTo(a, b);
+        }
+        File.renameTo(path, path + ".1");
+        return true;
+    }
+
+    static boolean toFileRotating(String path, int maxBytes, int keep,
+                                  int minLevel, int level, String tag, String msg) {
+        rotate(path, maxBytes, keep);
+        return toFile(path, minLevel, level, tag, msg);
+    }
+
+    /* satu baris JSON: {"ts":...,"level":"INFO","tag":"...","msg":"..."} */
+    static String jsonLine(int level, String tag, String msg) {
+        int[] o = Json.obj4("ts", Json.num(Str.fromInt(Time.epoch())),
+                            "level", Json.str(levelName(level)),
+                            "tag", Json.str(tag),
+                            "msg", Json.str(msg));
+        return Json.write(o);
+    }
+
+    static boolean jsonToFile(String path, int level, String tag, String msg) {
+        int fd = File.append(path);
+        if (fd < 0) return false;
+        File.writeAll(fd, jsonLine(level, tag, msg) + "\n");
+        File.close(fd);
+        return true;
+    }
 }

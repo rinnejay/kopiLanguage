@@ -17,6 +17,8 @@ import Str;
 import Tcp;
 import Url;
 import Cipher;
+import Tls;
+import Compress;
 
 class Http {
 
@@ -293,6 +295,19 @@ class Http {
         return b;
     }
 
+    /* body setelah dekompresi Content-Encoding (gzip/deflate) */
+    static int[] payloadDecoded(int[] resp) {
+        int[] p = payload(resp);
+        if (hasToken(resp, "Content-Encoding", "gzip"))
+            return Compress.gunzip(p);
+        if (hasToken(resp, "Content-Encoding", "deflate")) {
+            int[] z = Compress.unzlib(p);
+            if (z.length > 0) return z;
+            return Compress.inflateRaw(p, p.length * 128 + 1024);
+        }
+        return p;
+    }
+
     /* susun permintaan HTTP/1.1 (keep=1 → keep-alive, else close) */
     static String req11(String method, String hostHdr, String path,
                         String headers, int[] body, int keep) {
@@ -305,28 +320,20 @@ class Http {
         return out + "\r\n";
     }
 
-    /* satu transaksi; timeoutMs > 0 memasang SO_RCVTIMEO/SO_SNDTIMEO */
-    static int[] exchange(int addr, int port, String method, String hostHdr,
-                          String path, String headers, int[] body, int cap) {
-        int fd = Tcp.open(addr, port);
-        if (fd < 0) {
-            int[] e = new int[1];
-            e[0] = fd;
-            return e;
-        }
-        Net.settimeout(fd, 5000);                  /* jangan menggantung */
+    /* satu transaksi (core); timeoutMs > 0 memasang SO_RCVTIMEO/SO_SNDTIMEO */
+    static int[] exchangeDo(int fd, String method, String hostHdr, String path,
+                             String headers, int[] body, int cap, int timeoutMs) {
+        if (timeoutMs > 0) Net.settimeout(fd, timeoutMs);
         int[] head = req11(method, hostHdr, path, headers, body, 0);
         int r = Tcp.sendBuf(fd, head);
         if (r == 0 && body.length > 0) r = Tcp.sendBuf(fd, body);
         if (r < 0) {
-            Net.close(fd);
             int[] e = new int[1];
             e[0] = r;
             return e;
         }
         int[] buf = new int[cap];
         int n = Tcp.recvAll(fd, buf);
-        Net.close(fd);
         if (n <= 0) {
             int[] e = new int[1];
             e[0] = -1;
@@ -337,15 +344,42 @@ class Http {
         return resp;
     }
 
+    /* satu transaksi; timeoutMs > 0 memasang SO_RCVTIMEO/SO_SNDTIMEO */
+    static int[] exchange(int addr, int port, String method, String hostHdr,
+                          String path, String headers, int[] body, int cap) {
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) {
+            int[] e = new int[1];
+            e[0] = fd;
+            return e;
+        }
+        int[] resp = exchangeDo(fd, method, hostHdr, path, headers, body, cap, 5000);
+        Net.close(fd);
+        return resp;
+    }
+
     static int[] getFull(int addr, int port, String hostHdr, String path, int cap) {
         return exchange(addr, port, "GET", hostHdr, path,
                         "", new int[0], cap);
     }
 
+    static int[] getFullT(int addr, int port, String hostHdr, String path, int cap,
+                          int timeoutMs) {
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) {
+            int[] e = new int[1];
+            e[0] = fd;
+            return e;
+        }
+        int[] resp = exchangeDo(fd, "GET", hostHdr, path, "", new int[0], cap, timeoutMs);
+        Net.close(fd);
+        return resp;
+    }
+
     /* ikuti 301/302/303/307/308 (maks maxHops, host harus sama) */
-    static int[] follow(int addr, int port, String hostHdr, String path,
-                        int maxHops, int cap) {
-        int[] resp = getFull(addr, port, hostHdr, path, cap);
+    static int[] followT(int addr, int port, String hostHdr, String path,
+                         int maxHops, int cap, int timeoutMs) {
+        int[] resp = getFullT(addr, port, hostHdr, path, cap, timeoutMs);
         int hops = 0;
         while (hops < maxHops) {
             int st = statusOf(resp);
@@ -361,10 +395,15 @@ class Http {
             if (npath.length == 0) npath = "/";
             String q = Url.query(nu);
             if (q.length > 0) npath = npath + "?" + q;
-            resp = getFull(addr, np, hostHdr, npath, cap);
+            resp = getFullT(addr, np, hostHdr, npath, cap, timeoutMs);
             hops++;
         }
         return resp;
+    }
+
+    static int[] follow(int addr, int port, String hostHdr, String path,
+                        int maxHops, int cap) {
+        return followT(addr, port, hostHdr, path, maxHops, cap, 5000);
     }
 
     /* header "Authorization: Basic ..." dari user:pass */
@@ -372,16 +411,187 @@ class Http {
         return "Authorization: Basic " + Cipher.b64enc(user + ":" + pass) + "\r\n";
     }
 
+    static int[] formPostT(int addr, int port, String hostHdr, String path,
+                           String form, int cap, int timeoutMs) {
+        String h = "Content-Type: application/x-www-form-urlencoded\r\n";
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) { int[] e = new int[1]; e[0] = fd; return e; }
+        int[] resp = exchangeDo(fd, "POST", hostHdr, path, h, form, cap, timeoutMs);
+        Net.close(fd);
+        return resp;
+    }
+
     static int[] formPost(int addr, int port, String hostHdr, String path,
                           String form, int cap) {
         String h = "Content-Type: application/x-www-form-urlencoded\r\n";
-        return exchange(addr, port, "POST", hostHdr, path, h, form, cap);
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) { int[] e = new int[1]; e[0] = fd; return e; }
+        int[] resp = exchangeDo(fd, "POST", hostHdr, path, h, form, cap, 5000);
+        Net.close(fd);
+        return resp;
+    }
+
+    static int[] jsonPostT(int addr, int port, String hostHdr, String path,
+                           String jsonBody, int cap, int timeoutMs) {
+        String h = "Content-Type: application/json\r\n";
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) { int[] e = new int[1]; e[0] = fd; return e; }
+        int[] resp = exchangeDo(fd, "POST", hostHdr, path, h, jsonBody, cap, timeoutMs);
+        Net.close(fd);
+        return resp;
     }
 
     static int[] jsonPost(int addr, int port, String hostHdr, String path,
                           String jsonBody, int cap) {
         String h = "Content-Type: application/json\r\n";
-        return exchange(addr, port, "POST", hostHdr, path, h, jsonBody, cap);
+        int fd = Tcp.open(addr, port);
+        if (fd < 0) { int[] e = new int[1]; e[0] = fd; return e; }
+        int[] resp = exchangeDo(fd, "POST", hostHdr, path, h, jsonBody, cap, 5000);
+        Net.close(fd);
+        return resp;
+    }
+
+    /* ── iterasi header (v1.24) ────────────────────────────────── */
+
+    static String[] headerLines(int[] resp) {
+        String block = Net.mkstr(headerBlock(resp));
+        String[] all = Str.lines(block);
+        int n = 0;
+        for (int i = 0; i < all.length; i++) if (Str.trim(all[i]).length > 0) n++;
+        String[] out = new String[n];
+        int k = 0;
+        for (int i = 0; i < all.length; i++) {
+            String ln = Str.trim(all[i]);
+            if (ln.length == 0) continue;
+            out[k] = ln;
+            k++;
+        }
+        return out;
+    }
+
+    static int headerCount(int[] resp) { return headerLines(resp).length; }
+
+    /* nama header pada baris ke-i (sebelum ':'), "" bila bukan header */
+    static String headerNameAt(int[] resp, int idx) {
+        String[] ls = headerLines(resp);
+        if (idx < 0 || idx >= ls.length) return "";
+        int c = Str.indexOf(ls[idx], ":", 0);
+        if (c <= 0) return "";
+        return Str.trim(Str.sub(ls[idx], 0, c));
+    }
+
+    static String headerValueAt(int[] resp, int idx) {
+        String[] ls = headerLines(resp);
+        if (idx < 0 || idx >= ls.length) return "";
+        int c = Str.indexOf(ls[idx], ":", 0);
+        if (c < 0) return "";
+        return Str.trim(Str.sub(ls[idx], c + 1, ls[idx].length - c - 1));
+    }
+
+    static String headerLineAt(int[] resp, int idx) {
+        String[] ls = headerLines(resp);
+        if (idx < 0 || idx >= ls.length) return "";
+        return ls[idx];
+    }
+
+    /* semua nilai header bernama sama, digabung dengan `sep` */
+    static String headerAll(int[] resp, String name, String sep) {
+        String[] ls = headerLines(resp);
+        String out = "";
+        for (int i = 0; i < ls.length; i++) {
+            int c = Str.indexOf(ls[i], ":", 0);
+            if (c <= 0) continue;
+            String nm = Str.trim(Str.sub(ls[i], 0, c));
+            if (!Str.equalsIgnoreCase(nm, name)) continue;
+            String v = Str.trim(Str.sub(ls[i], c + 1, ls[i].length - c - 1));
+            if (out.length > 0) out = out + sep;
+            out = out + v;
+        }
+        return out;
+    }
+
+    /* ── multipart/form-data (v1.24) ───────────────────────────── */
+
+    static String multipartType(String boundary) {
+        return "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n";
+    }
+
+    static String multipartBody(String boundary, String[] names, String[] values) {
+        String out = "";
+        int n = names.length;
+        if (values.length < n) n = values.length;
+        for (int i = 0; i < n; i++) {
+            out = out + "--" + boundary + "\r\n";
+            out = out + "Content-Disposition: form-data; name=\"" + names[i] + "\"\r\n\r\n";
+            out = out + values[i] + "\r\n";
+        }
+        return out + "--" + boundary + "--\r\n";
+    }
+
+    static int[] multipartPost(int addr, int port, String hostHdr, String path,
+                               String boundary, String[] names, String[] values,
+                               int cap) {
+        String body = multipartBody(boundary, names, values);
+        return exchange(addr, port, "POST", hostHdr, path,
+                        multipartType(boundary), body, cap);
+    }
+
+    /* ── HTTPS (TLS 1.3, TOFU/pin) ─────────────────────────────── */
+
+    /* pin = 32 byte SHA-256 SPKI, atau array kosong untuk TOFU.
+     * Mengembalikan respons mentah; [0] negatif bila gagal. */
+    static int[] exchangeTlsDo(int[] ctx, String method, String hostHdr, String path,
+                                String headers, int[] body, int cap, int timeoutMs) {
+        if (ctx[0] < 0) {
+            int[] e = new int[1];
+            e[0] = ctx[0];
+            return e;
+        }
+        int verified = 0;
+        if (ctx[3] == 1) verified = 1;
+        if (ctx[2] < 0) verified = 0;      /* ctx[2]=pinOk; -1 = TOFU tanpa pin */
+        if (verified != 1) {
+            Net.close(ctx[0]);
+            int[] e = new int[1];
+            e[0] = -2;
+            return e;
+        }
+        if (timeoutMs > 0) Net.settimeout(ctx[0], timeoutMs);
+        String head = req11(method, hostHdr, path, headers, body, 0);
+        int r = Tls.writeApp(ctx, head);
+        if (r == 0 && body.length > 0) r = Tls.writeApp(ctx, body);
+        if (r < 0) {
+            Net.close(ctx[0]);
+            int[] e = new int[1];
+            e[0] = r;
+            return e;
+        }
+        int[] out = new int[cap];
+        int n = 0;
+        while (n < cap) {
+            int[] part = Tls.readApp(ctx);
+            if (part.length == 0) break;
+            int take = part.length;
+            if (n + take > cap) take = cap - n;
+            for (int i = 0; i < take; i++) out[n + i] = part[i];
+            n = n + take;
+            if (n >= cap) break;
+        }
+        Net.close(ctx[0]);
+        if (n == 0) {
+            int[] e = new int[1];
+            e[0] = -1;
+            return e;
+        }
+        int[] resp = new int[n];
+        for (int i = 0; i < n; i++) resp[i] = out[i];
+        return resp;
+    }
+
+    static int[] getTls(int addr, int port, String hostHdr, String path,
+                        int cap, int[] pin, int timeoutMs) {
+        int[] ctx = Tls.gate(addr, port, pin);
+        return exchangeTlsDo(ctx, "GET", hostHdr, path, "", new int[0], cap, timeoutMs);
     }
 
 }

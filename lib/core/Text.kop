@@ -1,0 +1,112 @@
+// Text.kop — StringBuilder sederhana di atas byte (v1.24).
+//
+// String di Kopi immutable, jadi `s = s + x` di dalam loop menyalin
+// seluruh isi tiap iterasi. `Text` menyimpan buffer byte yang bisa
+// tumbuh (amortized) lalu menghasilkan String sekali di akhir.
+//
+// Layout int[]:
+//   [0] = panjang terpakai (byte)
+//   [1] = kapasitas
+//   [2..] = byte teks (0..255)
+//
+// Karena array tidak bisa diperbesar di tempat, fungsi yang menulis
+// mengembalikan array (mungkin baru):
+//   int[] b = Text.make(64);
+//   b = Text.append(b, "Halo ");
+//   b = Text.appendInt(b, 42);
+//   String s = Text.build(b);          // "Halo 42"
+
+import Str;
+
+class Text {
+
+    static int[] make(int cap) {
+        if (cap < 8) cap = 8;
+        int[] b = new int[2 + cap];
+        b[1] = cap;
+        return b;
+    }
+
+    static int len(int[] b) { return b[0]; }
+    static int cap(int[] b) { return b[1]; }
+    static boolean isEmpty(int[] b) { return b[0] == 0; }
+
+    /* pastikan ruang untuk `need` byte lagi; kembalikan buffer (mungkin baru) */
+    static int[] reserve(int[] b, int need) {
+        if (b[0] + need <= b[1]) return b;
+        int c = b[1];
+        if (c < 8) c = 8;
+        while (c < b[0] + need) c = c * 2;
+        int[] n = new int[2 + c];
+        for (int i = 0; i < b[0]; i++) n[2 + i] = b[2 + i];
+        n[0] = b[0];
+        n[1] = c;
+        return n;
+    }
+
+    static int[] appendByte(int[] b, int v) {
+        b = reserve(b, 1);
+        b[2 + b[0]] = v & 255;
+        b[0] = b[0] + 1;
+        return b;
+    }
+
+    static int[] append(int[] b, String s) {
+        b = reserve(b, s.length);
+        int at = b[0];
+        for (int i = 0; i < s.length; i++) b[2 + at + i] = s[i] & 255;
+        b[0] = at + s.length;
+        return b;
+    }
+
+    static int[] appendBytes(int[] b, int[] s) {
+        b = reserve(b, s.length);
+        int at = b[0];
+        for (int i = 0; i < s.length; i++) b[2 + at + i] = s[i] & 255;
+        b[0] = at + s.length;
+        return b;
+    }
+
+    static int[] appendInt(int[] b, int v) { return append(b, Str.fromInt(v)); }
+
+    static int[] appendLong(int[] b, long v) { return append(b, Str.fromLong(v)); }
+
+    static int[] appendDouble(int[] b, double v) { return append(b, Str.fromDouble(v)); }
+
+    static int[] appendBool(int[] b, boolean v) { return append(b, Str.fromBool(v)); }
+
+    static int[] appendLine(int[] b, String s) {
+        b = append(b, s);
+        return appendByte(b, 10);
+    }
+
+    static int[] newline(int[] b) { return appendByte(b, 10); }
+
+    /* ulang byte yang sama `n` kali */
+    static int[] repeatByte(int[] b, int c, int n) {
+        b = reserve(b, n);
+        int at = b[0];
+        for (int i = 0; i < n; i++) b[2 + at + i] = c & 255;
+        b[0] = at + n;
+        return b;
+    }
+
+    /* buang `n` byte terakhir (di-clamp) */
+    static int[] truncate(int[] b, int n) {
+        if (n < 0) n = 0;
+        if (n > b[0]) n = b[0];
+        b[0] = b[0] - n;
+        return b;
+    }
+
+    static void clear(int[] b) { b[0] = 0; }
+
+    static String build(int[] b) {
+        if (b[0] == 0) return "";
+        int[] out = new int[b[0]];
+        for (int i = 0; i < b[0]; i++) out[i] = b[2 + i];
+        return Net.mkstr(out);
+    }
+
+    static String toString(int[] b) { return build(b); }
+}

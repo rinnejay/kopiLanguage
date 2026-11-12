@@ -1,0 +1,459 @@
+// Compress.kop — gzip/zlib/deflate murni Kopi (v1.24).
+//
+// Encoder memakai blok "stored" Deflate: hasilnya sah menurut RFC 1951
+// (bisa dibaca gzip/zlib mana pun), tetapi tidak mengecilkan data.
+// Decoder mendukung stored, fixed Huffman, dan dynamic Huffman sehingga
+// bisa membuka gzip/deflate produksi biasa (mis. respons HTTP).
+//
+//   int[] gz = Compress.gzip(data);
+//   int[] raw = Compress.gunzip(gz);          // array kosong bila galat
+//   int[] z  = Compress.zlib(data);
+//   int[] u  = Compress.unzlib(z);
+
+class Compress {
+
+    /* ── utilitas byte ─────────────────────────────────────────── */
+
+    static int[] push(int[] a, int v) {
+        int[] b = new int[a.length + 1];
+        for (int i = 0; i < a.length; i++) b[i] = a[i];
+        b[a.length] = v & 255;
+        return b;
+    }
+
+    static int[] push16(int[] a, int v) {
+        a = push(a, v & 255);
+        return push(a, (v >>> 8) & 255);
+    }
+
+    static int[] push32(int[] a, int v) {
+        a = push(a, v & 255);
+        a = push(a, (v >>> 8) & 255);
+        a = push(a, (v >>> 16) & 255);
+        return push(a, (v >>> 24) & 255);
+    }
+
+    static int get16(int[] a, int p) {
+        return (a[p] & 255) | ((a[p + 1] & 255) << 8);
+    }
+
+    static int get32(int[] a, int p) {
+        return (a[p] & 255) | ((a[p + 1] & 255) << 8)
+             | ((a[p + 2] & 255) << 16) | ((a[p + 3] & 255) << 24);
+    }
+
+    static int get32be(int[] a, int p) {
+        return ((a[p] & 255) << 24) | ((a[p + 1] & 255) << 16)
+             | ((a[p + 2] & 255) << 8) | (a[p + 3] & 255);
+    }
+
+    /* CRC-32 (polinom 0xEDB88320) */
+    static int crc32(int[] data) {
+        int crc = -1;
+        for (int i = 0; i < data.length; i++) {
+            crc = crc ^ (data[i] & 255);
+            for (int k = 0; k < 8; k++) {
+                if ((crc & 1) != 0) crc = (crc >>> 1) ^ (-306674912);
+                else crc = crc >>> 1;
+            }
+        }
+        return crc ^ (-1);
+    }
+
+    /* Adler-32 (RFC 1950) */
+    static int adler32(int[] data) {
+        int a = 1;
+        int b = 0;
+        for (int i = 0; i < data.length; i++) {
+            a = (a + (data[i] & 255)) % 65521;
+            b = (b + a) % 65521;
+        }
+        return (b << 16) | a;
+    }
+
+    /* ── encoder stored block ──────────────────────────────────── */
+
+    static int[] deflateRaw(int[] data) {
+        int[] out = new int[0];
+        int at = 0;
+        int n = data.length;
+        if (n == 0) {
+            int[] z = new int[5];
+            z[0] = 1; z[1] = 0; z[2] = 0; z[3] = 255; z[4] = 255;
+            return z;
+        }
+        while (at < n) {
+            int len = n - at;
+            if (len > 65535) len = 65535;
+            int last = 0;
+            if (at + len >= n) last = 1;
+            out = push(out, last);
+            out = push16(out, len);
+            out = push16(out, (~len) & 65535);
+            for (int i = 0; i < len; i++) out = push(out, data[at + i]);
+            at = at + len;
+        }
+        return out;
+    }
+
+    static int[] zlib(int[] data) {
+        int[] out = new int[2];                          /* CMF/FLG */
+        out[0] = 0x78; out[1] = 0x01;
+        int[] raw = deflateRaw(data);
+        for (int i = 0; i < raw.length; i++) out = push(out, raw[i]);
+        return push32(out, adler32(data));
+    }
+
+    static int[] gzip(int[] data) {
+        int[] out = new int[10];
+        out[0] = 31; out[1] = 139; out[2] = 8; out[3] = 0; out[4] = 0;
+        out[5] = 0; out[6] = 0; out[7] = 0; out[8] = 0; out[9] = 3;
+        int[] raw = deflateRaw(data);
+        for (int i = 0; i < raw.length; i++) out = push(out, raw[i]);
+        out = push32(out, crc32(data));
+        return push32(out, data.length);
+    }
+
+    /* ── bit reader ───────────────────────────────────────────── */
+
+    static void align(int[] st) { st[2] = 0; }
+
+    static int bit(int[] in, int[] st) {
+        if (st[2] == 0) {
+            if (st[0] >= in.length) { st[3] = 1; return 0; }
+            st[1] = in[st[0]] & 255;
+            st[0] = st[0] + 1;
+            st[2] = 8;
+        }
+        int v = st[1] & 1;
+        st[1] = st[1] >>> 1;
+        st[2] = st[2] - 1;
+        return v;
+    }
+
+    static int bits(int[] in, int[] st, int n) {
+        int v = 0;
+        for (int i = 0; i < n; i++) v = v | (bit(in, st) << i);
+        return v;
+    }
+
+    static int byteAt(int[] in, int[] st) {
+        if (st[0] >= in.length) { st[3] = 1; return 0; }
+        int v = in[st[0]] & 255;
+        st[0] = st[0] + 1;
+        return v;
+    }
+
+    /* ── Huffman kanonik ──────────────────────────────────────── */
+
+    /* hasil: [0]=maxBits, count[len] @1+len, simbol mulai @max+2 */
+    static int[] huff(int[] lengths) {
+        int max = 0;
+        for (int i = 0; i < lengths.length; i++)
+            if (lengths[i] > max) max = lengths[i];
+        int[] counts = new int[max + 1];
+        for (int i = 0; i < lengths.length; i++)
+            if (lengths[i] > 0) counts[lengths[i]] = counts[lengths[i]] + 1;
+        int total = 0;
+        for (int l = 1; l <= max; l++) total = total + counts[l];
+        int[] t = new int[max + 2 + total];
+        t[0] = max;
+        for (int l = 1; l <= max; l++) t[1 + l] = counts[l];
+        int[] next = new int[max + 2];
+        int acc = 0;
+        for (int l = 1; l <= max; l++) { next[l] = acc; acc = acc + counts[l]; }
+        for (int s = 0; s < lengths.length; s++) {
+            int l = lengths[s];
+            if (l == 0) continue;
+            t[max + 2 + next[l]] = s;
+            next[l] = next[l] + 1;
+        }
+        return t;
+    }
+
+    static int decode(int[] in, int[] st, int[] t) {
+        int max = t[0];
+        int code = 0;
+        int first = 0;
+        int index = 0;
+        for (int len = 1; len <= max; len++) {
+            code = code | bit(in, st);
+            int cnt = t[1 + len];
+            if (code - first < cnt) {
+                int at = max + 2 + index + (code - first);
+                if (at < 0 || at >= t.length) { st[3] = 1; return -1; }
+                return t[at];
+            }
+            index = index + cnt;
+            first = first + cnt;
+            first = first << 1;
+            code = code << 1;
+        }
+        st[3] = 1;
+        return -1;
+    }
+
+    static int[] fixedLit() {
+        int[] l = new int[288];
+        for (int i = 0; i <= 143; i++) l[i] = 8;
+        for (int i = 144; i <= 255; i++) l[i] = 9;
+        for (int i = 256; i <= 279; i++) l[i] = 7;
+        for (int i = 280; i <= 287; i++) l[i] = 8;
+        return l;
+    }
+
+    static int[] fixedDist() {
+        int[] l = new int[32];
+        for (int i = 0; i < 32; i++) l[i] = 5;
+        return l;
+    }
+
+    static int lenBase(int s) {
+        if (s < 8) return 3 + s;
+        if (s == 8) return 11;
+        if (s == 9) return 13;
+        if (s == 10) return 15;
+        if (s == 11) return 17;
+        if (s == 12) return 19;
+        if (s == 13) return 23;
+        if (s == 14) return 27;
+        if (s == 15) return 31;
+        if (s == 16) return 35;
+        if (s == 17) return 43;
+        if (s == 18) return 51;
+        if (s == 19) return 59;
+        if (s == 20) return 67;
+        if (s == 21) return 83;
+        if (s == 22) return 99;
+        if (s == 23) return 115;
+        if (s == 24) return 131;
+        if (s == 25) return 163;
+        if (s == 26) return 195;
+        if (s == 27) return 227;
+        return 258;
+    }
+
+    static int lenExtra(int s) {
+        if (s < 8) return 0;
+        if (s < 12) return 1;
+        if (s < 16) return 2;
+        if (s < 20) return 3;
+        if (s < 24) return 4;
+        if (s < 28) return 5;
+        return 0;
+    }
+
+    static int distBase(int s) {
+        if (s < 4) return 1 + s;
+        if (s == 4) return 5;
+        if (s == 5) return 7;
+        if (s == 6) return 9;
+        if (s == 7) return 13;
+        if (s == 8) return 17;
+        if (s == 9) return 25;
+        if (s == 10) return 33;
+        if (s == 11) return 49;
+        if (s == 12) return 65;
+        if (s == 13) return 97;
+        if (s == 14) return 129;
+        if (s == 15) return 193;
+        if (s == 16) return 257;
+        if (s == 17) return 385;
+        if (s == 18) return 513;
+        if (s == 19) return 769;
+        if (s == 20) return 1025;
+        if (s == 21) return 1537;
+        if (s == 22) return 2049;
+        if (s == 23) return 3073;
+        if (s == 24) return 4097;
+        if (s == 25) return 6145;
+        if (s == 26) return 8193;
+        if (s == 27) return 12289;
+        if (s == 28) return 16385;
+        return 24577;
+    }
+
+    static int distExtra(int s) {
+        if (s < 4) return 0;
+        if (s < 6) return 1;
+        if (s < 8) return 2;
+        if (s < 10) return 3;
+        if (s < 12) return 4;
+        if (s < 14) return 5;
+        if (s < 16) return 6;
+        if (s < 18) return 7;
+        if (s < 20) return 8;
+        if (s < 22) return 9;
+        if (s < 24) return 10;
+        if (s < 26) return 11;
+        if (s < 28) return 12;
+        return 13;
+    }
+
+    /* ── inflate ───────────────────────────────────────────────── */
+
+    /* tulis hasil ke out; -1 bila galat atau melebihi kapasitas */
+    static int inflateInto(int[] in, int from, int to, int[] out, int cap) {
+        int[] st = new int[4];
+        int[] src = new int[to - from];
+        for (int i = 0; i < src.length; i++) src[i] = in[from + i];
+        int o = 0;
+        while (true) {
+            if (st[3] != 0) return -1;
+            int last = bits(src, st, 1);
+            int type = bits(src, st, 2);
+            if (type == 0) {
+                align(st);
+                int len = get16(src, st[0]);
+                int nlen = get16(src, st[0] + 2);
+                st[0] = st[0] + 4;
+                if ((len ^ 65535) != nlen) return -1;
+                if (st[0] + len > src.length) return -1;
+                if (o + len > cap) return -1;
+                for (int i = 0; i < len; i++) {
+                    out[o] = src[st[0] + i];
+                    o++;
+                }
+                st[0] = st[0] + len;
+                if (last != 0) return o;
+                continue;
+            }
+            int[] lit = new int[0];
+            int[] dst = new int[0];
+            if (type == 1) {
+                lit = huff(fixedLit());
+                dst = huff(fixedDist());
+            } else if (type == 2) {
+                int hlit = bits(src, st, 5) + 257;
+                int hdist = bits(src, st, 5) + 1;
+                int hclen = bits(src, st, 4) + 4;
+                int[] order = new int[19];
+                order[0] = 16; order[1] = 17; order[2] = 18; order[3] = 0;
+                order[4] = 8; order[5] = 7; order[6] = 9; order[7] = 6;
+                order[8] = 10; order[9] = 5; order[10] = 11; order[11] = 4;
+                order[12] = 12; order[13] = 3; order[14] = 13; order[15] = 2;
+                order[16] = 14; order[17] = 1; order[18] = 15;
+                int[] cl = new int[19];
+                for (int i = 0; i < hclen; i++) cl[order[i]] = bits(src, st, 3);
+                int[] clt = huff(cl);
+                int[] lens = new int[hlit + hdist];
+                int k = 0;
+                while (k < lens.length) {
+                    int sym = decode(src, st, clt);
+                    if (sym < 0) return -1;
+                    if (sym < 16) { lens[k] = sym; k++; }
+                    else if (sym == 16) {
+                        if (k == 0) return -1;
+                        int rep = bits(src, st, 2) + 3;
+                        int v = lens[k - 1];
+                        while (rep > 0 && k < lens.length) { lens[k] = v; k++; rep--; }
+                    } else if (sym == 17) {
+                        int rep = bits(src, st, 3) + 3;
+                        while (rep > 0 && k < lens.length) { lens[k] = 0; k++; rep--; }
+                    } else if (sym == 18) {
+                        int rep = bits(src, st, 7) + 11;
+                        while (rep > 0 && k < lens.length) { lens[k] = 0; k++; rep--; }
+                    } else return -1;
+                }
+                int[] ll = new int[hlit];
+                int[] dl = new int[hdist];
+                for (int i = 0; i < hlit; i++) ll[i] = lens[i];
+                for (int i = 0; i < hdist; i++) dl[i] = lens[hlit + i];
+                lit = huff(ll);
+                dst = huff(dl);
+            } else return -1;
+
+            while (true) {
+                int sym = decode(src, st, lit);
+                if (sym < 0) return -1;
+                if (sym < 256) {
+                    if (o >= cap) return -1;
+                    out[o] = sym;
+                    o++;
+                } else if (sym == 256) break;
+                else {
+                    int li = sym - 257;
+                    if (li < 0 || li > 28) return -1;
+                    int len = lenBase(li) + bits(src, st, lenExtra(li));
+                    int ds = decode(src, st, dst);
+                    if (ds < 0 || ds > 29) return -1;
+                    int dist = distBase(ds) + bits(src, st, distExtra(ds));
+                    if (dist <= 0 || dist > o) return -1;
+                    if (o + len > cap) return -1;
+                    for (int i = 0; i < len; i++) {
+                        out[o] = out[o - dist];
+                        o++;
+                    }
+                }
+                if (st[3] != 0) return -1;
+            }
+            if (last != 0) return o;
+        }
+        return o;
+    }
+
+    /* deflate mentah dengan kapasitas keluaran eksplisit */
+    static int[] inflateRaw(int[] data, int cap) {
+        if (cap < 1) cap = 1;
+        int[] out = new int[cap];
+        int n = inflateInto(data, 0, data.length, out, cap);
+        if (n < 0) return new int[0];
+        int[] r = new int[n];
+        for (int i = 0; i < n; i++) r[i] = out[i];
+        return r;
+    }
+
+    static int[] unzlib(int[] data) {
+        if (data.length < 6) return new int[0];
+        int cmf = data[0] & 255;
+        int flg = data[1] & 255;
+        if ((cmf & 15) != 8) return new int[0];
+        if (((cmf << 8) + flg) % 31 != 0) return new int[0];
+        int cap = data.length * 128 + 1024;
+        int[] out = new int[cap];
+        int n = inflateInto(data, 2, data.length - 4, out, cap);
+        if (n < 0) return new int[0];
+        int want = get32be(data, data.length - 4);
+        int[] r = new int[n];
+        for (int i = 0; i < n; i++) r[i] = out[i];
+        if (adler32(r) != want) return new int[0];
+        return r;
+    }
+
+    static int[] gunzip(int[] data) {
+        if (data.length < 18) return new int[0];
+        if ((data[0] & 255) != 31 || (data[1] & 255) != 139) return new int[0];
+        if ((data[2] & 255) != 8) return new int[0];
+        int flg = data[3] & 255;
+        int i = 10;
+        if ((flg & 4) != 0) {
+            if (i + 2 > data.length) return new int[0];
+            int xlen = get16(data, i);
+            i = i + 2 + xlen;
+        }
+        if ((flg & 8) != 0) {
+            while (i < data.length && data[i] != 0) i++;
+            i++;
+        }
+        if ((flg & 16) != 0) {
+            while (i < data.length && data[i] != 0) i++;
+            i++;
+        }
+        if ((flg & 2) != 0) i = i + 2;
+        if (i + 8 > data.length) return new int[0];
+        int isize = get32(data, data.length - 4);
+        int cap = isize;
+        if (cap < 1) cap = 1;
+        int[] out = new int[cap];
+        int n = inflateInto(data, i, data.length - 8, out, cap);
+        if (n < 0) return new int[0];
+        int wantCrc = get32(data, data.length - 8);
+        int[] r = new int[n];
+        for (int k = 0; k < n; k++) r[k] = out[k];
+        if (crc32(r) != wantCrc) return new int[0];
+        return r;
+    }
+
+    static String gunzipText(int[] data) { return Net.mkstr(gunzip(data)); }
+    static int[] gzipText(String s) { return gzip(Net.strbytes(s)); }
+}

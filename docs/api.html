@@ -37,12 +37,12 @@
 <tr>
 <td><strong>Core</strong></td>
 <td><code>lib/core/</code></td>
-<td><code>Arrays</code>, <code>Bytes</code>, <code>Deque</code>, <code>Digits</code>, <code>File</code>, <code>Json</code>, <code>Log</code>, <code>Map</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>Path</code>, <code>Set</code>, <code>Stats</code>, <code>Str</code>, <code>Time</code></td>
+<td><code>Args</code>, <code>Arrays</code>, <code>Bytes</code>, <code>Compress</code>, <code>Config</code>, <code>Cookie</code>, <code>Deque</code>, <code>Digits</code>, <code>Env</code>, <code>File</code>, <code>Json</code>, <code>List</code>, <code>ListStr</code>, <code>Log</code>, <code>Map</code>, <code>MapSS</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>Path</code>, <code>Router</code>, <code>Set</code>, <code>SetStr</code>, <code>Stats</code>, <code>Str</code>, <code>Test</code>, <code>Text</code>, <code>Time</code></td>
 </tr>
 <tr>
 <td><strong>Net</strong></td>
 <td><code>lib/net/</code></td>
-<td><code>Auth</code>, <code>Dns</code>, <code>Http</code>, <code>HttpServer</code>, <code>Jwt</code>, <code>Mime</code>, <code>Resolv</code>, <code>Rfc</code>, <code>Session</code>, <code>Static</code>, <code>Tcp</code>, <code>Tls</code>, <code>Udp</code>, <code>Url</code>, <code>WebSocket</code></td>
+<td><code>Auth</code>, <code>Dns</code>, <code>Http</code>, <code>HttpServer</code>, <code>Jwt</code>, <code>Mime</code>, <code>Multipart</code>, <code>Resolv</code>, <code>Rfc</code>, <code>Session</code>, <code>Static</code>, <code>Tcp</code>, <code>Tls</code>, <code>Udp</code>, <code>Url</code>, <code>WebSocket</code>, <code>WsClient</code></td>
 </tr>
 <tr>
 <td><strong>Crypto</strong></td>
@@ -60,6 +60,12 @@
 <th>Ringkasan</th>
 </tr></thead><tbody>
 <tr>
+<td><a href="api-core.html#args"><code>Args</code></a></td>
+<td><code>lib/core/Args.kop</code></td>
+<td>10</td>
+<td>—</td>
+</tr>
+<tr>
 <td><a href="api-core.html#arrays"><code>Arrays</code></a></td>
 <td><code>lib/core/Arrays.kop</code></td>
 <td>23</td>
@@ -70,6 +76,24 @@
 <td><code>lib/core/Bytes.kop</code></td>
 <td>48</td>
 <td>Utilitas buffer byte <code>int[]</code>: I/O biner, jaringan, kriptografi. Untuk teks gunakan <code>Str</code>.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#compress"><code>Compress</code></a></td>
+<td><code>lib/core/Compress.kop</code></td>
+<td>29</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-core.html#config"><code>Config</code></a></td>
+<td><code>lib/core/Config.kop</code></td>
+<td>9</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-core.html#cookie"><code>Cookie</code></a></td>
+<td><code>lib/core/Cookie.kop</code></td>
+<td>16</td>
+<td>—</td>
 </tr>
 <tr>
 <td><a href="api-core.html#deque"><code>Deque</code></a></td>
@@ -84,6 +108,12 @@
 <td>Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain.</td>
 </tr>
 <tr>
+<td><a href="api-core.html#env"><code>Env</code></a></td>
+<td><code>lib/core/Env.kop</code></td>
+<td>11</td>
+<td>—</td>
+</tr>
+<tr>
 <td><a href="api-core.html#file"><code>File</code></a></td>
 <td><code>lib/core/File.kop</code></td>
 <td>15</td>
@@ -92,13 +122,25 @@
 <tr>
 <td><a href="api-core.html#json"><code>Json</code></a></td>
 <td><code>lib/core/Json.kop</code></td>
-<td>57</td>
+<td>72</td>
 <td>Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape <code>int[]</code>; literal bahasa memakai…</td>
+</tr>
+<tr>
+<td><a href="api-core.html#list"><code>List</code></a></td>
+<td><code>lib/core/List.kop</code></td>
+<td>25</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-core.html#liststr"><code>ListStr</code></a></td>
+<td><code>lib/core/ListStr.kop</code></td>
+<td>24</td>
+<td>—</td>
 </tr>
 <tr>
 <td><a href="api-core.html#log"><code>Log</code></a></td>
 <td><code>lib/core/Log.kop</code></td>
-<td>4</td>
+<td>18</td>
 <td>Logging ke stderr dengan timestamp UTC dan level.</td>
 </tr>
 <tr>
@@ -106,6 +148,12 @@
 <td><code>lib/core/Map.kop</code></td>
 <td>13</td>
 <td>Hash map int→int dengan open addressing dan <code>grow</code> eksplisit.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#mapss"><code>MapSS</code></a></td>
+<td><code>lib/core/MapSS.kop</code></td>
+<td>19</td>
+<td>—</td>
 </tr>
 <tr>
 <td><a href="api-core.html#mapstr"><code>MapStr</code></a></td>
@@ -132,10 +180,22 @@
 <td>Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut.</td>
 </tr>
 <tr>
+<td><a href="api-core.html#router"><code>Router</code></a></td>
+<td><code>lib/core/Router.kop</code></td>
+<td>14</td>
+<td>—</td>
+</tr>
+<tr>
 <td><a href="api-core.html#set"><code>Set</code></a></td>
 <td><code>lib/core/Set.kop</code></td>
 <td>8</td>
 <td>Himpunan int di atas Map: tambah/hapus/uji keanggotaan.</td>
+</tr>
+<tr>
+<td><a href="api-core.html#setstr"><code>SetStr</code></a></td>
+<td><code>lib/core/SetStr.kop</code></td>
+<td>11</td>
+<td>—</td>
 </tr>
 <tr>
 <td><a href="api-core.html#stats"><code>Stats</code></a></td>
@@ -150,9 +210,21 @@
 <td>Utilitas teks native <code>String</code>: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding,…</td>
 </tr>
 <tr>
+<td><a href="api-core.html#test"><code>Test</code></a></td>
+<td><code>lib/core/Test.kop</code></td>
+<td>16</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-core.html#text"><code>Text</code></a></td>
+<td><code>lib/core/Text.kop</code></td>
+<td>19</td>
+<td>—</td>
+</tr>
+<tr>
 <td><a href="api-core.html#time"><code>Time</code></a></td>
 <td><code>lib/core/Time.kop</code></td>
-<td>6</td>
+<td>32</td>
 <td>Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.</td>
 </tr>
 </tbody></table></div>
@@ -173,19 +245,19 @@
 <tr>
 <td><a href="api-net.html#dns"><code>Dns</code></a></td>
 <td><code>lib/net/Dns.kop</code></td>
-<td>6</td>
+<td>17</td>
 <td>Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.</td>
 </tr>
 <tr>
 <td><a href="api-net.html#http"><code>Http</code></a></td>
 <td><code>lib/net/Http.kop</code></td>
-<td>27</td>
+<td>44</td>
 <td>Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.</td>
 </tr>
 <tr>
 <td><a href="api-net.html#httpserver"><code>HttpServer</code></a></td>
 <td><code>lib/net/HttpServer.kop</code></td>
-<td>35</td>
+<td>47</td>
 <td>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,…</td>
 </tr>
 <tr>
@@ -199,6 +271,12 @@
 <td><code>lib/net/Mime.kop</code></td>
 <td>1</td>
 <td>Pemetaan ekstensi file → header Content-Type.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#multipart"><code>Multipart</code></a></td>
+<td><code>lib/net/Multipart.kop</code></td>
+<td>17</td>
+<td>—</td>
 </tr>
 <tr>
 <td><a href="api-net.html#resolv"><code>Resolv</code></a></td>
@@ -221,7 +299,7 @@
 <tr>
 <td><a href="api-net.html#static"><code>Static</code></a></td>
 <td><code>lib/net/Static.kop</code></td>
-<td>3</td>
+<td>7</td>
 <td>Penyajian file statis + MIME; menolak path traversal <code>..</code>.</td>
 </tr>
 <tr>
@@ -253,6 +331,12 @@
 <td><code>lib/net/WebSocket.kop</code></td>
 <td>12</td>
 <td>Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#wsclient"><code>WsClient</code></a></td>
+<td><code>lib/net/WsClient.kop</code></td>
+<td>15</td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <h3 id="crypto-buka-referensi-api-crypto-md">Crypto — <a href="api-crypto.html">buka referensi</a><a class="anchor" href="#crypto-buka-referensi-api-crypto-md" aria-label="tautan">#</a></h3>

@@ -1,0 +1,91 @@
+// Test.kop — assertion minimal untuk uji pustaka (v1.24).
+//
+//   int[] t = Test.make();
+//   Test.eqInt(t, 2 + 2, 4, "aritmetika");
+//   Test.eqStr(t, Str.trim(" x "), "x", "trim");
+//   int gagal = Test.report(t, "suite");
+//   Net.exit(Test.code(t));
+//
+// Penghitung disimpan di int[] {lulus, gagal} sehingga tidak butuh
+// variabel global.
+
+import Str;
+
+class Test {
+
+    static int[] make() { return new int[2]; }
+
+    static int passed(int[] t) { return t[0]; }
+    static int failed(int[] t) { return t[1]; }
+
+    static void ok(int[] t, boolean cond, String name) {
+        if (cond) t[0] = t[0] + 1;
+        else {
+            t[1] = t[1] + 1;
+            System.out.println("FAIL  " + name);
+        }
+    }
+
+    static void fail(int[] t, String name) { ok(t, false, name); }
+
+    static void eqInt(int[] t, int got, int want, String name) {
+        if (got == want) t[0] = t[0] + 1;
+        else {
+            t[1] = t[1] + 1;
+            System.out.println("FAIL  " + name + " — dapat " + Str.fromInt(got)
+                             + ", harap " + Str.fromInt(want));
+        }
+    }
+
+    static void neInt(int[] t, int got, int bad, String name) {
+        ok(t, got != bad, name);
+    }
+
+    static void eqLong(int[] t, long got, long want, String name) {
+        if (got == want) t[0] = t[0] + 1;
+        else {
+            t[1] = t[1] + 1;
+            System.out.println("FAIL  " + name + " — dapat " + Str.fromLong(got)
+                             + ", harap " + Str.fromLong(want));
+        }
+    }
+
+    static void eqStr(int[] t, String got, String want, String name) {
+        if (Str.eq(got, want)) t[0] = t[0] + 1;
+        else {
+            t[1] = t[1] + 1;
+            System.out.println("FAIL  " + name + " — dapat '" + got
+                             + "', harap '" + want + "'");
+        }
+    }
+
+    static void eqBool(int[] t, boolean got, boolean want, String name) {
+        if (got == want) t[0] = t[0] + 1;
+        else {
+            t[1] = t[1] + 1;
+            System.out.println("FAIL  " + name + " — boolean tidak cocok");
+        }
+    }
+
+    static void near(int[] t, double got, double want, double eps, String name) {
+        double d = got - want;
+        if (d < 0.0) d = -d;
+        ok(t, d <= eps, name);
+    }
+
+    static void true_(int[] t, boolean cond, String name) { ok(t, cond, name); }
+    static void false_(int[] t, boolean cond, String name) { ok(t, !cond, name); }
+
+    static int report(int[] t, String tag) {
+        System.out.println(tag + ": " + Str.fromInt(t[0]) + " pass, "
+                         + Str.fromInt(t[1]) + " fail");
+        return t[1];
+    }
+
+    static int code(int[] t) {
+        if (t[1] > 0) return 1;
+        return 0;
+    }
+
+    static void reset(int[] t) { t[0] = 0; t[1] = 0; }
+}

@@ -1,0 +1,156 @@
+// List.kop — array int dinamis (v1.24).
+//
+// Layout int[]:
+//   [0] = ukuran, [1] = kapasitas, [2..] = elemen
+//
+// Seperti struktur dinamis lain di lib, fungsi yang menambah elemen
+// mengembalikan array baru (bisa sama bila kapasitas masih cukup):
+//   int[] xs = List.make(4);
+//   xs = List.add(xs, 7);
+//   xs = List.add(xs, 9);
+//   System.out.println(List.get(xs, 1));     // 9
+
+class List {
+
+    static int[] make(int cap) {
+        if (cap < 1) cap = 1;
+        int[] xs = new int[2 + cap];
+        xs[1] = cap;
+        return xs;
+    }
+
+    static int[] from(int[] src) {
+        int[] xs = make(src.length);
+        for (int i = 0; i < src.length; i++) xs[2 + i] = src[i];
+        xs[0] = src.length;
+        return xs;
+    }
+
+    static int size(int[] xs) { return xs[0]; }
+    static int cap(int[] xs) { return xs[1]; }
+    static boolean isEmpty(int[] xs) { return xs[0] == 0; }
+
+    static int get(int[] xs, int i) {
+        if (i < 0 || i >= xs[0]) return 0;
+        return xs[2 + i];
+    }
+
+    static int getOr(int[] xs, int i, int def) {
+        if (i < 0 || i >= xs[0]) return def;
+        return xs[2 + i];
+    }
+
+    static boolean setAt(int[] xs, int i, int v) {
+        if (i < 0 || i >= xs[0]) return false;
+        xs[2 + i] = v;
+        return true;
+    }
+
+    static int[] grow(int[] xs, int need) {
+        int c = xs[1];
+        if (c < 1) c = 1;
+        while (c < xs[0] + need) c = c * 2;
+        int[] n = new int[2 + c];
+        for (int i = 0; i < xs[0]; i++) n[2 + i] = xs[2 + i];
+        n[0] = xs[0];
+        n[1] = c;
+        return n;
+    }
+
+    static int[] add(int[] xs, int v) {
+        xs = grow(xs, 1);
+        xs[2 + xs[0]] = v;
+        xs[0] = xs[0] + 1;
+        return xs;
+    }
+
+    static int[] addAll(int[] xs, int[] vs) {
+        xs = grow(xs, vs.length);
+        int at = xs[0];
+        for (int i = 0; i < vs.length; i++) xs[2 + at + i] = vs[i];
+        xs[0] = at + vs.length;
+        return xs;
+    }
+
+    static int[] insertAt(int[] xs, int i, int v) {
+        if (i < 0) i = 0;
+        if (i > xs[0]) i = xs[0];
+        xs = grow(xs, 1);
+        for (int k = xs[0]; k > i; k--) xs[2 + k] = xs[2 + k - 1];
+        xs[2 + i] = v;
+        xs[0] = xs[0] + 1;
+        return xs;
+    }
+
+    static int[] removeAt(int[] xs, int i) {
+        if (i < 0 || i >= xs[0]) return xs;
+        for (int k = i; k + 1 < xs[0]; k++) xs[2 + k] = xs[2 + k + 1];
+        xs[0] = xs[0] - 1;
+        return xs;
+    }
+
+    static int[] removeValue(int[] xs, int v) {
+        int i = indexOf(xs, v);
+        if (i < 0) return xs;
+        return removeAt(xs, i);
+    }
+
+    static int indexOf(int[] xs, int v) {
+        for (int i = 0; i < xs[0]; i++) if (xs[2 + i] == v) return i;
+        return -1;
+    }
+
+    static int lastIndexOf(int[] xs, int v) {
+        for (int i = xs[0] - 1; i >= 0; i--) if (xs[2 + i] == v) return i;
+        return -1;
+    }
+
+    static boolean contains(int[] xs, int v) { return indexOf(xs, v) >= 0; }
+
+    static int count(int[] xs, int v) {
+        int n = 0;
+        for (int i = 0; i < xs[0]; i++) if (xs[2 + i] == v) n++;
+        return n;
+    }
+
+    static void clear(int[] xs) { xs[0] = 0; }
+
+    static int[] copy(int[] xs) { return from(toArray(xs)); }
+
+    static int[] toArray(int[] xs) {
+        int[] out = new int[xs[0]];
+        for (int i = 0; i < xs[0]; i++) out[i] = xs[2 + i];
+        return out;
+    }
+
+    static int[] reverse(int[] xs) {
+        int[] out = toArray(xs);
+        int i = 0;
+        int j = out.length - 1;
+        while (i < j) {
+            int t = out[i]; out[i] = out[j]; out[j] = t;
+            i++; j--;
+        }
+        return out;
+    }
+
+    static int sum(int[] xs) {
+        int s = 0;
+        for (int i = 0; i < xs[0]; i++) s = s + xs[2 + i];
+        return s;
+    }
+
+    static int max(int[] xs) {
+        if (xs[0] == 0) return 0;
+        int m = xs[2];
+        for (int i = 1; i < xs[0]; i++) if (xs[2 + i] > m) m = xs[2 + i];
+        return m;
+    }
+
+    static int min(int[] xs) {
+        if (xs[0] == 0) return 0;
+        int m = xs[2];
+        for (int i = 1; i < xs[0]; i++) if (xs[2 + i] < m) m = xs[2 + i];
+        return m;
+    }
+}

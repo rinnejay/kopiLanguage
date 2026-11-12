@@ -1,0 +1,213 @@
+// MapSS.kop — peta String→String (open addressing + kolam byte) v1.24.
+//
+// Layout int[]:
+//   [0]=cap [1]=size [2]=poolUsed [3]=poolCap
+//   hash[cap] @4, koff[cap] @4+c, klen[cap] @4+2c,
+//   voff[cap] @4+3c, vlen[cap] @4+4c, pool @4+5c
+//
+// Kapasitas/pool tetap (tanpa grow) — cukup untuk header, config, dan
+// payload session. Kunci/nilai disalin ke kolam; remove memakai tombstone.
+
+import Str;
+
+class MapSS {
+
+    static int TOMB() { return 2147483647; }
+
+    static int[] make(int cap, int poolCap) {
+        int c = 2;
+        while (c < cap) c = c * 2;
+        int[] m = new int[4 + 5 * c + poolCap];
+        m[0] = c;
+        m[3] = poolCap;
+        return m;
+    }
+
+    static int cap(int[] m) { return m[0]; }
+    static int size(int[] m) { return m[1]; }
+    static int poolUsed(int[] m) { return m[2]; }
+    static boolean isEmpty(int[] m) { return m[1] == 0; }
+
+    private static int hash(int[] k) {
+        int h = (int)2166136261L;
+        for (int i = 0; i < k.length; i++) {
+            h = h ^ (k[i] & 255);
+            h = h * 16777619;
+        }
+        if (h == 0) h = 1;
+        if (h == TOMB()) h = TOMB() - 1;
+        return h;
+    }
+
+    private static int base(int[] m) { return 4 + 5 * m[0]; }
+
+    private static boolean same(int[] m, int slot, int[] key, int h) {
+        int c = m[0];
+        if (m[4 + slot] != h) return false;
+        int len = m[4 + 2 * c + slot];
+        if (len != key.length) return false;
+        int off = m[4 + c + slot];
+        int b = base(m);
+        for (int i = 0; i < len; i++)
+            if (m[b + off + i] != key[i]) return false;
+        return true;
+    }
+
+    private static int find(int[] m, int[] key) {
+        int c = m[0];
+        int h = hash(key);
+        int i = h & (c - 1);
+        for (int n = 0; n < c; n++) {
+            int hh = m[4 + i];
+            if (hh == 0) return -1;
+            if (hh != TOMB() && same(m, i, key, h)) return i;
+            i = (i + 1) & (c - 1);
+        }
+        return -1;
+    }
+
+    static boolean has(int[] m, String key) {
+        return find(m, Net.strbytes(key)) >= 0;
+    }
+
+    static String get(int[] m, String key) { return getOr(m, key, ""); }
+
+    static String getOr(int[] m, String key, String def) {
+        int i = find(m, Net.strbytes(key));
+        if (i < 0) return def;
+        return valAtSlot(m, i);
+    }
+
+    private static boolean place(int[] m, int at, int[] key, int h, String val) {
+        int c = m[0];
+        int need = key.length + val.length;
+        if (m[2] + need > m[3]) return false;
+        int b = base(m);
+        int atKey = m[2];
+        for (int i = 0; i < key.length; i++) m[b + atKey + i] = key[i] & 255;
+        int atVal = atKey + key.length;
+        for (int i = 0; i < val.length; i++) m[b + atVal + i] = val[i] & 255;
+        m[2] = atVal + val.length;
+        m[4 + at] = h;
+        m[4 + c + at] = atKey;
+        m[4 + 2 * c + at] = key.length;
+        m[4 + 3 * c + at] = atVal;
+        m[4 + 4 * c + at] = val.length;
+        m[1] = m[1] + 1;
+        return true;
+    }
+
+    static boolean put(int[] m, String key, String val) {
+        int[] kb = Net.strbytes(key);
+        int c = m[0];
+        int h = hash(kb);
+        int i = h & (c - 1);
+        int tomb = -1;
+        for (int n = 0; n < c; n++) {
+            int hh = m[4 + i];
+            if (hh == 0) {
+                int at = i;
+                if (tomb >= 0) at = tomb;
+                return place(m, at, kb, h, val);
+            }
+            if (hh == TOMB()) {
+                if (tomb < 0) tomb = i;
+            } else if (same(m, i, kb, h)) {
+                int vs = m[4 + 3 * c + i];
+                int vl = m[4 + 4 * c + i];
+                if (vl == val.length) {
+                    int b = base(m);
+                    for (int k = 0; k < vl; k++) m[b + vs + k] = val[k] & 255;
+                    return true;
+                }
+                /* panjang beda: tulis nilai baru di ujung kolam */
+                if (m[2] + val.length > m[3]) return false;
+                int b = base(m);
+                int at = m[2];
+                for (int k = 0; k < val.length; k++) m[b + at + k] = val[k] & 255;
+                m[2] = at + val.length;
+                m[4 + 3 * c + i] = at;
+                m[4 + 4 * c + i] = val.length;
+                return true;
+            }
+            i = (i + 1) & (c - 1);
+        }
+        if (tomb >= 0) return place(m, tomb, kb, h, val);
+        return false;
+    }
+
+    static boolean remove(int[] m, String key) {
+        return removeAt(m, find(m, Net.strbytes(key)));
+    }
+
+    static boolean removeAt(int[] m, int slot) {
+        if (slot < 0 || slot >= m[0] || !used(m, slot)) return false;
+        m[4 + slot] = TOMB();
+        m[1] = m[1] - 1;
+        return true;
+    }
+
+    static void clear(int[] m) {
+        int c = m[0];
+        for (int i = 0; i < c; i++) m[4 + i] = 0;
+        m[1] = 0;
+        m[2] = 0;
+    }
+
+    static boolean used(int[] m, int i) {
+        int h = m[4 + i];
+        return h != 0 && h != TOMB();
+    }
+
+    private static String slice(int[] m, int off, int len) {
+        int b = base(m);
+        int[] out = new int[len];
+        for (int i = 0; i < len; i++) out[i] = m[b + off + i];
+        return Net.mkstr(out);
+    }
+
+    static String keyAtSlot(int[] m, int i) {
+        int c = m[0];
+        return slice(m, m[4 + c + i], m[4 + 2 * c + i]);
+    }
+
+    static String valAtSlot(int[] m, int i) {
+        int c = m[0];
+        return slice(m, m[4 + 3 * c + i], m[4 + 4 * c + i]);
+    }
+
+    /* daftar kunci sesuai urutan slot (melewati tombstone) */
+    static String[] keys(int[] m) {
+        String[] out = new String[m[1]];
+        int n = 0;
+        for (int i = 0; i < m[0]; i++) {
+            if (!used(m, i)) continue;
+            out[n] = keyAtSlot(m, i);
+            n++;
+        }
+        return out;
+    }
+
+    static String[] values(int[] m) {
+        String[] out = new String[m[1]];
+        int n = 0;
+        for (int i = 0; i < m[0]; i++) {
+            if (!used(m, i)) continue;
+            out[n] = valAtSlot(m, i);
+            n++;
+        }
+        return out;
+    }
+
+    /* salin seluruh pasangan ke peta baru dengan kapasitas lebih besar */
+    static int[] growTo(int[] m, int cap, int poolCap) {
+        int[] n = make(cap, poolCap);
+        for (int i = 0; i < m[0]; i++) {
+            if (!used(m, i)) continue;
+            put(n, keyAtSlot(m, i), valAtSlot(m, i));
+        }
+        return n;
+    }
+
+    static String joinKeys(int[] m, String sep) { return Str.join(keys(m), sep); }
+}

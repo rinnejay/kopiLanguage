@@ -4,6 +4,27 @@ Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah die
 
 > Impor dengan `import {Nama};` — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.
 
+## Args
+
+`lib/core/Args.kop` · 10 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int count()` | — |
+| `static String at(int i)` | — |
+| `static String[] all()` | — |
+| `static boolean isFlag(String a)` | — |
+| `static boolean hasFlag(String flag)` | cocokkan "--nama", "-n", atau "--nama=nilai" |
+| `static String value(String flag, String def)` | nilai "--nama=nilai", "--nama nilai", atau "-n=nilai" |
+| `static int intValue(String flag, int def)` | — |
+| `static String[] positionals()` | — |
+| `static String command()` | perintah = positional pertama, "" bila tidak ada |
+| `static String[] flags()` | — |
+
+---
+
 ## Arrays
 
 `lib/core/Arrays.kop` · 23 fungsi
@@ -125,6 +146,93 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));
 
 ---
 
+## Compress
+
+`lib/core/Compress.kop` · 29 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] push(int[] a, int v)` | — |
+| `static int[] push16(int[] a, int v)` | — |
+| `static int[] push32(int[] a, int v)` | — |
+| `static int get16(int[] a, int p)` | — |
+| `static int get32(int[] a, int p)` | — |
+| `static int get32be(int[] a, int p)` | — |
+| `static int crc32(int[] data)` | CRC-32 (polinom 0xEDB88320) |
+| `static int adler32(int[] data)` | Adler-32 (RFC 1950) |
+| `static int[] deflateRaw(int[] data)` | — |
+| `static int[] zlib(int[] data)` | — |
+| `static int[] gzip(int[] data)` | — |
+| `static void align(int[] st)` | — |
+| `static int bit(int[] in, int[] st)` | — |
+| `static int bits(int[] in, int[] st, int n)` | — |
+| `static int byteAt(int[] in, int[] st)` | — |
+| `static int[] huff(int[] lengths)` | hasil: [0]=maxBits, count[len] @1+len, simbol mulai @max+2 |
+| `static int decode(int[] in, int[] st, int[] t)` | — |
+| `static int[] fixedLit()` | — |
+| `static int[] fixedDist()` | — |
+| `static int lenBase(int s)` | — |
+| `static int lenExtra(int s)` | — |
+| `static int distBase(int s)` | — |
+| `static int distExtra(int s)` | — |
+| `static int inflateInto(int[] in, int from, int to, int[] out, int cap)` | tulis hasil ke out; -1 bila galat atau melebihi kapasitas |
+| `static int[] inflateRaw(int[] data, int cap)` | deflate mentah dengan kapasitas keluaran eksplisit |
+| `static int[] unzlib(int[] data)` | — |
+| `static int[] gunzip(int[] data)` | — |
+| `static String gunzipText(int[] data)` | — |
+| `static int[] gzipText(String s)` | — |
+
+---
+
+## Config
+
+`lib/core/Config.kop` · 9 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] parse(String text)` | — |
+| `static int[] parseFile(String path)` | — |
+| `static String get(int[] cfg, String key)` | ambil nilai |
+| `static String getOr(int[] cfg, String key, String def)` | ambil nilai atau default bila tidak ada |
+| `static int getInt(int[] cfg, String key, int def)` | — |
+| `static boolean getBool(int[] cfg, String key, boolean def)` | — |
+| `static boolean has(int[] cfg, String key)` | true bila elemen/kunci ada |
+| `static String[] keys(int[] cfg)` | — |
+| `static int[] section(int[] cfg, String name)` | ambil semua kunci dalam satu seksi, tanpa prefiks "seksi." |
+
+---
+
+## Cookie
+
+`lib/core/Cookie.kop` · 16 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] parse(String header)` | header "Cookie: a=1; b=2" → peta nama→nilai |
+| `static String get(int[] jar, String name)` | ambil nilai |
+| `static String getOr(int[] jar, String name, String def)` | ambil nilai atau default bila tidak ada |
+| `static boolean has(int[] jar, String name)` | true bila elemen/kunci ada |
+| `static String[] names(int[] jar)` | — |
+| `static String make(String name, String value)` | buat struktur baru dengan kapasitas awal |
+| `static String withPath(String c, String p)` | — |
+| `static String withDomain(String c, String d)` | — |
+| `static String withMaxAge(String c, int sec)` | — |
+| `static String withExpires(String c, int epoch)` | — |
+| `static String withFlags(String c, boolean httpOnly, boolean secure)` | — |
+| `static String withSameSite(String c, String mode)` | — |
+| `static String headerFull(String name, String value, String path, int maxAge, boolean httpOnly, boolean secure, String sameSite)` | Set-Cookie lengkap; maxAge < 0 berarti tanpa Max-Age |
+| `static String header(String c)` | — |
+| `static String expired(String name, String path)` | cookie yang menghapus (Max-Age=0) |
+| `static String httpDate(int epoch)` | "Thu, 12 Nov 2026 00:00:00 GMT" (RFC 1123) |
+
+---
+
 ## Deque
 
 `lib/core/Deque.kop` · 11 fungsi
@@ -190,6 +298,28 @@ Digits.printBase(255, 16);                    // ff
 
 ---
 
+## Env
+
+`lib/core/Env.kop` · 11 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static String get(String name)` | ambil nilai |
+| `static String getOr(String name, String def)` | ambil nilai atau default bila tidak ada |
+| `static boolean has(String name)` | true bila elemen/kunci ada |
+| `static int getInt(String name, int def)` | — |
+| `static boolean getBool(String name, boolean def)` | — |
+| `static String home()` | — |
+| `static String user()` | — |
+| `static String shell()` | — |
+| `static String tmpdir()` | — |
+| `static String pwd()` | — |
+| `static String lang()` | — |
+
+---
+
 ## File
 
 `lib/core/File.kop` · 15 fungsi
@@ -247,7 +377,7 @@ File.close(r);
 
 ## Json
 
-`lib/core/Json.kop` · 57 fungsi
+`lib/core/Json.kop` · 72 fungsi
 
 Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape `int[]`; literal bahasa memakai `json {...}` / `json [...]`.
 
@@ -321,7 +451,22 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20
 | `static int[] wr(int[] v)` | (internal) tulis nilai JSON ke teks |
 | `static int[] keyAt(int[] obj, int idx)` | kunci pasangan ke-i pada objek |
 | `static int[] valAt(int[] obj, int idx)` | nilai pasangan ke-i pada objek |
+| `static int getInt(int[] obj, String key, int def)` | — |
+| `static long getLong(int[] obj, String key, long def)` | — |
+| `static double getDouble(int[] obj, String key, double def)` | — |
+| `static boolean getBool(int[] obj, String key, boolean def)` | — |
+| `static String getString(int[] obj, String key, String def)` | — |
+| `static int[] getArray(int[] obj, String key, int[] def)` | — |
+| `static int[] getObject(int[] obj, String key, int[] def)` | — |
+| `static int[] atOr(int[] arr, int idx, int[] def)` | — |
+| `static String typeName(int[] v)` | — |
+| `static int[] path(int[] root, String expr)` | bagian path |
+| `static boolean hasPath(int[] root, String expr)` | — |
+| `static String pad2(int depth)` | — |
+| `static String wrp(int[] v, int depth)` | — |
 | `static String write(int[] v)` | API publik: serialisasi ke teks |
+| `static String writePretty(int[] v)` | — |
+| `static int writePrettyInto(int[] v, int[] buf)` | — |
 | `static void print(int[] v)` | tulis ke stdout (fd 1) byte demi byte — melengkapi println(int) |
 | `static void line(int[] v)` | tulis dengan newline |
 
@@ -338,9 +483,80 @@ int umur = Json.asInt(Json.get(u, "umur"));   // 20
 
 ---
 
+## List
+
+`lib/core/List.kop` · 25 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] make(int cap)` | buat struktur baru dengan kapasitas awal |
+| `static int[] from(int[] src)` | — |
+| `static int size(int[] xs)` | jumlah elemen saat ini |
+| `static int cap(int[] xs)` | kapasitas saat ini |
+| `static boolean isEmpty(int[] xs)` | true bila kosong |
+| `static int get(int[] xs, int i)` | ambil nilai |
+| `static int getOr(int[] xs, int i, int def)` | ambil nilai atau default bila tidak ada |
+| `static boolean setAt(int[] xs, int i, int v)` | — |
+| `static int[] grow(int[] xs, int need)` | — |
+| `static int[] add(int[] xs, int v)` | tambahkan elemen |
+| `static int[] addAll(int[] xs, int[] vs)` | — |
+| `static int[] insertAt(int[] xs, int i, int v)` | — |
+| `static int[] removeAt(int[] xs, int i)` | — |
+| `static int[] removeValue(int[] xs, int v)` | — |
+| `static int indexOf(int[] xs, int v)` | — |
+| `static int lastIndexOf(int[] xs, int v)` | — |
+| `static boolean contains(int[] xs, int v)` | — |
+| `static int count(int[] xs, int v)` | — |
+| `static void clear(int[] xs)` | kosongkan isi |
+| `static int[] copy(int[] xs)` | salinan (array baru) |
+| `static int[] toArray(int[] xs)` | — |
+| `static int[] reverse(int[] xs)` | salinan terbalik |
+| `static int sum(int[] xs)` | — |
+| `static int max(int[] xs)` | nilai terbesar |
+| `static int min(int[] xs)` | nilai terkecil |
+
+---
+
+## ListStr
+
+`lib/core/ListStr.kop` · 24 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int base(int[] xs)` | — |
+| `static int[] make(int cap, int poolCap)` | buat struktur baru dengan kapasitas awal |
+| `static int[] from(String[] src)` | — |
+| `static int size(int[] xs)` | jumlah elemen saat ini |
+| `static int cap(int[] xs)` | kapasitas saat ini |
+| `static boolean isEmpty(int[] xs)` | true bila kosong |
+| `static String get(int[] xs, int i)` | ambil nilai |
+| `static String getOr(int[] xs, int i, String def)` | ambil nilai atau default bila tidak ada |
+| `static int[] growCap(int[] xs, int need)` | — |
+| `static int[] growPool(int[] xs, int need)` | — |
+| `static int[] add(int[] xs, String s)` | tambahkan elemen |
+| `static int[] addAll(int[] xs, String[] vs)` | — |
+| `static boolean setAt(int[] xs, int i, String s)` | — |
+| `static int[] insertAt(int[] xs, int i, String s)` | — |
+| `static int[] removeAt(int[] xs, int i)` | — |
+| `static int[] removeValue(int[] xs, String s)` | — |
+| `static int indexOf(int[] xs, String s)` | — |
+| `static int lastIndexOf(int[] xs, String s)` | — |
+| `static boolean contains(int[] xs, String s)` | — |
+| `static void clear(int[] xs)` | kosongkan isi |
+| `static String[] toArray(int[] xs)` | — |
+| `static int[] copy(int[] xs)` | salinan (array baru) |
+| `static String[] reverse(int[] xs)` | salinan terbalik |
+| `static String join(int[] xs, String sep)` | — |
+
+---
+
 ## Log
 
-`lib/core/Log.kop` · 4 fungsi
+`lib/core/Log.kop` · 18 fungsi
 
 Logging ke stderr dengan timestamp UTC dan level.
 
@@ -361,6 +577,30 @@ Log.error("db", "gagal konek");
 | `static void info(String tag, String msg)` | log INFO |
 | `static void warn(String tag, String msg)` | log WARN |
 | `static void error(String tag, String msg)` | log ERROR |
+| `static String levelName(int level)` | — |
+| `static boolean enabled(int minLevel, int level)` | — |
+| `static void emitTo(int fd, int minLevel, int level, String tag, String msg)` | tulis ke deskriptor tertentu (2 = stderr, 1 = stdout) |
+| `static void debug(String tag, String msg)` | — |
+| `static void infoMin(int minLevel, String tag, String msg)` | — |
+| `static void warnMin(int minLevel, String tag, String msg)` | — |
+| `static void errorMin(int minLevel, String tag, String msg)` | — |
+| `static String lineOf(int level, String tag, String msg)` | — |
+| `static boolean toFile(String path, int minLevel, int level, String tag, String msg)` | tulis ke file (append) bila level lolos; true bila ditulis |
+| `static int fileSize(String path)` | — |
+| `static boolean rotate(String path, int maxBytes, int keep)` | rotasi sederhana: path → path.1 → path.2 ... (keep=0 tanpa arsip) |
+| `static boolean toFileRotating(String path, int maxBytes, int keep, int minLevel, int level, String tag, String msg)` | — |
+| `static String jsonLine(int level, String tag, String msg)` | satu baris JSON: {"ts":...,"level":"INFO","tag":"...","msg":"..."} |
+| `static boolean jsonToFile(String path, int level, String tag, String msg)` | — |
+
+**Konstanta**
+
+| Nama | Keterangan |
+|---|---|
+| `static int DEBUG()` | — |
+| `static int INFO()` | — |
+| `static int WARN()` | — |
+| `static int ERROR()` | — |
+| `static int OFF()` | — |
 
 ---
 
@@ -406,6 +646,42 @@ System.out.println(Map.size(m));      // 1
 |---|---|
 | `static int EMPTY()` | marker slot kosong |
 | `static int TOMB()` | marker slot terhapus |
+
+---
+
+## MapSS
+
+`lib/core/MapSS.kop` · 19 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] make(int cap, int poolCap)` | buat struktur baru dengan kapasitas awal |
+| `static int cap(int[] m)` | kapasitas saat ini |
+| `static int size(int[] m)` | jumlah elemen saat ini |
+| `static int poolUsed(int[] m)` | — |
+| `static boolean isEmpty(int[] m)` | true bila kosong |
+| `static boolean has(int[] m, String key)` | true bila elemen/kunci ada |
+| `static String get(int[] m, String key)` | ambil nilai |
+| `static String getOr(int[] m, String key, String def)` | ambil nilai atau default bila tidak ada |
+| `static boolean put(int[] m, String key, String val)` | simpan pasangan |
+| `static boolean remove(int[] m, String key)` | hapus elemen |
+| `static boolean removeAt(int[] m, int slot)` | — |
+| `static void clear(int[] m)` | kosongkan isi |
+| `static boolean used(int[] m, int i)` | — |
+| `static String keyAtSlot(int[] m, int i)` | — |
+| `static String valAtSlot(int[] m, int i)` | — |
+| `static String[] keys(int[] m)` | daftar kunci sesuai urutan slot (melewati tombstone) |
+| `static String[] values(int[] m)` | — |
+| `static int[] growTo(int[] m, int cap, int poolCap)` | salin seluruh pasangan ke peta baru dengan kapasitas lebih besar |
+| `static String joinKeys(int[] m, String sep)` | — |
+
+**Konstanta**
+
+| Nama | Keterangan |
+|---|---|
+| `static int TOMB()` | — |
 
 ---
 
@@ -618,6 +894,31 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b
 
 ---
 
+## Router
+
+`lib/core/Router.kop` · 14 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int base(int[] r)` | — |
+| `static int[] make(int cap, int poolCap)` | buat struktur baru dengan kapasitas awal |
+| `static int size(int[] r)` | jumlah elemen saat ini |
+| `static int cap(int[] r)` | kapasitas saat ini |
+| `static int[] growCap(int[] r, int need)` | — |
+| `static int[] growPool(int[] r, int need)` | — |
+| `static int[] add(int[] r, String method, String pattern, int id)` | tambah rute; id bebas ditentukan pemanggil |
+| `static String methodAt(int[] r, int i)` | — |
+| `static String patternAt(int[] r, int i)` | — |
+| `static int idAt(int[] r, int i)` | — |
+| `static boolean matchPattern(String pat, String path, int[] params, boolean capture)` | cocokkan satu pola; isi params bila tidak null |
+| `static int matchInto(int[] r, String method, String path, int[] params)` | — |
+| `static int match(int[] r, String method, String path)` | — |
+| `static int allowMask(int[] r, String path)` | id rute yang metodenya cocok (untuk header Allow), -1 bila kosong |
+
+---
+
 ## Set
 
 `lib/core/Set.kop` · 8 fungsi
@@ -642,6 +943,28 @@ System.out.println(Set.has(s, 4));  // true
 | `static void clear(int[] s)` | kosongkan isi |
 | `static int[] grow(int[] s)` | salin set dengan kapasitas lebih besar |
 | `static void forEach(int[] s, fn f)` | panggil f(x) untuk tiap elemen |
+
+---
+
+## SetStr
+
+`lib/core/SetStr.kop` · 11 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] make(int cap, int poolCap)` | buat struktur baru dengan kapasitas awal |
+| `static int size(int[] s)` | jumlah elemen saat ini |
+| `static int cap(int[] s)` | kapasitas saat ini |
+| `static boolean isEmpty(int[] s)` | true bila kosong |
+| `static boolean add(int[] s, String v)` | tambahkan elemen |
+| `static boolean has(int[] s, String v)` | true bila elemen/kunci ada |
+| `static boolean remove(int[] s, String v)` | hapus elemen |
+| `static void clear(int[] s)` | kosongkan isi |
+| `static String[] values(int[] s)` | — |
+| `static boolean containsAll(int[] s, String[] vs)` | — |
+| `static int addAll(int[] s, String[] vs)` | — |
 
 ---
 
@@ -814,9 +1137,66 @@ System.out.println(Str.join(Str.split("a,b", ","), "|")); // a|b
 
 ---
 
+## Test
+
+`lib/core/Test.kop` · 16 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] make()` | buat struktur baru dengan kapasitas awal |
+| `static int passed(int[] t)` | — |
+| `static int failed(int[] t)` | — |
+| `static void ok(int[] t, boolean cond, String name)` | — |
+| `static void fail(int[] t, String name)` | — |
+| `static void eqInt(int[] t, int got, int want, String name)` | — |
+| `static void neInt(int[] t, int got, int bad, String name)` | — |
+| `static void eqLong(int[] t, long got, long want, String name)` | — |
+| `static void eqStr(int[] t, String got, String want, String name)` | — |
+| `static void eqBool(int[] t, boolean got, boolean want, String name)` | — |
+| `static void near(int[] t, double got, double want, double eps, String name)` | — |
+| `static void true_(int[] t, boolean cond, String name)` | — |
+| `static void false_(int[] t, boolean cond, String name)` | — |
+| `static int report(int[] t, String tag)` | — |
+| `static int code(int[] t)` | — |
+| `static void reset(int[] t)` | — |
+
+---
+
+## Text
+
+`lib/core/Text.kop` · 19 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] make(int cap)` | buat struktur baru dengan kapasitas awal |
+| `static int len(int[] b)` | — |
+| `static int cap(int[] b)` | kapasitas saat ini |
+| `static boolean isEmpty(int[] b)` | true bila kosong |
+| `static int[] reserve(int[] b, int need)` | pastikan ruang untuk `need` byte lagi; kembalikan buffer (mungkin baru) |
+| `static int[] appendByte(int[] b, int v)` | — |
+| `static int[] append(int[] b, String s)` | buka untuk menambah di akhir |
+| `static int[] appendBytes(int[] b, int[] s)` | — |
+| `static int[] appendInt(int[] b, int v)` | — |
+| `static int[] appendLong(int[] b, long v)` | — |
+| `static int[] appendDouble(int[] b, double v)` | — |
+| `static int[] appendBool(int[] b, boolean v)` | — |
+| `static int[] appendLine(int[] b, String s)` | — |
+| `static int[] newline(int[] b)` | — |
+| `static int[] repeatByte(int[] b, int c, int n)` | ulang byte yang sama `n` kali |
+| `static int[] truncate(int[] b, int n)` | buang `n` byte terakhir (di-clamp) |
+| `static void clear(int[] b)` | kosongkan isi |
+| `static String build(int[] b)` | — |
+| `static String toString(int[] b)` | — |
+
+---
+
 ## Time
 
-`lib/core/Time.kop` · 6 fungsi
+`lib/core/Time.kop` · 32 fungsi
 
 Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.
 
@@ -840,5 +1220,31 @@ Time.sleepMs(10);
 | `static int[] civil(int sec)` | [tahun, bulan(1..12), hari(1..31), jam, menit, detik] UTC |
 | `static int weekday(int sec)` | nama hari dari epoch detik |
 | `static String format(int sec)` | format "YYYY-MM-DD HH:MM:SS" UTC |
+| `static boolean isLeap(int y)` | — |
+| `static int daysInMonth(int y, int m)` | — |
+| `static int daysFromCivil(int y, int m, int d)` | tanggal → jumlah hari sejak 1970-01-01 (algoritma Hinnant) |
+| `static int fromCivil(int y, int m, int d, int hh, int mm, int ss)` | epoch dari komponen UTC; -1 bila komponen tidak valid |
+| `static int[] civilZone(int sec, int off)` | — |
+| `static int startOfDay(int sec, int off)` | — |
+| `static int startOfMonth(int sec, int off)` | — |
+| `static int parseOffset(String s, int at)` | "+07:00" / "-0530" → detik; 0 bila polos/Z |
+| `static int parseISO(String s)` | "2026-11-12", "2026-11-12T08:30:00", "...Z", "...+07:00" |
+| `static int parseISOOr(String s, int def)` | — |
+| `static String isoDate(int sec)` | — |
+| `static String isoTime(int sec)` | — |
+| `static String formatISO(int sec)` | — |
+| `static String formatISOZone(int sec, int off)` | — |
+| `static String formatZone(int sec, int off)` | — |
+| `static int addSeconds(int sec, int n)` | — |
+| `static int addMinutes(int sec, int n)` | — |
+| `static int addHours(int sec, int n)` | — |
+| `static int addDays(int sec, int n)` | — |
+| `static int addMonths(int sec, int n)` | tambah bulan kalender dengan clamp akhir bulan |
+| `static int diffSeconds(int a, int b)` | — |
+| `static int diffDays(int a, int b)` | — |
+| `static int diffMinutes(int a, int b)` | — |
+| `static int diffHours(int a, int b)` | — |
+| `static String duration(int sec)` | — |
+| `static String nowISO()` | — |
 
 ---
