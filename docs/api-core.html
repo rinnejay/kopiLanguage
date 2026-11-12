@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#regex">Regex</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
@@ -2469,6 +2469,49 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b</code></pre>
 <tr>
 <td><code>static int SEP()</code></td>
 <td>byte pemisah path</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="regex">Regex<a class="anchor" href="#regex" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Regex.kop</code> · 6 fungsi</p>
+<p>Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor.</p>
+<pre><code class="language-java">import Regex;
+
+System.out.println(Regex.search("\\d{4}-\\d{2}", "tahun 2024-05"));
+String[] g = Regex.groups("(\\w+)@(\\w+)", "halo@dunia");</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>groups</code> indeks 0 = seluruh kecocokan, lalu grup tangkap.</li>
+<li>Kelas: [abc], [^abc], [a-z]; escape: \d \w \s (dan huruf besar).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static boolean search(String pat, String txt)</code></td>
+<td>true bila ada kecocokan di mana saja</td>
+</tr>
+<tr>
+<td><code>static boolean matches(String pat, String txt)</code></td>
+<td>true bila seluruh teks cocok</td>
+</tr>
+<tr>
+<td><code>static int[] findAll(String pat, String txt)</code></td>
+<td>int[] offset awal semua kecocokan</td>
+</tr>
+<tr>
+<td><code>static String[] groups(String pat, String txt)</code></td>
+<td>String[] grup tangkap (indeks 0 = seluruh)</td>
+</tr>
+<tr>
+<td><code>static String replaceAll(String pat, String txt, String rep)</code></td>
+<td>ganti semua kecocokan dengan teks lain</td>
+</tr>
+<tr>
+<td><code>static int count(String pat, String txt)</code></td>
+<td>jumlah kecocokan</td>
 </tr>
 </tbody></table></div>
 <hr>

@@ -1,0 +1,557 @@
+/* Regex.kop — mesin regex sederhana (backtracking) murni di bahasa Kopi (v1.31).
+ *
+ * Sintaks yang didukung:
+ *   literal        karakter biasa
+ *   .              karakter apa saja kecuali newline
+ *   [abc] [^abc]   kelas karakter (rentang [a-z], escape di dalam)
+ *   \d \D \w \W \s \S   escape kelas; \. \\ \n \t \r escape literal
+ *   ^ $            anchor awal / akhir teks
+ *   * + ?          kuantifier (greedy); *? +? ?? lazy
+ *   {n} {n,} {n,m} kuantifier pasti/terbatas
+ *   ( ... )        grup tangkap; grup 0 = seluruh kecocokan
+ *   |              alternasi (di dalam grup)
+ *
+ * Semantik mirip PCRE/Python: greedy, '.' tidak cocok newline, '^'/'$'
+ * mengikat ke seluruh teks. Grup bernomor menurut urutan '('.
+ *
+ * Fungsi:
+ *   search(pat, txt)     true bila ada kecocokan di mana saja
+ *   matches(pat, txt)    true bila seluruh teks cocok
+ *   findAll(pat, txt)    int[] offset awal semua kecocokan
+ *   groups(pat, txt)     String[] grup tangkap (indeks 0 = seluruh)
+ *   replaceAll(pat,txt,r) teks dengan semua kecocokan diganti r
+ *   count(pat, txt)      jumlah kecocokan
+ */
+
+import Str;
+
+class Regex {
+
+    /* state mesin (satu instance per pencocokan) */
+    String pat;
+    int[] sub;
+    int[] pmap;
+    int[] gno;
+    int[] ctx;
+    int ng;
+
+    Regex() {
+        this.pat = "";
+        this.sub = new int[0];
+        this.pmap = new int[0];
+        this.gno = new int[0];
+        this.ctx = new int[1];
+        this.ng = 0;
+    }
+
+    /* ── utilitas ────────────────────────────────────────────────── */
+
+    /* escape kelas: 1 = \d, 2 = \D, 3 = \w, 4 = \W, 5 = \s, 6 = \S */
+    private static int classOf(int c) {
+        if (c == 100) return 1;
+        if (c == 68) return 2;
+        if (c == 119) return 3;
+        if (c == 87) return 4;
+        if (c == 115) return 5;
+        if (c == 83) return 6;
+        return 0;
+    }
+
+    /* escape literal → nilai karakter */
+    private static int escapeChar(int c) {
+        if (c == 110) return 10;
+        if (c == 116) return 9;
+        if (c == 114) return 13;
+        if (c == 48) return 0;
+        return c;
+    }
+
+    private static boolean isWord(int ch) {
+        return ch >= 48 && ch <= 57 || ch >= 97 && ch <= 122 ||
+               ch >= 65 && ch <= 90 || ch == 95;
+    }
+
+    private static boolean isSpace(int ch) {
+        return ch == 32 || ch == 9 || ch == 10 || ch == 13;
+    }
+
+    /* uji satu karakter terhadap kelas escape */
+    private static boolean inClass(int kind, int ch) {
+        if (kind == 1) return ch >= 48 && ch <= 57;
+        if (kind == 2) return isWord(ch);
+        if (kind == 3) return isWord(ch);
+        if (kind == 4) return !isWord(ch);
+        if (kind == 5) return isSpace(ch);
+        if (kind == 6) return !isSpace(ch);
+        return false;
+    }
+
+    /* peta kurung + nomor grup (urutan '(') */
+    private static void parenMaps(String pat, int[] pmap, int[] gno) {
+        int[] stack = new int[32];
+        int sp = 0;
+        int g = 0;
+        for (int i = 0; i < pat.length; i++) {
+            int c = pat.charAt(i);
+            if (c == 92) { i = i + 1; continue; }
+            if (c == 91) {
+                int j = i + 1;
+                if (j < pat.length && pat.charAt(j) == 94) j = j + 1;
+                while (j < pat.length && pat.charAt(j) != 93) {
+                    if (pat.charAt(j) == 92) j = j + 1;
+                    j = j + 1;
+                }
+                i = j;
+                continue;
+            }
+            if (c == 40) {
+                if (sp < 32) { stack[sp] = i; sp = sp + 1; }
+                g = g + 1;
+                gno[i] = g;
+            } else if (c == 41) {
+                if (sp > 0) {
+                    sp = sp - 1;
+                    pmap[stack[sp]] = i;
+                }
+            }
+        }
+    }
+
+    /* akhir posisi atom */
+    private int atomEnd(int pstart) {
+        int c = this.pat.charAt(pstart);
+        if (c == 40) {
+            int depth = 0;
+            int i = pstart;
+            while (i < this.pat.length) {
+                int ch = this.pat.charAt(i);
+                if (ch == 92) { i = i + 2; continue; }
+                if (ch == 91) {
+                    int j = i + 1;
+                    if (j < this.pat.length && this.pat.charAt(j) == 94) j = j + 1;
+                    while (j < this.pat.length && this.pat.charAt(j) != 93) {
+                        if (this.pat.charAt(j) == 92) j = j + 1;
+                        j = j + 1;
+                    }
+                    i = j + 1;
+                    continue;
+                }
+                if (ch == 40) depth = depth + 1;
+                if (ch == 41) {
+                    depth = depth - 1;
+                    if (depth == 0) return i + 1;
+                }
+                i = i + 1;
+            }
+            return this.pat.length;
+        }
+        if (c == 91) {
+            int j = pstart + 1;
+            if (j < this.pat.length && this.pat.charAt(j) == 94) j = j + 1;
+            while (j < this.pat.length && this.pat.charAt(j) != 93) {
+                if (this.pat.charAt(j) == 92) j = j + 1;
+                j = j + 1;
+            }
+            return j + 1;
+        }
+        if (c == 92) return pstart + 2;
+        return pstart + 1;
+    }
+
+    /* baca kuantifier: [min, max(-1=tak hingga), lazy, posBerikut, ada] */
+    private int[] quantOf(int pos) {
+        int[] q = new int[5];
+        q[0] = 1; q[1] = 1; q[2] = 0; q[3] = pos; q[4] = 0;
+        if (pos >= this.pat.length) return q;
+        int c = this.pat.charAt(pos);
+        if (c == 42) {
+            q[0] = 0; q[1] = -1; q[3] = pos + 1; q[4] = 1;
+            if (q[3] < this.pat.length && this.pat.charAt(q[3]) == 63) { q[2] = 1; q[3] = q[3] + 1; }
+            return q;
+        }
+        if (c == 43) {
+            q[0] = 1; q[1] = -1; q[3] = pos + 1; q[4] = 1;
+            if (q[3] < this.pat.length && this.pat.charAt(q[3]) == 63) { q[2] = 1; q[3] = q[3] + 1; }
+            return q;
+        }
+        if (c == 63) {
+            q[0] = 0; q[1] = 1; q[3] = pos + 1; q[4] = 1;
+            return q;
+        }
+        if (c == 123) {
+            int j = pos + 1;
+            int min = 0;
+            int digits = 0;
+            while (j < this.pat.length && this.pat.charAt(j) >= 48 && this.pat.charAt(j) <= 57) {
+                min = min * 10 + (this.pat.charAt(j) - 48);
+                j = j + 1;
+                digits = digits + 1;
+            }
+            if (digits == 0) return q;
+            int max = min;
+            if (j < this.pat.length && this.pat.charAt(j) == 44) {
+                j = j + 1;
+                int d2 = 0;
+                max = 0;
+                while (j < this.pat.length && this.pat.charAt(j) >= 48 && this.pat.charAt(j) <= 57) {
+                    max = max * 10 + (this.pat.charAt(j) - 48);
+                    j = j + 1;
+                    d2 = d2 + 1;
+                }
+                if (d2 == 0) max = -1;
+            }
+            if (j >= this.pat.length || this.pat.charAt(j) != 125) return q;
+            j = j + 1;
+            q[0] = min;
+            q[1] = max;
+            q[3] = j;
+            q[4] = 1;
+            if (j < this.pat.length && this.pat.charAt(j) == 63) { q[2] = 1; q[3] = j + 1; }
+            return q;
+        }
+        return q;
+    }
+
+    /* ── pencocokan ──────────────────────────────────────────────── */
+
+    /* coba cabang-cabang alternasi satu per satu (kiri ke kanan).
+     * isGroup: true → grup (akhir = akhir kecocokan subjek). */
+    private int tryBranches(int spos, int pstart, int pend, int g, boolean isGroup) {
+        int bStart = pstart;
+        while (bStart <= pend) {
+            int bEnd = pend;
+            int depth = 0;
+            int j = bStart;
+            while (j < pend) {
+                int ch = this.pat.charAt(j);
+                if (ch == 92) { j = j + 2; continue; }
+                if (ch == 91) {
+                    int k = j + 1;
+                    if (k < this.pat.length && this.pat.charAt(k) == 94) k = k + 1;
+                    while (k < this.pat.length && this.pat.charAt(k) != 93) {
+                        if (this.pat.charAt(k) == 92) k = k + 1;
+                        k = k + 1;
+                    }
+                    j = k + 1;
+                    continue;
+                }
+                if (ch == 40) depth = depth + 1;
+                else if (ch == 41) depth = depth - 1;
+                else if (ch == 124 && depth == 0) { bEnd = j; break; }
+                j = j + 1;
+            }
+            int r = this.altBranch(spos, bStart, bEnd);
+            if (r >= 0) {
+                if (isGroup) this.ctx[2 + 2 * g] = r;
+                return r;
+            }
+            if (bEnd >= pend) break;
+            bStart = bEnd + 1;
+        }
+        return -1;
+    }
+
+    /* cocokkan satu atom; hasil posisi baru atau -1 */
+    private int atom(int spos, int pstart, int pend) {
+        int c = this.pat.charAt(pstart);
+        if (c == 40) {
+            int close = this.pmap[pstart];
+            if (close < 0) return -1;
+            int g = this.gno[pstart];
+            if (g < 1) return -1;
+            /* percobaan gagal tidak boleh meninggalkan capture basi */
+            int saveA = this.ctx[1 + 2 * g];
+            int saveB = this.ctx[2 + 2 * g];
+            this.ctx[1 + 2 * g] = spos;
+            int r = this.tryBranches(spos, pstart + 1, close, g, true);
+            if (r < 0) {
+                this.ctx[1 + 2 * g] = saveA;
+                this.ctx[2 + 2 * g] = saveB;
+                return -1;
+            }
+            return r;
+        }
+        if (c == 94) {
+            if (spos == 0) return spos;
+            return -1;
+        }
+        if (c == 36) {
+            if (spos == this.sub.length) return spos;
+            return -1;
+        }
+        if (c == 46) {
+            if (spos >= this.sub.length) return -1;
+            if (this.sub[spos] == 10) return -1;
+            return spos + 1;
+        }
+        if (c == 91) {
+            /* kelas karakter: cocok bila SALAH SATU anggota cocok */
+            int j = pstart + 1;
+            boolean neg = false;
+            if (j < this.pat.length && this.pat.charAt(j) == 94) { neg = true; j = j + 1; }
+            boolean first = true;
+            int close = -1;
+            boolean matched = false;
+            int ch = 0;
+            while (j < this.pat.length) {
+                ch = this.pat.charAt(j);
+                if (ch == 93 && !first) { close = j; break; }
+                first = false;
+                if (ch == 92) {
+                    j = j + 1;
+                    int e = this.pat.charAt(j);
+                    int kind = classOf(e);
+                    if (kind != 0) {
+                        if (spos >= this.sub.length) return -1;
+                        if (inClass(kind, this.sub[spos])) matched = true;
+                        j = j + 1;
+                        continue;
+                    }
+                    ch = escapeChar(e);
+                }
+                int lo = ch;
+                j = j + 1;
+                if (j + 1 < this.pat.length && this.pat.charAt(j) == 45 && this.pat.charAt(j + 1) != 93) {
+                    j = j + 1;
+                    int hi = 0;
+                    int ch2 = this.pat.charAt(j);
+                    if (ch2 == 92) {
+                        j = j + 1;
+                        hi = escapeChar(this.pat.charAt(j));
+                    } else {
+                        hi = ch2;
+                    }
+                    j = j + 1;
+                    if (spos < this.sub.length) {
+                        int v = this.sub[spos];
+                        if (v >= lo && v <= hi) matched = true;
+                    }
+                } else {
+                    if (spos < this.sub.length) {
+                        if (this.sub[spos] == lo) matched = true;
+                    }
+                }
+            }
+            if (close < 0) return -1;
+            if (neg) matched = !matched;
+            if (!matched) return -1;
+            if (spos >= this.sub.length) return -1;
+            return spos + 1;
+        }
+        if (c == 92) {
+            if (pstart + 1 >= this.pat.length) return -1;
+            int e = this.pat.charAt(pstart + 1);
+            int kind = classOf(e);
+            if (kind != 0) {
+                if (spos >= this.sub.length) return -1;
+                boolean in = inClass(kind, this.sub[spos]);
+                if (kind == 2 || kind == 4 || kind == 6) in = !in;
+                if (!in) return -1;
+                return spos + 1;
+            }
+            if (spos >= this.sub.length) return -1;
+            if (this.sub[spos] != escapeChar(e)) return -1;
+            return spos + 1;
+        }
+        if (spos >= this.sub.length) return -1;
+        if (this.sub[spos] != c) return -1;
+        return spos + 1;
+    }
+
+    /* satu cabang alternasi: dari pstart sampai pend ("|" atau ")") */
+    private int altBranch(int spos, int pstart, int pend) {
+        int p = pstart;
+        while (p < pend) {
+            if (this.pat.charAt(p) == 124) break;      /* '|' */
+            int aEnd = this.atomEnd(p);
+            int[] q = this.quantOf(aEnd);
+            int next = q[3];
+            if (q[4] == 0) {
+                int r = this.atom(spos, p, pend);
+                if (r < 0) return -1;
+                spos = r;
+                p = next;
+                continue;
+            }
+            if (q[0] == 0 && q[1] == 1) {
+                /* '?' */
+                if (q[2] == 0) {
+                    int r = this.atom(spos, p, pend);
+                    if (r >= 0) {
+                        int rr = this.altBranch(r, next, pend);
+                        if (rr >= 0) return rr;
+                    }
+                }
+                int rr = this.altBranch(spos, next, pend);
+                if (rr >= 0) return rr;
+                return -1;
+            }
+            int r = this.rep(spos, p, aEnd, next, pend, 0, q);
+            if (r >= 0) return r;
+            return -1;
+        }
+        return spos;
+    }
+
+    /* pengulangan atom dengan backtracking */
+    private int rep(int spos, int aStart, int aEnd, int next, int pend, int count, int[] q) {
+        int min = q[0];
+        int max = q[1];
+        boolean lazy = q[2] != 0;
+        if (!lazy && (max < 0 || count < max)) {
+            int r = this.atom(spos, aStart, pend);
+            if (r >= 0) {
+                int rr = this.rep(r, aStart, aEnd, next, pend, count + 1, q);
+                if (rr >= 0) return rr;
+            }
+        }
+        if (count >= min) {
+            if (lazy) {
+                int r = this.atom(spos, aStart, pend);
+                if (r >= 0) {
+                    int rr = this.rep(r, aStart, aEnd, next, pend, count + 1, q);
+                    if (rr >= 0) return rr;
+                }
+            }
+            return this.altBranch(spos, next, pend);
+        }
+        if (lazy && (max < 0 || count < max)) {
+            int r = this.atom(spos, aStart, pend);
+            if (r >= 0) {
+                int rr = this.rep(r, aStart, aEnd, next, pend, count + 1, q);
+                if (rr >= 0) return rr;
+            }
+        }
+        return -1;
+    }
+
+    /* siapkan state untuk satu pencocokan */
+    private void prep(String pattern, String text) {
+        this.pat = pattern;
+        this.sub = Net.strbytes(text);
+        this.pmap = new int[pattern.length + 1];
+        this.gno = new int[pattern.length + 1];
+        for (int i = 0; i < this.pmap.length; i++) { this.pmap[i] = -1; this.gno[i] = 0; }
+        parenMaps(pattern, this.pmap, this.gno);
+        int g = 0;
+        for (int i = 0; i < pattern.length; i++) if (pattern.charAt(i) == 40) g = g + 1;
+        this.ng = g;
+        this.ctx = new int[1 + 2 * (g + 1)];
+    }
+
+    /* ── API statis ───────────────────────────────────────────────── */
+
+    /* true bila ada kecocokan di mana saja dalam teks */
+    static boolean search(String pat, String txt) {
+        Regex r = new Regex();
+        r.prep(pat, txt);
+        int start = 0;
+        while (start <= r.sub.length) {
+            int e = r.tryBranches(start, 0, pat.length, 0, false);
+            if (e >= 0) return true;
+            start = start + 1;
+        }
+        return false;
+    }
+
+    /* true bila seluruh teks cocok dengan pola */
+    static boolean matches(String pat, String txt) {
+        Regex r = new Regex();
+        r.prep(pat, txt);
+        int e = r.tryBranches(0, 0, pat.length, 0, false);
+        if (e < 0) return false;
+        return e == r.sub.length;
+    }
+
+    /* offset awal semua kecocokan */
+    static int[] findAll(String pat, String txt) {
+        Regex r = new Regex();
+        r.prep(pat, txt);
+        int[] out = new int[16];
+        int n = 0;
+        int start = 0;
+        while (start <= r.sub.length) {
+            int e = r.tryBranches(start, 0, pat.length, 0, false);
+            if (e < 0) {
+                start = start + 1;
+                continue;
+            }
+            if (n >= out.length) {
+                int[] bigger = new int[out.length * 2];
+                for (int i = 0; i < n; i++) bigger[i] = out[i];
+                out = bigger;
+            }
+            out[n] = start;
+            n = n + 1;
+            if (e == start) start = start + 1;
+            else start = e;
+        }
+        int[] res = new int[n];
+        for (int i = 0; i < n; i++) res[i] = out[i];
+        return res;
+    }
+
+    /* grup tangkap dari kecocokan pertama: indeks 0 = seluruh */
+    static String[] groups(String pat, String txt) {
+        Regex r = new Regex();
+        r.prep(pat, txt);
+        int e = -1;
+        int start = 0;
+        while (start <= r.sub.length) {
+            e = r.tryBranches(start, 0, pat.length, 0, false);
+            if (e >= 0) break;
+            start = start + 1;
+        }
+        if (e < 0) return new String[0];
+        r.ctx[1] = start;
+        r.ctx[2] = e;
+        String[] out = new String[r.ng + 1];
+        for (int i = 0; i <= r.ng; i++) {
+            int a = r.ctx[1 + 2 * i];
+            int b = r.ctx[2 + 2 * i];
+            if (b < a) b = a;
+            int[] piece = new int[b - a];
+            for (int k = 0; k < b - a; k++) piece[k] = r.sub[a + k];
+            out[i] = Net.mkstr(piece);
+        }
+        return out;
+    }
+
+    /* ganti semua kecocokan dengan teks pengganti */
+    static String replaceAll(String pat, String txt, String rep) {
+        Regex r = new Regex();
+        r.prep(pat, txt);
+        int[] out = new int[r.sub.length + 16];
+        int n = 0;
+        int start = 0;
+        int[] rr = Net.strbytes(rep);
+        while (start <= r.sub.length) {
+            if (n + rr.length + 16 >= out.length) {
+                int[] bigger = new int[out.length * 2];
+                for (int i = 0; i < n; i++) bigger[i] = out[i];
+                out = bigger;
+            }
+            int e = r.tryBranches(start, 0, pat.length, 0, false);
+            if (e < 0) {
+                if (start < r.sub.length) { out[n] = r.sub[start]; n = n + 1; }
+                start = start + 1;
+                continue;
+            }
+            for (int i = 0; i < rr.length; i++) { out[n] = rr[i]; n = n + 1; }
+            if (e == start) {
+                if (start < r.sub.length) { out[n] = r.sub[start]; n = n + 1; }
+                start = start + 1;
+            } else {
+                start = e;
+            }
+        }
+        int[] res = new int[n];
+        for (int i = 0; i < n; i++) res[i] = out[i];
+        return Net.mkstr(res);
+    }
+
+    /* jumlah kecocokan */
+    static int count(String pat, String txt) {
+        return findAll(pat, txt).length;
+    }
+}

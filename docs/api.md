@@ -4,7 +4,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Kelompok | Folder | Modul |
 |---|---|---|
-| **Core** | `lib/core/` | `Args`, `Arrays`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
+| **Core** | `lib/core/` | `Args`, `Arrays`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket`, `WsClient` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
@@ -38,6 +38,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Matrix`](api-core.md#matrix) | `lib/core/Matrix.kop` | 15 | Matriks persegi yang disimpan sebagai `int[]` datar (baris demi baris): aritmetika, transpose, trace,… |
 | [`MessagePack`](api-core.md#messagepack) | `lib/core/MessagePack.kop` | 11 | — |
 | [`Path`](api-core.md#path) | `lib/core/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
+| [`Regex`](api-core.md#regex) | `lib/core/Regex.kop` | 6 | Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor. |
 | [`Router`](api-core.md#router) | `lib/core/Router.kop` | 14 | — |
 | [`Set`](api-core.md#set) | `lib/core/Set.kop` | 8 | Himpunan int di atas Map: tambah/hapus/uji keanggotaan. |
 | [`SetStr`](api-core.md#setstr) | `lib/core/SetStr.kop` | 11 | — |

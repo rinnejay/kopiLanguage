@@ -190,6 +190,12 @@ META = {
         "notes": ["Waktu berlaku dikembalikan sebagai detik epoch.",
                   "`pin` = SHA-256(DER SPKI), cocok untuk pin TLS 1.3."],
     },
+    "Regex": {
+        "purpose": "Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor.",
+        "example": 'import Regex;\n\nSystem.out.println(Regex.search("\\\\d{4}-\\\\d{2}", "tahun 2024-05"));\nString[] g = Regex.groups("(\\\\w+)@(\\\\w+)", "halo@dunia");',
+        "notes": ["`groups` indeks 0 = seluruh kecocokan, lalu grup tangkap.",
+                  "Kelas: [abc], [^abc], [a-z]; escape: \\d \\w \\s (dan huruf besar)."],
+    },
     "Reader": {
         "purpose": "Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.",
         "example": 'import Reader;\n\nReader r = Reader.open("data.txt");\nString baris = r.readLine();\nr.close();',
@@ -706,6 +712,14 @@ EXTRA = {
         "pubKey": "byte kunci publik (isi BIT STRING SPKI)",
         "sigAlg": "OID algoritma tanda tangan",
         "oid": "OID → teks dotted",
+    }},
+    "Regex": {"descs": {
+        "search": "true bila ada kecocokan di mana saja",
+        "matches": "true bila seluruh teks cocok",
+        "findAll": "int[] offset awal semua kecocokan",
+        "groups": "String[] grup tangkap (indeks 0 = seluruh)",
+        "replaceAll": "ganti semua kecocokan dengan teks lain",
+        "count": "jumlah kecocokan",
     }},
     "Reader": {"descs": {
         "open": "buka file untuk dibaca (null bila gagal)",

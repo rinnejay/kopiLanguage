@@ -965,6 +965,35 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b
 
 ---
 
+## Regex
+
+`lib/core/Regex.kop` · 6 fungsi
+
+Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor.
+
+```java
+import Regex;
+
+System.out.println(Regex.search("\\d{4}-\\d{2}", "tahun 2024-05"));
+String[] g = Regex.groups("(\\w+)@(\\w+)", "halo@dunia");
+```
+
+**Catatan**
+
+- `groups` indeks 0 = seluruh kecocokan, lalu grup tangkap.
+- Kelas: [abc], [^abc], [a-z]; escape: \d \w \s (dan huruf besar).
+
+| Fungsi | Keterangan |
+|---|---|
+| `static boolean search(String pat, String txt)` | true bila ada kecocokan di mana saja |
+| `static boolean matches(String pat, String txt)` | true bila seluruh teks cocok |
+| `static int[] findAll(String pat, String txt)` | int[] offset awal semua kecocokan |
+| `static String[] groups(String pat, String txt)` | String[] grup tangkap (indeks 0 = seluruh) |
+| `static String replaceAll(String pat, String txt, String rep)` | ganti semua kecocokan dengan teks lain |
+| `static int count(String pat, String txt)` | jumlah kecocokan |
+
+---
+
 ## Router
 
 `lib/core/Router.kop` · 14 fungsi

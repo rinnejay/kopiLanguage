@@ -1,0 +1,44 @@
+// regexvec.kop — uji mesin Regex (lib/core/Regex.kop) vs oracle python `re`.
+import Regex;
+import Str;
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(Regex.search("abc", "xxabcyy"));
+        System.out.println(Regex.search("abc", "xx"));
+        System.out.println(Regex.matches("a.c", "abc"));
+        System.out.println(Regex.matches("a.c", "abcd"));
+        System.out.println(Regex.search("[0-9]+", "abc123def"));
+        System.out.println(Regex.search("^abc$", "abc"));
+        System.out.println(Regex.search("^abc$", "xabc"));
+
+        String[] g1 = Regex.groups("([a-z]+)@([a-z]+)", "user@host");
+        System.out.println(g1[0] + "|" + g1[1] + "|" + g1[2]);
+        String[] g2 = Regex.groups("(\\d{4})-(\\d{2})", "tahun 2024-05");
+        System.out.println(g2[0] + "|" + g2[1] + "|" + g2[2]);
+        String[] g3 = Regex.groups("(a|b)+", "abab");
+        System.out.println(g3[0] + "|" + g3[1]);
+
+        int[] f1 = Regex.findAll("\\d+", "a1b22c333");
+        System.out.println(Str.fromInt(f1[0]) + "," + Str.fromInt(f1[1]) + "," + Str.fromInt(f1[2]));
+        int[] f2 = Regex.findAll("[a-z]+", "ab cd ef");
+        System.out.println(Str.fromInt(f2[0]) + "," + Str.fromInt(f2[1]) + "," + Str.fromInt(f2[2]));
+
+        System.out.println(Regex.replaceAll("\\s+", "a   b  c", "-"));
+        System.out.println(Regex.replaceAll("[aeiou]", "makan nasi", "*"));
+
+        System.out.println(Regex.search("colou?r", "color"));
+        System.out.println(Regex.search("colou?r", "colour"));
+        System.out.println(Regex.search("a+b", "aaab"));
+        System.out.println(Regex.search("\\w+@\\w+", "halo@dunia"));
+        System.out.println(Regex.search("a{2}", "aa"));
+        System.out.println(Regex.search("a{2}", "a"));
+        System.out.println(Regex.search("a{2,}", "aaa"));
+        System.out.println(Regex.search("a{2,3}b", "aaab"));
+        System.out.println(Regex.search("^a.*z$", "abcz"));
+        System.out.println(Regex.search("[^abc]+", "xyz"));
+        System.out.println(Regex.search("a\\.c", "a.c"));
+        System.out.println(Regex.search("a\\.c", "abc"));
+        System.out.println(Regex.count("\\d", "a1b2"));
+    }
+}

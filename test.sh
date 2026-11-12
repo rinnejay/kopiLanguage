@@ -55,6 +55,10 @@ check aesvec "$T/kopi/aesvec.kop"
 python3 tools/gen_blakevec.py > "$T/kopi/blakevec.ref"
 check blakevec test/blakevec.kop
 
+# ─── Regex: mesin backtracking vs oracle python `re` ─────────────────────
+python3 tools/gen_regexvec.py > "$T/kopi/regexvec.ref"
+check regexvec test/regexvec.kop
+
 # ─── X.509: parse sertifikat (fixture openssl; oracle gen_x509vec.py) ─────
 python3 tools/gen_x509vec.py "$T/kopi/x509vec.kop" "$T/kopi/x509vec.ref" >/dev/null
 check x509vec "$T/kopi/x509vec.kop"
