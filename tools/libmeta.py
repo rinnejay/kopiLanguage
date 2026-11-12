@@ -558,9 +558,19 @@ EXTRA = {
         "SP": "(internal) spasi",
     }},
     "Jwt": {"descs": {
+        "signAlg": "tanda tangani dengan algoritma HS256/HS384/HS512",
+        "signHs384": "tanda tangani HS384 (HMAC-SHA384)",
+        "signHs512": "tanda tangani HS512 (HMAC-SHA512)",
+        "verifyAlg": "verifikasi sesuai algoritma header; 1 sah, 0 salah, -1 bentuk",
+        "algOf": "algoritma dari header token",
+        "checkClaims": "cek klaim waktu (exp/nbf); 1 ok, 0 tidak berlaku",
+        "verifyWithClaims": "verifikasi tanda tangan + klaim waktu",
         "unb64": "(internal) base64url decode",
         "sign": "tanda tangani payload dengan HS256 → token",
         "HEADER": "header JWT bawaan {\"alg\":\"HS256\"}",
+    }},
+    "Pbkdf2": {"descs": {
+        "sha512": "PBKDF2-HMAC-SHA512 (RFC 8018)",
     }},
     "Resolv": {"descs": {
         "defaultServer": "IP server nama pertama /etc/resolv.conf (0 bila gagal)",
@@ -681,6 +691,7 @@ EXTRA = {
         "gctr": "GCTR: mode CTR internal GCM",
     }},
     "Hash": {"descs": {
+        "hmacSha384": "HMAC-SHA384 (RFC 2104); kunci > 128 byte di-hash dulu",
         "sha512": "SHA-512 (FIPS 180-4): pesan byte-as-int → digest 64 byte",
         "sha384": "SHA-384 (FIPS 180-4): pesan byte-as-int → digest 48 byte",
         "hmacSha512": "HMAC-SHA512 (RFC 2104); kunci > 128 byte di-hash dulu",

@@ -618,7 +618,7 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 </tr>
 <tr>
 <td><code>static String signAlg(String payload, String secret, String alg)</code></td>
-<td>tanda tangan token sesuai algoritma header</td>
+<td>tanda tangani dengan algoritma HS256/HS384/HS512</td>
 </tr>
 <tr>
 <td><code>static String sign(String payload, String secret)</code></td>
@@ -626,11 +626,11 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 </tr>
 <tr>
 <td><code>static String signHs384(String payload, String secret)</code></td>
-<td>—</td>
+<td>tanda tangani HS384 (HMAC-SHA384)</td>
 </tr>
 <tr>
 <td><code>static String signHs512(String payload, String secret)</code></td>
-<td>—</td>
+<td>tanda tangani HS512 (HMAC-SHA512)</td>
 </tr>
 <tr>
 <td><code>static boolean same(int[] a, int[] b)</code></td>
@@ -638,11 +638,11 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 </tr>
 <tr>
 <td><code>static String algOf(String token)</code></td>
-<td>algoritma dari header token (HS256/HS384/HS512; "" bila tak dikenal)</td>
+<td>algoritma dari header token</td>
 </tr>
 <tr>
 <td><code>static int verifyAlg(String token, String secret, int[] payloadOut)</code></td>
-<td>hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah/alg tak didukung</td>
+<td>verifikasi sesuai algoritma header; 1 sah, 0 salah, -1 bentuk</td>
 </tr>
 <tr>
 <td><code>static int verify(String token, String secret, int[] payloadOut)</code></td>
@@ -654,7 +654,7 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 </tr>
 <tr>
 <td><code>static int checkClaims(String payloadJson, long nowSec)</code></td>
-<td>cek klaim waktu pada payload JSON. hasil: 1 ok, 0 kedaluwarsa (exp) atau belum berlaku (nbf).</td>
+<td>cek klaim waktu (exp/nbf); 1 ok, 0 tidak berlaku</td>
 </tr>
 <tr>
 <td><code>static int verifyWithClaims(String token, String secret, int[] payloadOut, long nowSec)</code></td>

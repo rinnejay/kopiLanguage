@@ -242,16 +242,16 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah
 | `static String headerFor(String alg)` | header untuk algoritma tertentu |
 | `static String b64(int[] raw)` | base64url tanpa padding (biner → teks) |
 | `static int[] unb64(String s)` | (internal) base64url decode |
-| `static String signAlg(String payload, String secret, String alg)` | tanda tangan token sesuai algoritma header |
+| `static String signAlg(String payload, String secret, String alg)` | tanda tangani dengan algoritma HS256/HS384/HS512 |
 | `static String sign(String payload, String secret)` | tanda tangani payload dengan HS256 → token |
-| `static String signHs384(String payload, String secret)` | — |
-| `static String signHs512(String payload, String secret)` | — |
+| `static String signHs384(String payload, String secret)` | tanda tangani HS384 (HMAC-SHA384) |
+| `static String signHs512(String payload, String secret)` | tanda tangani HS512 (HMAC-SHA512) |
 | `static boolean same(int[] a, int[] b)` | bandingkan dua array byte secara konstan (panjang sama) |
-| `static String algOf(String token)` | algoritma dari header token (HS256/HS384/HS512; "" bila tak dikenal) |
-| `static int verifyAlg(String token, String secret, int[] payloadOut)` | hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah/alg tak didukung |
+| `static String algOf(String token)` | algoritma dari header token |
+| `static int verifyAlg(String token, String secret, int[] payloadOut)` | verifikasi sesuai algoritma header; 1 sah, 0 salah, -1 bentuk |
 | `static int verify(String token, String secret, int[] payloadOut)` | hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah |
 | `static String payloadOf(String token)` | payload JSON dari token tanpa verifikasi (hati-hati) |
-| `static int checkClaims(String payloadJson, long nowSec)` | cek klaim waktu pada payload JSON. hasil: 1 ok, 0 kedaluwarsa (exp) atau belum berlaku (nbf). |
+| `static int checkClaims(String payloadJson, long nowSec)` | cek klaim waktu (exp/nbf); 1 ok, 0 tidak berlaku |
 | `static int verifyWithClaims(String token, String secret, int[] payloadOut, long nowSec)` | verifikasi tanda tangan + klaim waktu |
 
 **Konstanta**

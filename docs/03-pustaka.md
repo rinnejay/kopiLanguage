@@ -268,7 +268,8 @@ server dan belum verifikasi ECDSA CertificateVerify.
 import Pbkdf2; import Jwt; import Session; import Auth; import MapStr;
 
 int[] hash  = Pbkdf2.sha256(pass, salt, 100000, 32);   // hash tetap biner
-String token = Jwt.sign(payloadJson, secret);           // JWT = teks
+String token = Jwt.sign(payloadJson, secret);           // JWT = teks (HS256)
+String t512  = Jwt.signHs512(payloadJson, secret);      // HS384/HS512 juga
 int valid = Jwt.verify(token, secret, out);             // 1 sah, 0 salah, -1 bentuk
 
 int[] ids  = MapStr.make(256, 8192);

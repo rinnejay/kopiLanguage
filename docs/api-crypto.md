@@ -350,7 +350,7 @@ int[] hash = Pbkdf2.sha256(pass, salt, 100000, 32);
 | Fungsi | Keterangan |
 |---|---|
 | `static int[] sha256(int[] pass, int[] salt, int iter, int dkLen)` | derive key PBKDF2-HMAC-SHA256 (pass, salt, iterasi, panjang) |
-| `static int[] sha512(int[] pass, int[] salt, int iter, int dkLen)` | PBKDF2-HMAC-SHA512 (RFC 8018): digest 64 byte |
+| `static int[] sha512(int[] pass, int[] salt, int iter, int dkLen)` | PBKDF2-HMAC-SHA512 (RFC 8018) |
 
 ---
 
