@@ -319,7 +319,10 @@ class BigInt {
         return x;
     }
 
-    /* invers modular a^-1 mod m (Extended Euclid); array kosong bila tidak ada */
+    /* invers modular a^-1 mod m (Extended Euclid); array kosong bila tidak ada.
+     * BigInt hanya menyimpan nilai non-negatif, jadi koefisien s dijaga
+     * tetap residu mod m: s2 = (s0 - q*s1) mod m dilakukan dengan
+     * pengurangan bersyarat (sub hanya untuk a >= b). */
     static int[] modInv(int[] a, int[] m) {
         if (isZero(m)) return new int[0];
         int[] r0 = copy(m);
@@ -329,7 +332,13 @@ class BigInt {
         while (!isZero(r1)) {
             int[] q = divmod(r0, r1, 0);
             int[] r2 = sub(r0, mul(q, r1));
-            int[] s2 = sub(s0, mul(q, s1));
+            int[] qs = mod(mul(q, s1), m);
+            int[] s2 = new int[0];
+            if (cmp(s0, qs) >= 0) {
+                s2 = sub(s0, qs);
+            } else {
+                s2 = sub(m, sub(qs, s0));
+            }
             r0 = r1; r1 = r2;
             s0 = s1; s1 = s2;
         }

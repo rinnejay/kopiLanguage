@@ -16,6 +16,8 @@ class Main {
 
         System.out.println(BigInt.toDecimal(BigInt.modexp(BigInt.fromInt(2), BigInt.fromInt(1000), m)));
         System.out.println(BigInt.toDecimal(BigInt.modInv(BigInt.fromInt(3), m)));
+        System.out.println(BigInt.toDecimal(BigInt.modInv(BigInt.fromInt(3), BigInt.fromInt(7))));
+        System.out.println(BigInt.toDecimal(BigInt.modInv(BigInt.fromInt(17), BigInt.fromInt(31))));
         System.out.println(BigInt.toDecimal(BigInt.gcd(a, b)));
 
         System.out.println(BigInt.toDecimal(BigInt.shl(a, 10)));

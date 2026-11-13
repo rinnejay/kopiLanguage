@@ -263,6 +263,7 @@ server dan belum verifikasi ECDSA CertificateVerify.
 | `Blake2b`, `Scrypt` | BLAKE2b (RFC 7693) + scrypt KDF memory-hard (RFC 7914) |
 | `BigInt` | bilangan bulat presisi sembarang (limb 16-bit) |
 | `Rsa` | RSA PKCS#1 v1.5 (tanda tangan & enkripsi) di atas `BigInt` |
+| `Ecdsa` | ECDSA kurva P-256, k deterministik RFC 6979 (HMAC-SHA256) |
 | `Pem`, `X509` | armor PEM + parsing sertifikat X.509 (RFC 5280) |
 | `Big`, `X25519` | aritmetika medan 2²⁵⁵−19 & X25519 |
 | `Der` | parser DER minimal + pin SPKI |
@@ -275,6 +276,7 @@ import Pbkdf2; import Jwt; import Session; import Auth; import MapStr;
 int[] hash  = Pbkdf2.sha256(pass, salt, 100000, 32);   // hash tetap biner
 String token = Jwt.sign(payloadJson, secret);           // JWT = teks (HS256)
 String t512  = Jwt.signHs512(payloadJson, secret);      // HS384/HS512 juga
+String t256  = Jwt.signRs256(payloadJson, privDer);    // RS256 (RSA)
 int valid = Jwt.verify(token, secret, out);             // 1 sah, 0 salah, -1 bentuk
 
 int[] ids  = MapStr.make(256, 8192);

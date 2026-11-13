@@ -249,6 +249,36 @@ import Der;
 
 ---
 
+## Ecdsa
+
+`lib/crypto/Ecdsa.kop` · 3 fungsi
+
+ECDSA kurva P-256 (NIST) dengan k deterministik RFC 6979 (HMAC-SHA256): kunci publik, tanda tangan, verifikasi.
+
+```java
+import Ecdsa;
+import BigInt;
+
+int[] d = BigInt.fromBytes(priv32bytes);
+int[] pub = Ecdsa.pubKey(d);        // 64 byte (X||Y)
+int[] sig = Ecdsa.sign(d, pesan);   // 64 byte (r||s)
+boolean ok = Ecdsa.verify(pub, pesan, sig);
+```
+
+**Catatan**
+
+- Skalar & koordinat memakai BigInt (limb int[]).
+- Tanda tangan deterministik — tervalidasi vektor resmi RFC 6979 A.2.5.
+- Operasi titik memakai koordinat Jacobian di atas BigInt.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] pubKey(int[] d)` | kunci publik 64 byte (X//Y) dari skalar privat BigInt |
+| `static int[] sign(int[] d, int[] msg)` | tanda tangan deterministik 64 byte (r//s), SHA-256 + RFC 6979 |
+| `static boolean verify(int[] pub, int[] msg, int[] sig)` | verifikasi tanda tangan dengan kunci publik 64 byte |
+
+---
+
 ## Gcm
 
 `lib/crypto/Gcm.kop` · 10 fungsi

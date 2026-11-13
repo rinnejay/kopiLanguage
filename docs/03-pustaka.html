@@ -415,6 +415,10 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></
 <td>RSA PKCS#1 v1.5 (tanda tangan &amp; enkripsi) di atas <code>BigInt</code></td>
 </tr>
 <tr>
+<td><code>Ecdsa</code></td>
+<td>ECDSA kurva P-256, k deterministik RFC 6979 (HMAC-SHA256)</td>
+</tr>
+<tr>
 <td><code>Pem</code>, <code>X509</code></td>
 <td>armor PEM + parsing sertifikat X.509 (RFC 5280)</td>
 </tr>
@@ -433,6 +437,7 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></
 int[] hash  = Pbkdf2.sha256(pass, salt, 100000, 32);   // hash tetap biner
 String token = Jwt.sign(payloadJson, secret);           // JWT = teks (HS256)
 String t512  = Jwt.signHs512(payloadJson, secret);      // HS384/HS512 juga
+String t256  = Jwt.signRs256(payloadJson, privDer);    // RS256 (RSA)
 int valid = Jwt.verify(token, secret, out);             // 1 sah, 0 salah, -1 bentuk
 
 int[] ids  = MapStr.make(256, 8192);

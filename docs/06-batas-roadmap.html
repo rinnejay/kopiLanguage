@@ -181,7 +181,7 @@
 </tr>
 <tr>
 <td>Verifikasi ECDSA CertificateVerify</td>
-<td>TLS klien memakai pin SPKI TOFU + verifikasi Finished</td>
+<td>TLS klien memakai pin SPKI TOFU + verifikasi Finished; primitif ECDSA P-256 sudah ada sejak v1.35 (<code>Ecdsa</code>)</td>
 </tr>
 <tr>
 <td>Validasi rantai/PKI, hostname, expiry</td>
@@ -283,7 +283,7 @@
 </ul></li>
 <li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>
 <li>~~Array bertipe~~ <strong>✅ v1.16</strong> (<code>long[]</code>/<code>String[]</code> elemen 64-bit slot; sisa: <code>double[]</code>, array literal, multi-dimensi).</li>
-<li><strong>TLS server + verifikasi ECDSA/CertificateVerify + chain/hostname</strong>.</li>
+<li><strong>TLS server + verifikasi ECDSA/CertificateVerify + chain/hostname</strong> — fondasi ECDSA P-256 (v1.35) sudah siap dipakai.</li>
 <li><strong>HTTP</strong>: multipart, range/ETag, chunked response, gzip.</li>
 <li><strong>DB client</strong> (SQLite via protokol file atau Postgres/Redis via socket).</li>
 <li><strong>Ekosistem</strong>: package manager, LSP, formatter, CI lintas platform, fuzzing, audit keamanan.</li>

@@ -47,7 +47,7 @@
 <tr>
 <td><strong>Crypto</strong></td>
 <td><code>lib/crypto/</code></td>
-<td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>Blake2b</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Pem</code>, <code>Poly</code>, <code>Rand</code>, <code>Rsa</code>, <code>Scrypt</code>, <code>X25519</code>, <code>X509</code></td>
+<td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>Blake2b</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Ecdsa</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Pem</code>, <code>Poly</code>, <code>Rand</code>, <code>Rsa</code>, <code>Scrypt</code>, <code>X25519</code>, <code>X509</code></td>
 </tr>
 <tr>
 <td><strong>IO</strong></td>
@@ -435,6 +435,12 @@
 <td><code>lib/crypto/Der.kop</code></td>
 <td>4</td>
 <td>Parser ASN.1 DER minimal untuk mengekstrak SubjectPublicKeyInfo (pin TLS).</td>
+</tr>
+<tr>
+<td><a href="api-crypto.html#ecdsa"><code>Ecdsa</code></a></td>
+<td><code>lib/crypto/Ecdsa.kop</code></td>
+<td>3</td>
+<td>ECDSA kurva P-256 (NIST) dengan k deterministik RFC 6979 (HMAC-SHA256): kunci publik, tanda tangan,…</td>
 </tr>
 <tr>
 <td><a href="api-crypto.html#gcm"><code>Gcm</code></a></td>

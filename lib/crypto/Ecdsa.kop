@@ -1,0 +1,288 @@
+/* Ecdsa.kop — ECDSA kurva P-256 (NIST) murni di bahasa Kopi (v1.35).
+ *
+ * Aritmetika medan Fp memakai BigInt.kop; titik kurva disimpan dalam
+ * koordinat Jacobian sehingga hanya ada satu inversi di akhir
+ * perkalian skalar. Tanda tangan memakai SHA-256 dan k deterministik
+ * (RFC 6979, HMAC-SHA256) — hasilnya dapat direproduksi dan diuji
+ * langsung terhadap vektor resmi RFC 6979 A.2.5.
+ *
+ * Fungsi:
+ *   pubKey(d)                    → kunci publik 64 byte (X || Y)
+ *   sign(d, msg)                 → tanda tangan 64 byte (r || s)
+ *   verify(pub64, msg, sig64)    → true bila tanda tangan sah
+ *
+ * Rumus titik: penggandaan dbl-2001-l (khusus a = -3) dan penjumlahan
+ * campuran Jacobian/affine gaya "add-2007-bl". Kurva:
+ *   y^2 = x^3 - 3x + b  mod p
+ * dengan p, b, n, G sesuai SEC 2 / NIST SP 800-186 untuk P-256.
+ */
+
+import BigInt;
+import Hash;
+import Cipher;
+
+class Ecdsa {
+
+    /* ── akumulator koordinat Jacobian ───────────────────────────── */
+    int[] X;
+    int[] Y;
+    int[] Z;
+
+    /* ── konstanta kurva (BigInt) ────────────────────────────────── */
+    int[] P;
+    int[] A;
+    int[] B;
+    int[] N;
+    int[] GX;
+    int[] GY;
+
+    Ecdsa() {
+        this.P = beBig("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff");
+        this.A = beBig("ffffffff00000001000000000000000000000000fffffffffffffffffffffffc");
+        this.B = beBig("5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b");
+        this.N = beBig("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551");
+        this.GX = beBig("6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296");
+        this.GY = beBig("4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5");
+        this.X = BigInt.fromInt(0);
+        this.Y = BigInt.fromInt(0);
+        this.Z = BigInt.fromInt(0);
+    }
+
+    /* ── konversi ────────────────────────────────────────────────── */
+
+    /* byte big-endian → BigInt (fromBytes membaca dari belakang, jadi
+     * urutan byte big-endian langsung dipakai tanpa dibalik) */
+    private static int[] beBigBytes(int[] be) {
+        return BigInt.fromBytes(be);
+    }
+
+    /* teks hex → BigInt (big-endian) */
+    private static int[] beBig(String hex) {
+        return beBigBytes(Cipher.hexdec(hex));
+    }
+
+    private static int[] join(int[] a, int[] b) {
+        int[] o = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        for (int i = 0; i < b.length; i++) o[a.length + i] = b[i];
+        return o;
+    }
+
+    private static int[] slice(int[] a, int off, int len) {
+        int[] o = new int[len];
+        for (int i = 0; i < len; i++) o[i] = a[off + i] & 255;
+        return o;
+    }
+
+    /* ── aritmetika medan Fp ─────────────────────────────────────── */
+
+    private int[] fadd(int[] a, int[] b) {
+        return BigInt.rem(BigInt.add(a, b), this.P);
+    }
+
+    private int[] fsub(int[] a, int[] b) {
+        if (BigInt.cmp(a, b) >= 0) return BigInt.rem(BigInt.sub(a, b), this.P);
+        return BigInt.sub(this.P, BigInt.rem(BigInt.sub(b, a), this.P));
+    }
+
+    private int[] fmul(int[] a, int[] b) {
+        return BigInt.rem(BigInt.mul(a, b), this.P);
+    }
+
+    private int[] fsqr(int[] a) {
+        return this.fmul(a, a);
+    }
+
+    private int[] finv(int[] a) {
+        return BigInt.modInv(a, this.P);
+    }
+
+    /* ── aritmetika modulo n (orde kelompok) ─────────────────────── */
+
+    private int[] nadd(int[] a, int[] b) {
+        return BigInt.rem(BigInt.add(a, b), this.N);
+    }
+
+    private int[] nmul(int[] a, int[] b) {
+        return BigInt.rem(BigInt.mul(a, b), this.N);
+    }
+
+    private int[] ninv(int[] a) {
+        return BigInt.modInv(a, this.N);
+    }
+
+    /* ── operasi titik (Jacobian) ────────────────────────────────── */
+
+    private void setInf() {
+        this.X = BigInt.fromInt(0);
+        this.Y = BigInt.fromInt(1);
+        this.Z = BigInt.fromInt(0);
+    }
+
+    private boolean isInf() {
+        return BigInt.isZero(this.Z);
+    }
+
+    /* penggandaan — rumus dbl-2001-l (khusus a = -3) */
+    private void dbl() {
+        if (this.isInf()) return;
+        int[] delta = this.fmul(this.Z, this.Z);
+        int[] gamma = this.fmul(this.Y, this.Y);
+        int[] beta = this.fmul(this.X, gamma);
+        int[] xmd = this.fsub(this.X, delta);
+        int[] xpd = this.fadd(this.X, delta);
+        int[] mdp = this.fmul(xmd, xpd);
+        int[] alpha = this.fadd(this.fadd(mdp, mdp), mdp);   /* 3*(X-delta)*(X+delta) */
+        int[] beta2 = this.fadd(beta, beta);
+        int[] beta4 = this.fadd(beta2, beta2);
+        int[] beta8 = this.fadd(beta4, beta4);
+        int[] x3 = this.fsub(this.fmul(alpha, alpha), beta8);
+        int[] gamma2 = this.fmul(gamma, gamma);
+        int[] gamma4 = this.fadd(this.fadd(gamma2, gamma2), this.fadd(gamma2, gamma2));
+        int[] gamma8 = this.fadd(gamma4, gamma4);
+        int[] z3 = this.fsub(this.fsub(this.fsqr(this.fadd(this.Y, this.Z)), gamma), delta);
+        this.X = x3;
+        this.Y = this.fsub(this.fmul(alpha, this.fsub(beta4, x3)), gamma8);
+        this.Z = z3;
+    }
+
+    /* penjumlahan titik affine (Z2 = 1) ke akumulator Jacobian */
+    private void addAffine(int[] x2, int[] y2) {
+        if (this.isInf()) {
+            this.X = x2;
+            this.Y = y2;
+            this.Z = BigInt.fromInt(1);
+            return;
+        }
+        int[] zz = this.fmul(this.Z, this.Z);
+        int[] u2 = this.fmul(x2, zz);
+        int[] s2 = this.fmul(y2, this.fmul(this.Z, zz));
+        if (BigInt.cmp(u2, this.X) == 0) {
+            if (BigInt.cmp(s2, this.Y) != 0) {
+                this.setInf();
+                return;
+            }
+            this.dbl();
+            return;
+        }
+        int[] h = this.fsub(u2, this.X);
+        int[] r = this.fsub(s2, this.Y);
+        int[] hh = this.fmul(h, h);
+        int[] hhh = this.fmul(h, hh);
+        int[] v = this.fmul(this.X, hh);
+        int[] x3 = this.fsub(this.fsub(this.fmul(r, r), hhh), this.fadd(v, v));
+        this.Y = this.fsub(this.fmul(r, this.fsub(v, x3)), this.fmul(this.Y, hhh));
+        this.X = x3;
+        this.Z = this.fmul(this.Z, h);
+    }
+
+    /* perkalian skalar: this = k * (x2, y2); k = 0 menghasilkan infinity */
+    private void scalarMul(int[] k, int[] x2, int[] y2) {
+        this.setInf();
+        int bits = BigInt.bitLength(k);
+        for (int i = bits - 1; i >= 0; i--) {
+            this.dbl();
+            if (BigInt.testBit(k, i)) this.addAffine(x2, y2);
+        }
+    }
+
+    private int[] affineX() {
+        int[] zi = this.finv(this.Z);
+        return this.fmul(this.X, this.fmul(zi, zi));
+    }
+
+    private int[] affineY() {
+        int[] zi = this.finv(this.Z);
+        int[] zi2 = this.fmul(zi, zi);
+        return this.fmul(this.Y, this.fmul(zi, zi2));
+    }
+
+    /* ── API ─────────────────────────────────────────────────────── */
+
+    /* kunci publik dari skalar privat d: 64 byte (X || Y) */
+    static int[] pubKey(int[] d) {
+        Ecdsa c = new Ecdsa();
+        c.scalarMul(d, c.GX, c.GY);
+        int[] xb = BigInt.toBytes(c.affineX(), 32);
+        int[] yb = BigInt.toBytes(c.affineY(), 32);
+        return join(xb, yb);
+    }
+
+    /* tanda tangan deterministik (RFC 6979, HMAC-SHA256): 64 byte (r || s) */
+    static int[] sign(int[] d, int[] msg) {
+        Ecdsa c = new Ecdsa();
+        int[] h1 = Hash.sha256(msg);
+        int[] eN = BigInt.rem(beBigBytes(h1), c.N);
+        int[] xOct = BigInt.toBytes(d, 32);
+        int[] hOct = BigInt.toBytes(beBigBytes(h1), 32);
+        int[] zero1 = new int[1];
+        int[] one1 = new int[1];
+        one1[0] = 1;
+        int[] K = new int[32];
+        int[] V = new int[32];
+        for (int i = 0; i < 32; i++) {
+            K[i] = 0;
+            V[i] = 1;
+        }
+        K = Hash.hmac(K, join(join(V, zero1), join(xOct, hOct)));
+        V = Hash.hmac(K, V);
+        K = Hash.hmac(K, join(join(V, one1), join(xOct, hOct)));
+        V = Hash.hmac(K, V);
+        int[] dN = BigInt.rem(d, c.N);
+        while (true) {
+            V = Hash.hmac(K, V);
+            int[] k = beBigBytes(V);
+            if (BigInt.cmp(k, BigInt.fromInt(0)) > 0 && BigInt.cmp(k, c.N) < 0) {
+                c.scalarMul(k, c.GX, c.GY);
+                int[] r = BigInt.rem(c.affineX(), c.N);
+                if (!BigInt.isZero(r)) {
+                    int[] s = c.nmul(c.ninv(k), c.nadd(eN, c.nmul(r, dN)));
+                    if (!BigInt.isZero(s)) {
+                        return join(BigInt.toBytes(r, 32), BigInt.toBytes(s, 32));
+                    }
+                }
+            }
+            K = Hash.hmac(K, join(V, zero1));
+            V = Hash.hmac(K, V);
+        }
+    }
+
+    /* verifikasi: pub 64 byte (X || Y), sig 64 byte (r || s) */
+    static boolean verify(int[] pub, int[] msg, int[] sig) {
+        if (pub.length != 64 || sig.length != 64) return false;
+        Ecdsa c = new Ecdsa();
+        int[] qx = beBigBytes(slice(pub, 0, 32));
+        int[] qy = beBigBytes(slice(pub, 32, 32));
+        int[] r = beBigBytes(slice(sig, 0, 32));
+        int[] s = beBigBytes(slice(sig, 32, 32));
+        if (BigInt.isZero(r) || BigInt.cmp(r, c.N) >= 0) return false;
+        if (BigInt.isZero(s) || BigInt.cmp(s, c.N) >= 0) return false;
+        /* kunci publik wajib terletak di kurva: y^2 = x^3 + a*x + b */
+        int[] lhs = c.fmul(qy, qy);
+        int[] x2 = c.fmul(qx, qx);
+        int[] x3 = c.fmul(x2, qx);
+        int[] ax = c.fmul(c.A, qx);
+        int[] rhs = c.fadd(c.fadd(x3, ax), c.B);
+        if (BigInt.cmp(lhs, rhs) != 0) return false;
+        int[] w = c.ninv(s);
+        int[] u1 = c.nmul(BigInt.rem(beBigBytes(Hash.sha256(msg)), c.N), w);
+        int[] u2 = c.nmul(r, w);
+        /* P2 = u2*Q, diubah ke affine (tandai bila infinity) */
+        c.scalarMul(u2, qx, qy);
+        boolean has2 = !c.isInf();
+        int[] p2x = new int[1];
+        int[] p2y = new int[1];
+        if (has2) {
+            p2x = c.affineX();
+            p2y = c.affineY();
+        }
+        /* R = u1*G + P2 */
+        c.scalarMul(u1, c.GX, c.GY);
+        if (has2) c.addAffine(p2x, p2y);
+        if (c.isInf()) return false;
+        int[] xr = BigInt.rem(c.affineX(), c.N);
+        return BigInt.cmp(xr, r) == 0;
+    }
+
+
+}

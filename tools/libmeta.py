@@ -202,6 +202,13 @@ META = {
         "notes": ["Nilai non-negatif; `sub` butuh a >= b.",
                   "Pembagian panjang biner: benar, tapi lambat untuk modulus besar."],
     },
+    "Ecdsa": {
+        "purpose": "ECDSA kurva P-256 (NIST) dengan k deterministik RFC 6979 (HMAC-SHA256): kunci publik, tanda tangan, verifikasi.",
+        "example": 'import Ecdsa;\nimport BigInt;\n\nint[] d = BigInt.fromBytes(priv32bytes);\nint[] pub = Ecdsa.pubKey(d);        // 64 byte (X||Y)\nint[] sig = Ecdsa.sign(d, pesan);   // 64 byte (r||s)\nboolean ok = Ecdsa.verify(pub, pesan, sig);',
+        "notes": ["Skalar & koordinat memakai BigInt (limb int[]).",
+                  "Tanda tangan deterministik — tervalidasi vektor resmi RFC 6979 A.2.5.",
+                  "Operasi titik memakai koordinat Jacobian di atas BigInt."],
+    },
     "Rsa": {
         "purpose": "RSA PKCS#1 v1.5: tanda tangan & verifikasi SHA-1/256/384/512, enkripsi/dekripsi blok.",
         "example": 'import Rsa;\nimport Hash;\n\nint[] sig = Rsa.sign(privDer, Hash.sha256(Net.bytes("abc")), "SHA-256");\nboolean ok = Rsa.verify(pubDer, Hash.sha256(Net.bytes("abc")), sig, "SHA-256");',
@@ -754,6 +761,11 @@ EXTRA = {
         "toDecimal": "big → teks desimal",
         "fromInt": "int → big",
         "toInt": "big → int",
+    }},
+    "Ecdsa": {"descs": {
+        "pubKey": "kunci publik 64 byte (X||Y) dari skalar privat BigInt",
+        "sign": "tanda tangan deterministik 64 byte (r||s), SHA-256 + RFC 6979",
+        "verify": "verifikasi tanda tangan dengan kunci publik 64 byte",
     }},
     "Rsa": {"descs": {
         "sign": "tanda tangan digest dengan kunci privat (DER PKCS#1)",

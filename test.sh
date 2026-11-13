@@ -78,6 +78,35 @@ else
   echo "FAIL  rsavec [a64]: gagal build/execute"; FAIL=$((FAIL+1))
 fi
 
+# ─── ECDSA P-256 (RFC 6979 A.2.5; backend native a64 — skalar mult + modInv
+#     besar di VM terlalu lambat) ───────────────────────────────────────────
+python3 tools/gen_ecdsavec.py "$T/kopi/ecdsavec.kop" "$T/kopi/ecdsavec.ref" >/dev/null
+if ./kopicc "$T/kopi/ecdsavec.kop" -t a64 -o "$T/kopi/ecdsavec.s" && \
+   cc "$T/kopi/ecdsavec.s" -o "$T/kopi/ecdsavec.bin" && \
+   "$T/kopi/ecdsavec.bin" > "$T/kopi/ecdsavec.out"; then
+  if diff -q "$T/kopi/ecdsavec.ref" "$T/kopi/ecdsavec.out" >/dev/null 2>&1; then
+    echo "PASS  ecdsavec [a64]"; PASS=$((PASS+1))
+  else
+    echo "FAIL  ecdsavec [a64]: output tidak cocok"; FAIL=$((FAIL+1))
+  fi
+else
+  echo "FAIL  ecdsavec [a64]: gagal build/execute"; FAIL=$((FAIL+1))
+fi
+
+# ─── JWT RS256 (tanda tangan RSA; backend native a64) ─────────────────────
+python3 tools/gen_jwtrs.py "$T/kopi/jwtrs.kop" "$T/kopi/jwtrs.ref" >/dev/null
+if ./kopicc "$T/kopi/jwtrs.kop" -t a64 -o "$T/kopi/jwtrs.s" && \
+   cc "$T/kopi/jwtrs.s" -o "$T/kopi/jwtrs.bin" && \
+   "$T/kopi/jwtrs.bin" > "$T/kopi/jwtrs.out"; then
+  if diff -q "$T/kopi/jwtrs.ref" "$T/kopi/jwtrs.out" >/dev/null 2>&1; then
+    echo "PASS  jwtrs [a64]"; PASS=$((PASS+1))
+  else
+    echo "FAIL  jwtrs [a64]: output tidak cocok"; FAIL=$((FAIL+1))
+  fi
+else
+  echo "FAIL  jwtrs [a64]: gagal build/execute"; FAIL=$((FAIL+1))
+fi
+
 # ─── X.509: parse sertifikat (fixture openssl; oracle gen_x509vec.py) ─────
 python3 tools/gen_x509vec.py "$T/kopi/x509vec.kop" "$T/kopi/x509vec.ref" >/dev/null
 check x509vec "$T/kopi/x509vec.kop"

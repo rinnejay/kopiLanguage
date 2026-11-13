@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-crypto">Referensi API — Crypto<a class="anchor" href="#referensi-api-crypto" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#aes">Aes</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#blake2b">Blake2b</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#gcm">Gcm</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#pem">Pem</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#rsa">Rsa</a></li><li class="toc-h2"><a href="#scrypt">Scrypt</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li><li class="toc-h2"><a href="#x509">X509</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#aes">Aes</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#blake2b">Blake2b</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#ecdsa">Ecdsa</a></li><li class="toc-h2"><a href="#gcm">Gcm</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#pem">Pem</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#rsa">Rsa</a></li><li class="toc-h2"><a href="#scrypt">Scrypt</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li><li class="toc-h2"><a href="#x509">X509</a></li></ul></nav>
 <p>Hash, PBKDF2, cipher, X25519, AEAD, DER. Semua signature di bawah diekstrak langsung dari source <code>lib/crypto/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="aead">Aead<a class="anchor" href="#aead" aria-label="tautan">#</a></h2>
@@ -461,6 +461,41 @@ int h = Crypto.hashInt(123);   // hash integer deterministik</code></pre>
 <tr>
 <td><code>static int[] spkiPin(int[] cert)</code></td>
 <td>fingerprint pin: SHA-256 dari DER SPKI</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="ecdsa">Ecdsa<a class="anchor" href="#ecdsa" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Ecdsa.kop</code> · 3 fungsi</p>
+<p>ECDSA kurva P-256 (NIST) dengan k deterministik RFC 6979 (HMAC-SHA256): kunci publik, tanda tangan, verifikasi.</p>
+<pre><code class="language-java">import Ecdsa;
+import BigInt;
+
+int[] d = BigInt.fromBytes(priv32bytes);
+int[] pub = Ecdsa.pubKey(d);        // 64 byte (X||Y)
+int[] sig = Ecdsa.sign(d, pesan);   // 64 byte (r||s)
+boolean ok = Ecdsa.verify(pub, pesan, sig);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Skalar &amp; koordinat memakai BigInt (limb int[]).</li>
+<li>Tanda tangan deterministik — tervalidasi vektor resmi RFC 6979 A.2.5.</li>
+<li>Operasi titik memakai koordinat Jacobian di atas BigInt.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] pubKey(int[] d)</code></td>
+<td>kunci publik 64 byte (X//Y) dari skalar privat BigInt</td>
+</tr>
+<tr>
+<td><code>static int[] sign(int[] d, int[] msg)</code></td>
+<td>tanda tangan deterministik 64 byte (r//s), SHA-256 + RFC 6979</td>
+</tr>
+<tr>
+<td><code>static boolean verify(int[] pub, int[] msg, int[] sig)</code></td>
+<td>verifikasi tanda tangan dengan kunci publik 64 byte</td>
 </tr>
 </tbody></table></div>
 <hr>
