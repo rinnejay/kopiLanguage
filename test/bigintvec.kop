@@ -1,0 +1,29 @@
+// bigintvec.kop — uji lib/core/BigInt.kop vs oracle python.
+import BigInt;
+
+class Main {
+    public static void main(String[] args) {
+        int[] a = BigInt.fromDecimal("123456789012345678901234567890");
+        int[] b = BigInt.fromDecimal("987654321098765432109876543210");
+        int[] m = BigInt.fromDecimal("1000000007");
+
+        System.out.println(BigInt.toDecimal(BigInt.add(a, b)));
+        System.out.println(BigInt.toDecimal(BigInt.sub(b, a)));
+        System.out.println(BigInt.toDecimal(BigInt.mul(a, b)));
+
+        System.out.println(BigInt.toDecimal(BigInt.div(a, m)));
+        System.out.println(BigInt.toDecimal(BigInt.rem(a, m)));
+
+        System.out.println(BigInt.toDecimal(BigInt.modexp(BigInt.fromInt(2), BigInt.fromInt(1000), m)));
+        System.out.println(BigInt.toDecimal(BigInt.modInv(BigInt.fromInt(3), m)));
+        System.out.println(BigInt.toDecimal(BigInt.gcd(a, b)));
+
+        System.out.println(BigInt.toDecimal(BigInt.shl(a, 10)));
+        System.out.println(BigInt.toDecimal(BigInt.shr(a, 10)));
+        System.out.println(BigInt.bitLength(a));
+
+        int[] raw = new int[32];
+        for (int i = 0; i < 32; i++) raw[i] = 0;
+        System.out.println(BigInt.toDecimal(BigInt.fromBytes(BigInt.toBytes(a, 32))));
+    }
+}

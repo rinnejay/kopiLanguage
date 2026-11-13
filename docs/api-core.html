@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#regex">Regex</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bigint">BigInt</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#regex">Regex</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
@@ -189,6 +189,113 @@ int[] s = Arrays.sort(a);                    // [1,2,3,4]</code></pre>
 <tr>
 <td><code>static int sumBy(int[] xs, fn f)</code></td>
 <td>jumlah hasil pemetaan</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="bigint">BigInt<a class="anchor" href="#bigint" aria-label="tautan">#</a></h2>
+<p><code>lib/core/BigInt.kop</code> · 22 fungsi</p>
+<p>Bilangan bulat presisi sembarang: tambah, kali, bagi, pangkat modulo, invers modulo, FPB, konversi byte/desimal.</p>
+<pre><code class="language-java">import BigInt;
+
+int[] a = BigInt.fromDecimal("12345678901234567890");
+System.out.println(BigInt.toDecimal(BigInt.mul(a, a)));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Nilai non-negatif; <code>sub</code> butuh a &gt;= b.</li>
+<li>Pembagian panjang biner: benar, tapi lambat untuk modulus besar.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] copy(int[] x)</code></td>
+<td>salinan (array baru)</td>
+</tr>
+<tr>
+<td><code>static boolean isZero(int[] x)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] fromInt(int v)</code></td>
+<td>int → big</td>
+</tr>
+<tr>
+<td><code>static int toInt(int[] x)</code></td>
+<td>big → int</td>
+</tr>
+<tr>
+<td><code>static int[] fromBytes(int[] b)</code></td>
+<td>byte big-endian → big</td>
+</tr>
+<tr>
+<td><code>static int[] toBytes(int[] x, int len)</code></td>
+<td>big → byte big-endian</td>
+</tr>
+<tr>
+<td><code>static int bitLength(int[] x)</code></td>
+<td>jumlah bit significant</td>
+</tr>
+<tr>
+<td><code>static int[] add(int[] a, int[] b)</code></td>
+<td>a + b</td>
+</tr>
+<tr>
+<td><code>static int[] sub(int[] a, int[] b)</code></td>
+<td>a - b (a &gt;= b)</td>
+</tr>
+<tr>
+<td><code>static int[] mul(int[] a, int[] b)</code></td>
+<td>a * b</td>
+</tr>
+<tr>
+<td><code>static int cmp(int[] a, int[] b)</code></td>
+<td>perbandingan -1/0/1</td>
+</tr>
+<tr>
+<td><code>static int[] shr(int[] a, int n)</code></td>
+<td>a &gt;&gt; n</td>
+</tr>
+<tr>
+<td><code>static int[] shl(int[] a, int n)</code></td>
+<td>a &lt;&lt; n</td>
+</tr>
+<tr>
+<td><code>static boolean testBit(int[] a, int n)</code></td>
+<td>uji bit ke-n</td>
+</tr>
+<tr>
+<td><code>static int[] div(int[] a, int[] b)</code></td>
+<td>kuosien a / b</td>
+</tr>
+<tr>
+<td><code>static int[] rem(int[] a, int[] b)</code></td>
+<td>sisa a % b</td>
+</tr>
+<tr>
+<td><code>static int[] mod(int[] a, int[] m)</code></td>
+<td>sisa a % m</td>
+</tr>
+<tr>
+<td><code>static int[] modexp(int[] base, int[] exp, int[] m)</code></td>
+<td>(base^exp) mod m</td>
+</tr>
+<tr>
+<td><code>static int[] gcd(int[] a, int[] b)</code></td>
+<td>FPB(a, b)</td>
+</tr>
+<tr>
+<td><code>static int[] modInv(int[] a, int[] m)</code></td>
+<td>invers modular a^-1 mod m</td>
+</tr>
+<tr>
+<td><code>static String toDecimal(int[] x)</code></td>
+<td>big → teks desimal</td>
+</tr>
+<tr>
+<td><code>static int[] fromDecimal(String s)</code></td>
+<td>teks desimal → big</td>
 </tr>
 </tbody></table></div>
 <hr>

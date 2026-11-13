@@ -59,6 +59,10 @@ check blakevec test/blakevec.kop
 python3 tools/gen_regexvec.py > "$T/kopi/regexvec.ref"
 check regexvec test/regexvec.kop
 
+# ─── BigInt: bilangan presisi sembarang vs oracle python int ──────────────
+python3 tools/gen_bigintvec.py > "$T/kopi/bigintvec.ref"
+check bigintvec test/bigintvec.kop
+
 # ─── X.509: parse sertifikat (fixture openssl; oracle gen_x509vec.py) ─────
 python3 tools/gen_x509vec.py "$T/kopi/x509vec.kop" "$T/kopi/x509vec.ref" >/dev/null
 check x509vec "$T/kopi/x509vec.kop"

@@ -73,6 +73,51 @@ int[] s = Arrays.sort(a);                    // [1,2,3,4]
 
 ---
 
+## BigInt
+
+`lib/core/BigInt.kop` · 22 fungsi
+
+Bilangan bulat presisi sembarang: tambah, kali, bagi, pangkat modulo, invers modulo, FPB, konversi byte/desimal.
+
+```java
+import BigInt;
+
+int[] a = BigInt.fromDecimal("12345678901234567890");
+System.out.println(BigInt.toDecimal(BigInt.mul(a, a)));
+```
+
+**Catatan**
+
+- Nilai non-negatif; `sub` butuh a >= b.
+- Pembagian panjang biner: benar, tapi lambat untuk modulus besar.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] copy(int[] x)` | salinan (array baru) |
+| `static boolean isZero(int[] x)` | — |
+| `static int[] fromInt(int v)` | int → big |
+| `static int toInt(int[] x)` | big → int |
+| `static int[] fromBytes(int[] b)` | byte big-endian → big |
+| `static int[] toBytes(int[] x, int len)` | big → byte big-endian |
+| `static int bitLength(int[] x)` | jumlah bit significant |
+| `static int[] add(int[] a, int[] b)` | a + b |
+| `static int[] sub(int[] a, int[] b)` | a - b (a >= b) |
+| `static int[] mul(int[] a, int[] b)` | a * b |
+| `static int cmp(int[] a, int[] b)` | perbandingan -1/0/1 |
+| `static int[] shr(int[] a, int n)` | a >> n |
+| `static int[] shl(int[] a, int n)` | a << n |
+| `static boolean testBit(int[] a, int n)` | uji bit ke-n |
+| `static int[] div(int[] a, int[] b)` | kuosien a / b |
+| `static int[] rem(int[] a, int[] b)` | sisa a % b |
+| `static int[] mod(int[] a, int[] m)` | sisa a % m |
+| `static int[] modexp(int[] base, int[] exp, int[] m)` | (base^exp) mod m |
+| `static int[] gcd(int[] a, int[] b)` | FPB(a, b) |
+| `static int[] modInv(int[] a, int[] m)` | invers modular a^-1 mod m |
+| `static String toDecimal(int[] x)` | big → teks desimal |
+| `static int[] fromDecimal(String s)` | teks desimal → big |
+
+---
+
 ## Bytes
 
 `lib/core/Bytes.kop` · 48 fungsi

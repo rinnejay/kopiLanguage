@@ -15,7 +15,7 @@ import HttpServer;
 | `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` |
 | `lib/crypto/` | `Crypto` `Cipher` `Hash` `Aes` `Gcm` `Pem` `X509` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
 | `lib/io/` | `Reader` `Writer` |
-| `lib/core/` | `Regex` (mesin regex backtracking) |
+| `lib/core/` | `Regex` (mesin regex backtracking) `BigInt` (bilangan presisi sembarang) |
 
 > **Referensi API lengkap** (signature semua fungsi diekstrak langsung dari
 > source): [Referensi pustaka](api.md) → [Core](api-core.md) ·

@@ -1,0 +1,343 @@
+/* BigInt.kop — bilangan bulat presisi sembarang (big integer), murni Kopi (v1.32).
+ *
+ * Representasi: int[] limb radiks 2^16, little-endian, tanpa nol di depan.
+ *   limb &lt; 65536 → 2 limb = 4 byte (selaras dengan byte big-endian)
+ *   perkalian memakai `long`: a[i]*b[j] ≤ 2^32 (tidak meluap int32)
+ *
+ * Semua fungsi statis; nilai balik baru (tidak mengubah argumen).
+ * Nilai selalu non-negatif; `sub` ulong，就需要 a ≥ b.
+ *
+ * Operasi: tambah, kurang, kali, bagi, sisa, pangkat modulo, invers modulo,
+ * FPB, perbandingan, geser, uji bit, konversi byte/decimal.
+ *
+ * Bergantung Str.kop (teks).
+ */
+
+import Str;
+
+class BigInt {
+
+    /* ── utilitas ────────────────────────────────────────────────── */
+
+    private static int MASK() { return 65535; }
+
+    /* buang nol di depan; array kosong = nilai 0 */
+    private static int[] norm(int[] x) {
+        int n = x.length;
+        while (n > 0 && x[n - 1] == 0) n = n - 1;
+        if (n == x.length) return x;
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) out[i] = x[i];
+        return out;
+    }
+
+    static int[] copy(int[] x) {
+        int[] out = new int[x.length];
+        for (int i = 0; i < x.length; i++) out[i] = x[i];
+        return out;
+    }
+
+    static boolean isZero(int[] x) {
+        for (int i = 0; i < x.length; i++) if (x[i] != 0) return false;
+        return true;
+    }
+
+    /* ── konversi ────────────────────────────────────────────────── */
+
+    /* int (32-bit bertanda, non-negatif) → big */
+    static int[] fromInt(int v) {
+        if (v <= 0) return new int[0];
+        long x = (long)v;
+        int[] out = new int[2];
+        out[0] = (int)(x & 65535L);
+        out[1] = (int)((x >>> 16) & 65535L);
+        return norm(out);
+    }
+
+    /* big → int (nilai kecil; meluap modulo 2^32) */
+    static int toInt(int[] x) {
+        long v = 0;
+        int n = x.length;
+        if (n > 2) n = 2;
+        for (int i = n - 1; i >= 0; i--) v = (v << 16) | (long)(x[i] & 65535);
+        return (int)v;
+    }
+
+    /* byte big-endian → big.
+     * limb 0 = least-significant → baca dari byte terakhir. */
+    static int[] fromBytes(int[] b) {
+        int n = (b.length + 1) / 2;
+        int[] out = new int[n];
+        int i = 0;
+        int p = b.length;
+        while (p > 0) {
+            int lo = b[p - 1] & 255;
+            int hi = 0;
+            if (p - 2 >= 0) hi = b[p - 2] & 255;
+            out[i] = ((hi << 8) | lo) & 65535;
+            p = p - 2;
+            i = i + 1;
+        }
+        return norm(out);
+    }
+
+    /* big → byte big-endian (panjang len, depan nol) */
+    static int[] toBytes(int[] x, int len) {
+        int[] out = new int[len > 0 ? len : 0];
+        int i = 0;
+        int idx = len - 2;
+        while (i < x.length && idx >= 0) {
+            int v = x[i] & 65535;
+            out[idx + 1] = v & 255;
+            out[idx] = (v >>> 8) & 255;
+            i = i + 1;
+            idx = idx - 2;
+        }
+        return out;
+    }
+
+    /* jumlah bit significant */
+    static int bitLength(int[] x) {
+        int n = x.length;
+        if (n == 0) return 0;
+        int top = x[n - 1] & 65535;
+        int bits = 0;
+        while (top > 0) { bits = bits + 1; top = top >>> 1; }
+        return (n - 1) * 16 + bits;
+    }
+
+    /* ── aritmetika dasar ────────────────────────────────────────── */
+
+    /* a + b */
+    static int[] add(int[] a, int[] b) {
+        int n = a.length > b.length ? a.length : b.length;
+        int[] out = new int[n + 1];
+        int carry = 0;
+        for (int i = 0; i < n; i++) {
+            int av = i < a.length ? (a[i] & 65535) : 0;
+            int bv = i < b.length ? (b[i] & 65535) : 0;
+            int s = av + bv + carry;
+            out[i] = s & 65535;
+            carry = s >>> 16;
+        }
+        out[n] = carry;
+        return norm(out);
+    }
+
+    /* a - b (panggil hanya bila a >= b) */
+    static int[] sub(int[] a, int[] b) {
+        int n = a.length > b.length ? a.length : b.length;
+        int[] out = new int[n];
+        int borrow = 0;
+        for (int i = 0; i < n; i++) {
+            int av = i < a.length ? (a[i] & 65535) : 0;
+            int bv = i < b.length ? (b[i] & 65535) : 0;
+            int d = av - bv - borrow;
+            if (d < 0) { d = d + 65536; borrow = 1; } else { borrow = 0; }
+            out[i] = d & 65535;
+        }
+        return norm(out);
+    }
+
+    /* a * b */
+    static int[] mul(int[] a, int[] b) {
+        if (isZero(a) || isZero(b)) return new int[0];
+        int[] out = new int[a.length + b.length + 1];
+        for (int i = 0; i < a.length; i++) {
+            int ai = a[i] & 65535;
+            if (ai == 0) continue;
+            long carry = 0;
+            for (int j = 0; j < b.length; j++) {
+                long t = (long)out[i + j] + (long)ai * (long)(b[j] & 65535) + carry;
+                out[i + j] = (int)(t & 65535L);
+                carry = t >>> 16;
+            }
+            int k = i + b.length;
+            while (carry > 0) {
+                long t = (long)out[k] + carry;
+                out[k] = (int)(t & 65535L);
+                carry = t >>> 16;
+                k = k + 1;
+            }
+        }
+        return norm(out);
+    }
+
+    /* perbandingan: -1, 0, 1 */
+    static int cmp(int[] a, int[] b) {
+        int n = a.length > b.length ? a.length : b.length;
+        for (int i = n - 1; i >= 0; i--) {
+            int av = i < a.length ? (a[i] & 65535) : 0;
+            int bv = i < b.length ? (b[i] & 65535) : 0;
+            if (av > bv) return 1;
+            if (av < bv) return -1;
+        }
+        return 0;
+    }
+
+    /* a >> n (bagi 2^n, bulat ke bawah) */
+    static int[] shr(int[] a, int n) {
+        int limbShift = n / 16;
+        int bitShift = n % 16;
+        int[] out = new int[a.length + 1];
+        for (int i = 0; i + limbShift < a.length; i++) {
+            int src = i + limbShift;
+            int v = (a[src] & 65535) >>> bitShift;
+            if (bitShift > 0 && src + 1 < a.length) {
+                v = v | ((a[src + 1] & 65535) << (16 - bitShift));
+            }
+            out[i] = v & 65535;
+        }
+        return norm(out);
+    }
+
+    /* a << n */
+    static int[] shl(int[] a, int n) {
+        if (isZero(a)) return new int[0];
+        int limbShift = n / 16;
+        int bitShift = n % 16;
+        int[] out = new int[a.length + limbShift + 2];
+        for (int i = 0; i < a.length; i++) {
+            int v = (a[i] & 65535) << bitShift;
+            int idx = i + limbShift;
+            out[idx] = (out[idx] | (v & 65535)) & 65535;
+            if (bitShift > 0) {
+                int carry = (a[i] & 65535) >>> (16 - bitShift);
+                if (carry > 0) out[idx + 1] = (out[idx + 1] | carry) & 65535;
+            }
+        }
+        return norm(out);
+    }
+
+    /* bit ke-n (0 = paling rendah) */
+    static boolean testBit(int[] a, int n) {
+        int limb = n / 16;
+        if (limb >= a.length) return false;
+        int bit = n % 16;
+        return ((a[limb] & 65535) >>> bit) % 2 == 1;
+    }
+
+    /* ── pembagian (bagi panjang biner: sederhana & benar) ───────── */
+
+    /* hasil: kuosien (which=0) atau sisa (which=1).
+     * Kopi tak mendukung array bersarang, jadi dipisah dua fungsi. */
+    static int[] div(int[] a, int[] b) { return divmod(a, b, 0); }
+
+    /* sisa pembagian */
+    static int[] rem(int[] a, int[] b) { return divmod(a, b, 1); }
+
+    private static int[] divmod(int[] a, int[] b, int which) {
+        if (isZero(b)) return new int[0];
+        if (cmp(a, b) < 0) {
+            if (which == 0) return new int[0];
+            return copy(a);
+        }
+        int bits = bitLength(a);
+        int[] q = new int[bits / 16 + 2];
+        int[] rem = new int[0];
+        for (int i = bits - 1; i >= 0; i--) {
+            rem = shl(rem, 1);
+            if (testBit(a, i)) {
+                if (rem.length == 0) rem = new int[1];
+                rem[0] = (rem[0] & 65535) | 1;
+                rem = norm(rem);
+            }
+            if (cmp(rem, b) >= 0) {
+                rem = sub(rem, b);
+                int limb = i / 16;
+                int bit = i % 16;
+                q[limb] = (q[limb] & 65535) | (1 << bit);
+            }
+        }
+        if (which == 0) return norm(q);
+        return norm(rem);
+    }
+
+    /* sisa a mod m */
+    static int[] mod(int[] a, int[] m) {
+        if (isZero(m)) return new int[0];
+        return divmod(a, m, 1);
+    }
+
+    /* ── pangkat & invers ────────────────────────────────────────── */
+
+    /* (base^exp) mod m */
+    static int[] modexp(int[] base, int[] exp, int[] m) {
+        if (isZero(m)) return new int[0];
+        if (isZero(exp)) return fromInt(1);
+        int[] result = fromInt(1);
+        int[] b = mod(base, m);
+        int bits = bitLength(exp);
+        for (int i = 0; i < bits; i++) {
+            if (testBit(exp, i)) result = mod(mul(result, b), m);
+            b = mod(mul(b, b), m);
+        }
+        return result;
+    }
+
+    /* FPB (Euclid) */
+    static int[] gcd(int[] a, int[] b) {
+        int[] x = a;
+        int[] y = b;
+        while (!isZero(y)) {
+            int[] r = mod(x, y);
+            x = y;
+            y = r;
+        }
+        return x;
+    }
+
+    /* invers modular a^-1 mod m (Extended Euclid); array kosong bila tidak ada */
+    static int[] modInv(int[] a, int[] m) {
+        if (isZero(m)) return new int[0];
+        int[] r0 = copy(m);
+        int[] r1 = mod(a, m);
+        int[] s0 = new int[0];
+        int[] s1 = fromInt(1);
+        while (!isZero(r1)) {
+            int[] q = divmod(r0, r1, 0);
+            int[] r2 = sub(r0, mul(q, r1));
+            int[] s2 = sub(s0, mul(q, s1));
+            r0 = r1; r1 = r2;
+            s0 = s1; s1 = s2;
+        }
+        int[] one = fromInt(1);
+        if (cmp(r0, one) == 0) return mod(s0, m);
+        return new int[0];
+    }
+
+    /* ── teks desimal ───────────────────────────────────────────── */
+
+    /* big → teks desimal */
+    static String toDecimal(int[] x) {
+        if (isZero(x)) return "0";
+        int[] work = x;
+        String out = "";
+        int[] chunk = fromInt(10000000);
+        while (!isZero(work)) {
+            int[] q = divmod(work, chunk, 0);
+            int[] rr = divmod(work, chunk, 1);
+            work = q;
+            String part = Str.fromInt(toInt(rr));
+            while (part.length < 7) part = "0" + part;
+            out = part + out;
+        }
+        /* buang nol di depan (chunk terakhir tidak perlu nol tambahan) */
+        while (out.length > 1 && out.charAt(0) == 48) out = Str.sub(out, 1, out.length - 1);
+        return out;
+    }
+
+    /* teks desimal → big */
+    static int[] fromDecimal(String s) {
+        int[] acc = new int[0];
+        int i = 0;
+        int n = s.length;
+        while (i < n) {
+            int c = s.charAt(i) - 48;
+            if (c < 0 || c > 9) break;
+            acc = add(mul(acc, fromInt(10)), fromInt(c));
+            i = i + 1;
+        }
+        return acc;
+    }
+}
