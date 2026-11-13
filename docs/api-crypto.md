@@ -448,6 +448,25 @@ int[] k = Rand.bytes(32);   // kunci 256-bit
 
 ---
 
+## Rsa
+
+`lib/crypto/Rsa.kop` · 8 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] modulusOf(int[] keyDer)` | modulus: kunci publik (n=idx0) atau privat (v=0, n=idx1) |
+| `static int[] exponentOf(int[] keyDer)` | eksponen publik: kunci publik (e=idx1) atau privat (v,n,e → idx2) |
+| `static int[] exponentOf2(int[] privDer)` | eksponen privat dari kunci privat PKCS#1 |
+| `static int[] publicKey(int[] privDer)` | kunci publik DER dari kunci privat PKCS#1 |
+| `static int[] sign(int[] privDer, int[] digest, String alg)` | tanda tangan digest dengan kunci privat PKCS#1 |
+| `static boolean verify(int[] pubDer, int[] digest, int[] sig, String alg)` | verifikasi tanda tangan (digest harus digest SHA- yang sama) |
+| `static int[] encrypt(int[] pubDer, int[] msg)` | enkripsi pesan dengan kunci publik |
+| `static int[] decrypt(int[] privDer, int[] ct)` | dekripsi ciphertext dengan kunci privat |
+
+---
+
 ## Scrypt
 
 `lib/crypto/Scrypt.kop` · 1 fungsi

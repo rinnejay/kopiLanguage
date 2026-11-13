@@ -6,7 +6,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|
 | **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket`, `WsClient` |
-| **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Scrypt`, `X25519`, `X509` |
+| **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
 
 ## Daftar modul
@@ -91,6 +91,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Pem`](api-crypto.md#pem) | `lib/crypto/Pem.kop` | 3 | Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner. |
 | [`Poly`](api-crypto.md#poly) | `lib/crypto/Poly.kop` | 10 | Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit. |
 | [`Rand`](api-crypto.md#rand) | `lib/crypto/Rand.kop` | 1 | Byte acak kriptografis dari `/dev/urandom`. |
+| [`Rsa`](api-crypto.md#rsa) | `lib/crypto/Rsa.kop` | 8 | — |
 | [`Scrypt`](api-crypto.md#scrypt) | `lib/crypto/Scrypt.kop` | 1 | scrypt (RFC 7914): KDF memory-hard untuk menyimpan kata sandi (Salsa20/8 + BlockMix + ROMix). |
 | [`X25519`](api-crypto.md#x25519) | `lib/crypto/X25519.kop` | 2 | Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3. |
 | [`X509`](api-crypto.md#x509) | `lib/crypto/X509.kop` | 11 | Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik. |

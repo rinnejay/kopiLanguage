@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-crypto">Referensi API — Crypto<a class="anchor" href="#referensi-api-crypto" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#aes">Aes</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#blake2b">Blake2b</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#gcm">Gcm</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#pem">Pem</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#scrypt">Scrypt</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li><li class="toc-h2"><a href="#x509">X509</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#aead">Aead</a></li><li class="toc-h2"><a href="#aes">Aes</a></li><li class="toc-h2"><a href="#big">Big</a></li><li class="toc-h2"><a href="#blake2b">Blake2b</a></li><li class="toc-h2"><a href="#chacha">ChaCha</a></li><li class="toc-h2"><a href="#cipher">Cipher</a></li><li class="toc-h2"><a href="#crypto">Crypto</a></li><li class="toc-h2"><a href="#der">Der</a></li><li class="toc-h2"><a href="#gcm">Gcm</a></li><li class="toc-h2"><a href="#hash">Hash</a></li><li class="toc-h2"><a href="#kdf">Kdf</a></li><li class="toc-h2"><a href="#pbkdf2">Pbkdf2</a></li><li class="toc-h2"><a href="#pem">Pem</a></li><li class="toc-h2"><a href="#poly">Poly</a></li><li class="toc-h2"><a href="#rand">Rand</a></li><li class="toc-h2"><a href="#rsa">Rsa</a></li><li class="toc-h2"><a href="#scrypt">Scrypt</a></li><li class="toc-h2"><a href="#x25519">X25519</a></li><li class="toc-h2"><a href="#x509">X509</a></li></ul></nav>
 <p>Hash, PBKDF2, cipher, X25519, AEAD, DER. Semua signature di bawah diekstrak langsung dari source <code>lib/crypto/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="aead">Aead<a class="anchor" href="#aead" aria-label="tautan">#</a></h2>
@@ -770,6 +770,48 @@ int[] k = Rand.bytes(32);   // kunci 256-bit</code></pre>
 <tr>
 <td><code>static int[] bytes(int n)</code></td>
 <td>n byte acak dari /dev/urandom</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="rsa">Rsa<a class="anchor" href="#rsa" aria-label="tautan">#</a></h2>
+<p><code>lib/crypto/Rsa.kop</code> · 8 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] modulusOf(int[] keyDer)</code></td>
+<td>modulus: kunci publik (n=idx0) atau privat (v=0, n=idx1)</td>
+</tr>
+<tr>
+<td><code>static int[] exponentOf(int[] keyDer)</code></td>
+<td>eksponen publik: kunci publik (e=idx1) atau privat (v,n,e → idx2)</td>
+</tr>
+<tr>
+<td><code>static int[] exponentOf2(int[] privDer)</code></td>
+<td>eksponen privat dari kunci privat PKCS#1</td>
+</tr>
+<tr>
+<td><code>static int[] publicKey(int[] privDer)</code></td>
+<td>kunci publik DER dari kunci privat PKCS#1</td>
+</tr>
+<tr>
+<td><code>static int[] sign(int[] privDer, int[] digest, String alg)</code></td>
+<td>tanda tangan digest dengan kunci privat PKCS#1</td>
+</tr>
+<tr>
+<td><code>static boolean verify(int[] pubDer, int[] digest, int[] sig, String alg)</code></td>
+<td>verifikasi tanda tangan (digest harus digest SHA- yang sama)</td>
+</tr>
+<tr>
+<td><code>static int[] encrypt(int[] pubDer, int[] msg)</code></td>
+<td>enkripsi pesan dengan kunci publik</td>
+</tr>
+<tr>
+<td><code>static int[] decrypt(int[] privDer, int[] ct)</code></td>
+<td>dekripsi ciphertext dengan kunci privat</td>
 </tr>
 </tbody></table></div>
 <hr>

@@ -1,0 +1,292 @@
+/* Rsa.kop — RSA (PKCS#1 v1.5) murni di bahasa Kopi (v1.33).
+ *
+ * Didukung:
+ *   - kunci privat PKCS#1 (RSAPrivateKey DER) & kunci publik PKCS#1
+ *   - tanda tangan EMSA-PKCS1-v1_5 dengan SHA-1/256/384/512
+ *   - enkripsi/dekripsi PKCS#1 v1.5
+ *
+ * Bergantung BigInt.kop (modeksponen), Der.kop (TLV), Hash.kop (digest).
+ *
+ * Catatan performa: perpangkatan modulo memakai pembagian panjang biner,
+ * jadi kunci 2048-bit masih lambat di interpreter. Gunakan kunci kecil
+ * untuk pengujian; untuk produksi RSA besar lebih baik pakai pustaka lain.
+ *
+ * Fungsi:
+ *   publicKey(privDer)   → DER RSAPublicKey dari kunci privat PKCS#1
+ *   sign(privDer, digest, alg)   → tanda tangan (panjang = modulus)
+ *   verify(pubDer, digest, sig, alg) → true bila sah
+ *   encrypt(pubDer, msg) → ciphertext PKCS#1 v1.5
+ *   decrypt(privDer, ct) → plaintext
+ *   modulusOf(keyDer) / exponentOf(keyDer) → big integer (limb int[])
+ */
+
+import BigInt;
+import Der;
+import Hash;
+
+class Rsa {
+
+    /* ── DER kecil ──────────────────────────────────────────────── */
+
+    /* panjang DER (singkat atau 1-2 byte) */
+    private static int[] derLen(int n) {
+        if (n < 128) {
+            int[] o = new int[1];
+            o[0] = n;
+            return o;
+        }
+        if (n < 256) {
+            int[] o = new int[2];
+            o[0] = 129;
+            o[1] = n;
+            return o;
+        }
+        int[] o = new int[3];
+        o[0] = 130;
+        o[1] = (n >>> 8) & 255;
+        o[2] = n & 255;
+        return o;
+    }
+
+    /* bungkus isi jadi SEQUENCE DER */
+    private static int[] derSeq(int[] body) {
+        int[] len = derLen(body.length);
+        int[] out = new int[1 + len.length + body.length];
+        out[0] = 48;
+        for (int i = 0; i < len.length; i++) out[1 + i] = len[i];
+        for (int i = 0; i < body.length; i++) out[1 + len.length + i] = body[i];
+        return out;
+    }
+
+    /* integer big → INTEGER DER (dengan 0x00 bila bit tertinggi set) */
+    private static int[] derInt(int[] big) {
+        int bits = BigInt.bitLength(big);
+        int len = (bits + 7) / 8;
+        if (len < 1) len = 1;
+        int[] b = BigInt.toBytes(big, len);
+        if (b.length > 0 && (b[0] & 128) != 0) {
+            int[] w = new int[b.length + 1];
+            for (int i = 0; i < b.length; i++) w[i + 1] = b[i];
+            return w;
+        }
+        return b;
+    }
+
+    /* integer big → INTEGER DER lengkap (tag 0x02) */
+    private static int[] derIntFull(int[] big) {
+        int[] v = derInt(big);
+        int[] len = derLen(v.length);
+        int[] out = new int[1 + len.length + v.length];
+        out[0] = 2;
+        for (int i = 0; i < len.length; i++) out[1 + i] = len[i];
+        for (int i = 0; i < v.length; i++) out[1 + len.length + i] = v[i];
+        return out;
+    }
+
+    /* ── baca field INTEGER dari SEQUENCE DER ───────────────────── */
+
+    /* integer ke-idx (0-based) di dalam SEQUENCE DER */
+    private static int[] nthInt(int[] der, int idx) {
+        int[] o = new int[4];
+        Der.tlv(der, 0, o);
+        if (o[0] != 48) return new int[0];
+        int p = o[2];
+        int end = o[3];
+        int seen = 0;
+        while (p < end) {
+            Der.tlv(der, p, o);
+            if (o[0] < 0) return new int[0];
+            if (o[0] == 2) {
+                if (seen == idx) return BigInt.fromBytes(Der.sliceOf(der, o[2], o[1]));
+                seen = seen + 1;
+            }
+            p = o[3];
+        }
+        return new int[0];
+    }
+
+    /* jumlah INTEGER di dalam SEQUENCE (9 → kunci privat, 2 → publik) */
+    private static int countInts(int[] der) {
+        int[] o = new int[4];
+        Der.tlv(der, 0, o);
+        if (o[0] != 48) return 0;
+        int p = o[2];
+        int end = o[3];
+        int n = 0;
+        while (p < end) {
+            Der.tlv(der, p, o);
+            if (o[0] < 0) return n;
+            if (o[0] == 2) n = n + 1;
+            p = o[3];
+        }
+        return n;
+    }
+
+    /* modulus: kunci publik (n=idx0) atau privat (v=0, n=idx1) */
+    static int[] modulusOf(int[] keyDer) {
+        if (countInts(keyDer) >= 9) return nthInt(keyDer, 1);
+        return nthInt(keyDer, 0);
+    }
+
+    /* eksponen publik: kunci publik (e=idx1) atau privat (v,n,e → idx2) */
+    static int[] exponentOf(int[] keyDer) {
+        if (countInts(keyDer) >= 9) return nthInt(keyDer, 2);
+        return nthInt(keyDer, 1);
+    }
+
+    /* eksponen privat dari kunci privat PKCS#1 */
+    static int[] exponentOf2(int[] privDer) {
+        return nthInt(privDer, 3);
+    }
+
+    /* kunci publik DER dari kunci privat PKCS#1 */
+    static int[] publicKey(int[] privDer) {
+        int[] n = nthInt(privDer, 1);
+        int[] e = nthInt(privDer, 2);
+        if (n.length == 0 || e.length == 0) return new int[0];
+        int[] body = new int[derIntFull(n).length + derIntFull(e).length];
+        int[] a = derIntFull(n);
+        int[] b = derIntFull(e);
+        for (int i = 0; i < a.length; i++) body[i] = a[i];
+        for (int i = 0; i < b.length; i++) body[a.length + i] = b[i];
+        return derSeq(body);
+    }
+
+    /* ── DigestInfo (PKCS#1 v1.5) ────────────────────────────────── */
+
+    /* prefix DigestInfo + penanda panjang digest (alg: "SHA-256" dll) */
+    private static int[] digestInfo(String alg) {
+        int[] p = new int[0];
+        if (alg == "SHA-1") {
+            /* 3021300906052b0e03021a05000414 */
+            p = new int[15];
+            p[0] = 48; p[1] = 33; p[2] = 48; p[3] = 9; p[4] = 6; p[5] = 5; p[6] = 43;
+            p[7] = 14; p[8] = 3; p[9] = 2; p[10] = 26; p[11] = 5; p[12] = 0; p[13] = 4; p[14] = 20;
+            return p;
+        }
+        if (alg == "SHA-256") {
+            /* 3031300d060960864801650304020105000420 */
+            p = new int[19];
+            p[0] = 48; p[1] = 49; p[2] = 48; p[3] = 13; p[4] = 6; p[5] = 9;
+            p[6] = 96; p[7] = 134; p[8] = 72; p[9] = 1; p[10] = 101; p[11] = 3; p[12] = 4;
+            p[13] = 2; p[14] = 1; p[15] = 5; p[16] = 0; p[17] = 4; p[18] = 32;
+            return p;
+        }
+        if (alg == "SHA-384") {
+            /* 3041300d060960864801650304020205000430 */
+            p = new int[19];
+            p[0] = 48; p[1] = 65; p[2] = 48; p[3] = 13; p[4] = 6; p[5] = 9;
+            p[6] = 96; p[7] = 134; p[8] = 72; p[9] = 1; p[10] = 101; p[11] = 3; p[12] = 4;
+            p[13] = 2; p[14] = 2; p[15] = 5; p[16] = 0; p[17] = 4; p[18] = 48;
+            return p;
+        }
+        if (alg == "SHA-512") {
+            /* 3051300d060960864801650304020305000440 */
+            p = new int[19];
+            p[0] = 48; p[1] = 81; p[2] = 48; p[3] = 13; p[4] = 6; p[5] = 9;
+            p[6] = 96; p[7] = 134; p[8] = 72; p[9] = 1; p[10] = 101; p[11] = 3; p[12] = 4;
+            p[13] = 2; p[14] = 3; p[15] = 5; p[16] = 0; p[17] = 4; p[18] = 64;
+            return p;
+        }
+        return new int[0];
+    }
+
+    /* EMSA-PKCS1-v1_5: 0x00 || 0x01 || 0xFF... || 0x00 || T */
+    private static int[] emsa(int[] t, int k) {
+        if (t.length + 11 > k) return new int[0];
+        int[] em = new int[k];
+        em[0] = 0;
+        em[1] = 1;
+        int pad = k - t.length - 3;
+        for (int i = 0; i < pad; i++) em[2 + i] = 255;
+        em[2 + pad] = 0;
+        for (int i = 0; i < t.length; i++) em[3 + pad + i] = t[i] & 255;
+        return em;
+    }
+
+    /* EMSA-PKCS1-v1_5 untuk enkripsi: 0x00 || 0x02 || PS(nonzero) || 0x00 || M */
+    private static int[] emsaEnc(int[] msg, int k) {
+        if (msg.length + 11 > k) return new int[0];
+        int[] em = new int[k];
+        em[0] = 0;
+        em[1] = 2;
+        int pad = k - msg.length - 3;
+        for (int i = 0; i < pad; i++) em[2 + i] = (i % 255) + 1;
+        em[2 + pad] = 0;
+        for (int i = 0; i < msg.length; i++) em[3 + pad + i] = msg[i] & 255;
+        return em;
+    }
+
+    /* ── tanda tangan ────────────────────────────────────────────── */
+
+    /* tanda tangan digest dengan kunci privat PKCS#1 */
+    static int[] sign(int[] privDer, int[] digest, String alg) {
+        int[] n = nthInt(privDer, 1);
+        int[] d = nthInt(privDer, 3);
+        if (n.length == 0 || d.length == 0) return new int[0];
+        int k = (BigInt.bitLength(n) + 7) / 8;
+        int[] di = digestInfo(alg);
+        if (di.length == 0) return new int[0];
+        int[] t = new int[di.length + digest.length];
+        for (int i = 0; i < di.length; i++) t[i] = di[i];
+        for (int i = 0; i < digest.length; i++) t[di.length + i] = digest[i];
+        int[] em = emsa(t, k);
+        if (em.length == 0) return new int[0];
+        int[] m = BigInt.modexp(BigInt.fromBytes(em), d, n);
+        return BigInt.toBytes(m, k);
+    }
+
+    /* verifikasi tanda tangan (digest harus digest SHA-* yang sama) */
+    static boolean verify(int[] pubDer, int[] digest, int[] sig, String alg) {
+        int[] n = nthInt(pubDer, 0);
+        int[] e = nthInt(pubDer, 1);
+        if (n.length == 0 || e.length == 0) return false;
+        int k = (BigInt.bitLength(n) + 7) / 8;
+        if (sig.length != k) return false;
+        int[] m = BigInt.modexp(BigInt.fromBytes(sig), e, n);
+        int[] em = BigInt.toBytes(m, k);
+        int[] di = digestInfo(alg);
+        if (di.length == 0) return false;
+        int[] t = new int[di.length + digest.length];
+        for (int i = 0; i < di.length; i++) t[i] = di[i];
+        for (int i = 0; i < digest.length; i++) t[di.length + i] = digest[i];
+        int[] expect = emsa(t, k);
+        if (expect.length != em.length) return false;
+        int diff = 0;
+        for (int i = 0; i < em.length; i++) diff = diff | (em[i] ^ expect[i]);
+        return diff == 0;
+    }
+
+    /* ── enkripsi / dekripsi PKCS#1 v1.5 ─────────────────────────── */
+
+    /* enkripsi pesan dengan kunci publik */
+    static int[] encrypt(int[] pubDer, int[] msg) {
+        int[] n = nthInt(pubDer, 0);
+        int[] e = nthInt(pubDer, 1);
+        if (n.length == 0 || e.length == 0) return new int[0];
+        int k = (BigInt.bitLength(n) + 7) / 8;
+        int[] em = emsaEnc(msg, k);
+        if (em.length == 0) return new int[0];
+        int[] c = BigInt.modexp(BigInt.fromBytes(em), e, n);
+        return BigInt.toBytes(c, k);
+    }
+
+    /* dekripsi ciphertext dengan kunci privat */
+    static int[] decrypt(int[] privDer, int[] ct) {
+        int[] n = nthInt(privDer, 1);
+        int[] d = nthInt(privDer, 3);
+        if (n.length == 0 || d.length == 0) return new int[0];
+        int k = (BigInt.bitLength(n) + 7) / 8;
+        if (ct.length != k) return new int[0];
+        int[] m = BigInt.modexp(BigInt.fromBytes(ct), d, n);
+        int[] em = BigInt.toBytes(m, k);
+        if (em.length < 11) return new int[0];
+        if (em[0] != 0 || em[1] != 2) return new int[0];
+        int i = 2;
+        while (i < em.length && em[i] != 0) i = i + 1;
+        if (i >= em.length) return new int[0];
+        int[] out = new int[em.length - i - 1];
+        for (int j = 0; j < out.length; j++) out[j] = em[i + 1 + j];
+        return out;
+    }
+}
