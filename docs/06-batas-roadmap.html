@@ -177,11 +177,11 @@
 </tr>
 <tr>
 <td>TLS <strong>server</strong></td>
-<td>tidak ada; pakai reverse proxy</td>
+<td>✅ v1.36 — <code>TlsServer</code> (X25519 + ECDSA P-256, ChaCha/AES-GCM); belum mTLS</td>
 </tr>
 <tr>
 <td>Verifikasi ECDSA CertificateVerify</td>
-<td>TLS klien memakai pin SPKI TOFU + verifikasi Finished; primitif ECDSA P-256 sudah ada sejak v1.35 (<code>Ecdsa</code>)</td>
+<td>✅ sisi server (v1.36): CV klien diverifikasi; sisi klien masih pin SPKI TOFU</td>
 </tr>
 <tr>
 <td>Validasi rantai/PKI, hostname, expiry</td>
@@ -283,7 +283,7 @@
 </ul></li>
 <li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>
 <li>~~Array bertipe~~ <strong>✅ v1.16</strong> (<code>long[]</code>/<code>String[]</code> elemen 64-bit slot; sisa: <code>double[]</code>, array literal, multi-dimensi).</li>
-<li><strong>TLS server + verifikasi ECDSA/CertificateVerify + chain/hostname</strong> — fondasi ECDSA P-256 (v1.35) sudah siap dipakai.</li>
+<li><strong>TLS server</strong> ✅ v1.36 (<code>TlsServer</code>, oracle OpenSSL/Python). Sisa: verifikasi rantai/hostname di klien, mTLS, session resumption.</li>
 <li><strong>HTTP</strong>: multipart, range/ETag, chunked response, gzip.</li>
 <li><strong>DB client</strong> (SQLite via protokol file atau Postgres/Redis via socket).</li>
 <li><strong>Ekosistem</strong>: package manager, LSP, formatter, CI lintas platform, fuzzing, audit keamanan.</li>

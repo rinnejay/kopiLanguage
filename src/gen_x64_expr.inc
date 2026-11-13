@@ -454,8 +454,28 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmovl 8(%%rsp), %%edi");              /* fd */
             emit("\tmovq %%r11, %%rsi");
             emit("\tmovl %%edx, %%edx");                 /* want */
+            /* push r8/r9: sendto memakai r8,r9 utk addr/addrlen */
+            emit("\tpushq %%r8");
+            emit("\tpushq %%r9");
+            emit("\tmovl 24(%%rsp), %%edi");             /* fd (setelah 2 push) */
+            emit("\tmovq %%r11, %%rsi");
+            emit("\tmovl %%edx, %%edx");
+            emit("\tmovl $16384, %%r10d");               /* MSG_NOSIGNAL */
+            emit("\txorl %%r8d, %%r8d");                 /* addr = NULL */
+            emit("\txorl %%r9d, %%r9d");                 /* addrlen = 0 */
+            emit("\tmovl $44, %%eax");                   /* __NR_sendto */
+            emit("\tsyscall");
+            emit("\tcmpl $-88, %%eax");                  /* ENOTSOCK → write */
+            emit("\tjne .LSX%dso", ln);
+            emit("\tmovl 24(%%rsp), %%edi");
+            emit("\tmovq %%r11, %%rsi");
+            emit("\tmovl %%edx, %%edx");
             emit("\tmovl $1, %%eax");                    /* __NR_write */
             emit("\tsyscall");
+            emit(".LSX%dso:", ln);
+            emit("\tleaq kop_iobuf(%%rip), %%r11");      /* syscall merusak r11 */
+            emit("\tpopq %%r9");
+            emit("\tpopq %%r8");
             emit("\ttestq %%rax, %%rax");
             emit("\tjs .LSX%de", ln);
             emit("\taddl %%eax, %%r9d");                 /* penuh/parsial */

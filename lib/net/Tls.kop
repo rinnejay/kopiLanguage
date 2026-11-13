@@ -431,6 +431,7 @@ class Tls {
 
         /* ── master + kunci app ── */
         int[] d2 = Kdf.deriveSecret(hsSec, Net.bytes("derived"), new int[0]);
+        /* RFC 8446 §7.1: master = Extract(salt=D2, IKM=0) */
         int[] master = Kdf.extract(d2, new int[32]);
         int[] sApSecret = Kdf.deriveSecret(master, Net.bytes("s ap traffic"), tx);
         int[] sApKey = tkey(sApSecret);

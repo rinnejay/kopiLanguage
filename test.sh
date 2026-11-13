@@ -1776,6 +1776,47 @@ else
     echo "FAIL  traceerr [vm]"; FAIL=$((FAIL+1)); echo "$errout" | head -6
 fi
 
+# ─── v1.36: TLS server (TlsServer) — oracle python ssl + klien Kopi ──
+pkill -f "tlssrv\.[b]in" 2>/dev/null
+sleep 0.3
+if ./kopicc test/tlssrv.kop -t a64 -o "$T/kopi/tlssrv.s" &&
+   cc "$T/kopi/tlssrv.s" -o "$T/kopi/tlssrv.bin" &&
+   ./kopicc test/tlssrvcli.kop -t a64 -o "$T/kopi/tlssrvcli.s" &&
+   cc "$T/kopi/tlssrvcli.s" -o "$T/kopi/tlssrvcli.bin"; then
+    rm -f "$T/kopi/tls_cert.der" "$T/kopi/srvout.log" "$T/srvdbg.log"
+    "$T/kopi/tlssrv.bin" 10085 "$T/kopi/tls_cert.der" > "$T/kopi/srvout.log" 2>&1 &
+    SPID=$!
+    ok=0
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        sleep 1
+        if grep -q "listen ok" "$T/opencode/srvdbg.log" 2>/dev/null ||
+           grep -q "listen ok" "$T/srvdbg.log" 2>/dev/null; then
+            ok=1
+            break
+        fi
+    done
+    if [ $ok -eq 1 ]; then
+        pyout="$(python3 tools/tls_srv_probe.py 10085 2>&1 | tail -1)"
+        cliout="$("$T/kopi/tlssrvcli.bin" 10085 "$T/kopi/tls_cert.der" 2>&1)"
+        sleep 1
+        if [ "$pyout" = "py TLSv1.3 True" ] &&
+           echo "$cliout" | grep -q "cli pin=1 fin=1 echo=pong"; then
+            echo "PASS  tlssrv [a64]"; PASS=$((PASS+1))
+        else
+            echo "FAIL  tlssrv [a64]"; FAIL=$((FAIL+1))
+            echo "py=$pyout"
+            echo "$cliout" | head -3
+        fi
+    else
+        echo "FAIL  tlssrv [a64]: server tidak siap"; FAIL=$((FAIL+1))
+        tail -5 "$T/kopi/srvout.log"
+    fi
+    kill $SPID 2>/dev/null
+    wait $SPID 2>/dev/null
+else
+    echo "FAIL  tlssrv [a64]: build gagal"; FAIL=$((FAIL+1))
+fi
+
 # ─── situs dokumentasi HTML (GitHub Pages) ───
 # gen_libref dulu: signature lib/*.kop harus sinkron dengan docs/api-*.md
 if python3 tools/gen_libref.py > "$T/kopi/libref.out" 2>&1 &&

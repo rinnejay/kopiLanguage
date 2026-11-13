@@ -97,7 +97,9 @@
                     if (want > 4096) want = 4096;
                     for (long i = 0; i < want; i++)
                         tmp[i] = (unsigned char)(buf[1 + terkirim + i] & 0xff);
-                    long nwr = write((int)fdi, tmp, (size_t)want);
+                    long nwr = send((int)fdi, tmp, (size_t)want, MSG_NOSIGNAL);
+                    if (nwr < 0 && errno == ENOTSOCK)
+                        nwr = write((int)fdi, tmp, (size_t)want);
                     if (nwr <= 0) { terkirim = -1; break; }
                     terkirim += nwr;
                 }

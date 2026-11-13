@@ -1,0 +1,39 @@
+/* tlssrvcli.kop — klien Kopi menyambung ke server TLS uji (tlssrv.kop).
+ *
+ * Pakai: tlssrvcli.kop <port> <certFile>
+ * pin = SHA-256(SPKI sertifikat) — dari berkas DER yang ditulis server.
+ * Kirim "ping", harap "pong".
+ */
+import Tls;
+import Tcp;
+import Der;
+import File;
+import Cipher;
+import Str;
+
+class Main {
+    public static void main(String[] args) {
+        int port = 10085;
+        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+        String certPath = "";
+        if (Net.argc() > 1) certPath = Net.argv(1);
+
+        int ffd = File.openRead(certPath);
+        int n = File.size(ffd);
+        int[] cert = new int[n];
+        File.readInto(ffd, cert);
+        File.close(ffd);
+        int[] pin = Der.spkiPin(cert);
+
+        int[] ctx = Tls.gate(Tcp.loopback(), port, pin);
+        if (ctx[1] != 1) {
+            System.out.println("cli pin=" + Str.fromInt(ctx[2]) + " fin="
+                + Str.fromInt(ctx[3]) + " st=" + Str.fromInt(ctx[6]));
+            return;
+        }
+        Tls.writeApp(ctx, Net.bytes("ping"));
+        int[] got = Tls.readApp(ctx);
+        String s = Net.mkstr(got);
+        System.out.println("cli pin=1 fin=1 echo=" + s);
+    }
+}

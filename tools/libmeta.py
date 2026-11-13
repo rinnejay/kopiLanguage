@@ -400,6 +400,13 @@ META = {
         "notes": ["Bukan TLS server; belum verifikasi ECDSA CertificateVerify/rantai/hostname.",
                   "Pin SPKI = SHA-256 DER SPKI leaf (TOFU)."],
     },
+    "TlsServer": {
+        "purpose": "Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished, data aplikasi dua arah.",
+        "example": 'import TlsServer;\nimport Tcp;\n\nint lfd = Net.socket(2, 1);\nNet.bind(lfd, Tcp.loopback(), 9443);\nNet.listen(lfd, 4);\nint fd = Net.accept(lfd);\nint[] ctx = TlsServer.accept(fd, certDer, priv32, Rand.bytes(64));\nint[] pesan = TlsServer.readApp(ctx);\nTlsServer.writeApp(ctx, Net.bytes("pong"));',
+        "notes": ["Suite: TLS_CHACHA20_POLY1305_SHA256 (0x1303), AES-128-GCM (0x1301), AES-256-GCM (0x1302) — dipilih dengan prioritas SHA-256.",
+                  "Sertifikat self-signed ECDSA-SHA256 dibangun oleh certDer; kunci privat = skalar P-256 32 byte.",
+                  "Handshake tervalidasi terhadap klien OpenSSL/Python (oracle)."],
+    },
 }
 
 # Deskripsi tambahan untuk fungsi/konstanta yang tidak punya komentar sumber.
@@ -657,6 +664,17 @@ EXTRA = {
         "arr2": "(internal) array dua byte",
         "arr3": "(internal) array tiga byte",
         "sliceOf": "(internal) potong array",
+    }},
+    "TlsServer": {"descs": {
+        "certDer": "bangun sertifikat self-signed ECDSA-SHA256 (X.509 v3) dari skalar privat",
+        "pinOf": "pin SPKI sertifikat (SHA-256 DER SPKI)",
+        "accept": "handshake server TLS 1.3; context untuk writeApp/readApp (ctx[1]=1 sukses)",
+        "writeApp": "kirim data aplikasi terenkripsi",
+        "readApp": "baca data aplikasi (deenkripsi); kosong = tutup/galat",
+        "tlv": "(internal) DER TLV",
+        "oid": "(internal) OID dari teks titik",
+        "seq": "(internal) DER SEQUENCE",
+        "sigDer": "(internal) bungkus r||s jadi DER ECDSA-Sig-Value",
     }},
     "Udp": {"descs": {"loopback": "alamat 127.0.0.1"}},
     "Url": {"descs": {

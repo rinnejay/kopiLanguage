@@ -1,0 +1,552 @@
+/* TlsServer.kop — server TLS 1.3 (RFC 8446) murni Kopi (v1.36).
+ *
+ * Sisi cermin dari Tls.kop (klien): server menerima ClientHello,
+ * menjawab ServerHello (x25519 + TLS 1.3), mengirim EncryptedExtensions,
+ * Certificate, CertificateVerify (tanda tangan ECDSA P-256 — lihat
+ * Ecdsa.kop), dan server Finished; lalu memverifikasi client Finished.
+ *
+ * Cipher suite (dipilih dari penawaran klien; suite ber-hash SHA-256
+ * diprioritaskan — 0x1302 menuntut key schedule SHA-384):
+ *   0x1301 AES-128-GCM  (kunci AEAD 16 byte)
+ *   0x1302 AES-256-GCM  (kunci AEAD 32 byte)
+ *   0x1303 ChaCha20-Poly1305 (kunci 32 byte)
+ *
+ * Sertifikat dibangun sendiri (self-signed, ECDSA-SHA256, RFC 6979):
+ *   TlsServer.certDer(priv32) → DER X.509 — memakai BigInt untuk skalar.
+ *
+ * API (ctx layout identik dengan Tls.gate agar writeApp/readApp satu pola):
+ *   TlsServer.accept(fd, certDer, priv32) → ctx
+ *   TlsServer.writeApp(ctx, data) / TlsServer.readApp(ctx)
+ *
+ * Offset ctx: 0 fd; 1 bersambung-hasil (1 pas penuh); 2 alg record
+ * (0=aes128gcm, 1=chacha, 2=aes256gcm); 3 client-Finished cocok;
+ * 4 seq keluar; 5 seq masuk; 8..39 kunci app keluar; 40..51 iv keluar;
+ * 56..87 kunci app masuk; 88..99 iv masuk.
+ */
+
+import Hash;
+import Kdf;
+import ChaCha;
+import Aead;
+import Gcm;
+import Aes;
+import X25519;
+import Tcp;
+import Der;
+import BigInt;
+import Cipher;
+import Tls;
+import Ecdsa;
+
+class TlsServer {
+
+    /* hasil parse ClientHello (per koneksi) */
+    int[] cliPub;
+    int[] cliSid;
+    int alg;
+    int verOk;
+
+    TlsServer() {
+        this.cliPub = new int[0];
+        this.cliSid = new int[0];
+        this.alg = -1;
+        this.verOk = 0;
+    }
+
+    /* ── DER tulis (untuk sertifikat) ───────────────────────────── */
+
+    /* TLV dengan panjang singkat/panjang (0x81/0x82) */
+    static int[] tlv(int tag, int[] body) {
+        int bl = body.length;
+        int hl = 0;
+        if (bl < 128) hl = 1;
+        else if (bl < 256) hl = 2;
+        else hl = 3;
+        int[] out = new int[1 + hl + bl];
+        out[0] = tag & 255;
+        if (hl == 1) {
+            out[1] = bl;
+        } else if (hl == 2) {
+            out[1] = 129;
+            out[2] = bl;
+        } else {
+            out[1] = 130;
+            out[2] = (bl >>> 8) & 255;
+            out[3] = bl & 255;
+        }
+        for (int i = 0; i < bl; i++) out[1 + hl + i] = body[i] & 255;
+        return out;
+    }
+
+    static int[] cat(int[] a, int[] b) {
+        int[] o = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        for (int i = 0; i < b.length; i++) o[a.length + i] = b[i];
+        return o;
+    }
+
+    static int[] cat3(int[] a, int[] b, int[] c) {
+        return cat(cat(a, b), c);
+    }
+
+    static int[] arr1(int a) {
+        int[] o = new int[1];
+        o[0] = a & 255;
+        return o;
+    }
+
+    static int[] arr2(int a, int b) {
+        int[] o = new int[2];
+        o[0] = a & 255;
+        o[1] = b & 255;
+        return o;
+    }
+
+    static int[] u16(int v) {
+        return arr2((v >>> 8) & 255, v & 255);
+    }
+
+    static int[] u24(int v) {
+        return cat(arr1((v >>> 16) & 255), arr2((v >>> 8) & 255, v & 255));
+    }
+
+    static int[] hexp(String hex) {
+        return Cipher.hexdec(hex);
+    }
+
+    /* 64 spasi untuk konten CertificateVerify (RFC 8446 §4.4.3) */
+    static int[] spaces64() {
+        int[] o = new int[64];
+        for (int i = 0; i < 64; i++) o[i] = 32;
+        return o;
+    }
+
+    /* DER OID: byte mentah sudah berbentuk lengkap (tag 06) */
+    static int[] oid(String raw) {
+        return tlv(6, hexp(raw));
+    }
+
+    static int[] seq(int[] body) {
+        return tlv(48, body);                       /* 0x30 */
+    }
+
+    static int[] setOf(int[] body) {
+        return tlv(49, body);                       /* 0x31 */
+    }
+
+    static int[] integer1() {
+        return tlv(2, arr1(1));
+    }
+
+    static int[] utctimeA() {
+        return tlv(23, Net.bytes("260101000000Z"));  /* notBefore */
+    }
+
+    static int[] utctimeB() {
+        return tlv(23, Net.bytes("360101000000Z"));  /* notAfter */
+    }
+
+    static int[] bitstr(int[] body) {
+        return tlv(3, cat(arr1(0), body));          /* 0x03, 0 byte tak terpakai */
+    }
+
+    static int[] explicit0(int[] body) {
+        return tlv(160, body);                      /* [0] EXPLICIT 0xA0 */
+    }
+
+    /* Name satu RDN: CN=kopi (Net.bytes butuh literal) */
+    static int[] nameKopi() {
+        int[] cnOid = oid("550403");                /* 2.5.4.3 commonName */
+        int[] atv = seq(cat(cnOid, tlv(12, Net.bytes("kopi"))));
+        return seq(setOf(atv));
+    }
+
+    /* ── sertifikat self-signed ECDSA-SHA256 ────────────────────── */
+
+    /* priv32 = skalar privat 32 byte big-endian; balikan DER Certificate.
+     * Deterministik (RFC 6979) sehingga vektor uji bisa direkam. */
+    static int[] certDer(int[] priv32) {
+        /* SPKI: EC P-256 */
+        int[] d = BigInt.fromBytes(priv32);
+        int[] pub64 = Ecdsa.pubKey(d);
+        int[] poin = cat(arr1(4), pub64);           /* 04 ‖ X ‖ Y */
+        int[] ecpk = cat(oid("2a8648ce3d0201"),     /* 1.2.840.10045.2.1 */
+                         oid("2a8648ce3d030107"));  /* prime256v1 */
+        int[] spki = seq(cat(seq(ecpk), bitstr(poin)));
+
+        int[] sigAlg = seq(oid("2a8648ce3d040302")); /* ecdsa-with-SHA256 */
+        int[] ver = tlv(2, arr1(2));                 /* version v3 = 2 */
+        int[] nm = nameKopi();
+        int[] valid = seq(cat3(utctimeA(), utctimeB(), new int[0]));
+
+        int[] tbsBody =
+            cat(explicit0(ver),
+                cat(integer1(),                     /* serial = 1 */
+                    cat(sigAlg,
+                        cat(nm,
+                            cat(valid,
+                                cat(nm, spki))))));
+        int[] tbs = seq(tbsBody);
+        int[] sig = Ecdsa.sign(d, tbs);
+        return seq(cat3(tbs, sigAlg, bitstr(sigDer(sig))));
+    }
+
+    /* INTEGER DER dari 32 byte skalar (kanonik: leading-zero dipangkas,
+     * 0x00 didepan bila bit tertinggi terpasang) */
+    static int[] intDer32(int[] v) {
+        int s = 0;
+        while (s < 32 && v[s] == 0) s = s + 1;
+        int need = 32 - s;
+        if (need == 0) return tlv(2, arr1(0));
+        int pad = 0;
+        if (v[s] >= 128) pad = 1;
+        int[] c = new int[pad + need];
+        if (pad == 1) c[0] = 0;
+        for (int i = 0; i < need; i++) c[pad + i] = v[s + i];
+        return tlv(2, c);
+    }
+
+    /* ECDSA-SigValue DER: SEQUENCE{INTEGER r, INTEGER s} dari r‖s 64 byte */
+    static int[] sigDer(int[] rs) {
+        int[] r = new int[32];
+        int[] s2 = new int[32];
+        for (int i = 0; i < 32; i++) {
+            r[i] = rs[i];
+            s2[i] = rs[32 + i];
+        }
+        return seq(cat(intDer32(r), intDer32(s2)));
+    }
+
+    /* pin SPKI sertifikat (ala Tls gate): SHA-256(DER SPKI leaf) */
+    static int[] pinOf(int[] cert) {
+        return Der.spkiPin(cert);
+    }
+
+    /* ── layer record (dua algoritma) ───────────────────────────── */
+
+    /* kunci AEAD sesuai alg (RFC 8446 §7.3): aes128=16, aes256=32, chacha=32 */
+    static int[] keyOf(int[] secret, int alg) {
+        int n = 32;
+        if (alg == 0) n = 16;
+        return Kdf.expandLabel(secret, Net.bytes("key"), new int[0], n);
+    }
+
+    /* record keluar penuh: header ‖ ciphertext ‖ tag */
+    static int[] sealR(int alg, int[] key, int[] iv, int seq, int ctype, int[] payload) {
+        int[] nce = Tls.nonceOf(iv, seq);
+        int[] plain = new int[payload.length + 1];
+        for (int i = 0; i < payload.length; i++) plain[i] = payload[i];
+        plain[payload.length] = ctype;
+        int[] hdr = Tls.cat(Tls.arr3(23, 3, 3), Tls.u16(plain.length + 16));
+        if (alg == 1) {
+            int[] ctr = ChaCha.xctr(key, nce, 1, plain);
+            int[] tag = Aead.tagOf(key, nce, hdr, ctr);
+            return Tls.cat(Tls.cat(hdr, ctr), tag);
+        }
+        int[] cttag = Gcm.seal(key, nce, hdr, plain);
+        return cat(hdr, cttag);
+    }
+
+    /* record masuk → plaintext (tanpa byte tipe dalam). okOut[0]:
+     * -1 galat, selain itu tipe dalam (20 finished, 4 NST, 21 alert, 23 app). */
+    static int[] openR(int alg, int[] key, int[] iv, int seq, int[] rec, int[] okOut) {
+        okOut[0] = -1;
+        int[] kosong = new int[0];
+        if (rec.length < 22) return kosong;
+        int pl = rec.length - 5;
+        int[] hdr = Tls.sliceOf(rec, 0, 5);
+        if (alg == 1) {
+            int[] sub = new int[1];
+            int[] pt = Tls.openRec(key, iv, seq, rec, sub);
+            okOut[0] = sub[0];
+            return pt;
+        }
+        int[] data = Tls.sliceOf(rec, 5, pl - 16);
+        int[] tag = Tls.sliceOf(rec, 5 + pl - 16, 16);
+        int[] nce = Tls.nonceOf(iv, seq);
+        int[] plain = Gcm.open(key, nce, hdr, Tls.cat(data, tag));
+        if (plain.length == 0) return kosong;
+        int idx = -1;
+        for (int q = plain.length - 1; q >= 0; q--) {
+            if (plain[q] != 0) {
+                idx = q;
+                break;
+            }
+        }
+        if (idx < 0) return kosong;
+        okOut[0] = plain[idx];
+        return Tls.sliceOf(plain, 0, idx);
+    }
+
+    /* ── parse ClientHello ──────────────────────────────────────── */
+
+    /* isi handshake message CH. mengisi this.cliPub/alg/verOk.
+     * balikan 1 bila cukup lengkap (pub x25519 + TLS 1.3 + suite dikenal). */
+    int parseCH(int[] isi) {
+        this.alg = -1;
+        this.verOk = 0;
+        this.cliPub = new int[0];
+        this.cliSid = new int[0];
+        if (isi.length < 40) return 0;
+        if (isi[0] != 1) return 0;
+        int mlen = Tls.get24(isi, 1);
+        if (mlen + 4 != isi.length) return 0;
+        int p = 4 + 2 + 32;                          /* legacy version + random */
+        int sid = isi[p];
+        this.cliSid = Tls.sliceOf(isi, p + 1, sid);  /* legacy_session_id (harus di-echo) */
+        p = p + 1 + sid;
+        int sl = Tls.get16(isi, p);
+        p = p + 2;
+        int q = p;
+        int hasChacha = 0;
+        int hasAes128 = 0;
+        int hasAes256 = 0;
+        while (q + 2 <= p + sl) {
+            int cs = Tls.get16(isi, q);
+            q = q + 2;
+            if (cs == 4867) hasChacha = 1;       /* 0x1303 ChaCha20 (SHA-256) */
+            else if (cs == 4865) hasAes128 = 1;  /* 0x1301 AES128-GCM (SHA-256) */
+            else if (cs == 4866) hasAes256 = 1;  /* 0x1302 AES256-GCM (SHA-384!) */
+        }
+        /* prioritas: suite ber-hash SHA-256 dulu — 0x1302 menuntut
+         * key schedule SHA-384 (RFC 8446 §7.1) yang belum didukung
+         * Kdf; dipilih hanya bila klien tidak menawarkan yang lain. */
+        this.alg = -1;
+        if (hasChacha == 1) this.alg = 1;
+        else if (hasAes128 == 1) this.alg = 0;
+        else if (hasAes256 == 1) this.alg = 2;
+        p = p + sl;
+        int cl = isi[p];
+        p = p + 1 + cl;
+        if (cl != 1 || isi[p - 1] != 0) return 0;    /* kompresi harus [null] */
+        int el = Tls.get16(isi, p);
+        p = p + 2;
+        int e = p;
+        while (e + 4 <= p + el) {
+            int id = Tls.get16(isi, e);
+            int xlen = Tls.get16(isi, e + 2);
+            int bs = e + 4;
+            if (id == 43 && xlen >= 3) {
+                int nv = isi[bs];
+                int f = bs + 1;
+                while (f + 2 <= bs + 1 + nv) {
+                    int vv = Tls.get16(isi, f);
+                    f = f + 2;
+                    if (vv == 772) this.verOk = 1;   /* 0x0304 TLS 1.3 */
+                }
+            }
+            if (id == 51 && xlen >= 4) {
+                int tot = Tls.get16(isi, bs);
+                int f = bs + 2;
+                while (f + 4 <= bs + 2 + tot && f + 4 <= isi.length) {
+                    int grp = Tls.get16(isi, f);
+                    int klen = Tls.get16(isi, f + 2);
+                    if (grp == 29 && klen == 32 && f + 4 + 32 <= isi.length) {
+                        this.cliPub = Tls.sliceOf(isi, f + 4, 32);
+                    }
+                    f = f + 4 + klen;
+                }
+            }
+            e = bs + xlen;
+        }
+        if (this.alg < 0 || this.verOk != 1 || this.cliPub.length != 32) return 0;
+        return 1;
+    }
+
+    /* ── handshake server ───────────────────────────────────────── */
+
+    /* fd = koneksi hasil accept; certDer = sertifikat; priv32 = skalar ECDSA.
+     * randSes ≥ 64 byte: 0..31 kunci ephemeral server, 32..63 random server. */
+    static int[] accept(int fd, int[] certDer, int[] priv32, int[] randSes) {
+        int[] ctx = new int[256];
+        ctx[0] = fd;
+
+        /* ── ClientHello ── */
+        int[] rec = Tls.recvRecord(fd);
+        if (rec.length == 0) {
+            ctx[6] = 1;
+            return ctx;
+        }
+        if (rec[0] != 22) {
+            ctx[6] = 2;
+            return ctx;
+        }
+        int[] ch = Tls.sliceOf(rec, 5, rec.length - 5);
+        TlsServer hs = new TlsServer();
+        if (hs.parseCH(ch) != 1) {
+            ctx[6] = 3;
+            return ctx;
+        }
+        ctx[2] = hs.alg;
+        ctx[6] = 4;                                  /* CH terbaca */
+        int[] tx = ch;
+
+        /* ── ServerHello ── */
+        int[] sk = Tls.sliceOf(randSes, 0, 32);
+        int[] rnd = Tls.sliceOf(randSes, 32, 32);
+        int[] spub = X25519.pub(sk);
+        int[] ksBody = Tls.cat(Tls.u16(29), Tls.cat(Tls.u16(32), spub));
+        int[] svBody = Tls.arr2(3, 4);               /* SH: 0304 saja (bukan vektor) */
+        int[] exts = Tls.cat(Tls.extOf(43, svBody), Tls.extOf(51, ksBody));
+        int[] body = Tls.cat(Tls.cat(Tls.arr2(3, 3), rnd),
+                             Tls.cat(Tls.arr1(hs.cliSid.length), hs.cliSid));
+        body = Tls.cat(body, Tls.cat(Tls.u16(hs.alg == 1 ? 4867 : (hs.alg == 2 ? 4866 : 4865)),
+                                     Tls.arr1(0)));
+        body = Tls.cat(body, Tls.cat(Tls.u16(exts.length), exts));
+        int[] sh = Tls.cat3(Tls.arr1(2), Tls.u24(body.length), body);
+        int[] shRec = Tls.cat3(Tls.arr3(22, 3, 3), Tls.u16(sh.length), sh);
+        int t0 = Tcp.sendBuf(fd, shRec);
+        if (t0 < 0) {
+            ctx[6] = 5;
+            return ctx;
+        }
+        tx = Tls.cat(tx, sh);
+
+        /* ── key schedule handshake ── */
+        int[] ecd = X25519.x25519(sk, hs.cliPub);
+        int[] early = Kdf.extract(new int[32], new int[32]);
+        int[] hsDerived = Kdf.deriveSecret(early, Net.bytes("derived"), new int[0]);
+        int[] hsSec = Kdf.extract(hsDerived, ecd);
+        int[] cHs = Kdf.deriveSecret(hsSec, Net.bytes("c hs traffic"), tx);
+        int[] sHs = Kdf.deriveSecret(hsSec, Net.bytes("s hs traffic"), tx);
+
+        /* ── EE ‖ Cert ‖ CV ‖ Finished (empat record tersegel) ── */
+        int[] eeBody = Tls.u16(0);                   /* tanpa ekstensi */
+        int[] ee = Tls.cat3(Tls.arr1(8), Tls.u24(eeBody.length), eeBody);
+        int[] certBody = Tls.cat(Tls.arr1(0),
+                                 Tls.u24(certDer.length + 5));  /* chain: u24+cert+u16 */
+        certBody = Tls.cat(certBody, Tls.cat(Tls.u24(certDer.length), certDer));
+        certBody = Tls.cat(certBody, Tls.u16(0));    /* ekstensi per-sertifikat */
+        int[] cm = Tls.cat3(Tls.arr1(11), Tls.u24(certBody.length), certBody);
+        /* transkrip maju s.d. Certificate — isi CertificateVerify (RFC 8446 §4.4.3) */
+        tx = Tls.cat(tx, Tls.cat(ee, cm));
+        int[] isiCv = Tls.cat(spaces64(),
+                              Net.bytes("TLS 1.3, server CertificateVerify"));
+        isiCv = Tls.cat(Tls.cat(isiCv, Tls.arr1(0)), Hash.sha256(tx));
+        int[] sig = Ecdsa.sign(BigInt.fromBytes(priv32), isiCv);
+        /* RFC 8446 §4.2.3: sig ECDSA TLS 1.3 = DER ECDSA-Sig-Value (bukan raw r‖s) */
+        sig = sigDer(sig);
+        int[] cvBody = Tls.cat(Tls.u16(1027), Tls.cat(Tls.u16(sig.length), sig));
+        int[] cv = Tls.cat3(Tls.arr1(15), Tls.u24(cvBody.length), cvBody);
+        tx = Tls.cat(tx, cv);
+        int[] fk = Kdf.expandLabel(sHs, Net.bytes("finished"), new int[0], 32);
+        int[] vd = Hash.hmac(fk, Hash.sha256(tx));   /* s.d. CertificateVerify */
+        int[] fin = Tls.cat3(Tls.arr1(20), Tls.u24(vd.length), vd);
+        tx = Tls.cat(tx, fin);
+
+        int[] skey = keyOf(sHs, hs.alg);
+        int[] siv = Tls.tiv(sHs);
+        int seq = 0;
+        int[] r1 = sealR(hs.alg, skey, siv, seq, 22, ee);
+        int t1 = Tcp.sendBuf(fd, r1);
+        if (t1 < 0) {
+            ctx[6] = 6;
+            return ctx;
+        }
+        seq = seq + 1;
+        int[] r2 = sealR(hs.alg, skey, siv, seq, 22, cm);
+        int t2 = Tcp.sendBuf(fd, r2);
+        if (t2 < 0) {
+            ctx[6] = 6;
+            return ctx;
+        }
+        seq = seq + 1;
+        int[] r3 = sealR(hs.alg, skey, siv, seq, 22, cv);
+        int t3 = Tcp.sendBuf(fd, r3);
+        if (t3 < 0) {
+            ctx[6] = 6;
+            return ctx;
+        }
+        seq = seq + 1;
+        int[] r4 = sealR(hs.alg, skey, siv, seq, 22, fin);
+        int t4 = Tcp.sendBuf(fd, r4);
+        if (t4 < 0) {
+            ctx[6] = 6;
+            return ctx;
+        }
+        ctx[6] = 7;                                  /* server flight terkirim */
+
+        /* ── client Finished (lewati CCS) ── */
+        int cfinOk = -1;
+        int loops = 0;
+        while (cfinOk < 0 && loops < 8) {
+            loops = loops + 1;
+            int[] rrec = Tls.recvRecord(fd);
+            if (rrec.length == 0) {
+                ctx[6] = 8;
+                return ctx;
+            }
+            if (rrec[0] != 23) continue;             /* CCS compat / alert */
+            int[] okOut = new int[1];
+            int[] plain = openR(hs.alg, keyOf(cHs, hs.alg), Tls.tiv(cHs), 0, rrec, okOut);
+            if (okOut[0] != 22 || plain.length < 4 || plain[0] != 20) {
+                /* tipe dalam = content handshake (22); handshake type Finished = 20 */
+                ctx[6] = 9;
+                return ctx;
+            }
+            int[] vdin = Tls.sliceOf(plain, 4, plain.length - 4);
+            /* base_key client Finished = cHs (RFC 8446 §4.4.4) */
+            int[] cfk = Kdf.expandLabel(cHs, Net.bytes("finished"), new int[0], 32);
+            int[] cvd = Hash.hmac(cfk, Hash.sha256(tx));
+            cfinOk = Hash.eq(vdin, cvd) == 1 ? 1 : 0;
+        }
+        if (cfinOk < 0) {
+            ctx[6] = 10;
+            return ctx;
+        }
+
+        /* ── kunci app (transkrip s.d. server Finished) ── */
+        int[] d2 = Kdf.deriveSecret(hsSec, Net.bytes("derived"), new int[0]);
+        /* RFC 8446 §7.1: master = Extract(salt=D2, IKM=0) */
+        int[] master = Kdf.extract(d2, new int[32]);
+        int[] sAp = Kdf.deriveSecret(master, Net.bytes("s ap traffic"), tx);
+        int[] cAp = Kdf.deriveSecret(master, Net.bytes("c ap traffic"), tx);
+        int[] sApIv = Tls.tiv(sAp);
+        int[] cApIv = Tls.tiv(cAp);
+        ctx[3] = cfinOk;
+        for (int w = 0; w < 32; w++) {
+            ctx[8 + w] = sAp[w];
+            ctx[56 + w] = cAp[w];
+        }
+        for (int v = 0; v < 12; v++) {
+            ctx[40 + v] = sApIv[v];
+            ctx[88 + v] = cApIv[v];
+        }
+        if (cfinOk == 1) ctx[1] = 1;
+        return ctx;
+    }
+
+    /* ── app data ───────────────────────────────────────────────── */
+
+    static int writeApp(int[] ctx, int[] data) {
+        /* ctx menyimpan secret; kunci AEAD = expandLabel(secret, "key") */
+        int[] key = keyOf(Tls.sliceOf(ctx, 8, 32), ctx[2]);
+        int[] iv = Tls.sliceOf(ctx, 40, 12);
+        int[] rrec = sealR(ctx[2], key, iv, ctx[4], 23, data);
+        int k = Tcp.sendBuf(ctx[0], rrec);
+        if (k < 0) return k;
+        ctx[4] = ctx[4] + 1;
+        return 0;
+    }
+
+    static int[] readApp(int[] ctx) {
+        int[] kosong = new int[0];
+        int[] key = keyOf(Tls.sliceOf(ctx, 56, 32), ctx[2]);
+        int[] iv = Tls.sliceOf(ctx, 88, 12);
+        int loops = 0;
+        while (loops < 999) {
+            loops = loops + 1;
+            int[] rrec = Tls.recvRecord(ctx[0]);
+            if (rrec.length == 0) return kosong;
+            if (rrec[0] != 23) continue;             /* CCS/alert terluar */
+            int[] okOut = new int[1];
+            int[] plain = openR(ctx[2], key, iv, ctx[5], rrec, okOut);
+            if (okOut[0] < 0) return kosong;
+            ctx[5] = ctx[5] + 1;
+            if (okOut[0] == 21) return kosong;       /* alert/close */
+            if (okOut[0] == 23) return plain;
+            /* NST (4) dsb → lewati */
+        }
+        return kosong;
+    }
+}

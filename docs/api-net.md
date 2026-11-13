@@ -518,6 +518,64 @@ int[] data = Tls.readApp(ctx);
 
 ---
 
+## TlsServer
+
+`lib/net/TlsServer.kop` · 28 fungsi
+
+Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished, data aplikasi dua arah.
+
+```java
+import TlsServer;
+import Tcp;
+
+int lfd = Net.socket(2, 1);
+Net.bind(lfd, Tcp.loopback(), 9443);
+Net.listen(lfd, 4);
+int fd = Net.accept(lfd);
+int[] ctx = TlsServer.accept(fd, certDer, priv32, Rand.bytes(64));
+int[] pesan = TlsServer.readApp(ctx);
+TlsServer.writeApp(ctx, Net.bytes("pong"));
+```
+
+**Catatan**
+
+- Suite: TLS_CHACHA20_POLY1305_SHA256 (0x1303), AES-128-GCM (0x1301), AES-256-GCM (0x1302) — dipilih dengan prioritas SHA-256.
+- Sertifikat self-signed ECDSA-SHA256 dibangun oleh certDer; kunci privat = skalar P-256 32 byte.
+- Handshake tervalidasi terhadap klien OpenSSL/Python (oracle).
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] tlv(int tag, int[] body)` | (internal) DER TLV |
+| `static int[] cat(int[] a, int[] b)` | — |
+| `static int[] cat3(int[] a, int[] b, int[] c)` | — |
+| `static int[] arr1(int a)` | — |
+| `static int[] arr2(int a, int b)` | — |
+| `static int[] u16(int v)` | — |
+| `static int[] u24(int v)` | — |
+| `static int[] hexp(String hex)` | — |
+| `static int[] spaces64()` | 64 spasi untuk konten CertificateVerify (RFC 8446 §4.4.3) |
+| `static int[] oid(String raw)` | (internal) OID dari teks titik |
+| `static int[] seq(int[] body)` | (internal) DER SEQUENCE |
+| `static int[] setOf(int[] body)` | — |
+| `static int[] integer1()` | — |
+| `static int[] utctimeA()` | — |
+| `static int[] utctimeB()` | — |
+| `static int[] bitstr(int[] body)` | — |
+| `static int[] explicit0(int[] body)` | — |
+| `static int[] nameKopi()` | Name satu RDN: CN=kopi (Net.bytes butuh literal) |
+| `static int[] certDer(int[] priv32)` | bangun sertifikat self-signed ECDSA-SHA256 (X.509 v3) dari skalar privat |
+| `static int[] intDer32(int[] v)` | INTEGER DER dari 32 byte skalar (kanonik: leading-zero dipangkas, 0x00 didepan bila bit tertinggi terpasang) |
+| `static int[] sigDer(int[] rs)` | (internal) bungkus r//s jadi DER ECDSA-Sig-Value |
+| `static int[] pinOf(int[] cert)` | pin SPKI sertifikat (SHA-256 DER SPKI) |
+| `static int[] keyOf(int[] secret, int alg)` | kunci AEAD sesuai alg (RFC 8446 §7.3): aes128=16, aes256=32, chacha=32 |
+| `static int[] sealR(int alg, int[] key, int[] iv, int seq, int ctype, int[] payload)` | record keluar penuh: header ‖ ciphertext ‖ tag |
+| `static int[] openR(int alg, int[] key, int[] iv, int seq, int[] rec, int[] okOut)` | record masuk → plaintext (tanpa byte tipe dalam). okOut[0]: -1 galat, selain itu tipe dalam (20 finished, 4 NST, 21 alert, 23 app). |
+| `static int[] accept(int fd, int[] certDer, int[] priv32, int[] randSes)` | handshake server TLS 1.3; context untuk writeApp/readApp (ctx[1]=1 sukses) |
+| `static int writeApp(int[] ctx, int[] data)` | kirim data aplikasi terenkripsi |
+| `static int[] readApp(int[] ctx)` | baca data aplikasi (deenkripsi); kosong = tutup/galat |
+
+---
+
 ## Udp
 
 `lib/net/Udp.kop` · 7 fungsi

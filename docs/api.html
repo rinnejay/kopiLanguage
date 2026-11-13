@@ -42,7 +42,7 @@
 <tr>
 <td><strong>Net</strong></td>
 <td><code>lib/net/</code></td>
-<td><code>Auth</code>, <code>Dns</code>, <code>Http</code>, <code>HttpServer</code>, <code>Jwt</code>, <code>Mime</code>, <code>Multipart</code>, <code>Resolv</code>, <code>Rfc</code>, <code>Session</code>, <code>Static</code>, <code>Tcp</code>, <code>Tls</code>, <code>Udp</code>, <code>Url</code>, <code>WebSocket</code>, <code>WsClient</code></td>
+<td><code>Auth</code>, <code>Dns</code>, <code>Http</code>, <code>HttpServer</code>, <code>Jwt</code>, <code>Mime</code>, <code>Multipart</code>, <code>Resolv</code>, <code>Rfc</code>, <code>Session</code>, <code>Static</code>, <code>Tcp</code>, <code>Tls</code>, <code>TlsServer</code>, <code>Udp</code>, <code>Url</code>, <code>WebSocket</code>, <code>WsClient</code></td>
 </tr>
 <tr>
 <td><strong>Crypto</strong></td>
@@ -354,6 +354,12 @@
 <td><code>lib/net/Tls.kop</code></td>
 <td>25</td>
 <td>Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#tlsserver"><code>TlsServer</code></a></td>
+<td><code>lib/net/TlsServer.kop</code></td>
+<td>28</td>
+<td>Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,…</td>
 </tr>
 <tr>
 <td><a href="api-net.html#udp"><code>Udp</code></a></td>

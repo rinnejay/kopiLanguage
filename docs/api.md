@@ -5,7 +5,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | Kelompok | Folder | Modul |
 |---|---|---|
 | **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
-| **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `Udp`, `Url`, `WebSocket`, `WsClient` |
+| **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `TlsServer`, `Udp`, `Url`, `WebSocket`, `WsClient` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
 
@@ -67,6 +67,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Static`](api-net.md#static) | `lib/net/Static.kop` | 7 | Penyajian file statis + MIME; menolak path traversal `..`. |
 | [`Tcp`](api-net.md#tcp) | `lib/net/Tcp.kop` | 13 | Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat. |
 | [`Tls`](api-net.md#tls) | `lib/net/Tls.kop` | 25 | Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah. |
+| [`TlsServer`](api-net.md#tlsserver) | `lib/net/TlsServer.kop` | 28 | Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,… |
 | [`Udp`](api-net.md#udp) | `lib/net/Udp.kop` | 7 | Datagram UDP: bind, kirim/terima satu datagram, shutdown. |
 | [`Url`](api-net.md#url) | `lib/net/Url.kop` | 26 | URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4. |
 | [`WebSocket`](api-net.md#websocket) | `lib/net/WebSocket.kop` | 12 | Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask. |

@@ -12,7 +12,7 @@ import HttpServer;
 | Folder | Modul |
 |---|---|
 | `lib/core/` | `Str` `Bytes` `Math` `Digits` `Stats` `Matrix` `Arrays` `Json` `Map` `MapStr` `Set` `Deque` `File` `Path` `Time` `Log` |
-| `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` |
+| `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` `TlsServer` |
 | `lib/crypto/` | `Crypto` `Cipher` `Hash` `Aes` `Gcm` `Pem` `X509` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
 | `lib/io/` | `Reader` `Writer` |
 | `lib/core/` | `Regex` (mesin regex backtracking) `BigInt` (bilangan presisi sembarang) |
@@ -246,8 +246,16 @@ ping pong close(code) decode(buf,n) payload(f) opcode(f)`.
 ### `Tls` (klien TLS 1.3)
 
 `handshake(ip, port, pinSpki, randSes)` → context; `writeApp(ctx,data)`,
-`readApp(ctx)`. `pinSpki` = SHA-256 DER SPKI leaf (TOFU). Belum ada TLS
-server dan belum verifikasi ECDSA CertificateVerify.
+`readApp(ctx)`. `pinSpki` = SHA-256 DER SPKI leaf (TOFU). Belum verifikasi
+ECDSA CertificateVerify (server memakai pin SPKI).
+
+### `TlsServer` (server TLS 1.3)
+
+`certDer(priv32)` → sertifikat self-signed ECDSA-SHA256 (X.509 v3);
+`accept(fd, certDer, priv32, randSes)` → context (ctx[1]=1 bila sukses);
+`writeApp(ctx,data)`, `readApp(ctx)`. Suite: ChaCha20-Poly1305 /
+AES-128/256-GCM (prioritas SHA-256). Handshake tervalidasi lawan klien
+OpenSSL/Python; belum verifikasi sertifikat klien (mTLS).
 
 ## 9. Kriptografi
 

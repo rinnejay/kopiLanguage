@@ -447,8 +447,17 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmov\tw2, w12");
             emit("\tmov\tx1, x17");
             emit("\tldr\tw0, [sp, #16]");
+            emit("\tmov\tx3, #16384");                 /* MSG_NOSIGNAL */
+            emit("\tmov\tx4, #0");
+            emit("\tmov\tx5, #0");
+            emit("\tmov\tx8, #206");                   /* __NR_sendto (arm64) */
+            emit("\tsvc\t#0");
+            emit("\tcmn\tw0, #88");                    /* ENOTSOCK → berkas/pipe */
+            emit("\tb.ne\t.LRS%dso", ln);
+            emit("\tldr\tw0, [sp, #16]");
             emit("\tmov\tx8, #64");                    /* __NR_write */
             emit("\tsvc\t#0");
+            emit(".LRS%dso:", ln);
             emit("\tcmp\tw0, #0");
             emit("\tb.lt\t.LRS%de", ln);
             emit("\tadd\tw9, w9, w0");                 /* penuh/parsial */

@@ -1,0 +1,120 @@
+/* tlssrv.kop — uji server TLS 1.3 (TlsServer.kop).
+ *
+ * Pakai: tlssrv.kop <port> <certFile>
+ *  - bangun sertifikat self-signed ECDSA P-256 (kunci tetap RFC 6979)
+ *  - tulis DER sertifikat ke certFile (untuk pemeriksaan oracle)
+ *  - terima 2 sambungan: (1) klien python/OpenSSL, (2) klien Kopi Tls.gate
+ *  - tiap sambungan: baca satu pesan app, balas "pong", tutup.
+ *
+ * Catatan arena: handshake + tanda tangan ECDSA mengalokasi banyak —
+ * tiap tahap dibungkus malloc<64mb> agar arena dibebaskan; hasil yang
+ * dibutuhkan setelah blok disalin ke field int atau berkas.
+ */
+import TlsServer;
+import Tls;
+import Tcp;
+import Rand;
+import Hash;
+import Cipher;
+import Str;
+import Writer;
+import File;
+
+class TlsSrv {
+
+    Writer lg;
+    int certlen;
+    int ok1;
+    int st1;
+    int alg1;
+    int got1;
+
+    TlsSrv() {
+        this.lg = Writer.open("/data/data/com.termux/files/usr/tmp/opencode/srvdbg.log");
+        this.certlen = 0;
+        this.ok1 = 0;
+        this.st1 = 0;
+        this.alg1 = 0;
+        this.got1 = 0;
+    }
+
+    void say(String m) {
+        Writer w = this.lg;
+        w.writeLine(m);
+        w.flush();
+    }
+
+    void run() {
+        int port = 10085;
+        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+        String certPath = "";
+        if (Net.argc() > 1) certPath = Net.argv(1);
+
+        /* kunci privat tetap: RFC 6979 A.2.5 (deterministik) */
+        int[] priv = Cipher.hexdec("C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721");
+        malloc<64mb> {
+            int[] cert = TlsServer.certDer(priv);
+            Writer w = Writer.open(certPath);
+            w.writeBytes(cert);
+            w.close();
+            this.certlen = cert.length;
+        }
+        System.out.println("certlen=" + Str.fromInt(this.certlen));
+        this.say("cert ok");
+
+        /* sertifikat untuk dipakai selama server hidup: baca dari berkas */
+        int ffd = File.openRead(certPath);
+        int n = File.size(ffd);
+        int[] cert = new int[n];
+        File.readInto(ffd, cert);
+        File.close(ffd);
+
+        int lfd = Net.socket(2, 1);
+        Net.setsockopt(lfd, 1, 2, 1);
+        if (Net.bind(lfd, 0, port) < 0 || Net.listen(lfd, 4) < 0) {
+            System.out.println("bind gagal");
+            return;
+        }
+        System.out.println("siap");
+        this.say("listen ok");
+
+        for (int i = 0; i < 2; i++) {
+            int c = Net.accept(lfd);
+            if (c < 0) {
+                System.out.println("conn" + Str.fromInt(i + 1) + " accept gagal");
+                continue;
+            }
+            this.ok1 = 0;
+            this.st1 = 0;
+            this.alg1 = 0;
+            this.got1 = 0;
+            this.say("accepted");
+            malloc<64mb> {
+                int[] ctx = TlsServer.accept(c, cert, priv, Rand.bytes(64));
+                this.say("handshake st=" + Str.fromInt(ctx[6]));
+                this.alg1 = ctx[2];
+                this.st1 = ctx[6];
+                if (ctx[1] == 1) {
+                    this.ok1 = 1;
+                    int[] got = TlsServer.readApp(ctx);
+                    this.got1 = got.length;
+                    int k = TlsServer.writeApp(ctx, Net.bytes("pong"));
+                    if (k < 0) this.got1 = -1;
+                }
+            }
+            this.say("conn" + Str.fromInt(i + 1) + " alg=" + Str.fromInt(this.alg1)
+                + " ok=" + Str.fromInt(this.ok1) + " st=" + Str.fromInt(this.st1)
+                + " got=" + Str.fromInt(this.got1));
+            Net.close(c);
+        }
+        Net.close(lfd);
+        System.out.println("selesai");
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        TlsSrv s = new TlsSrv();
+        s.run();
+    }
+}

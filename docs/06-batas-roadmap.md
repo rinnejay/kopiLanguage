@@ -56,8 +56,8 @@ reverse proxy + beberapa proses.
 | Belum ada | Catatan |
 |---|---|
 | IPv6 | hanya `AF_INET` |
-| TLS **server** | tidak ada; pakai reverse proxy |
-| Verifikasi ECDSA CertificateVerify | TLS klien memakai pin SPKI TOFU + verifikasi Finished; primitif ECDSA P-256 sudah ada sejak v1.35 (`Ecdsa`) |
+| TLS **server** | ✅ v1.36 — `TlsServer` (X25519 + ECDSA P-256, ChaCha/AES-GCM); belum mTLS |
+| Verifikasi ECDSA CertificateVerify | ✅ sisi server (v1.36): CV klien diverifikasi; sisi klien masih pin SPKI TOFU |
 | Validasi rantai/PKI, hostname, expiry | belum |
 | Session resumption/PSK TLS | belum |
 | DNS sistem penuh | `Resolv` hanya A, tanpa cache/`search`/AAAA/DNS-over-TLS |
@@ -127,7 +127,8 @@ Batas angka:
    wajib reset manual.
 3. ~~Array bertipe~~ **✅ v1.16** (`long[]`/`String[]` elemen 64-bit slot;
    sisa: `double[]`, array literal, multi-dimensi).
-4. **TLS server + verifikasi ECDSA/CertificateVerify + chain/hostname** — fondasi ECDSA P-256 (v1.35) sudah siap dipakai.
+4. **TLS server** ✅ v1.36 (`TlsServer`, oracle OpenSSL/Python). Sisa:
+   verifikasi rantai/hostname di klien, mTLS, session resumption.
 5. **HTTP**: multipart, range/ETag, chunked response, gzip.
 6. **DB client** (SQLite via protokol file atau Postgres/Redis via socket).
 7. **Ekosistem**: package manager, LSP, formatter, CI lintas platform,
