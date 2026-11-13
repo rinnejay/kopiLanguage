@@ -589,7 +589,7 @@ HttpServer.send(c, resp);</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="jwt">Jwt<a class="anchor" href="#jwt" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Jwt.kop</code> · 14 fungsi</p>
+<p><code>lib/net/Jwt.kop</code> · 16 fungsi</p>
 <p>JWT HS256: tanda tangan, verifikasi, ambil payload.</p>
 <pre><code class="language-java">import Jwt;
 
@@ -651,6 +651,14 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah</code></pre>
 <tr>
 <td><code>static String payloadOf(String token)</code></td>
 <td>payload JSON dari token tanpa verifikasi (hati-hati)</td>
+</tr>
+<tr>
+<td><code>static String signRs256(String payload, int[] privKeyDer)</code></td>
+<td>tanda tangani payload dengan kunci privat DER PKCS#1 (RSAPrivateKey)</td>
+</tr>
+<tr>
+<td><code>static int verifyRs256(String token, int[] pubKeyDer, int[] payloadOut)</code></td>
+<td>verifikasi token RS256 dengan kunci publik DER PKCS#1 (RSAPublicKey). hasil: 1 sah, 0 tanda tangan salah, -1 bentuk/alg tak didukung</td>
 </tr>
 <tr>
 <td><code>static int checkClaims(String payloadJson, long nowSec)</code></td>

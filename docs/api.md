@@ -58,7 +58,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 17 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
 | [`Http`](api-net.md#http) | `lib/net/Http.kop` | 44 | Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik. |
 | [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 47 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
-| [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 14 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
+| [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 16 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
 | [`Mime`](api-net.md#mime) | `lib/net/Mime.kop` | 1 | Pemetaan ekstensi file → header Content-Type. |
 | [`Multipart`](api-net.md#multipart) | `lib/net/Multipart.kop` | 17 | — |
 | [`Resolv`](api-net.md#resolv) | `lib/net/Resolv.kop` | 5 | Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout. |

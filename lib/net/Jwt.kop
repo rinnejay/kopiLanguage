@@ -19,6 +19,8 @@ import Str;
 import Hash;
 import Cipher;
 import Json;
+import Rsa;
+import Rsa;
 
 class Jwt {
 
@@ -101,6 +103,7 @@ class Jwt {
         if (Str.contains(head, "HS384")) return "HS384";
         if (Str.contains(head, "HS512")) return "HS512";
         if (Str.contains(head, "HS256")) return "HS256";
+        if (Str.contains(head, "RS256")) return "RS256";
         return "";
     }
 
@@ -151,6 +154,39 @@ class Jwt {
         int[] d = dots(token);
         if (d[1] <= d[0]) return "";
         return Net.mkstr(unb64(Str.sub(token, d[0] + 1, d[1] - d[0] - 1)));
+    }
+
+    /* ── RS256 (RSA PKCS#1 v1.5 + SHA-256) ───────────────────────── */
+
+    /* tanda tangani payload dengan kunci privat DER PKCS#1 (RSAPrivateKey) */
+    static String signRs256(String payload, int[] privKeyDer) {
+        String input = b64(Net.strbytes(headerFor("RS256"))) + "." + b64(Net.strbytes(payload));
+        int[] sig = Rsa.sign(privKeyDer, Hash.sha256(Net.strbytes(input)), "SHA-256");
+        return input + "." + b64(sig);
+    }
+
+    /* verifikasi token RS256 dengan kunci publik DER PKCS#1 (RSAPublicKey).
+     * hasil: 1 sah, 0 tanda tangan salah, -1 bentuk/alg tak didukung */
+    static int verifyRs256(String token, int[] pubKeyDer, int[] payloadOut) {
+        int[] d = dots(token);
+        if (d[0] <= 0 || d[1] <= d[0]) return -1;
+        String h = Str.sub(token, 0, d[0]);
+        String p = Str.sub(token, d[0] + 1, d[1] - d[0] - 1);
+        String s = Str.sub(token, d[1] + 1, token.length - d[1] - 1);
+        String alg = algOf(token);
+        if (alg != "RS256") return -1;
+        int[] sig = unb64(s);
+        int[] digest = Hash.sha256(Net.strbytes(h + "." + p));
+        boolean ok = Rsa.verify(pubKeyDer, digest, sig, "SHA-256");
+        if (payloadOut.length > 0) {
+            int[] raw = unb64(p);
+            for (int i = 0; i < payloadOut.length; i++) {
+                if (i < raw.length) payloadOut[i] = raw[i];
+                else payloadOut[i] = 0;
+            }
+        }
+        if (ok) return 1;
+        return 0;
     }
 
     /* cek klaim waktu pada payload JSON.

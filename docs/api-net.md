@@ -222,7 +222,7 @@ HttpServer.send(c, resp);
 
 ## Jwt
 
-`lib/net/Jwt.kop` · 14 fungsi
+`lib/net/Jwt.kop` · 16 fungsi
 
 JWT HS256: tanda tangan, verifikasi, ambil payload.
 
@@ -251,6 +251,8 @@ int ok = Jwt.verify(token, secret, new int[128]); // 1 sah
 | `static int verifyAlg(String token, String secret, int[] payloadOut)` | verifikasi sesuai algoritma header; 1 sah, 0 salah, -1 bentuk |
 | `static int verify(String token, String secret, int[] payloadOut)` | hasil: 1 valid, 0 tanda tangan salah, -1 bentuk salah |
 | `static String payloadOf(String token)` | payload JSON dari token tanpa verifikasi (hati-hati) |
+| `static String signRs256(String payload, int[] privKeyDer)` | tanda tangani payload dengan kunci privat DER PKCS#1 (RSAPrivateKey) |
+| `static int verifyRs256(String token, int[] pubKeyDer, int[] payloadOut)` | verifikasi token RS256 dengan kunci publik DER PKCS#1 (RSAPublicKey). hasil: 1 sah, 0 tanda tangan salah, -1 bentuk/alg tak didukung |
 | `static int checkClaims(String payloadJson, long nowSec)` | cek klaim waktu (exp/nbf); 1 ok, 0 tidak berlaku |
 | `static int verifyWithClaims(String token, String secret, int[] payloadOut, long nowSec)` | verifikasi tanda tangan + klaim waktu |
 
