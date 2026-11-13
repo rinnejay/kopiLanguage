@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-pustaka">Referensi pustaka<a class="anchor" href="#referensi-pustaka" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — buka referensi</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — buka referensi</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — buka referensi</a></li><li class="toc-h3"><a href="#io-buka-referensi-api-io-md">IO — buka referensi</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — buka referensi</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — buka referensi</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — buka referensi</a></li><li class="toc-h3"><a href="#io-buka-referensi-api-io-md">IO — buka referensi</a></li><li class="toc-h3"><a href="#database-buka-referensi-api-db-md">Database — buka referensi</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
 <p>Ringkasan semua modul di <code>lib/</code>. Setiap modul adalah class Kopi dengan method static; impor memakai nama class.</p>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -53,6 +53,11 @@
 <td><strong>IO</strong></td>
 <td><code>lib/io/</code></td>
 <td><code>Reader</code>, <code>Writer</code></td>
+</tr>
+<tr>
+<td><strong>Database</strong></td>
+<td><code>lib/db/</code></td>
+<td><code>Sqlite</code></td>
 </tr>
 </tbody></table></div>
 <h2 id="daftar-modul">Daftar modul<a class="anchor" href="#daftar-modul" aria-label="tautan">#</a></h2>
@@ -546,6 +551,21 @@
 <td><code>lib/io/Writer.kop</code></td>
 <td>2</td>
 <td>Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.</td>
+</tr>
+</tbody></table></div>
+<h3 id="database-buka-referensi-api-db-md">Database — <a href="api-db.html">buka referensi</a><a class="anchor" href="#database-buka-referensi-api-db-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-db.html#sqlite"><code>Sqlite</code></a></td>
+<td><code>lib/db/Sqlite.kop</code></td>
+<td>18</td>
+<td>Pembaca file database SQLite read-only (RFC sqlite file format): b-tree tabel, varint, record serial-type,…</td>
 </tr>
 </tbody></table></div>
 <h2 id="cara-menerapkan">Cara menerapkan<a class="anchor" href="#cara-menerapkan" aria-label="tautan">#</a></h2>

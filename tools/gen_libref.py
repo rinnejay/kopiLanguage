@@ -26,6 +26,7 @@ CATS = [
     ("net", "Net", "TCP/UDP, HTTP, WebSocket, URL, auth, DNS, TLS"),
     ("crypto", "Crypto", "Hash, PBKDF2, cipher, X25519, AEAD, DER"),
     ("io", "IO", "Pembaca & penulis berkas berbuffer"),
+    ("db", "Database", "Pembaca SQLite read-only"),
 ]
 
 

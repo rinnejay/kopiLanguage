@@ -1,0 +1,158 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi API — Database · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-api-database">Referensi API — Database<a class="anchor" href="#referensi-api-database" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#sqlite">Sqlite</a></li></ul></nav>
+<p>Pembaca SQLite read-only. Semua signature di bawah diekstrak langsung dari source <code>lib/db/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="sqlite">Sqlite<a class="anchor" href="#sqlite" aria-label="tautan">#</a></h2>
+<p><code>lib/db/Sqlite.kop</code> · 18 fungsi</p>
+<p>Pembaca file database SQLite read-only (RFC sqlite file format): b-tree tabel, varint, record serial-type, rantai halaman overflow, sqlite_master, parse CREATE TABLE (kolom + alias rowid).</p>
+<pre><code class="language-java">import Sqlite;
+
+int[] ctx = Sqlite.open("data.db");
+if (ctx[0] &gt;= 0) {
+    String[] t = Sqlite.tables(ctx);
+    int k = Sqlite.query(ctx, "Barang");
+    while (Sqlite.next(ctx)) {
+        System.out.println(Sqlite.intOf(ctx, 0) + " " + Sqlite.strOf(ctx, 1));
+    }
+    Sqlite.close(ctx);
+}</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Read-only; db yang sedang ditulis bisa terbaca setengah jadi.</li>
+<li>Hanya UTF-8 + tabel rowid biasa (WITHOUT ROWID/virtual ditolak).</li>
+<li>Payload record maks 65536 byte; offset halaman 32-bit (db &lt; 2 GB).</li>
+<li>Regresi: tools/gen_sqlitevec.py (fixture page 512 + oracle python sqlite3).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] open(String path)</code></td>
+<td>buka db (validasi header/encoding); ctx[0] &lt; 0 = gagal</td>
+</tr>
+<tr>
+<td><code>static void close(int[] ctx)</code></td>
+<td>tutup file db</td>
+</tr>
+<tr>
+<td><code>static boolean next(int[] ctx)</code></td>
+<td>maju ke record berikutnya; false = habis/galat</td>
+</tr>
+<tr>
+<td><code>static int typeOf(int[] ctx, int i)</code></td>
+<td>tipe serial SQLite kolom saat ini</td>
+</tr>
+<tr>
+<td><code>static int count(int[] ctx)</code></td>
+<td>jumlah nilai record saat ini</td>
+</tr>
+<tr>
+<td><code>static int errOf(int[] ctx)</code></td>
+<td>kode galat internal terakhir (0 = ok)</td>
+</tr>
+<tr>
+<td><code>static long rowid(int[] ctx)</code></td>
+<td>rowid record saat ini (long)</td>
+</tr>
+<tr>
+<td><code>static boolean isNull(int[] ctx, int i)</code></td>
+<td>true bila NULL (kolom ipk tidak pernah NULL)</td>
+</tr>
+<tr>
+<td><code>static long intOf(int[] ctx, int i)</code></td>
+<td>nilai kolom sebagai long (ipk NULL = rowid)</td>
+</tr>
+<tr>
+<td><code>static double realOf(int[] ctx, int i)</code></td>
+<td>nilai kolom sebagai double (REAL/integer)</td>
+</tr>
+<tr>
+<td><code>static String strOf(int[] ctx, int i)</code></td>
+<td>nilai kolom sebagai String (teks)</td>
+</tr>
+<tr>
+<td><code>static int[] blobOf(int[] ctx, int i)</code></td>
+<td>nilai kolom sebagai int[] (blob)</td>
+</tr>
+<tr>
+<td><code>static double bitsToDouble(long bits)</code></td>
+<td>(internal) IEEE-754 64 bit → double</td>
+</tr>
+<tr>
+<td><code>static String[] tables(int[] ctx)</code></td>
+<td>nama tabel user dari sqlite_master (urutan scan)</td>
+</tr>
+<tr>
+<td><code>static String[] columns(int[] ctx, String table)</code></td>
+<td>nama kolom dari parse CREATE TABLE</td>
+</tr>
+<tr>
+<td><code>static String[] parseCols(String sql)</code></td>
+<td>(internal) nama kolom dari CREATE TABLE</td>
+</tr>
+<tr>
+<td><code>static int findIpk(String sql)</code></td>
+<td>(internal) indeks kolom INTEGER PRIMARY KEY</td>
+</tr>
+<tr>
+<td><code>static int query(int[] ctx, String table)</code></td>
+<td>siapkan scan tabel; hasil = jumlah kolom, &lt;0 galat</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int MAXPAY()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int MAXCOL()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int MAXDEPTH()</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.20 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-db.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

@@ -1823,6 +1823,15 @@ else
     echo "FAIL  http2 [a64]: build gagal"; FAIL=$((FAIL+1))
 fi
 
+# ─── v1.38: pembaca SQLite — fixture + oracle python sqlite3 ────────
+rm -f "$T/kopi/sqlitevec.db" "$T/kopi/sqlitevec.kop" "$T/kopi/sqlitevec.ref"
+python3 tools/gen_sqlitevec.py "$T/kopi" >/dev/null
+check sqlitevec "$T/kopi/sqlitevec.kop"
+./kopicc "$T/kopi/sqlitevec.kop" -t x64 -o "$T/kopi/sqlitevec64.s" \
+  && cc -target x86_64-linux-gnu -c "$T/kopi/sqlitevec64.s" -o /dev/null \
+  && echo "PASS  sqlitevec [x64]" && PASS=$((PASS+1)) \
+  || { echo "FAIL  sqlitevec [x64]"; FAIL=$((FAIL+1)); }
+
 # ─── v1.36: TLS server (TlsServer) — oracle python ssl + klien Kopi ──
 pkill -f "tlssrv\.[b]in" 2>/dev/null
 sleep 0.3

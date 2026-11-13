@@ -15,6 +15,7 @@ import HttpServer;
 | `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` `TlsServer` `Http2` `Http2Tabel` |
 | `lib/crypto/` | `Crypto` `Cipher` `Hash` `Aes` `Gcm` `Pem` `X509` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
 | `lib/io/` | `Reader` `Writer` |
+| `lib/db/` | `Sqlite` (pembaca file `.db` read-only) |
 | `lib/core/` | `Regex` (mesin regex backtracking) `BigInt` (bilangan presisi sembarang) |
 
 > **Referensi API lengkap** (signature semua fungsi diekstrak langsung dari
@@ -274,7 +275,25 @@ uji live lawan oracle `tools/h2_oracle.py` (python h2).
 `stVal()` `stValOff()` (statik 61 entri). Hasil generator
 `tools/gen_http2.py`; sumber data `tools/hpack_huffman.tsv`.
 
-## 9. Kriptografi
+## 9. Database
+
+### `Sqlite` (pembaca file `.db` read-only)
+
+`open(path)` → ctx (validasi header, pageSize 512–65536, UTF-8);
+`tables(ctx)` → nama tabel user; `columns(ctx, nm)` → nama kolom dari
+CREATE TABLE; `query(ctx, nm)` → siapkan scan (hasil = jumlah kolom);
+`next(ctx)` → record berikutnya; akses nilai `intOf` (long, termasuk
+int64 & INTEGER PRIMARY KEY = rowid), `realOf` (double, konversi
+IEEE-754 murni Kopi), `strOf` (String), `blobOf` (int[]),
+`typeOf`/`isNull`/`rowid`/`count`; `close(ctx)`.
+Mendukung: b-tree tabel leaf+interior, varint, serial type 0–12+,
+rantai halaman overflow (payload ≤ 65536 byte). Read-only, tanpa
+kunci — db yang sedang ditulis bisa terbaca setengah jadi.
+Regresi: `tools/gen_sqlitevec.py` (fixture page 512, 3 tabel, 219 baris:
+NULL/int64/REAL/blob/overflow + b-tree multipage) lawan oracle python
+`sqlite3`.
+
+## 10. Kriptografi
 
 | Modul | Isi |
 |---|---|
@@ -293,7 +312,7 @@ uji live lawan oracle `tools/h2_oracle.py` (python h2).
 | `Big`, `X25519` | aritmetika medan 2²⁵⁵−19 & X25519 |
 | `Der` | parser DER minimal + pin SPKI |
 
-## 10. Auth & session
+## 11. Auth & session
 
 ```java
 import Pbkdf2; import Jwt; import Session; import Auth; import MapStr;
@@ -316,7 +335,7 @@ Auth.bearer(h);
 
 Penyimpanan sesi masih in-memory (dua `MapStr`); belum persisten.
 
-## 11. `Log` + observability
+## 12. `Log` + observability
 
 Belum ada metrics/tracing. Pola yang disarankan: `Log.info` per request
 dengan tag + path, dan kirim `X-Request-Id` sendiri. Lihat

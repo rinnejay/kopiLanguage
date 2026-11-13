@@ -236,6 +236,14 @@ static void collect_cp_stmt(Node *s) {
     } else if (s->kind == ST_IF || s->kind == ST_WHILE) {
         collect_cp_stmt(s->b);
         collect_cp_stmt(s->c);
+    } else if (s->kind == ST_DO) {
+        /* v1.38: do..while — badan di s->b (println-literal di dalamnya
+         * juga harus di-intern) */
+        collect_cp_stmt(s->b);
+    } else if (s->kind == ST_REGION) {
+        /* v1.38: malloc { ... } — println-literal di dalam arena blok
+         * tidak pernah ter-intern (cp=0 → cpool[0]) sebelum ini */
+        collect_cp_stmt(s->d);
     } else if (s->kind == ST_BLOCK) {
         collect_cp_stmt(s->d);
     } else if (s->kind == ST_FOR) {

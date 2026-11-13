@@ -208,8 +208,8 @@
 <td>belum</td>
 </tr>
 <tr>
-<td>DB client (SQLite/Postgres/Redis)</td>
-<td>belum</td>
+<td>DB client (<code>Sqlite</code> via protokol file; Postgres/Redis via socket belum)</td>
+<td><code>Sqlite</code></td>
 </tr>
 <tr>
 <td><code>sendfile</code>/zero-copy</td>
@@ -273,7 +273,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>155/155</strong> (v1.23) — a64 + VM + sintaks x64 + dokumen HTML (150 PASS termasuk cek x64 yang tidak masuk counter).</li>
+<li>Suite: <strong>174/174</strong> (v1.38) — a64 + VM + sintaks x64 + dokumen HTML (174 PASS termasuk cek x64).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>
@@ -288,8 +288,8 @@
 <li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>
 <li>~~Array bertipe~~ <strong>✅ v1.16</strong> (<code>long[]</code>/<code>String[]</code> elemen 64-bit slot; sisa: <code>double[]</code>, array literal, multi-dimensi).</li>
 <li><strong>TLS server</strong> ✅ v1.36 (<code>TlsServer</code>, oracle OpenSSL/Python). Sisa: verifikasi rantai/hostname di klien, mTLS, session resumption.</li>
-<li><strong>HTTP</strong>: multipart, range/ETag, chunked response, gzip.</li>
-<li><strong>DB client</strong> (SQLite via protokol file atau Postgres/Redis via socket).</li>
+<li><strong>HTTP/2 (klien)</strong> ✅ v1.37 — <code>Http2</code> (gate TLS+ALPN h2, HPACK decode penuh + Huffman, dt dinamis); sisi server h2 &amp; HPACK encode dinamis belum.</li>
+<li><strong>DB client</strong> ✅ v1.38 — <code>Sqlite</code> (pembaca file <code>.db</code> read-only; Postgres/Redis via socket belum).</li>
 <li><strong>Ekosistem</strong>: package manager, LSP, formatter, CI lintas platform, fuzzing, audit keamanan.</li>
 <li><strong>Performa</strong>: register allocation/const-folding, <code>sendfile</code>, buffer pooling, event-loop yang lebih hemat; trap error berline untuk backend native (a64/x64) — VM sudah selesai (v1.13).</li>
 </ol>

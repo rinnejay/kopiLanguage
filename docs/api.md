@@ -8,6 +8,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `Http2`, `Http2Tabel`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `TlsServer`, `Udp`, `Url`, `WebSocket`, `WsClient` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
+| **Database** | `lib/db/` | `Sqlite` |
 
 ## Daftar modul
 
@@ -106,6 +107,12 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|---|
 | [`Reader`](api-io.md#reader) | `lib/io/Reader.kop` | 1 | Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori. |
 | [`Writer`](api-io.md#writer) | `lib/io/Writer.kop` | 2 | Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh. |
+
+### Database — [buka referensi](api-db.md)
+
+| Modul | File | Fungsi | Ringkasan |
+|---|---|---|---|
+| [`Sqlite`](api-db.md#sqlite) | `lib/db/Sqlite.kop` | 18 | Pembaca file database SQLite read-only (RFC sqlite file format): b-tree tabel, varint, record serial-type,… |
 
 ## Cara menerapkan
 

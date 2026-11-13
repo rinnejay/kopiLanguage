@@ -420,6 +420,14 @@ META = {
         "example": 'import Http2Tabel;\n\nint[] kode = Http2Tabel.hufCode();\nSystem.out.println(kode[0]);  // simbol 0',
         "notes": ["Sumber data: tools/hpack_huffman.tsv (257 baris, commit)."],
     },
+    "Sqlite": {
+        "purpose": "Pembaca file database SQLite read-only (RFC sqlite file format): b-tree tabel, varint, record serial-type, rantai halaman overflow, sqlite_master, parse CREATE TABLE (kolom + alias rowid).",
+        "example": 'import Sqlite;\n\nint[] ctx = Sqlite.open("data.db");\nif (ctx[0] >= 0) {\n    String[] t = Sqlite.tables(ctx);\n    int k = Sqlite.query(ctx, "Barang");\n    while (Sqlite.next(ctx)) {\n        System.out.println(Sqlite.intOf(ctx, 0) + " " + Sqlite.strOf(ctx, 1));\n    }\n    Sqlite.close(ctx);\n}',
+        "notes": ["Read-only; db yang sedang ditulis bisa terbaca setengah jadi.",
+                  "Hanya UTF-8 + tabel rowid biasa (WITHOUT ROWID/virtual ditolak).",
+                  "Payload record maks 65536 byte; offset halaman 32-bit (db < 2 GB).",
+                  "Regresi: tools/gen_sqlitevec.py (fixture page 512 + oracle python sqlite3)."],
+    },
 }
 
 # Deskripsi tambahan untuk fungsi/konstanta yang tidak punya komentar sumber.
@@ -721,6 +729,28 @@ EXTRA = {
         "stNameOff": "offset nama per entri (62 = sentinel)",
         "stVal": "nilai tabel statik (ASCII berdempet)",
         "stValOff": "offset nilai per entri (62 = sentinel)",
+    }},
+    "Sqlite": {"descs": {
+        "open": "buka db (validasi header/encoding); ctx[0] < 0 = gagal",
+        "close": "tutup file db",
+        "tables": "nama tabel user dari sqlite_master (urutan scan)",
+        "columns": "nama kolom dari parse CREATE TABLE",
+        "query": "siapkan scan tabel; hasil = jumlah kolom, <0 galat",
+        "next": "maju ke record berikutnya; false = habis/galat",
+        "intOf": "nilai kolom sebagai long (ipk NULL = rowid)",
+        "realOf": "nilai kolom sebagai double (REAL/integer)",
+        "strOf": "nilai kolom sebagai String (teks)",
+        "blobOf": "nilai kolom sebagai int[] (blob)",
+        "isNull": "true bila NULL (kolom ipk tidak pernah NULL)",
+        "typeOf": "tipe serial SQLite kolom saat ini",
+        "rowid": "rowid record saat ini (long)",
+        "count": "jumlah nilai record saat ini",
+        "errOf": "kode galat internal terakhir (0 = ok)",
+        "bitsToDouble": "(internal) IEEE-754 64 bit → double",
+        "readPage": "(internal) muat halaman b-tree ke buffer",
+        "parseCols": "(internal) nama kolom dari CREATE TABLE",
+        "findIpk": "(internal) indeks kolom INTEGER PRIMARY KEY",
+        "topSegments": "(internal) pecah isi kurung CREATE TABLE per koma",
     }},
     "Udp": {"descs": {"loopback": "alamat 127.0.0.1"}},
     "Url": {"descs": {

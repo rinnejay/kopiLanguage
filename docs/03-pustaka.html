@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="03-pustaka-standar">03 — Pustaka standar<a class="anchor" href="#03-pustaka-standar" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-str-teks-native-string">1. Str — teks native String</a></li><li class="toc-h2"><a href="#1b-bytes-buffer-int">1b. Bytes — buffer int[]</a></li><li class="toc-h2"><a href="#2-arrays-array-int">2. Arrays — array int[]</a></li><li class="toc-h2"><a href="#3-math-digits-stats-matrix">3. Math, Digits, Stats, Matrix</a></li><li class="toc-h2"><a href="#4-json">4. Json</a></li><li class="toc-h2"><a href="#5-koleksi">5. Koleksi</a></li><li class="toc-h2"><a href="#6-file-path-time">6. File, Path, Time</a></li><li class="toc-h2"><a href="#7-log">7. Log</a></li><li class="toc-h2"><a href="#8-jaringan">8. Jaringan</a></li><li class="toc-h3"><a href="#tcp">Tcp</a></li><li class="toc-h3"><a href="#udp">Udp</a></li><li class="toc-h3"><a href="#dns-resolv">Dns / Resolv</a></li><li class="toc-h3"><a href="#url">Url</a></li><li class="toc-h3"><a href="#http-klien">Http (klien)</a></li><li class="toc-h3"><a href="#httpserver-static-mime">HttpServer, Static, Mime</a></li><li class="toc-h3"><a href="#websocket">WebSocket</a></li><li class="toc-h3"><a href="#tls-klien-tls-1-3">Tls (klien TLS 1.3)</a></li><li class="toc-h3"><a href="#tlsserver-server-tls-1-3">TlsServer (server TLS 1.3)</a></li><li class="toc-h3"><a href="#http2-klien-http-2">Http2 (klien HTTP/2)</a></li><li class="toc-h3"><a href="#http2tabel-tabel-hpack">Http2Tabel (tabel HPACK)</a></li><li class="toc-h2"><a href="#9-kriptografi">9. Kriptografi</a></li><li class="toc-h2"><a href="#10-auth-session">10. Auth &amp; session</a></li><li class="toc-h2"><a href="#11-log-observability">11. Log + observability</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-str-teks-native-string">1. Str — teks native String</a></li><li class="toc-h2"><a href="#1b-bytes-buffer-int">1b. Bytes — buffer int[]</a></li><li class="toc-h2"><a href="#2-arrays-array-int">2. Arrays — array int[]</a></li><li class="toc-h2"><a href="#3-math-digits-stats-matrix">3. Math, Digits, Stats, Matrix</a></li><li class="toc-h2"><a href="#4-json">4. Json</a></li><li class="toc-h2"><a href="#5-koleksi">5. Koleksi</a></li><li class="toc-h2"><a href="#6-file-path-time">6. File, Path, Time</a></li><li class="toc-h2"><a href="#7-log">7. Log</a></li><li class="toc-h2"><a href="#8-jaringan">8. Jaringan</a></li><li class="toc-h3"><a href="#tcp">Tcp</a></li><li class="toc-h3"><a href="#udp">Udp</a></li><li class="toc-h3"><a href="#dns-resolv">Dns / Resolv</a></li><li class="toc-h3"><a href="#url">Url</a></li><li class="toc-h3"><a href="#http-klien">Http (klien)</a></li><li class="toc-h3"><a href="#httpserver-static-mime">HttpServer, Static, Mime</a></li><li class="toc-h3"><a href="#websocket">WebSocket</a></li><li class="toc-h3"><a href="#tls-klien-tls-1-3">Tls (klien TLS 1.3)</a></li><li class="toc-h3"><a href="#tlsserver-server-tls-1-3">TlsServer (server TLS 1.3)</a></li><li class="toc-h3"><a href="#http2-klien-http-2">Http2 (klien HTTP/2)</a></li><li class="toc-h3"><a href="#http2tabel-tabel-hpack">Http2Tabel (tabel HPACK)</a></li><li class="toc-h2"><a href="#9-database">9. Database</a></li><li class="toc-h3"><a href="#sqlite-pembaca-file-db-read-only">Sqlite (pembaca file .db read-only)</a></li><li class="toc-h2"><a href="#10-kriptografi">10. Kriptografi</a></li><li class="toc-h2"><a href="#11-auth-session">11. Auth &amp; session</a></li><li class="toc-h2"><a href="#12-log-observability">12. Log + observability</a></li></ul></nav>
 <p>Semua pustaka <strong>ditulis dalam bahasa Kopi</strong> (<code>lib/*.kop</code>) di atas builtin <code>Net</code> dan tipe dasar. Import selalu eksplisit:</p>
 <pre><code class="language-java">import Str;
 import Math;
@@ -51,6 +51,10 @@ import HttpServer;</code></pre>
 <tr>
 <td><code>lib/io/</code></td>
 <td><code>Reader</code> <code>Writer</code></td>
+</tr>
+<tr>
+<td><code>lib/db/</code></td>
+<td><code>Sqlite</code> (pembaca file <code>.db</code> read-only)</td>
 </tr>
 <tr>
 <td><code>lib/core/</code></td>
@@ -374,7 +378,10 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></
 <p><code>gate(ip, port, pinSpki, randSes)</code> → hctx (TLS + ALPN h2 + preface + SETTINGS + WINDOW_UPDATE); <code>request(hctx, method, path, authority, body)</code> → kirim HEADERS+DATA (stream id bergulir 1, 3, 5, …); <code>readResp(hctx)</code> → body; <code>respStatus(hctx)</code>, <code>respErr(hctx)</code>, <code>close(hctx)</code>. Dekoder HPACK penuh (RFC 7541): indexed, literal incremental/without/never, tabel dinamis 64 slot, Huffman kanonik. Regresi: vektor oracle <code>tools/gen_http2vec.py</code> (pustaka python hpack); uji live lawan oracle <code>tools/h2_oracle.py</code> (python h2).</p>
 <h3 id="http2tabel-tabel-hpack"><code>Http2Tabel</code> (tabel HPACK)<a class="anchor" href="#http2tabel-tabel-hpack" aria-label="tautan">#</a></h3>
 <p><code>hufCode()</code> <code>hufLen()</code> (Huffman 257 simbol), <code>stName()</code> <code>stNameOff()</code> <code>stVal()</code> <code>stValOff()</code> (statik 61 entri). Hasil generator <code>tools/gen_http2.py</code>; sumber data <code>tools/hpack_huffman.tsv</code>.</p>
-<h2 id="9-kriptografi">9. Kriptografi<a class="anchor" href="#9-kriptografi" aria-label="tautan">#</a></h2>
+<h2 id="9-database">9. Database<a class="anchor" href="#9-database" aria-label="tautan">#</a></h2>
+<h3 id="sqlite-pembaca-file-db-read-only"><code>Sqlite</code> (pembaca file <code>.db</code> read-only)<a class="anchor" href="#sqlite-pembaca-file-db-read-only" aria-label="tautan">#</a></h3>
+<p><code>open(path)</code> → ctx (validasi header, pageSize 512–65536, UTF-8); <code>tables(ctx)</code> → nama tabel user; <code>columns(ctx, nm)</code> → nama kolom dari CREATE TABLE; <code>query(ctx, nm)</code> → siapkan scan (hasil = jumlah kolom); <code>next(ctx)</code> → record berikutnya; akses nilai <code>intOf</code> (long, termasuk int64 &amp; INTEGER PRIMARY KEY = rowid), <code>realOf</code> (double, konversi IEEE-754 murni Kopi), <code>strOf</code> (String), <code>blobOf</code> (int[]), <code>typeOf</code>/<code>isNull</code>/<code>rowid</code>/<code>count</code>; <code>close(ctx)</code>. Mendukung: b-tree tabel leaf+interior, varint, serial type 0–12+, rantai halaman overflow (payload ≤ 65536 byte). Read-only, tanpa kunci — db yang sedang ditulis bisa terbaca setengah jadi. Regresi: <code>tools/gen_sqlitevec.py</code> (fixture page 512, 3 tabel, 219 baris: NULL/int64/REAL/blob/overflow + b-tree multipage) lawan oracle python <code>sqlite3</code>.</p>
+<h2 id="10-kriptografi">10. Kriptografi<a class="anchor" href="#10-kriptografi" aria-label="tautan">#</a></h2>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Modul</th>
@@ -437,7 +444,7 @@ int n = Udp.recvFrom(s, buf, from);         // from[0]=ip, from[1]=port</code></
 <td>parser DER minimal + pin SPKI</td>
 </tr>
 </tbody></table></div>
-<h2 id="10-auth-session">10. Auth &amp; session<a class="anchor" href="#10-auth-session" aria-label="tautan">#</a></h2>
+<h2 id="11-auth-session">11. Auth &amp; session<a class="anchor" href="#11-auth-session" aria-label="tautan">#</a></h2>
 <pre><code class="language-java">import Pbkdf2; import Jwt; import Session; import Auth; import MapStr;
 
 int[] hash  = Pbkdf2.sha256(pass, salt, 100000, 32);   // hash tetap biner
@@ -455,7 +462,7 @@ String h = HttpServer.headerValue(req, "Authorization");
 Auth.checkBasic(h, "budi", "rahasia");
 Auth.bearer(h);</code></pre>
 <p>Penyimpanan sesi masih in-memory (dua <code>MapStr</code>); belum persisten.</p>
-<h2 id="11-log-observability">11. <code>Log</code> + observability<a class="anchor" href="#11-log-observability" aria-label="tautan">#</a></h2>
+<h2 id="12-log-observability">12. <code>Log</code> + observability<a class="anchor" href="#12-log-observability" aria-label="tautan">#</a></h2>
 <p>Belum ada metrics/tracing. Pola yang disarankan: <code>Log.info</code> per request dengan tag + path, dan kirim <code>X-Request-Id</code> sendiri. Lihat <code>docs/04-server.md</code>.</p>
 <footer class="foot">
   <span>Dokumentasi Kopi v1.20 · lisensi MIT</span>

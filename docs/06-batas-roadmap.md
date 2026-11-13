@@ -64,7 +64,7 @@ reverse proxy + beberapa proses.
 | HTTP/2 (klien) | ✅ v1.37 — `Http2` (gate TLS+ALPN h2, HPACK decode penuh + Huffman, dt dinamis); sisi server h2 & HPACK encode dinamis belum |
 | WebSocket fragmentation, kompresi | belum |
 | Multipart, range request, ETag/Last-Modified, chunked response streaming | belum |
-| DB client (SQLite/Postgres/Redis) | belum |
+| DB client (`Sqlite` via protokol file; Postgres/Redis via socket belum) | `Sqlite` |
 | `sendfile`/zero-copy | belum; `Static` membaca file ke memori |
 
 Batas angka:
@@ -102,8 +102,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **155/155** (v1.23) — a64 + VM + sintaks x64 + dokumen HTML
-  (150 PASS termasuk cek x64 yang tidak masuk counter).
+- Suite: **174/174** (v1.38) — a64 + VM + sintaks x64 + dokumen HTML
+  (174 PASS termasuk cek x64).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal
@@ -130,8 +130,8 @@ Batas angka:
    sisa: `double[]`, array literal, multi-dimensi).
 4. **TLS server** ✅ v1.36 (`TlsServer`, oracle OpenSSL/Python). Sisa:
    verifikasi rantai/hostname di klien, mTLS, session resumption.
-5. **HTTP**: multipart, range/ETag, chunked response, gzip.
-6. **DB client** (SQLite via protokol file atau Postgres/Redis via socket).
+5. **HTTP/2 (klien)** ✅ v1.37 — `Http2` (gate TLS+ALPN h2, HPACK decode penuh + Huffman, dt dinamis); sisi server h2 & HPACK encode dinamis belum.
+6. **DB client** ✅ v1.38 — `Sqlite` (pembaca file `.db` read-only; Postgres/Redis via socket belum).
 7. **Ekosistem**: package manager, LSP, formatter, CI lintas platform,
    fuzzing, audit keamanan.
 8. **Performa**: register allocation/const-folding, `sendfile`,

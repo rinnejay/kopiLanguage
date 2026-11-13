@@ -1,0 +1,675 @@
+// Sqlite.kop — pembaca file database SQLite, read-only (v1.38).
+//
+// Format: https://www.sqlite.org/fileformat2.html
+// Murni Kopi di atas builtin Net (file syscall) + lib File.
+// Membaca: header file, b-tree tabel (leaf 0x0D / interior 0x05),
+// varint, record serial-type, rantai halaman overflow, sqlite_master,
+// dan parse CREATE TABLE untuk nama kolom + alias rowid.
+//
+// Batas jujur:
+//   - hanya UTF-8 (encoding 1) dan tabel rowid biasa;
+//     WITHOUT ROWID / virtual table ditolak dengan err.
+//   - payload record maksimum 65536 byte (diikuti via halaman overflow).
+//   - read-only: db yang sedang ditulis proses lain bisa terbaca
+//     setengah jadi (tidak ada kunci/WAL replay).
+//   - offset halaman dihitung 32-bit; db > 2 GB tidak didukung.
+//
+// API streaming:
+//   int[] ctx = Sqlite.open(path);          // ctx[0] < 0 = gagal buka
+//   String[] t = Sqlite.tables(ctx);        // nama tabel (urutan scan)
+//   String[] c = Sqlite.columns(ctx, nm);   // nama kolom dari CREATE TABLE
+//   int k = Sqlite.query(ctx, nm);          // mulai scan; k = jumlah kolom
+//   while (Sqlite.next(ctx)) {
+//       Sqlite.intOf(ctx, i)  → long     Sqlite.realOf(ctx, i) → double
+//       Sqlite.strOf(ctx, i)  → String   Sqlite.blobOf(ctx, i) → int[]
+//       Sqlite.isNull(ctx, i) → boolean  Sqlite.typeOf(ctx, i) → int
+//       Sqlite.rowid(ctx)     → long     Sqlite.count(ctx)    → int
+//   }
+//   Sqlite.close(ctx);
+//
+// Layout ctx (satu array besar, dialokasi open()):
+//   0 fd        1 pageSize  2 usable   3 err     4 depth
+//   5 ncol      6 rowLo     7 ipk      8 hdrOff  9 hdrSize
+//   10 payLen  11 rowHi
+//   12 PB0 (halaman b-tree, ps byte)
+//   13 OV0 (halaman overflow, ps byte)
+//   14 PAY0 (payload record, 65536)
+//   15 TYP0 (tipe serial 64 kolom)
+//   16 OFF0 (offset nilai 64 kolom)
+//   OFF0+64  STK  (stack pgno, 64 frame)
+//   OFF0+128 SIX  (indeks sel berikut, 64)
+//   OFF0+192 SCN  (jumlah sel, 64)
+//   OFF0+256 STP  (status frame: 0=muat 1=leaf 2=interior, 64)
+
+import Str;
+import Bytes;
+import File;
+
+class Sqlite {
+
+    /* ── konstanta ──────────────────────────────────────────────── */
+
+    static int MAXPAY() { return 65536; }   /* batas payload record */
+    static int MAXCOL() { return 64; }      /* batas kolom per record */
+    static int MAXDEPTH() { return 64; }    /* tinggi b-tree */
+
+    /* ── I/O file bantu ─────────────────────────────────────────── */
+
+    /* baca sampai buffer penuh; recvb biasanya penuh untuk regular
+     * file, tapi jangan bersandar */
+    private static int readFull(int fd, int[] buf) {
+        int n = File.readInto(fd, buf);
+        if (n >= buf.length) return n;
+        if (n < 0) n = 0;
+        while (n < buf.length) {
+            int b = Net.rdb(fd);
+            if (b < 0) break;
+            buf[n] = b;
+            n++;
+        }
+        return n;
+    }
+
+    /* ── buka/tutup ─────────────────────────────────────────────── */
+
+    static int[] open(String path) {
+        int[] fail = new int[2];
+        fail[0] = -1;
+        int fd = File.openRead(path);
+        if (fd < 0) return fail;
+        int[] hdr = new int[512];
+        int n = readFull(fd, hdr);
+        if (n < 512) { File.close(fd); return fail; }
+        /* "SQLite format 3\0" */
+        int[] magic = new int[16];
+        magic[0] = 83; magic[1] = 81; magic[2] = 76; magic[3] = 105;
+        magic[4] = 116; magic[5] = 101; magic[6] = 32; magic[7] = 102;
+        magic[8] = 111; magic[9] = 114; magic[10] = 109; magic[11] = 97;
+        magic[12] = 116; magic[13] = 32; magic[14] = 51; magic[15] = 0;
+        for (int i = 0; i < 16; i++) {
+            if (hdr[i] != magic[i]) { File.close(fd); return fail; }
+        }
+        int ps = ((hdr[16] & 255) << 8) | (hdr[17] & 255);
+        if (ps == 1) ps = 65536;
+        if (ps < 512 || ps > 65536 || (ps & (ps - 1)) != 0) {
+            File.close(fd); return fail;
+        }
+        int resv = hdr[20] & 255;
+        int us = ps - resv;
+        if (us < 480) { File.close(fd); return fail; }
+        int enc = ((hdr[56] & 255) << 24) | ((hdr[57] & 255) << 16)
+            | ((hdr[58] & 255) << 8) | (hdr[59] & 255);
+        if (enc != 1) { File.close(fd); return fail; }   /* hanya UTF-8 */
+
+        int pb0 = 17;
+        int ov0 = pb0 + ps;
+        int pay0 = ov0 + ps;
+        int typ0 = pay0 + 65536;
+        int off0 = typ0 + 64;
+        int[] ctx = new int[off0 + 64 + 256];
+        ctx[0] = fd; ctx[1] = ps; ctx[2] = us; ctx[3] = 0; ctx[4] = -1;
+        ctx[5] = 0; ctx[6] = 0; ctx[7] = -1; ctx[8] = 0; ctx[9] = 8;
+        ctx[10] = 0; ctx[11] = 0;
+        ctx[12] = pb0; ctx[13] = ov0; ctx[14] = pay0;
+        ctx[15] = typ0; ctx[16] = off0;
+        return ctx;
+    }
+
+    static void close(int[] ctx) {
+        if (ctx[0] >= 0) { File.close(ctx[0]); ctx[0] = -1; }
+    }
+
+    /* ── baca halaman ───────────────────────────────────────────── */
+
+    /* muat halaman pgno ke PB; hasil = tipe halaman (13 leaf tabel,
+     * 5 interior tabel), <0 galat */
+    private static int readPage(int[] ctx, int pgno) {
+        int ps = ctx[1];
+        int off = (pgno - 1) * ps;
+        if (pgno < 1 || File.seekSet(ctx[0], off) != off) {
+            ctx[3] = -21; return -1;
+        }
+        int[] tmp = new int[ps];
+        int n = readFull(ctx[0], tmp);
+        if (n < ps) { ctx[3] = -22; return -1; }
+        int pb = ctx[12];
+        for (int i = 0; i < ps; i++) ctx[pb + i] = tmp[i];
+        int hdr = 0;
+        if (pgno == 1) hdr = 100;        /* halaman 1: header file 100 byte */
+        ctx[8] = hdr;
+        int t = ctx[pb + hdr];
+        ctx[9] = 8;
+        if (t == 5) ctx[9] = 12;
+        return t;
+    }
+
+    private static int readOv(int[] ctx, int pgno) {
+        int ps = ctx[1];
+        int off = (pgno - 1) * ps;
+        if (pgno < 1 || File.seekSet(ctx[0], off) != off) {
+            ctx[3] = -21; return -1;
+        }
+        int[] tmp = new int[ps];
+        int n = readFull(ctx[0], tmp);
+        if (n < ps) { ctx[3] = -22; return -1; }
+        int ov = ctx[13];
+        for (int i = 0; i < ps; i++) ctx[ov + i] = tmp[i];
+        return 0;
+    }
+
+    /* u16/u32 big-endian dari PB / OV */
+    private static int u16Pb(int[] ctx, int off) {
+        int pb = ctx[12];
+        return ((ctx[pb + off] & 255) << 8) | (ctx[pb + off + 1] & 255);
+    }
+
+    private static int u32Pb(int[] ctx, int off) {
+        int pb = ctx[12];
+        return ((ctx[pb + off] & 255) << 24) | ((ctx[pb + off + 1] & 255) << 16)
+            | ((ctx[pb + off + 2] & 255) << 8) | (ctx[pb + off + 3] & 255);
+    }
+
+    private static int u32Ov(int[] ctx) {
+        int ov = ctx[13];
+        return ((ctx[ov] & 255) << 24) | ((ctx[ov + 1] & 255) << 16)
+            | ((ctx[ov + 2] & 255) << 8) | (ctx[ov + 3] & 255);
+    }
+
+    /* posisi sel ke-i (array pointer sel: 2 byte per sel) */
+    private static int cellPtr(int[] ctx, int i) {
+        return u16Pb(ctx, ctx[8] + ctx[9] + 2 * i);
+    }
+
+    /* ── varint (§1.5): 7 bit per byte, byte ke-9 penuh ─────────── */
+
+    /* varint di halaman PB; io[0]=nilai(long) io[1]=pos baru */
+    private static void pvPage(int[] ctx, int off, long[] io) {
+        int pb = ctx[12];
+        long v = 0;
+        int p = off;
+        for (int i = 0; i < 8; i++) {
+            int b = ctx[pb + p] & 255;
+            p++;
+            v = (v << 7) | (b & 127);
+            if ((b & 128) == 0) { io[0] = v; io[1] = p; return; }
+        }
+        int b9 = ctx[pb + p] & 255;
+        io[0] = (v << 8) | b9;
+        io[1] = p + 1;
+    }
+
+    /* varint di payload PAY */
+    private static void pvPay(int[] ctx, int off, long[] io) {
+        int pay = ctx[14];
+        long v = 0;
+        int p = off;
+        for (int i = 0; i < 8; i++) {
+            int b = ctx[pay + p] & 255;
+            p++;
+            v = (v << 7) | (b & 127);
+            if ((b & 128) == 0) { io[0] = v; io[1] = p; return; }
+        }
+        int b9 = ctx[pay + p] & 255;
+        io[0] = (v << 8) | b9;
+        io[1] = p + 1;
+    }
+
+    /* ── record (§2.1): header varint + serial type + data ──────── */
+
+    private static int typeSize(int t) {
+        if (t == 0 || t == 8 || t == 9) return 0;
+        if (t == 1) return 1;
+        if (t == 2) return 2;
+        if (t == 3) return 3;
+        if (t == 4) return 4;
+        if (t == 5) return 6;
+        if (t == 6 || t == 7) return 8;
+        if (t >= 12) return (t - 12) / 2;    /* genap blob, ganjil teks */
+        return 0;
+    }
+
+    /* decode payload di PAY (payLen byte) → TYP/OFF/ncol */
+    private static int decodeRec(int[] ctx) {
+        long[] io = new long[2];
+        pvPay(ctx, 0, io);
+        int hlen = (int)io[0];
+        if (hlen < 1 || hlen > ctx[10]) { ctx[3] = -31; return -1; }
+        int p = 1;
+        int n = 0;
+        while (p < hlen) {
+            if (n >= 64) { ctx[3] = -32; return -1; }
+            pvPay(ctx, p, io);
+            p = (int)io[1];
+            ctx[ctx[15] + n] = (int)io[0];
+            n++;
+        }
+        ctx[5] = n;
+        int d = hlen;
+        for (int i = 0; i < n; i++) {
+            ctx[ctx[16] + i] = d;
+            d = d + typeSize(ctx[ctx[15] + i]);
+        }
+        if (d != ctx[10]) { ctx[3] = -33; return -1; }
+        return 0;
+    }
+
+    /* ── sel leaf tabel + rantai overflow (§1.6) ────────────────── */
+
+    /* parse sel leaf pada off: varint P, varint rowid, payload lokal
+     * + halaman overflow; payload penuh ditempatkan di PAY */
+    private static int loadCell(int[] ctx, int off) {
+        int us = ctx[2];
+        long[] io = new long[2];
+        pvPage(ctx, off, io);
+        int plen = (int)io[0];
+        int p = (int)io[1];
+        pvPage(ctx, p, io);
+        long rid = io[0];                     /* rowid (long, pecah hi/lo) */
+        ctx[6] = (int)rid;
+        ctx[11] = (int)(rid >> 32);
+        p = (int)io[1];
+        if (plen < 0 || plen > 65536) { ctx[3] = -41; return -1; }
+        int X = us - 35;
+        int L = plen;
+        if (plen > X) {
+            int M = ((us - 12) * 32) / 255 - 23;
+            int K = M + ((plen - M) % (us - 4));
+            if (K <= X) L = K; else L = M;
+        }
+        int pb = ctx[12];
+        int pay = ctx[14];
+        for (int i = 0; i < L; i++) ctx[pay + i] = ctx[pb + p + i];
+        if (L < plen) {
+            int ovpg = u32Pb(ctx, p + L);
+            int rem = plen - L;
+            int q = L;
+            int guard = 0;
+            while (rem > 0) {
+                if (ovpg < 1 || guard > 65536) { ctx[3] = -42; return -1; }
+                guard++;
+                if (readOv(ctx, ovpg) < 0) return -1;
+                int chunk = us - 4;
+                if (chunk > rem) chunk = rem;
+                int ov = ctx[13];
+                for (int i = 0; i < chunk; i++) ctx[pay + q + i] = ctx[ov + 4 + i];
+                q = q + chunk;
+                rem = rem - chunk;
+                ovpg = u32Ov(ctx);
+            }
+        }
+        ctx[10] = plen;
+        return 0;
+    }
+
+    /* ── traversal b-tree tabel (iteratif, preorder = urutan rowid) */
+
+    private static void push(int[] ctx, int pgno) {
+        int d = ctx[4];
+        int stk = ctx[16] + 64;
+        int six = stk + 64;
+        int scn = six + 64;
+        int stp = scn + 64;
+        ctx[stk + d] = pgno;
+        ctx[six + d] = 0;
+        ctx[scn + d] = 0;
+        ctx[stp + d] = 0;
+        ctx[4] = d + 1;
+    }
+
+    /* maju ke record berikutnya; decode ke TYP/OFF; false = habis/galat */
+    static boolean next(int[] ctx) {
+        if (ctx[0] < 0 || ctx[3] != 0) return false;
+        int stk = ctx[16] + 64;
+        int six = stk + 64;
+        int scn = six + 64;
+        int stp = scn + 64;
+        while (ctx[4] > 0) {
+            int d = ctx[4] - 1;
+            if (ctx[stp + d] == 0) {          /* frame baru: muat halaman */
+                int t = readPage(ctx, ctx[stk + d]);
+                if (t < 0) return false;
+                if (t == 13) ctx[stp + d] = 1;
+                else if (t == 5) ctx[stp + d] = 2;
+                else { ctx[3] = -23; return false; }
+                ctx[scn + d] = u16Pb(ctx, ctx[8] + 3);
+                ctx[six + d] = 0;
+            }
+            if (ctx[stp + d] == 1) {          /* leaf: satu sel = satu record */
+                if (ctx[six + d] >= ctx[scn + d]) {
+                    ctx[4] = d;               /* pop + muat ulang induk */
+                    if (ctx[4] <= 0) return false;
+                    int pd = ctx[4] - 1;
+                    if (readPage(ctx, ctx[stk + pd]) < 0) return false;
+                    continue;
+                }
+                int cp = cellPtr(ctx, ctx[six + d]);
+                ctx[six + d] = ctx[six + d] + 1;
+                if (loadCell(ctx, cp) < 0) return false;
+                if (decodeRec(ctx) < 0) return false;
+                return true;
+            }
+            /* interior: anak kiri sel, lalu rightmost di hdr+8 */
+            if (ctx[six + d] < ctx[scn + d]) {
+                int cp = cellPtr(ctx, ctx[six + d]);
+                ctx[six + d] = ctx[six + d] + 1;
+                int child = u32Pb(ctx, cp);
+                if (ctx[4] >= 64) { ctx[3] = -24; return false; }
+                push(ctx, child);
+                continue;
+            }
+            int child = u32Pb(ctx, ctx[8] + 8);
+            ctx[stk + d] = child;             /* frame jadi rightmost */
+            ctx[stp + d] = 0;
+        }
+        return false;
+    }
+
+    /* ── akses nilai record saat ini ────────────────────────────── */
+
+    static int typeOf(int[] ctx, int i) { return ctx[ctx[15] + i]; }
+
+    static int count(int[] ctx) { return ctx[5]; }
+
+    static int errOf(int[] ctx) { return ctx[3]; }
+
+    static long rowid(int[] ctx) {
+        return ((long)ctx[11] << 32) | (ctx[6] & 4294967295L);
+    }
+
+    static boolean isNull(int[] ctx, int i) {
+        if (typeOf(ctx, i) != 0) return false;
+        return i != ctx[7];               /* kolom INTEGER PRIMARY KEY = rowid */
+    }
+
+    /* integer bertanda big-endian 1..6 byte */
+    private static long rawInt(int[] ctx, int i) {
+        int t = typeOf(ctx, i);
+        int s = typeSize(t);
+        int o = ctx[ctx[16] + i] + ctx[14];
+        long v = 0;
+        for (int k = 0; k < s; k++) v = (v << 8) | (ctx[o + k] & 255);
+        if (s < 8 && (ctx[o] & 128) != 0) v = v - (1L << (8 * s));
+        return v;
+    }
+
+    /* 8 byte big-endian (bit double / integer 64) */
+    private static long raw8(int[] ctx, int o) {
+        long v = 0;
+        for (int k = 0; k < 8; k++) v = (v << 8) | (ctx[o + k] & 255);
+        return v;
+    }
+
+    static long intOf(int[] ctx, int i) {
+        int t = typeOf(ctx, i);
+        if (t == 8) return 0L;
+        if (t == 9) return 1L;
+        if (t == 0) {
+            if (i == ctx[7]) return rowid(ctx);
+            return 0L;
+        }
+        if (t >= 1 && t <= 6) return rawInt(ctx, i);
+        if (t == 7) return (long)realOf(ctx, i);
+        return 0L;
+    }
+
+    static double realOf(int[] ctx, int i) {
+        int t = typeOf(ctx, i);
+        if (t == 7) return bitsToDouble(raw8(ctx, ctx[ctx[16] + i] + ctx[14]));
+        if (t >= 1 && t <= 6) return (double)rawInt(ctx, i);
+        if (t == 9) return 1.0;
+        return 0.0;
+    }
+
+    static String strOf(int[] ctx, int i) {
+        int t = typeOf(ctx, i);
+        if (t < 13 || (t % 2) == 0) return Net.mkstr(new int[0]);
+        int n = (t - 13) / 2;
+        int o = ctx[ctx[16] + i] + ctx[14];
+        int[] out = new int[n];
+        for (int k = 0; k < n; k++) out[k] = ctx[o + k];
+        return Net.mkstr(out);
+    }
+
+    static int[] blobOf(int[] ctx, int i) {
+        int t = typeOf(ctx, i);
+        if (t < 12 || (t % 2) != 0) return new int[0];
+        int n = (t - 12) / 2;
+        int o = ctx[ctx[16] + i] + ctx[14];
+        int[] out = new int[n];
+        for (int k = 0; k < n; k++) out[k] = ctx[o + k];
+        return out;
+    }
+
+    /* IEEE-754: 64 bit → double (subnormal/normal/inf/nan) */
+    static double bitsToDouble(long bits) {
+        boolean neg = bits < 0;
+        long m = bits & 4503599627370495L;       /* mantissa 52 bit */
+        int e = (int)((bits >> 52) & 2047L);
+        double big = 1.0e308;
+        double inf = big * 10.0;
+        if (e == 2047) {
+            if (m == 0L) {
+                if (neg) return -inf;
+                return inf;
+            }
+            return inf - inf;                     /* nan */
+        }
+        double x = 0.0;
+        if (e == 0) {
+            /* subnormal: m × 2^-1074 (tepat, semua kelipatan 2^-1074) */
+            x = (double)m * 4.9406564584124654e-324;
+        } else {
+            /* normal: (1 + m/2^52) × 2^(e-1023) — semua langkah eksak */
+            x = 1.0 + (double)m / 4503599627370496.0;
+            int k = e - 1023;
+            if (k > 0) {
+                for (int i = 0; i < k; i++) x = x * 2.0;
+            } else {
+                for (int i = 0; i < -k; i++) x = x * 0.5;
+            }
+        }
+        if (neg) return -x;
+        return x;
+    }
+
+    /* ── sqlite_master (root halaman 1) ─────────────────────────── */
+
+    /* scan sqlite_master: type,name,tbl_name,rootpage,sql */
+    private static int findRoot(int[] ctx, String table) {
+        ctx[4] = 0;
+        push(ctx, 1);
+        int found = -1;
+        while (found < 0 && next(ctx)) {
+            if (ctx[5] < 5) continue;
+            String ty = strOf(ctx, 0);
+            String nm = strOf(ctx, 1);
+            if (Str.equalsIgnoreCase(ty, "table") && Str.equalsIgnoreCase(nm, table)) {
+                found = (int)intOf(ctx, 3);
+            }
+        }
+        return found;
+    }
+
+    private static String tableSql(int[] ctx, String table) {
+        ctx[4] = 0;
+        push(ctx, 1);
+        String out = "";
+        while (next(ctx)) {
+            if (ctx[5] < 5) continue;
+            String ty = strOf(ctx, 0);
+            String nm = strOf(ctx, 1);
+            if (Str.equalsIgnoreCase(ty, "table") && Str.equalsIgnoreCase(nm, table)) {
+                out = strOf(ctx, 4);
+            }
+        }
+        return out;
+    }
+
+    static String[] tables(int[] ctx) {
+        if (ctx[0] < 0) return new String[0];
+        ctx[3] = 0;
+        ctx[4] = 0;
+        push(ctx, 1);
+        String[] out = new String[8];
+        int n = 0;
+        while (next(ctx)) {
+            if (ctx[5] < 5) continue;
+            String ty = strOf(ctx, 0);
+            String nm = strOf(ctx, 1);
+            if (!Str.equalsIgnoreCase(ty, "table")) continue;
+            if (Str.indexOf(nm, "sqlite_", 0) == 0) continue;
+            if (n == out.length) {
+                String[] bigger = new String[n * 2];
+                for (int i = 0; i < n; i++) bigger[i] = out[i];
+                out = bigger;
+            }
+            out[n] = nm;
+            n++;
+        }
+        String[] fin = new String[n];
+        for (int i = 0; i < n; i++) fin[i] = out[i];
+        return fin;
+    }
+
+    /* ── parse CREATE TABLE ─────────────────────────────────────── */
+
+    /* potong isi kurung pertama, pecah koma level-teratas */
+    private static String[] topSegments(String sql) {
+        int a = Str.indexOf(sql, "(", 0);
+        if (a < 0) return new String[0];
+        int depth = 0;
+        int b = sql.length;
+        for (int i = a; i < sql.length; i++) {
+            int ch = sql[i];
+            if (ch == 40) depth++;
+            else if (ch == 41) {
+                depth--;
+                if (depth == 0) { b = i; break; }
+            }
+        }
+        String body = Str.sub(sql, a + 1, b - a - 1);
+        String[] out = new String[8];
+        int n = 0;
+        int st = 0;
+        depth = 0;
+        for (int i = 0; i <= body.length; i++) {
+            boolean cut = i == body.length;
+            if (!cut) {
+                int ch = body[i];
+                if (ch == 40) depth++;
+                else if (ch == 41) depth--;
+                else if (ch == 44 && depth == 0) cut = true;
+            }
+            if (cut) {
+                String seg = Str.sub(body, st, i - st);
+                if (n == out.length) {
+                    String[] bigger = new String[n * 2];
+                    for (int i2 = 0; i2 < n; i2++) bigger[i2] = out[i2];
+                    out = bigger;
+                }
+                out[n] = seg;
+                n++;
+                st = i + 1;
+            }
+        }
+        String[] fin = new String[n];
+        for (int i = 0; i < n; i++) fin[i] = out[i];
+        return fin;
+    }
+
+    private static boolean isNameByte(int c) {
+        if (c >= 97 && c <= 122) return true;
+        if (c >= 65 && c <= 90) return true;
+        if (c >= 48 && c <= 57) return true;
+        if (c == 95) return true;             /* _ */
+        if (c >= 128) return true;            /* UTF-8 non-ASCII */
+        return false;
+    }
+
+    private static boolean isConstraint(String low) {
+        if (Str.equalsIgnoreCase(low, "primary")) return true;
+        if (Str.equalsIgnoreCase(low, "unique")) return true;
+        if (Str.equalsIgnoreCase(low, "check")) return true;
+        if (Str.equalsIgnoreCase(low, "foreign")) return true;
+        if (Str.equalsIgnoreCase(low, "constraint")) return true;
+        return false;
+    }
+
+    /* nama kolom dari CREATE TABLE (urutan deklarasi) */
+    static String[] columns(int[] ctx, String table) {
+        if (ctx[0] < 0) return new String[0];
+        String sql = tableSql(ctx, table);
+        return parseCols(sql);
+    }
+
+    static String[] parseCols(String sql) {
+        String[] seg = topSegments(sql);
+        String[] out = new String[8];
+        int n = 0;
+        for (int i = 0; i < seg.length; i++) {
+            String s = Str.trim(seg[i]);
+            if (s.length == 0) continue;
+            String name = "";
+            int q = s[0];
+            if (q == 34 || q == 96 || q == 39 || q == 91) {
+                /* nama berkutip: " ` ' [ */
+                int closeCh = q;
+                if (q == 91) closeCh = 93;
+                int e = 1;
+                while (e < s.length && s[e] != closeCh) e++;
+                name = Str.sub(s, 1, e - 1);
+            } else {
+                int e = 0;
+                while (e < s.length && isNameByte(s[e])) e++;
+                name = Str.sub(s, 0, e);
+            }
+            if (isConstraint(name)) continue;
+            if (n == out.length) {
+                String[] bigger = new String[n * 2];
+                for (int i2 = 0; i2 < n; i2++) bigger[i2] = out[i2];
+                out = bigger;
+            }
+            out[n] = name;
+            n++;
+        }
+        String[] fin = new String[n];
+        for (int i = 0; i < n; i++) fin[i] = out[i];
+        return fin;
+    }
+
+    /* indeks kolom INTEGER PRIMARY KEY (alias rowid); -1 bila tidak ada */
+    static int findIpk(String sql) {
+        if (sql.length == 0) return -1;
+        String[] seg = topSegments(Str.lower(sql));
+        for (int i = 0; i < seg.length; i++) {
+            String s = Str.trim(seg[i]);
+            if (s.length == 0) continue;
+            int e = 0;
+            while (e < s.length && isNameByte(s[e])) e++;
+            String head = Str.lower(Str.sub(s, 0, e));
+            if (isConstraint(head)) continue;
+            if (Str.contains(s, "integer") && Str.contains(s, "primary")
+                && Str.contains(s, "key")) return i;
+        }
+        return -1;
+    }
+
+    /* ── mulai scan tabel ───────────────────────────────────────── */
+
+    /* siapkan traversal; hasil = jumlah kolom, <0 galat */
+    static int query(int[] ctx, String table) {
+        if (ctx[0] < 0) return -1;
+        ctx[3] = 0;
+        int root = findRoot(ctx, table);
+        if (root < 0) { ctx[3] = -51; return -1; }
+        String sql = tableSql(ctx, table);
+        int ipk = -1;
+        if (sql.length > 0) ipk = findIpk(sql);
+        ctx[7] = ipk;
+        String[] c = parseCols(sql);
+        ctx[4] = 0;
+        if (ctx[4] >= 64) { ctx[3] = -24; return -1; }
+        push(ctx, root);
+        return c.length;
+    }
+}
