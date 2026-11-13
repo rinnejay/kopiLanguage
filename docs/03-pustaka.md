@@ -12,7 +12,7 @@ import HttpServer;
 | Folder | Modul |
 |---|---|
 | `lib/core/` | `Str` `Bytes` `Math` `Digits` `Stats` `Matrix` `Arrays` `Json` `Map` `MapStr` `Set` `Deque` `File` `Path` `Time` `Log` |
-| `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` `TlsServer` |
+| `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` `TlsServer` `Http2` `Http2Tabel` |
 | `lib/crypto/` | `Crypto` `Cipher` `Hash` `Aes` `Gcm` `Pem` `X509` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
 | `lib/io/` | `Reader` `Writer` |
 | `lib/core/` | `Regex` (mesin regex backtracking) `BigInt` (bilangan presisi sembarang) |
@@ -256,6 +256,23 @@ ECDSA CertificateVerify (server memakai pin SPKI).
 `writeApp(ctx,data)`, `readApp(ctx)`. Suite: ChaCha20-Poly1305 /
 AES-128/256-GCM (prioritas SHA-256). Handshake tervalidasi lawan klien
 OpenSSL/Python; belum verifikasi sertifikat klien (mTLS).
+
+### `Http2` (klien HTTP/2)
+
+`gate(ip, port, pinSpki, randSes)` → hctx (TLS + ALPN h2 + preface +
+SETTINGS + WINDOW_UPDATE); `request(hctx, method, path, authority, body)`
+→ kirim HEADERS+DATA (stream id bergulir 1, 3, 5, …);
+`readResp(hctx)` → body; `respStatus(hctx)`, `respErr(hctx)`,
+`close(hctx)`. Dekoder HPACK penuh (RFC 7541): indexed, literal
+incremental/without/never, tabel dinamis 64 slot, Huffman kanonik.
+Regresi: vektor oracle `tools/gen_http2vec.py` (pustaka python hpack);
+uji live lawan oracle `tools/h2_oracle.py` (python h2).
+
+### `Http2Tabel` (tabel HPACK)
+
+`hufCode()` `hufLen()` (Huffman 257 simbol), `stName()` `stNameOff()`
+`stVal()` `stValOff()` (statik 61 entri). Hasil generator
+`tools/gen_http2.py`; sumber data `tools/hpack_huffman.tsv`.
 
 ## 9. Kriptografi
 

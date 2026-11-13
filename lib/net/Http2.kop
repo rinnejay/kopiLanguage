@@ -1,0 +1,622 @@
+/* Http2.kop — klien HTTP/2 (RFC 9113/7540) + HPACK (RFC 7541) murni Kopi.
+ *
+ * Layer:
+ *   1. transport: Tls.handshake — wajib ALPN "h2" (flag di ctx[250]).
+ *   2. frame (§4, §5): preface 24 byte + SETTINGS + WINDOW_UPDATE;
+ *      HEADERS (END_HEADERS) + DATA (END_STREAM, pecah ≤ 16384);
+ *      balasan: SETTINGS→ACK, PING→ACK, WINDOW_UPDATE/PRIORITY diabaikan,
+ *      GOAWAY/RST_STREAM→selesai, HEADERS/CONTINUATION→HPACK, DATA→body.
+ *   3. HPACK: encode literal-without-indexing (tanpa Huffman);
+ *      decode penuh: indexed, literal (incremental/without/never),
+ *      dynamic table size update, Huffman kanonik 5..30 bit (Appendix B).
+ *
+ * Konteks hctx (semua state di region int[] — tidak ada static field):
+ *   0..255     copy ctx TLS (fd, kunci app, seq write/read, ...)
+ *   256 CUR    257 DTS (ukuran dt oktet)   258 DTN (isi dt)
+ *   260 ST     261 RBL   262 RBP   263 SID   264 DONE   265 ERR
+ *   267 HBL    269 BODYL
+ *   512..16895     slot tabel dinamis: 64 × 256 byte
+ *                  (nameLen u16, valLen u16, name, val)
+ *   16900..49795   buffer baca frame (frame bisa span beberapa record)
+ *   49900..59115   blok header (HEADERS ‖ CONTINUATION)
+ *   59300..92067   body respons
+ *   92100..        tabel Huffman + peta kanonik + tabel statik
+ */
+import Tls;
+import Tcp;
+import Cipher;
+import Str;
+import Hash;
+import Http2Tabel;
+
+class Http2 {
+
+    /* ── tabel Huffman kanonik + statik → hctx ──────────────────── */
+
+    static void initTables(int[] hctx) {
+        int HUFC = 92100;
+        int HUFL = 92400;
+        int SBYS = 92700;
+        int FC = 93000;
+        int CNT = 93040;
+        int OFF = 93080;
+        int STN = 93200;
+        int STNO = 93900;
+        int STV = 94000;
+        int STVO = 94100;
+        int[] hc = Http2Tabel.hufCode();
+        int[] hl = Http2Tabel.hufLen();
+        for (int i = 0; i < 257; i++) {
+            hctx[HUFC + i] = hc[i];
+            hctx[HUFL + i] = hl[i];
+        }
+        /* firstCode/count/off per panjang 5..30 (kanonik, RFC 7541 B) */
+        int fc = 0;
+        for (int L = 5; L <= 30; L++) {
+            int c = 0;
+            for (int s = 0; s < 257; s++) {
+                if (hctx[HUFL + s] == L) c = c + 1;
+            }
+            hctx[FC + L] = fc;
+            hctx[CNT + L] = c;
+            if (L == 5) hctx[OFF + L] = 0;
+            else hctx[OFF + L] = hctx[OFF + L - 1] + hctx[CNT + L - 1];
+            fc = (fc + c) << 1;
+        }
+        /* SBYS: simbol urut kode dalam tiap panjang — cari langsung
+         * berdasarkan firstCode + j (tidak mengasumsikan urutan simbol) */
+        for (int L = 5; L <= 30; L++) {
+            for (int j = 0; j < hctx[CNT + L]; j++) {
+                int want = hctx[FC + L] + j;
+                for (int s = 0; s < 257; s++) {
+                    if (hctx[HUFL + s] == L && hctx[HUFC + s] == want) {
+                        hctx[SBYS + hctx[OFF + L] + j] = s;
+                        s = 999;
+                    }
+                }
+            }
+        }
+        int[] sn = Http2Tabel.stName();
+        int[] sno = Http2Tabel.stNameOff();
+        int[] sv = Http2Tabel.stVal();
+        int[] svo = Http2Tabel.stValOff();
+        for (int i = 0; i < sn.length; i++) hctx[STN + i] = sn[i];
+        for (int i = 0; i < sno.length; i++) hctx[STNO + i] = sno[i];
+        for (int i = 0; i < sv.length; i++) hctx[STV + i] = sv[i];
+        for (int i = 0; i < svo.length; i++) hctx[STVO + i] = svo[i];
+    }
+
+    static int bitAt(int[] b, int pos, int bp) {
+        return (b[pos] >>> (7 - bp)) & 1;
+    }
+
+    /* Huffman decode bitLen bit mulai byte pos; byte hasil; okOut[0]=1
+     * sukses (padding akhir diabaikan), 0 gagal (EOS/lewat 30 bit). */
+    static int[] hufDec(int[] hctx, int[] src, int pos, int bitLen, int[] okOut) {
+        okOut[0] = 0;
+        int HUFC = 92100;
+        int HUFL = 92400;
+        int SBYS = 92700;
+        int FC = 93000;
+        int CNT = 93040;
+        int OFF = 93080;
+        int[] out = new int[bitLen / 5 + 2];
+        int on = 0;
+        int code = 0;
+        int L = 0;
+        int p = pos;
+        int bp = 0;
+        int left = bitLen;
+        while (left > 0) {
+            int bit = bitAt(src, p, bp);
+            bp = bp + 1;
+            if (bp == 8) {
+                bp = 0;
+                p = p + 1;
+            }
+            code = code * 2 + bit;
+            L = L + 1;
+            left = left - 1;
+            if (L >= 5) {
+                int idx = code - hctx[FC + L];
+                if (idx >= 0 && idx < hctx[CNT + L]) {
+                    int sym = hctx[SBYS + hctx[OFF + L] + idx];
+                    if (sym == 256) return out;          /* EOS */
+                    out[on] = sym;
+                    on = on + 1;
+                    code = 0;
+                    L = 0;
+                } else if (L >= 30) {
+                    return out;                          /* tak valid */
+                }
+            }
+        }
+        okOut[0] = 1;
+        return Tls.sliceOf(out, 0, on);
+    }
+
+    /* ── integer & string HPACK (§5.1, §5.2) ────────────────────── */
+
+    /* decode integer prefix n bit di blk[p]; io[0]=nilai, io[1]=pos baru */
+    static void decInt(int[] blk, int p, int n, int[] io) {
+        int mask = (1 << n) - 1;
+        int v = blk[p] & mask;
+        p = p + 1;
+        if (v == mask) {
+            int m = 0;
+            while (p < blk.length) {
+                int b2 = blk[p];
+                p = p + 1;
+                v = v + ((b2 & 127) << m);
+                m = m + 7;
+                if ((b2 & 128) == 0) break;
+            }
+        }
+        io[0] = v;
+        io[1] = p;
+    }
+
+    /* string literal di blk[p]; keluar byte; io[0]=pos baru; okOut[0] */
+    static int[] decStr(int[] hctx, int[] blk, int p, int[] io, int[] okOut) {
+        okOut[0] = 0;
+        int huf = (blk[p] >>> 7) & 1;
+        int[] io2 = new int[2];
+        decInt(blk, p, 7, io2);
+        int L = io2[0];
+        p = io2[1];
+        io[0] = p + L;
+        if (huf == 1) {
+            return hufDec(hctx, blk, p, L * 8, okOut);
+        }
+        if (p + L > blk.length) return new int[0];
+        okOut[0] = 1;
+        return Tls.sliceOf(blk, p, L);
+    }
+
+    /* ── tabel dinamis HPACK (§4.3): 64 slot × 256 byte di hctx ─── */
+
+    static void dtEvict(int[] hctx) {
+        int CUR = 256;
+        int DTS = 257;
+        int DTN = 258;
+        if (hctx[DTN] == 0) return;
+        int old = (hctx[CUR] - hctx[DTN] + 128) % 64;
+        int base = 512 + old * 256;
+        int nl = ((hctx[base] & 255) << 8) | (hctx[base + 1] & 255);
+        int vl = ((hctx[base + 2] & 255) << 8) | (hctx[base + 3] & 255);
+        hctx[DTS] = hctx[DTS] - (nl + vl + 32);
+        hctx[DTN] = hctx[DTN] - 1;
+    }
+
+    static void dtAdd(int[] hctx, int[] name, int[] val) {
+        int CUR = 256;
+        int DTS = 257;
+        int DTN = 258;
+        int esize = name.length + val.length + 32;
+        if (esize > 4096 || name.length > 250 || val.length > 250) {
+            /* entri tak muat: tabel dikosongkan (RFC 7541 §4.4) */
+            while (hctx[DTN] > 0) dtEvict(hctx);
+            return;
+        }
+        while (hctx[DTN] > 0 && hctx[DTS] + esize > 4096) dtEvict(hctx);
+        while (hctx[DTN] >= 64) dtEvict(hctx);
+        int slot = hctx[CUR];
+        int base = 512 + slot * 256;
+        hctx[base] = (name.length >>> 8) & 255;
+        hctx[base + 1] = name.length & 255;
+        hctx[base + 2] = (val.length >>> 8) & 255;
+        hctx[base + 3] = val.length & 255;
+        for (int i = 0; i < name.length; i++) hctx[base + 4 + i] = name[i];
+        for (int i = 0; i < val.length; i++) hctx[base + 4 + name.length + i] = val[i];
+        hctx[CUR] = (slot + 1) % 64;
+        hctx[DTN] = hctx[DTN] + 1;
+        hctx[DTS] = hctx[DTS] + esize;
+    }
+
+    /* idx HPACK → out: [0]=nameLen [1]=valLen [2]=name ‖ val; okOut[0] */
+    static void lookup(int[] hctx, int idx, int[] out, int[] okOut) {
+        okOut[0] = 0;
+        int STN = 93200;
+        int STNO = 93900;
+        int STV = 94000;
+        int STVO = 94100;
+        int CUR = 256;
+        int DTN = 258;
+        if (idx >= 1 && idx <= 61) {
+            int ns = hctx[STNO + idx - 1];
+            int vs = hctx[STVO + idx - 1];
+            int nl = hctx[STNO + idx] - ns;
+            int vl = hctx[STVO + idx] - vs;
+            out[0] = nl;
+            out[1] = vl;
+            for (int i = 0; i < nl; i++) out[2 + i] = hctx[STN + ns + i];
+            for (int i = 0; i < vl; i++) out[2 + nl + i] = hctx[STV + vs + i];
+            okOut[0] = 1;
+            return;
+        }
+        if (idx >= 62) {
+            int k = idx - 62;                            /* 0 = terbaru */
+            if (k >= hctx[DTN]) return;
+            int slot = (hctx[CUR] - 1 - k + 128) % 64;
+            int base = 512 + slot * 256;
+            int nl = ((hctx[base] & 255) << 8) | (hctx[base + 1] & 255);
+            int vl = ((hctx[base + 2] & 255) << 8) | (hctx[base + 3] & 255);
+            out[0] = nl;
+            out[1] = vl;
+            for (int i = 0; i < nl; i++) out[2 + i] = hctx[base + 4 + i];
+            for (int i = 0; i < vl; i++) out[2 + nl + i] = hctx[base + 4 + nl + i];
+            okOut[0] = 1;
+        }
+    }
+
+    static boolean isStatAt(int[] b, int off, int n) {
+        if (n != 7) return false;
+        return b[off] == 58 && b[off + 1] == 115 && b[off + 2] == 116
+            && b[off + 3] == 97 && b[off + 4] == 116 && b[off + 5] == 117
+            && b[off + 6] == 115;
+    }
+
+    static int digitsVal(int[] b, int off, int n) {
+        int v = 0;
+        for (int i = 0; i < n; i++) {
+            v = v * 10 + (b[off + i] - 48);
+        }
+        return v;
+    }
+
+    /* ── decode blok header (§6) ────────────────────────────────── */
+
+    static void decodeBlock(int[] hctx, int[] blk, int[] okOut) {
+        okOut[0] = 0;
+        int p = 0;
+        int ST = 260;
+        int DTS = 257;
+        int DTN = 258;
+        int[] io = new int[2];
+        int[] tmp = new int[1400];
+        int[] ok2 = new int[1];
+        while (p < blk.length) {
+            int b = blk[p];
+            if ((b & 128) != 0) {
+                /* 1xxxxxxx — indexed header field */
+                decInt(blk, p, 7, io);
+                int idx = io[0];
+                p = io[1];
+                if (idx <= 0) return;
+                lookup(hctx, idx, tmp, ok2);
+                if (ok2[0] == 0) return;
+                if (isStatAt(tmp, 2, tmp[0])) {
+                    hctx[ST] = digitsVal(tmp, 2 + tmp[0], tmp[1]);
+                }
+            } else if ((b & 192) == 64) {
+                /* 01xxxxxx — literal with incremental indexing */
+                decInt(blk, p, 6, io);
+                int idx = io[0];
+                p = io[1];
+                int[] name = new int[0];
+                if (idx == 0) {
+                    name = decStr(hctx, blk, p, io, ok2);
+                    p = io[0];
+                    if (ok2[0] == 0) return;
+                } else {
+                    lookup(hctx, idx, tmp, ok2);
+                    if (ok2[0] == 0) return;
+                    name = Tls.sliceOf(tmp, 2, tmp[0]);
+                }
+                int[] val = decStr(hctx, blk, p, io, ok2);
+                p = io[0];
+                if (ok2[0] == 0) return;
+                if (isStatAt(name, 0, name.length)) {
+                    hctx[ST] = digitsVal(val, 0, val.length);
+                }
+                dtAdd(hctx, name, val);
+            } else if ((b & 224) == 32) {
+                /* 001xxxxx — dynamic table size update */
+                decInt(blk, p, 5, io);
+                p = io[1];
+                while (hctx[DTS] > io[0] && hctx[DTN] > 0) dtEvict(hctx);
+            } else {
+                /* 0000xxxx / 0001xxxx — literal without / never indexed */
+                decInt(blk, p, 4, io);
+                int idx = io[0];
+                p = io[1];
+                int[] name = new int[0];
+                if (idx == 0) {
+                    name = decStr(hctx, blk, p, io, ok2);
+                    p = io[0];
+                    if (ok2[0] == 0) return;
+                } else {
+                    lookup(hctx, idx, tmp, ok2);
+                    if (ok2[0] == 0) return;
+                    name = Tls.sliceOf(tmp, 2, tmp[0]);
+                }
+                int[] val = decStr(hctx, blk, p, io, ok2);
+                p = io[0];
+                if (ok2[0] == 0) return;
+                if (isStatAt(name, 0, name.length)) {
+                    hctx[ST] = digitsVal(val, 0, val.length);
+                }
+            }
+        }
+        okOut[0] = 1;
+    }
+
+    /* ── frame (§4, §6) ─────────────────────────────────────────── */
+
+    static int[] frameHdr(int len, int type, int flags, int sid) {
+        int[] h = new int[9];
+        h[0] = (len >>> 16) & 255;
+        h[1] = (len >>> 8) & 255;
+        h[2] = len & 255;
+        h[3] = type;
+        h[4] = flags;
+        h[5] = (sid >>> 24) & 127;
+        h[6] = (sid >>> 16) & 255;
+        h[7] = (sid >>> 8) & 255;
+        h[8] = sid & 255;
+        return h;
+    }
+
+    static int sendFrame(int[] hctx, int type, int flags, int sid, int[] payload) {
+        int[] rec = Tls.cat(frameHdr(payload.length, type, flags, sid), payload);
+        return Tls.writeApp(hctx, rec);
+    }
+
+    /* ── gate: TLS + ALPN h2 + preface + SETTINGS ───────────────── */
+
+    static int[] gate(int ip, int port, int[] pin, int[] randSes) {
+        int[] tctx = Tls.handshake(ip, port, pin, randSes);
+        int[] hctx = new int[94300];
+        if (tctx[1] != 1) {
+            hctx[265] = -1;
+            return hctx;
+        }
+        if (tctx[250] != 1) {
+            hctx[265] = -2;                              /* ALPN h2 gagal */
+            Net.close(tctx[0]);
+            return hctx;
+        }
+        for (int i = 0; i < 256; i++) hctx[i] = tctx[i];
+        initTables(hctx);
+        /* preface magic + SETTINGS kosong + WINDOW_UPDATE koneksi */
+        int[] wup = new int[4];
+        wup[0] = 64;                                     /* 1 << 30 */
+        int[] pre = Tls.cat(Net.bytes("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"),
+            Tls.cat(frameHdr(0, 4, 0, 0), Tls.cat(frameHdr(4, 8, 0, 0), wup)));
+        int k = Tls.writeApp(hctx, pre);
+        if (k < 0) {
+            hctx[265] = -3;
+            return hctx;
+        }
+        hctx[1] = 1;
+        return hctx;
+    }
+
+    /* ── encoder HPACK (kirim; tanpa Huffman, tanpa indexing) ───── */
+
+    static int encStr(int[] out, int n, int[] v) {
+        int L = v.length;
+        if (L < 127) {
+            out[n] = L;
+            n = n + 1;
+        } else {
+            out[n] = 127;
+            n = n + 1;
+            int r = L - 127;
+            while (r >= 128) {
+                out[n] = (r & 127) | 128;
+                n = n + 1;
+                r = r >>> 7;
+            }
+            out[n] = r;
+            n = n + 1;
+        }
+        for (int i = 0; i < L; i++) {
+            out[n + i] = v[i];
+        }
+        return n + L;
+    }
+
+    /* literal tanpa indexing, name-index idx ≤ 15 (prefix 4 bit) */
+    static int litIdx(int[] out, int n, int idx, int[] val) {
+        out[n] = idx & 15;
+        n = n + 1;
+        return encStr(out, n, val);
+    }
+
+    /* literal tanpa indexing, nama baru */
+    static int litNew(int[] out, int n, int[] name, int[] val) {
+        out[n] = 0;
+        n = n + 1;
+        n = encStr(out, n, name);
+        return encStr(out, n, val);
+    }
+
+    /* ── request: HEADERS + DATA stream 1 ───────────────────────── */
+
+    static int request(int[] hctx, String method, String path, String authority, int[] body) {
+        int[] blk = new int[1024];
+        int n = 0;
+        if (Str.eq(method, "GET")) {
+            blk[n] = 130;                                /* idx 2 :method GET */
+            n = n + 1;
+        } else if (Str.eq(method, "POST")) {
+            blk[n] = 131;                                /* idx 3 :method POST */
+            n = n + 1;
+        } else {
+            n = litNew(blk, n, Net.bytes(":method"), Net.strbytes(method));
+        }
+        blk[n] = 135;                                    /* idx 7 :scheme https */
+        n = n + 1;
+        n = litIdx(blk, n, 1, Net.strbytes(authority));  /* idx 1 :authority */
+        n = litIdx(blk, n, 4, Net.strbytes(path));       /* idx 4 :path */
+        if (!Str.eq(method, "GET")) {
+            String ds = Str.fromInt(body.length);
+            n = litNew(blk, n, Net.bytes("content-length"), Net.strbytes(ds));
+        }
+        /* stream id bergulir: 1, 3, 5, ... (stream HTTP/2 sekali pakai) */
+        int sid = hctx[263];
+        if (sid <= 0) sid = 1;
+        /* HEADERS: END_HEADERS; END_STREAM bila tanpa body */
+        int fl = 4;
+        if (body.length == 0) fl = 5;
+        int k = sendFrame(hctx, 1, fl, sid, Tls.sliceOf(blk, 0, n));
+        if (k < 0) return -1;
+        /* DATA ≤ 16384 per frame, terakhir END_STREAM */
+        int off = 0;
+        while (off < body.length) {
+            int want = body.length - off;
+            if (want > 16384) want = 16384;
+            int df = 0;
+            if (off + want == body.length) df = 1;
+            k = sendFrame(hctx, 0, df, sid, Tls.sliceOf(body, off, want));
+            if (k < 0) return -1;
+            off = off + want;
+        }
+        hctx[266] = sid;
+        hctx[263] = sid + 2;
+        return 0;
+    }
+
+    /* ── readResp: isi buffer baca dari record TLS ──────────────── */
+
+    static int fillRb(int[] hctx, int need) {
+        int RBL = 261;
+        int RBP = 262;
+        int RB = 16900;
+        int RBCAP = 32896;
+        while (hctx[RBL] - hctx[RBP] < need) {
+            if (hctx[RBP] > 0) {
+                int sisa = hctx[RBL] - hctx[RBP];
+                for (int i = 0; i < sisa; i++) hctx[RB + i] = hctx[RB + hctx[RBP] + i];
+                hctx[RBL] = sisa;
+                hctx[RBP] = 0;
+            }
+            int[] d = Tls.readApp(hctx);
+            if (d.length == 0) return -1;
+            for (int i = 0; i < d.length; i++) hctx[RB + hctx[RBL] + i] = d[i];
+            hctx[RBL] = hctx[RBL] + d.length;
+            if (hctx[RBL] > RBCAP) return -1;
+        }
+        return 0;
+    }
+
+    /* baca respons stream 1 sampai END_STREAM/GOAWAY/RST.
+     * status → hctx[ST]; body → respBody/readResp balikan. 0 sukses. */
+    static int[] readResp(int[] hctx) {
+        int ST = 260;
+        int RBL = 261;
+        int RBP = 262;
+        int DONE = 264;
+        int ERR = 265;
+        int HBL = 267;
+        int BODYL = 269;
+        int RB = 16900;
+        int RBCAP = 32896;
+        int HBCAP = 9216;
+        int HB = 49900;
+        int BODY = 59300;
+        int BODYCAP = 32768;
+        hctx[ST] = 0;
+        hctx[DONE] = 0;
+        hctx[ERR] = 0;
+        hctx[HBL] = 0;
+        hctx[BODYL] = 0;
+        int[] kosong = new int[0];
+        while (hctx[DONE] == 0 && hctx[ERR] == 0) {
+            if (fillRb(hctx, 9) < 0) {
+                hctx[ERR] = -10;
+                break;
+            }
+            int b0 = hctx[RB + hctx[RBP]];
+            int l = ((b0 & 255) << 16) | ((hctx[RB + hctx[RBP] + 1] & 255) << 8)
+                | (hctx[RB + hctx[RBP] + 2] & 255);
+            int type = hctx[RB + hctx[RBP] + 3] & 255;
+            int flags = hctx[RB + hctx[RBP] + 4] & 255;
+            int fsid = ((hctx[RB + hctx[RBP] + 5] & 127) << 24)
+                | ((hctx[RB + hctx[RBP] + 6] & 255) << 16)
+                | ((hctx[RB + hctx[RBP] + 7] & 255) << 8)
+                | (hctx[RB + hctx[RBP] + 8] & 255);
+            int pl = hctx[RBP] + 9;
+            if (fillRb(hctx, 9 + l) < 0) {
+                hctx[ERR] = -11;
+                break;
+            }
+            pl = hctx[RBP] + 9;
+            if (type == 4) {
+                /* SETTINGS → ACK bila bukan ACK */
+                if ((flags & 1) == 0) {
+                    if (sendFrame(hctx, 4, 1, 0, kosong) < 0) {
+                        hctx[ERR] = -12;
+                        break;
+                    }
+                }
+            } else if (type == 6) {
+                /* PING → ACK echo payload */
+                if ((flags & 1) == 0) {
+                    int[] pay = Tls.sliceOf(hctx, RB + pl, l);
+                    if (sendFrame(hctx, 6, 1, 0, pay) < 0) {
+                        hctx[ERR] = -12;
+                        break;
+                    }
+                }
+            } else if (type == 7) {
+                hctx[DONE] = 1;                          /* GOAWAY */
+            } else if (type == 3) {
+                hctx[DONE] = 1;
+                hctx[ERR] = -13;                         /* RST_STREAM */
+            } else if (type == 1 || type == 9) {
+                /* HEADERS / CONTINUATION — hanya stream respons aktif */
+                if (fsid != hctx[266]) {
+                    hctx[RBP] = hctx[RBP] + 9 + l;
+                    continue;
+                }
+                if (hctx[HBL] + l > HBCAP) {
+                    hctx[ERR] = -14;
+                    break;
+                }
+                for (int i = 0; i < l; i++) hctx[HB + hctx[HBL] + i] = hctx[RB + pl + i];
+                hctx[HBL] = hctx[HBL] + l;
+                if ((flags & 4) != 0) {
+                    int[] okB = new int[1];
+                    int[] blkArr = Tls.sliceOf(hctx, HB, hctx[HBL]);
+                    decodeBlock(hctx, blkArr, okB);
+                    if (okB[0] == 0) {
+                        hctx[ERR] = -15;
+                        break;
+                    }
+                    hctx[HBL] = 0;
+                }
+                if ((flags & 1) != 0) hctx[DONE] = 1;    /* END_STREAM di HEADERS */
+            } else if (type == 0) {
+                /* DATA — hanya stream respons aktif */
+                if (fsid != hctx[266]) {
+                    hctx[RBP] = hctx[RBP] + 9 + l;
+                    continue;
+                }
+                if (hctx[BODYL] + l > BODYCAP) {
+                    hctx[ERR] = -16;
+                    break;
+                }
+                for (int i = 0; i < l; i++) hctx[BODY + hctx[BODYL] + i] = hctx[RB + pl + i];
+                hctx[BODYL] = hctx[BODYL] + l;
+                if ((flags & 1) != 0) hctx[DONE] = 1;
+            }
+            /* 2 PRIORITY, 5 PUSH_PROMISE, 8 WINDOW_UPDATE → abaikan */
+            hctx[RBP] = hctx[RBP] + 9 + l;
+        }
+        return Tls.sliceOf(hctx, BODY, hctx[BODYL]);
+    }
+
+    static int respStatus(int[] hctx) {
+        return hctx[260];
+    }
+
+    static int respErr(int[] hctx) {
+        return hctx[265];
+    }
+
+    static void close(int[] hctx) {
+        Net.close(hctx[0]);
+    }
+}

@@ -714,9 +714,12 @@ void gen_x64(const char *outpath) {
     emit(".Lmsg_oom_auto: .asciz \"%s\"", "kopi: arena malloc habis — batas otomatis 4096 MB terlampaui (pakai malloc<N> untuk batas lain)\\n");
     emit(".Lmsg_oom_auto_fail: .asciz \"%s\"", "kopi: gagal menyediakan arena malloc otomatis 4096 MB (coba malloc<N> lebih kecil)\\n");
     for (int i = 0; i < prog.ncp; i++) {
-        char esc[1200];
-        asm_escape(prog.cpool[i], esc, sizeof esc);
+        size_t eln = strlen(prog.cpool[i]) * 2 + 8;
+        char *esc = malloc(eln);
+        if (!esc) die("memori host habis");
+        asm_escape(prog.cpool[i], esc, eln);
         emit("cpool%d: .asciz \"%s\"", i, esc);
+        free(esc);
     }
     fclose(out);
 }

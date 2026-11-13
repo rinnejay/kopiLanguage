@@ -78,7 +78,7 @@ class Main {
 | Kelompok | Modul |
 |---|---|
 | `lib/core/` | `Str`, `Math`, `Digits`, `Stats`, `Matrix`, `Arrays`, `Json`, `Map`, `Set`, `Deque`, `File`, `Path`, `Time` |
-| `lib/net/` | `Tcp`, `Udp`, `Dns`, `Resolv`, `Rfc`, `Http`, `Url`, `Tls`, `TlsServer`, `HttpServer`, `Static`, `Mime`, `WebSocket`, `Jwt`, `Session`, `Auth` |
+| `lib/net/` | `Tcp`, `Udp`, `Dns`, `Resolv`, `Rfc`, `Http`, `Url`, `Tls`, `TlsServer`, `Http2`, `Http2Tabel`, `HttpServer`, `Static`, `Mime`, `WebSocket`, `Jwt`, `Session`, `Auth` |
 | `lib/crypto/` | `Crypto`, `Cipher`, `Hash`, `Pbkdf2`, `Kdf`, `Big`, `X25519`, `ChaCha`, `Poly`, `Aead`, `Rand`, `Der` |
 
 Termasuk klien TLS 1.3, HTTP/1.1, WebSocket, server HTTP, event loop,

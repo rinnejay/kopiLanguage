@@ -5,7 +5,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | Kelompok | Folder | Modul |
 |---|---|---|
 | **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
-| **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `TlsServer`, `Udp`, `Url`, `WebSocket`, `WsClient` |
+| **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `Http2`, `Http2Tabel`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `TlsServer`, `Udp`, `Url`, `WebSocket`, `WsClient` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
 
@@ -57,6 +57,8 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Auth`](api-net.md#auth) | `lib/net/Auth.kop` | 8 | Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401. |
 | [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 17 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
 | [`Http`](api-net.md#http) | `lib/net/Http.kop` | 44 | Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik. |
+| [`Http2`](api-net.md#http2) | `lib/net/Http2.kop` | 23 | Klien HTTP/2 (RFC 9113/7540) di atas Tls: gate TLS+ALPN h2+preface, request HEADERS+DATA (stream id… |
+| [`Http2Tabel`](api-net.md#http2tabel) | `lib/net/Http2Tabel.kop` | 6 | Tabel HPACK (RFC 7541) untuk Http2: kode Huffman kanonik 257 simbol (Appendix B) dan tabel statik 61 entri… |
 | [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 47 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
 | [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 16 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
 | [`Mime`](api-net.md#mime) | `lib/net/Mime.kop` | 1 | Pemetaan ekstensi file → header Content-Type. |
@@ -66,7 +68,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Session`](api-net.md#session) | `lib/net/Session.kop` | 6 | Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry). |
 | [`Static`](api-net.md#static) | `lib/net/Static.kop` | 7 | Penyajian file statis + MIME; menolak path traversal `..`. |
 | [`Tcp`](api-net.md#tcp) | `lib/net/Tcp.kop` | 13 | Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat. |
-| [`Tls`](api-net.md#tls) | `lib/net/Tls.kop` | 25 | Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah. |
+| [`Tls`](api-net.md#tls) | `lib/net/Tls.kop` | 27 | Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah. |
 | [`TlsServer`](api-net.md#tlsserver) | `lib/net/TlsServer.kop` | 28 | Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,… |
 | [`Udp`](api-net.md#udp) | `lib/net/Udp.kop` | 7 | Datagram UDP: bind, kirim/terima satu datagram, shutdown. |
 | [`Url`](api-net.md#url) | `lib/net/Url.kop` | 26 | URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4. |

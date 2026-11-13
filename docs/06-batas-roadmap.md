@@ -61,7 +61,8 @@ reverse proxy + beberapa proses.
 | Validasi rantai/PKI, hostname, expiry | belum |
 | Session resumption/PSK TLS | belum |
 | DNS sistem penuh | `Resolv` hanya A, tanpa cache/`search`/AAAA/DNS-over-TLS |
-| HTTP/2, WebSocket fragmentation, kompresi | belum |
+| HTTP/2 (klien) | ✅ v1.37 — `Http2` (gate TLS+ALPN h2, HPACK decode penuh + Huffman, dt dinamis); sisi server h2 & HPACK encode dinamis belum |
+| WebSocket fragmentation, kompresi | belum |
 | Multipart, range request, ETag/Last-Modified, chunked response streaming | belum |
 | DB client (SQLite/Postgres/Redis) | belum |
 | `sendfile`/zero-copy | belum; `Static` membaca file ke memori |

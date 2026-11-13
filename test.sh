@@ -1776,6 +1776,53 @@ else
     echo "FAIL  traceerr [vm]"; FAIL=$((FAIL+1)); echo "$errout" | head -6
 fi
 
+# ─── v1.37: HPACK/Huffman (Http2) — vektor oracle python hpack ─────
+python3 tools/gen_http2vec.py "$T/kopi/http2vec.kop" "$T/kopi/http2vec.ref" >/dev/null
+check http2vec "$T/kopi/http2vec.kop"
+
+# ─── v1.37: klien HTTP/2 end-to-end — oracle python h2 (TLS+ALPN h2) ──
+pkill -f "h2_[o]racle.py" 2>/dev/null
+sleep 0.3
+if ./kopicc test/http2cli.kop -t a64 -o "$T/kopi/h2cli.s" && \
+   cc "$T/kopi/h2cli.s" -o "$T/kopi/h2cli.bin"; then
+    if [ ! -f "$T/h2_cert.pem" ]; then
+        openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+            -nodes -keyout "$T/h2_key.pem" -out "$T/h2_cert.pem" \
+            -days 3650 -subj /CN=h2oracle 2>/dev/null
+    fi
+    openssl x509 -in "$T/h2_cert.pem" -outform der -out "$T/h2_cert.der" 2>/dev/null
+    python3 tools/h2_oracle.py 10096 "$T/h2_cert.pem" "$T/h2_key.pem" \
+        > "$T/kopi/h2oracle.log" 2>&1 &
+    OPID=$!
+    ok=0
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        sleep 1
+        if python3 -c "import socket; socket.create_connection(('127.0.0.1', 10096), timeout=1).close()" 2>/dev/null; then
+            ok=1
+            break
+        fi
+    done
+    if [ $ok -eq 1 ]; then
+        cliout="$("$T/kopi/h2cli.bin" 10096 "$T/h2_cert.der" 2>&1)"
+        sleep 1
+        if echo "$cliout" | grep -q "gate=1" \
+           && echo "$cliout" | grep -q "st=200 n=11" \
+           && echo "$cliout" | grep -q "st2=200 n2=12 echo=1"; then
+            echo "PASS  http2 [a64]"; PASS=$((PASS+1))
+        else
+            echo "FAIL  http2 [a64]"; FAIL=$((FAIL+1))
+            echo "$cliout" | head -6
+        fi
+    else
+        echo "FAIL  http2 [a64]: oracle tidak siap"; FAIL=$((FAIL+1))
+        head -5 "$T/kopi/h2oracle.log"
+    fi
+    kill $OPID 2>/dev/null
+    wait $OPID 2>/dev/null
+else
+    echo "FAIL  http2 [a64]: build gagal"; FAIL=$((FAIL+1))
+fi
+
 # ─── v1.36: TLS server (TlsServer) — oracle python ssl + klien Kopi ──
 pkill -f "tlssrv\.[b]in" 2>/dev/null
 sleep 0.3

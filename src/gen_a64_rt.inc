@@ -536,10 +536,13 @@ static void gen_a64_runtime(void) {
     emit(".Lfmt_gf: .asciz \"%s\"", "%.9g");
     emit(".Lfmt_gfn: .asciz \"%s\"", "%.9g\\n");
     for (int i = 0; i < prog.ncp; i++) {
-        char esc[1200];
-        asm_escape(prog.cpool[i], esc, sizeof esc);
+        size_t eln = strlen(prog.cpool[i]) * 2 + 8;
+        char *esc = malloc(eln);
+        if (!esc) die("memori host habis");
+        asm_escape(prog.cpool[i], esc, eln);
         emit("cpool%d:", i);
         emit("\t.asciz \"%s\"", esc);
+        free(esc);
     }
     fclose(out);
 }

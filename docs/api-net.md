@@ -139,6 +139,89 @@ System.out.println(Http.payload(r));
 
 ---
 
+## Http2
+
+`lib/net/Http2.kop` · 23 fungsi
+
+Klien HTTP/2 (RFC 9113/7540) di atas Tls: gate TLS+ALPN h2+preface, request HEADERS+DATA (stream id bergulir), readResp dengan dekoder HPACK penuh (RFC 7541: indexed, literal, dt dinamis, Huffman).
+
+```java
+import Tls;
+import Http2;
+import Rand;
+
+int[] hctx = Http2.gate(ip, 443, pinSpki, Rand.bytes(32));
+if (Http2.respErr(hctx) == 0 && hctx[0] == 1) {
+    Http2.request(hctx, "GET", "/", "example.com", new int[0]);
+    int[] body = Http2.readResp(hctx);
+    System.out.println(Http2.respStatus(hctx));
+}
+Http2.close(hctx);
+```
+
+**Catatan**
+
+- Hanya klien; butuh TLS dengan ALPN h2 (Tls mengirim ext ALPN otomatis).
+- readResp mengikuti stream respons aktif (hctx[266]); frame stream lain diabaikan.
+- Encoder HPACK literal-tanpa-indexing tanpa Huffman; decoder mendukung Huffman penuh + tabel dinamis.
+- Regresi: vektor HPACK/Huffman dari tools/gen_http2vec.py (oracle pustaka python hpack).
+
+| Fungsi | Keterangan |
+|---|---|
+| `static void initTables(int[] hctx)` | (internal) muat tabel Huffman+statik ke hctx |
+| `static int bitAt(int[] b, int pos, int bp)` | (internal) ambil bit ke-pos dari byte array |
+| `static int[] hufDec(int[] hctx, int[] src, int pos, int bitLen, int[] okOut)` | (internal) decode Huffman HPACK; simbol 256 = EOS |
+| `static void decInt(int[] blk, int p, int n, int[] io)` | (internal) decode integer prefix n bit (HPACK §5.1) |
+| `static int[] decStr(int[] hctx, int[] blk, int p, int[] io, int[] okOut)` | (internal) decode string literal HPACK (Huffman bila bit-H=1) |
+| `static void dtEvict(int[] hctx)` | (internal) buang entri dt terlama sampai muat |
+| `static void dtAdd(int[] hctx, int[] name, int[] val)` | (internal) tambah entri tabel dinamis (name‖val) |
+| `static void lookup(int[] hctx, int idx, int[] out, int[] okOut)` | (internal) idx HPACK → name‖val (statik ≥1..61, dinamis ≥62) |
+| `static boolean isStatAt(int[] b, int off, int n)` | (internal) cocokkan byte dengan teks statik |
+| `static int digitsVal(int[] b, int off, int n)` | (internal) byte ASCII digit → nilai |
+| `static void decodeBlock(int[] hctx, int[] blk, int[] okOut)` | (internal) decode blok header HPACK penuh (§6) |
+| `static int[] frameHdr(int len, int type, int flags, int sid)` | (internal) header frame 9 byte |
+| `static int sendFrame(int[] hctx, int type, int flags, int sid, int[] payload)` | (internal) kirim satu frame lewat Tls |
+| `static int[] gate(int ip, int port, int[] pin, int[] randSes)` | buka TLS + ALPN h2, kirim preface+SETTINGS+WINDOW_UPDATE; hctx[1]=1 sukses |
+| `static int encStr(int[] out, int n, int[] v)` | (internal) encode string literal tanpa Huffman (§5.2) |
+| `static int litIdx(int[] out, int n, int idx, int[] val)` | (internal) literal tanpa indexing, name-index ≤15 |
+| `static int litNew(int[] out, int n, int[] name, int[] val)` | (internal) literal tanpa indexing, nama baru |
+| `static int request(int[] hctx, String method, String path, String authority, int[] body)` | kirim request (HEADERS+DATA) di stream baru (id 1,3,5,...); hctx[266]=id stream respons |
+| `static int fillRb(int[] hctx, int need)` | (internal) isi buffer baca frame dari record TLS |
+| `static int[] readResp(int[] hctx)` | baca respons stream aktif sampai END_STREAM/GOAWAY/RST; hasil body |
+| `static int respStatus(int[] hctx)` | status :status respons terakhir (0 bila belum ada) |
+| `static int respErr(int[] hctx)` | kode galat internal terakhir (0 = ok) |
+| `static void close(int[] hctx)` | tutup koneksi TLS |
+
+---
+
+## Http2Tabel
+
+`lib/net/Http2Tabel.kop` · 6 fungsi
+
+Tabel HPACK (RFC 7541) untuk Http2: kode Huffman kanonik 257 simbol (Appendix B) dan tabel statik 61 entri (Appendix A). Hasil generator tools/gen_http2.py — jangan edit manual.
+
+```java
+import Http2Tabel;
+
+int[] kode = Http2Tabel.hufCode();
+System.out.println(kode[0]);  // simbol 0
+```
+
+**Catatan**
+
+- Sumber data: tools/hpack_huffman.tsv (257 baris, commit).
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] hufCode()` | kode Huffman 257 simbol (u32, Appendix B) |
+| `static int[] hufLen()` | panjang kode Huffman 257 simbol (byte) |
+| `static int[] stName()` | nama tabel statik (ASCII berdempet) |
+| `static int[] stNameOff()` | offset nama per entri (62 = sentinel) |
+| `static int[] stVal()` | nilai tabel statik (ASCII berdempet) |
+| `static int[] stValOff()` | offset nilai per entri (62 = sentinel) |
+
+---
+
 ## HttpServer
 
 `lib/net/HttpServer.kop` · 47 fungsi
@@ -470,7 +553,7 @@ Tcp.drop(fd);
 
 ## Tls
 
-`lib/net/Tls.kop` · 25 fungsi
+`lib/net/Tls.kop` · 27 fungsi
 
 Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah.
 
@@ -508,8 +591,10 @@ int[] data = Tls.readApp(ctx);
 | `static int[] recvExact(int fd, int n)` | (internal) baca tepat n byte dari fd |
 | `static int[] recvRecord(int fd)` | (internal) baca satu record TLS |
 | `static int[] extOf(int id, int[] body)` | (internal) bangun extension |
+| `static int[] alpnExts()` | ALPN (16): daftar protokol; kita tawarkan "h2" saja. body = u16(len daftar) ‖ u8(len nama) ‖ nama (RFC 7301/7540) |
 | `static int[] chMsg(int[] sk, int[] rnd)` | handshake message ClientHello (tanpa header record) |
-| `static int[] parseSH(int[] isi)` | isi fragment SH (dari record header). balikan = key_share pub server (32 byte) atau kosong bila gagal. |
+| `static int[] parseSH(int[] isi, int[] alpnOut)` | isi fragment SH (dari record header). balikan = key_share pub server (32 byte) atau kosong bila gagal. alpnOut[0] = 1 bila server memilih protokol "h2" (ALPN id 16, RFC 7540 §3.3). |
+| `static void parseEEalpn(int[] plain, int[] alpnOut)` | isi EncryptedExtensions ( plaintext pesan): cari ALPN (id 16) — di TLS 1.3 protokol yang dipilih server ada DI SINI (§4.3.2), bukan di ServerHello. alpnOut[0] = 1 bila "h2". |
 | `static int[] gate(int ip, int port, int[] pin)` | Untuk uji: gate() pakai Rand; gateFixed dipatok kunci ephemeral. Inti bersama di handshake(). |
 | `static int[] gateFixed(int ip, int port, int[] pin, int[] fsk, int[] frnd)` | (internal) handshake dengan pin & kunci tetap (uji) |
 | `static int[] handshake(int ip, int port, int[] pin, int[] randSes)` | handshake TLS 1.3; context untuk writeApp/readApp |

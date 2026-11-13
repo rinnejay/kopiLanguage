@@ -213,6 +213,12 @@ class Tls {
         return cat3(u16(id), u16(body.length), body);
     }
 
+    /* ALPN (16): daftar protokol; kita tawarkan "h2" saja.
+     * body = u16(len daftar) ‖ u8(len nama) ‖ nama (RFC 7301/7540) */
+    static int[] alpnExts() {
+        return extOf(16, cat(u16(3), arr3(2, 104, 50)));
+    }
+
     /* handshake message ClientHello (tanpa header record) */
     static int[] chMsg(int[] sk, int[] rnd) {
         int[] pub = X25519.pub(sk);
@@ -239,7 +245,8 @@ class Tls {
         int[] exts =
             cat(extOf(10, grBody),
                 cat(extOf(13, saBody),
-                    cat(extOf(43, svBody), extOf(51, ksBody))));
+                    cat(extOf(43, svBody),
+                        cat(extOf(51, ksBody), alpnExts()))));
         int[] b1 = arr2(3, 3);                          /* legacy 0x0303 */
         int[] b2 = arr1(0);                             /* sid len 0 */
         int[] b3 = u16(2);
@@ -256,9 +263,11 @@ class Tls {
     /* ── ServerHello: ambil key_share & supported_versions ──────── */
 
     /* isi fragment SH (dari record header). balikan = key_share pub
-     * server (32 byte) atau kosong bila gagal. */
-    static int[] parseSH(int[] isi) {
+     * server (32 byte) atau kosong bila gagal. alpnOut[0] = 1 bila
+     * server memilih protokol "h2" (ALPN id 16, RFC 7540 §3.3). */
+    static int[] parseSH(int[] isi, int[] alpnOut) {
         int[] kosong = new int[0];
+        alpnOut[0] = 0;
         if (isi.length < 40) return kosong;
         if (isi[0] != 2) return kosong;
         int mlen = get24(isi, 1);
@@ -291,11 +300,40 @@ class Tls {
             if (id == 43 && el == 2) {
                 ver = get16(isi, bs);
             }
+            if (id == 16 && el >= 5) {
+                /* daftar protokol: u16(len daftar) ‖ u8(len nama) ‖ nama
+                 * — "h2" = 00 03 02 68 32 (RFC 7301) */
+                if (get16(isi, bs) == 3 && isi[bs + 2] == 2 &&
+                    isi[bs + 3] == 104 && isi[bs + 4] == 50) alpnOut[0] = 1;
+            }
             e = bs + el;
         }
         if (shareOfs < 0) return kosong;
         if (ver != 772) return kosong;                   /* 0x0304 = TLS 1.3 */
         return sliceOf(isi, shareOfs, 32);
+    }
+
+    /* isi EncryptedExtensions ( plaintext pesan): cari ALPN (id 16) —
+     * di TLS 1.3 protokol yang dipilih server ada DI SINI (§4.3.2),
+     * bukan di ServerHello. alpnOut[0] = 1 bila "h2". */
+    static void parseEEalpn(int[] plain, int[] alpnOut) {
+        alpnOut[0] = 0;
+        if (plain.length < 8) return;
+        if (plain[0] != 8) return;
+        int p = 4;                                       /* melewati header */
+        int tot = get16(plain, p);
+        p = p + 2;
+        int e = p;
+        while (e + 4 <= p + tot && e + 4 <= plain.length) {
+            int id = get16(plain, e);
+            int el = get16(plain, e + 2);
+            int bs = e + 4;
+            if (id == 16 && el >= 5) {
+                if (get16(plain, bs) == 3 && plain[bs + 2] == 2 &&
+                    plain[bs + 3] == 104 && plain[bs + 4] == 50) alpnOut[0] = 1;
+            }
+            e = bs + el;
+        }
     }
 
     /* ── gate: handshake penuh + pin ────────────────────────────── */
@@ -312,6 +350,7 @@ class Tls {
 
     static int[] handshake(int ip, int port, int[] pin, int[] randSes) {
         int[] ctx = new int[256];
+        int[] alpnOut = new int[1];
         int fd = Tcp.open(ip, port);
         if (fd < 0) return ctx;
         ctx[0] = fd;
@@ -345,7 +384,7 @@ class Tls {
             ctx[6] = 6;
             return ctx;
         }
-        int[] spub = parseSH(shFrag);
+        int[] spub = parseSH(shFrag, alpnOut);
         ctx[9] = spub.length;
         if (spub.length != 32) {
             ctx[6] = 7;
@@ -404,6 +443,10 @@ class Tls {
             }
             if (mtype == 8 || mtype == 11 || mtype == 15) {
                 tx = cat(tx, plain);
+            }
+            if (mtype == 8) {
+                parseEEalpn(plain, alpnOut);
+                ctx[250] = alpnOut[0];                   /* ALPN h2 disepakati */
             }
             if (mtype == 11) {
                 int c0 = 4;                              /* mulai body */

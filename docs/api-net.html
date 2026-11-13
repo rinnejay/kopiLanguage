@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-net">Referensi API — Net<a class="anchor" href="#referensi-api-net" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#auth">Auth</a></li><li class="toc-h2"><a href="#dns">Dns</a></li><li class="toc-h2"><a href="#http">Http</a></li><li class="toc-h2"><a href="#httpserver">HttpServer</a></li><li class="toc-h2"><a href="#jwt">Jwt</a></li><li class="toc-h2"><a href="#mime">Mime</a></li><li class="toc-h2"><a href="#multipart">Multipart</a></li><li class="toc-h2"><a href="#resolv">Resolv</a></li><li class="toc-h2"><a href="#rfc">Rfc</a></li><li class="toc-h2"><a href="#session">Session</a></li><li class="toc-h2"><a href="#static">Static</a></li><li class="toc-h2"><a href="#tcp">Tcp</a></li><li class="toc-h2"><a href="#tls">Tls</a></li><li class="toc-h2"><a href="#tlsserver">TlsServer</a></li><li class="toc-h2"><a href="#udp">Udp</a></li><li class="toc-h2"><a href="#url">Url</a></li><li class="toc-h2"><a href="#websocket">WebSocket</a></li><li class="toc-h2"><a href="#wsclient">WsClient</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#auth">Auth</a></li><li class="toc-h2"><a href="#dns">Dns</a></li><li class="toc-h2"><a href="#http">Http</a></li><li class="toc-h2"><a href="#http2">Http2</a></li><li class="toc-h2"><a href="#http2tabel">Http2Tabel</a></li><li class="toc-h2"><a href="#httpserver">HttpServer</a></li><li class="toc-h2"><a href="#jwt">Jwt</a></li><li class="toc-h2"><a href="#mime">Mime</a></li><li class="toc-h2"><a href="#multipart">Multipart</a></li><li class="toc-h2"><a href="#resolv">Resolv</a></li><li class="toc-h2"><a href="#rfc">Rfc</a></li><li class="toc-h2"><a href="#session">Session</a></li><li class="toc-h2"><a href="#static">Static</a></li><li class="toc-h2"><a href="#tcp">Tcp</a></li><li class="toc-h2"><a href="#tls">Tls</a></li><li class="toc-h2"><a href="#tlsserver">TlsServer</a></li><li class="toc-h2"><a href="#udp">Udp</a></li><li class="toc-h2"><a href="#url">Url</a></li><li class="toc-h2"><a href="#websocket">WebSocket</a></li><li class="toc-h2"><a href="#wsclient">WsClient</a></li></ul></nav>
 <p>TCP/UDP, HTTP, WebSocket, URL, auth, DNS, TLS. Semua signature di bawah diekstrak langsung dari source <code>lib/net/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="auth">Auth<a class="anchor" href="#auth" aria-label="tautan">#</a></h2>
@@ -356,6 +356,168 @@ System.out.println(Http.payload(r));</code></pre>
 <tr>
 <td><code>static int[] getTls(int addr, int port, String hostHdr, String path, int cap, int[] pin, int timeoutMs)</code></td>
 <td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="http2">Http2<a class="anchor" href="#http2" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Http2.kop</code> · 23 fungsi</p>
+<p>Klien HTTP/2 (RFC 9113/7540) di atas Tls: gate TLS+ALPN h2+preface, request HEADERS+DATA (stream id bergulir), readResp dengan dekoder HPACK penuh (RFC 7541: indexed, literal, dt dinamis, Huffman).</p>
+<pre><code class="language-java">import Tls;
+import Http2;
+import Rand;
+
+int[] hctx = Http2.gate(ip, 443, pinSpki, Rand.bytes(32));
+if (Http2.respErr(hctx) == 0 &amp;&amp; hctx[0] == 1) {
+    Http2.request(hctx, "GET", "/", "example.com", new int[0]);
+    int[] body = Http2.readResp(hctx);
+    System.out.println(Http2.respStatus(hctx));
+}
+Http2.close(hctx);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Hanya klien; butuh TLS dengan ALPN h2 (Tls mengirim ext ALPN otomatis).</li>
+<li>readResp mengikuti stream respons aktif (hctx[266]); frame stream lain diabaikan.</li>
+<li>Encoder HPACK literal-tanpa-indexing tanpa Huffman; decoder mendukung Huffman penuh + tabel dinamis.</li>
+<li>Regresi: vektor HPACK/Huffman dari tools/gen_http2vec.py (oracle pustaka python hpack).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static void initTables(int[] hctx)</code></td>
+<td>(internal) muat tabel Huffman+statik ke hctx</td>
+</tr>
+<tr>
+<td><code>static int bitAt(int[] b, int pos, int bp)</code></td>
+<td>(internal) ambil bit ke-pos dari byte array</td>
+</tr>
+<tr>
+<td><code>static int[] hufDec(int[] hctx, int[] src, int pos, int bitLen, int[] okOut)</code></td>
+<td>(internal) decode Huffman HPACK; simbol 256 = EOS</td>
+</tr>
+<tr>
+<td><code>static void decInt(int[] blk, int p, int n, int[] io)</code></td>
+<td>(internal) decode integer prefix n bit (HPACK §5.1)</td>
+</tr>
+<tr>
+<td><code>static int[] decStr(int[] hctx, int[] blk, int p, int[] io, int[] okOut)</code></td>
+<td>(internal) decode string literal HPACK (Huffman bila bit-H=1)</td>
+</tr>
+<tr>
+<td><code>static void dtEvict(int[] hctx)</code></td>
+<td>(internal) buang entri dt terlama sampai muat</td>
+</tr>
+<tr>
+<td><code>static void dtAdd(int[] hctx, int[] name, int[] val)</code></td>
+<td>(internal) tambah entri tabel dinamis (name‖val)</td>
+</tr>
+<tr>
+<td><code>static void lookup(int[] hctx, int idx, int[] out, int[] okOut)</code></td>
+<td>(internal) idx HPACK → name‖val (statik ≥1..61, dinamis ≥62)</td>
+</tr>
+<tr>
+<td><code>static boolean isStatAt(int[] b, int off, int n)</code></td>
+<td>(internal) cocokkan byte dengan teks statik</td>
+</tr>
+<tr>
+<td><code>static int digitsVal(int[] b, int off, int n)</code></td>
+<td>(internal) byte ASCII digit → nilai</td>
+</tr>
+<tr>
+<td><code>static void decodeBlock(int[] hctx, int[] blk, int[] okOut)</code></td>
+<td>(internal) decode blok header HPACK penuh (§6)</td>
+</tr>
+<tr>
+<td><code>static int[] frameHdr(int len, int type, int flags, int sid)</code></td>
+<td>(internal) header frame 9 byte</td>
+</tr>
+<tr>
+<td><code>static int sendFrame(int[] hctx, int type, int flags, int sid, int[] payload)</code></td>
+<td>(internal) kirim satu frame lewat Tls</td>
+</tr>
+<tr>
+<td><code>static int[] gate(int ip, int port, int[] pin, int[] randSes)</code></td>
+<td>buka TLS + ALPN h2, kirim preface+SETTINGS+WINDOW_UPDATE; hctx[1]=1 sukses</td>
+</tr>
+<tr>
+<td><code>static int encStr(int[] out, int n, int[] v)</code></td>
+<td>(internal) encode string literal tanpa Huffman (§5.2)</td>
+</tr>
+<tr>
+<td><code>static int litIdx(int[] out, int n, int idx, int[] val)</code></td>
+<td>(internal) literal tanpa indexing, name-index ≤15</td>
+</tr>
+<tr>
+<td><code>static int litNew(int[] out, int n, int[] name, int[] val)</code></td>
+<td>(internal) literal tanpa indexing, nama baru</td>
+</tr>
+<tr>
+<td><code>static int request(int[] hctx, String method, String path, String authority, int[] body)</code></td>
+<td>kirim request (HEADERS+DATA) di stream baru (id 1,3,5,...); hctx[266]=id stream respons</td>
+</tr>
+<tr>
+<td><code>static int fillRb(int[] hctx, int need)</code></td>
+<td>(internal) isi buffer baca frame dari record TLS</td>
+</tr>
+<tr>
+<td><code>static int[] readResp(int[] hctx)</code></td>
+<td>baca respons stream aktif sampai END_STREAM/GOAWAY/RST; hasil body</td>
+</tr>
+<tr>
+<td><code>static int respStatus(int[] hctx)</code></td>
+<td>status :status respons terakhir (0 bila belum ada)</td>
+</tr>
+<tr>
+<td><code>static int respErr(int[] hctx)</code></td>
+<td>kode galat internal terakhir (0 = ok)</td>
+</tr>
+<tr>
+<td><code>static void close(int[] hctx)</code></td>
+<td>tutup koneksi TLS</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="http2tabel">Http2Tabel<a class="anchor" href="#http2tabel" aria-label="tautan">#</a></h2>
+<p><code>lib/net/Http2Tabel.kop</code> · 6 fungsi</p>
+<p>Tabel HPACK (RFC 7541) untuk Http2: kode Huffman kanonik 257 simbol (Appendix B) dan tabel statik 61 entri (Appendix A). Hasil generator tools/gen_http2.py — jangan edit manual.</p>
+<pre><code class="language-java">import Http2Tabel;
+
+int[] kode = Http2Tabel.hufCode();
+System.out.println(kode[0]);  // simbol 0</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Sumber data: tools/hpack_huffman.tsv (257 baris, commit).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] hufCode()</code></td>
+<td>kode Huffman 257 simbol (u32, Appendix B)</td>
+</tr>
+<tr>
+<td><code>static int[] hufLen()</code></td>
+<td>panjang kode Huffman 257 simbol (byte)</td>
+</tr>
+<tr>
+<td><code>static int[] stName()</code></td>
+<td>nama tabel statik (ASCII berdempet)</td>
+</tr>
+<tr>
+<td><code>static int[] stNameOff()</code></td>
+<td>offset nama per entri (62 = sentinel)</td>
+</tr>
+<tr>
+<td><code>static int[] stVal()</code></td>
+<td>nilai tabel statik (ASCII berdempet)</td>
+</tr>
+<tr>
+<td><code>static int[] stValOff()</code></td>
+<td>offset nilai per entri (62 = sentinel)</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -1028,7 +1190,7 @@ Tcp.drop(fd);</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="tls">Tls<a class="anchor" href="#tls" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Tls.kop</code> · 25 fungsi</p>
+<p><code>lib/net/Tls.kop</code> · 27 fungsi</p>
 <p>Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah.</p>
 <pre><code class="language-java">import Tls;
 import Rand;
@@ -1119,12 +1281,20 @@ int[] data = Tls.readApp(ctx);</code></pre>
 <td>(internal) bangun extension</td>
 </tr>
 <tr>
+<td><code>static int[] alpnExts()</code></td>
+<td>ALPN (16): daftar protokol; kita tawarkan "h2" saja. body = u16(len daftar) ‖ u8(len nama) ‖ nama (RFC 7301/7540)</td>
+</tr>
+<tr>
 <td><code>static int[] chMsg(int[] sk, int[] rnd)</code></td>
 <td>handshake message ClientHello (tanpa header record)</td>
 </tr>
 <tr>
-<td><code>static int[] parseSH(int[] isi)</code></td>
-<td>isi fragment SH (dari record header). balikan = key_share pub server (32 byte) atau kosong bila gagal.</td>
+<td><code>static int[] parseSH(int[] isi, int[] alpnOut)</code></td>
+<td>isi fragment SH (dari record header). balikan = key_share pub server (32 byte) atau kosong bila gagal. alpnOut[0] = 1 bila server memilih protokol "h2" (ALPN id 16, RFC 7540 §3.3).</td>
+</tr>
+<tr>
+<td><code>static void parseEEalpn(int[] plain, int[] alpnOut)</code></td>
+<td>isi EncryptedExtensions ( plaintext pesan): cari ALPN (id 16) — di TLS 1.3 protokol yang dipilih server ada DI SINI (§4.3.2), bukan di ServerHello. alpnOut[0] = 1 bila "h2".</td>
 </tr>
 <tr>
 <td><code>static int[] gate(int ip, int port, int[] pin)</code></td>

@@ -1,0 +1,55 @@
+/* http2cli.kop — uji klien HTTP/2 (Http2.kop) lawan oracle python h2.
+ *
+ * Pakai: http2cli.kop <port> <certDER>
+ * GET / → status 200, body "halo-http2\n"; POST /echo → echo body.
+ */
+import Http2;
+import Tcp;
+import Der;
+import File;
+import Rand;
+import Str;
+
+class Main {
+    public static void main(String[] args) {
+        int port = 10096;
+        if (Net.argc() > 0) port = Str.toInt(Net.argv(0));
+        String certPath = "/data/data/com.termux/files/usr/tmp/kopi/h2_cert.der";
+        if (Net.argc() > 1) certPath = Net.argv(1);
+
+        int ffd = File.openRead(certPath);
+        int n = File.size(ffd);
+        int[] cert = new int[n];
+        File.readInto(ffd, cert);
+        File.close(ffd);
+        int[] pin = Der.spkiPin(cert);
+
+        int[] hctx = Http2.gate(Tcp.loopback(), port, pin, Rand.bytes(64));
+        if (hctx[1] != 1) {
+            System.out.println("gate=0 err=" + Str.fromInt(Http2.respErr(hctx)));
+            return;
+        }
+        System.out.println("gate=1");
+        int k = Http2.request(hctx, "GET", "/", "127.0.0.1:" + Str.fromInt(port), new int[0]);
+        if (k < 0) {
+            System.out.println("send=-1");
+            return;
+        }
+        int[] body = Http2.readResp(hctx);
+        System.out.println("st=" + Str.fromInt(Http2.respStatus(hctx))
+            + " n=" + Str.fromInt(body.length));
+        System.out.println(Net.mkstr(body));
+
+        /* POST echo */
+        int[] pb = Net.bytes("halo-h2-pony");
+        int k2 = Http2.request(hctx, "POST", "/echo", "127.0.0.1:" + Str.fromInt(port), pb);
+        if (k2 < 0) {
+            System.out.println("send2=-1");
+            return;
+        }
+        int[] body2 = Http2.readResp(hctx);
+        System.out.println("st2=" + Str.fromInt(Http2.respStatus(hctx))
+            + " n2=" + Str.fromInt(body2.length) + " echo=" + Str.fromInt(Str.eq(Net.mkstr(body2), "halo-h2-pony") ? 1 : 0));
+        Http2.close(hctx);
+    }
+}
