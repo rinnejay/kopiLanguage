@@ -452,18 +452,31 @@ int[] k = Rand.bytes(32);   // kunci 256-bit
 
 `lib/crypto/Rsa.kop` · 8 fungsi
 
-Modul pustaka Kopi.
+RSA PKCS#1 v1.5: tanda tangan & verifikasi SHA-1/256/384/512, enkripsi/dekripsi blok.
+
+```java
+import Rsa;
+import Hash;
+
+int[] sig = Rsa.sign(privDer, Hash.sha256(Net.bytes("abc")), "SHA-256");
+boolean ok = Rsa.verify(pubDer, Hash.sha256(Net.bytes("abc")), sig, "SHA-256");
+```
+
+**Catatan**
+
+- Kunci: DER PKCS#1 (RSAPrivateKey / RSAPublicKey).
+- Perpangkatan modulo memakai BigInt — lambat untuk kunci 2048-bit di VM.
 
 | Fungsi | Keterangan |
 |---|---|
-| `static int[] modulusOf(int[] keyDer)` | modulus: kunci publik (n=idx0) atau privat (v=0, n=idx1) |
-| `static int[] exponentOf(int[] keyDer)` | eksponen publik: kunci publik (e=idx1) atau privat (v,n,e → idx2) |
+| `static int[] modulusOf(int[] keyDer)` | modulus (big integer) dari kunci |
+| `static int[] exponentOf(int[] keyDer)` | eksponen publik (big integer) dari kunci |
 | `static int[] exponentOf2(int[] privDer)` | eksponen privat dari kunci privat PKCS#1 |
-| `static int[] publicKey(int[] privDer)` | kunci publik DER dari kunci privat PKCS#1 |
-| `static int[] sign(int[] privDer, int[] digest, String alg)` | tanda tangan digest dengan kunci privat PKCS#1 |
-| `static boolean verify(int[] pubDer, int[] digest, int[] sig, String alg)` | verifikasi tanda tangan (digest harus digest SHA- yang sama) |
-| `static int[] encrypt(int[] pubDer, int[] msg)` | enkripsi pesan dengan kunci publik |
-| `static int[] decrypt(int[] privDer, int[] ct)` | dekripsi ciphertext dengan kunci privat |
+| `static int[] publicKey(int[] privDer)` | DER RSAPublicKey dari kunci privat |
+| `static int[] sign(int[] privDer, int[] digest, String alg)` | tanda tangan digest dengan kunci privat (DER PKCS#1) |
+| `static boolean verify(int[] pubDer, int[] digest, int[] sig, String alg)` | verifikasi tanda tangan dengan kunci publik |
+| `static int[] encrypt(int[] pubDer, int[] msg)` | enkripsi blok PKCS#1 v1.5 |
+| `static int[] decrypt(int[] privDer, int[] ct)` | dekripsi blok PKCS#1 v1.5 |
 
 ---
 

@@ -202,6 +202,12 @@ META = {
         "notes": ["Nilai non-negatif; `sub` butuh a >= b.",
                   "Pembagian panjang biner: benar, tapi lambat untuk modulus besar."],
     },
+    "Rsa": {
+        "purpose": "RSA PKCS#1 v1.5: tanda tangan & verifikasi SHA-1/256/384/512, enkripsi/dekripsi blok.",
+        "example": 'import Rsa;\nimport Hash;\n\nint[] sig = Rsa.sign(privDer, Hash.sha256(Net.bytes("abc")), "SHA-256");\nboolean ok = Rsa.verify(pubDer, Hash.sha256(Net.bytes("abc")), sig, "SHA-256");',
+        "notes": ["Kunci: DER PKCS#1 (RSAPrivateKey / RSAPublicKey).",
+                  "Perpangkatan modulo memakai BigInt — lambat untuk kunci 2048-bit di VM."],
+    },
     "Reader": {
         "purpose": "Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.",
         "example": 'import Reader;\n\nReader r = Reader.open("data.txt");\nString baris = r.readLine();\nr.close();',
@@ -748,6 +754,15 @@ EXTRA = {
         "toDecimal": "big → teks desimal",
         "fromInt": "int → big",
         "toInt": "big → int",
+    }},
+    "Rsa": {"descs": {
+        "sign": "tanda tangan digest dengan kunci privat (DER PKCS#1)",
+        "verify": "verifikasi tanda tangan dengan kunci publik",
+        "encrypt": "enkripsi blok PKCS#1 v1.5",
+        "decrypt": "dekripsi blok PKCS#1 v1.5",
+        "publicKey": "DER RSAPublicKey dari kunci privat",
+        "modulusOf": "modulus (big integer) dari kunci",
+        "exponentOf": "eksponen publik (big integer) dari kunci",
     }},
     "Reader": {"descs": {
         "open": "buka file untuk dibaca (null bila gagal)",

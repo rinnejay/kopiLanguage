@@ -261,6 +261,8 @@ server dan belum verifikasi ECDSA CertificateVerify.
 | `Aead`, `ChaCha`, `Poly` | ChaCha20-Poly1305 (TLS record) |
 | `Aes`, `Gcm` | AES-128/192/256 (FIPS-197) + AES-GCM (SP 800-38D) |
 | `Blake2b`, `Scrypt` | BLAKE2b (RFC 7693) + scrypt KDF memory-hard (RFC 7914) |
+| `BigInt` | bilangan bulat presisi sembarang (limb 16-bit) |
+| `Rsa` | RSA PKCS#1 v1.5 (tanda tangan & enkripsi) di atas `BigInt` |
 | `Pem`, `X509` | armor PEM + parsing sertifikat X.509 (RFC 5280) |
 | `Big`, `X25519` | aritmetika medan 2²⁵⁵−19 & X25519 |
 | `Der` | parser DER minimal + pin SPKI |

@@ -91,7 +91,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Pem`](api-crypto.md#pem) | `lib/crypto/Pem.kop` | 3 | Armor PEM (RFC 7468): encode/decode sertifikat dan kunci ke DER biner. |
 | [`Poly`](api-crypto.md#poly) | `lib/crypto/Poly.kop` | 10 | Poly1305 one-time MAC (RFC 7539) dengan aritmetika limb 15-bit. |
 | [`Rand`](api-crypto.md#rand) | `lib/crypto/Rand.kop` | 1 | Byte acak kriptografis dari `/dev/urandom`. |
-| [`Rsa`](api-crypto.md#rsa) | `lib/crypto/Rsa.kop` | 8 | — |
+| [`Rsa`](api-crypto.md#rsa) | `lib/crypto/Rsa.kop` | 8 | RSA PKCS#1 v1.5: tanda tangan & verifikasi SHA-1/256/384/512, enkripsi/dekripsi blok. |
 | [`Scrypt`](api-crypto.md#scrypt) | `lib/crypto/Scrypt.kop` | 1 | scrypt (RFC 7914): KDF memory-hard untuk menyimpan kata sandi (Salsa20/8 + BlockMix + ROMix). |
 | [`X25519`](api-crypto.md#x25519) | `lib/crypto/X25519.kop` | 2 | Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3. |
 | [`X509`](api-crypto.md#x509) | `lib/crypto/X509.kop` | 11 | Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik. |

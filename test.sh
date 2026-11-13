@@ -63,6 +63,21 @@ check regexvec test/regexvec.kop
 python3 tools/gen_bigintvec.py > "$T/kopi/bigintvec.ref"
 check bigintvec test/bigintvec.kop
 
+# ─── RSA: PKCS#1 v1.5 sign/verify/encrypt (backend native a64; modexp di
+#     VM terlalu lambat untuk key 512-bit — lihat catatan di docs) ─────────
+python3 tools/gen_rsavec.py "$T/kopi/rsavec.kop" "$T/kopi/rsavec.ref" >/dev/null
+if ./kopicc "$T/kopi/rsavec.kop" -t a64 -o "$T/kopi/rsavec.s" && \
+   cc "$T/kopi/rsavec.s" -o "$T/kopi/rsavec.bin" && \
+   "$T/kopi/rsavec.bin" > "$T/kopi/rsavec.out"; then
+  if diff -q "$T/kopi/rsavec.ref" "$T/kopi/rsavec.out" >/dev/null 2>&1; then
+    echo "PASS  rsavec [a64]"; PASS=$((PASS+1))
+  else
+    echo "FAIL  rsavec [a64]: output tidak cocok"; FAIL=$((FAIL+1))
+  fi
+else
+  echo "FAIL  rsavec [a64]: gagal build/execute"; FAIL=$((FAIL+1))
+fi
+
 # ─── X.509: parse sertifikat (fixture openssl; oracle gen_x509vec.py) ─────
 python3 tools/gen_x509vec.py "$T/kopi/x509vec.kop" "$T/kopi/x509vec.ref" >/dev/null
 check x509vec "$T/kopi/x509vec.kop"
@@ -672,7 +687,7 @@ check scope "$T/kopi/scope.kop"
 cp examples/array.kop "$T/kopi/array.kop"
 cp test/bitops.kop  "$T/kopi/bitops.kop"
 pas64=1
-for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec aesvec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec arrayfn arrchk jsontest; do
+for t in array cryptot arrtest ciphertest netrfc netdns netget netpost netbulk bitops hashvec aesvec rsavec bigsmoke febig curve25519 hkdf stream polyvec aeadvec mathvec numvec arrayfn arrchk jsontest; do
     [ -f "$T/kopi/$t.x64.s" ] || continue
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" && \
     cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null || pas64=0

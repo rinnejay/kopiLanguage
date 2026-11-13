@@ -775,7 +775,17 @@ int[] k = Rand.bytes(32);   // kunci 256-bit</code></pre>
 <hr>
 <h2 id="rsa">Rsa<a class="anchor" href="#rsa" aria-label="tautan">#</a></h2>
 <p><code>lib/crypto/Rsa.kop</code> · 8 fungsi</p>
-<p>Modul pustaka Kopi.</p>
+<p>RSA PKCS#1 v1.5: tanda tangan &amp; verifikasi SHA-1/256/384/512, enkripsi/dekripsi blok.</p>
+<pre><code class="language-java">import Rsa;
+import Hash;
+
+int[] sig = Rsa.sign(privDer, Hash.sha256(Net.bytes("abc")), "SHA-256");
+boolean ok = Rsa.verify(pubDer, Hash.sha256(Net.bytes("abc")), sig, "SHA-256");</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Kunci: DER PKCS#1 (RSAPrivateKey / RSAPublicKey).</li>
+<li>Perpangkatan modulo memakai BigInt — lambat untuk kunci 2048-bit di VM.</li>
+</ul>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Fungsi</th>
@@ -783,11 +793,11 @@ int[] k = Rand.bytes(32);   // kunci 256-bit</code></pre>
 </tr></thead><tbody>
 <tr>
 <td><code>static int[] modulusOf(int[] keyDer)</code></td>
-<td>modulus: kunci publik (n=idx0) atau privat (v=0, n=idx1)</td>
+<td>modulus (big integer) dari kunci</td>
 </tr>
 <tr>
 <td><code>static int[] exponentOf(int[] keyDer)</code></td>
-<td>eksponen publik: kunci publik (e=idx1) atau privat (v,n,e → idx2)</td>
+<td>eksponen publik (big integer) dari kunci</td>
 </tr>
 <tr>
 <td><code>static int[] exponentOf2(int[] privDer)</code></td>
@@ -795,23 +805,23 @@ int[] k = Rand.bytes(32);   // kunci 256-bit</code></pre>
 </tr>
 <tr>
 <td><code>static int[] publicKey(int[] privDer)</code></td>
-<td>kunci publik DER dari kunci privat PKCS#1</td>
+<td>DER RSAPublicKey dari kunci privat</td>
 </tr>
 <tr>
 <td><code>static int[] sign(int[] privDer, int[] digest, String alg)</code></td>
-<td>tanda tangan digest dengan kunci privat PKCS#1</td>
+<td>tanda tangan digest dengan kunci privat (DER PKCS#1)</td>
 </tr>
 <tr>
 <td><code>static boolean verify(int[] pubDer, int[] digest, int[] sig, String alg)</code></td>
-<td>verifikasi tanda tangan (digest harus digest SHA- yang sama)</td>
+<td>verifikasi tanda tangan dengan kunci publik</td>
 </tr>
 <tr>
 <td><code>static int[] encrypt(int[] pubDer, int[] msg)</code></td>
-<td>enkripsi pesan dengan kunci publik</td>
+<td>enkripsi blok PKCS#1 v1.5</td>
 </tr>
 <tr>
 <td><code>static int[] decrypt(int[] privDer, int[] ct)</code></td>
-<td>dekripsi ciphertext dengan kunci privat</td>
+<td>dekripsi blok PKCS#1 v1.5</td>
 </tr>
 </tbody></table></div>
 <hr>
