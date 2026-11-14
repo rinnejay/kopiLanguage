@@ -190,7 +190,7 @@ System.out.println(s.length);
   untuk `long[]`/`String[]` tulis loop `for` biasa.
 - Belum ada array literal (`{1,2,3}`) atau array multi-dimensi.
 
-### Buffer byte `byte[]` / `uint8[]` (v1.43)
+### Buffer byte `byte[]` / `uint8[]` (v1.43–v1.44)
 
 ```java
 byte[] buf = new byte[1024];  // 1 byte per elemen + header 8 byte
@@ -208,13 +208,34 @@ System.out.println(raw[0]);   // 200
   `uint8_t`. Lihat `Bytes.widen`/`narrow` untuk jembatan ke `int[]`.
 - `new byte[n]` mengalokasikan `header + ceil(n/8)` slot dan men-zero-kan
   seluruh byte; `n` harus non-negatif.
-- Assignment elemen menerima `byte`/`uint8` yang sesuai atau literal yang
-  muat; nilai lain butuh cast eksplisit (`buf[i] = (byte)x;`).
+- Assignment elemen menerima nilai integer apa pun dan memotongnya ke
+  8 bit (`raw[0] = 300` → 44), seperti menyimpan byte bertipe sempit.
 - Bounds check sama seperti array lain; pelanggaran menghentikan program.
 - Buffer bisa diparamkan/dikembalikan (`static int sum(byte[] b)`), dan
   dicetak sebagai teks byte (debug), sama seperti `int[]`.
 - Helper `Bytes.lenB/widen/narrow/copyB/textB/printB/lineB` bekerja pada
-  buffer packed; helper `Bytes` lama tetap bekerja pada `int[]`.
+  `byte[]`, dan `lenU/widenU/narrowU/copyU/textU/printU/lineU` pada
+  `uint8[]`; helper `Bytes` lama tetap bekerja pada `int[]`.
+- **Buffer "multiple" (v1.44)**: `int[]`, `byte[]`, `uint8[]`, dan
+  `String` bisa saling dioperasikan lewat koersi otomatis di
+  inisialisasi, assignment, `return`, dan argumen metode.
+- Konversi `int[] ↔ packed` dan `String ↔ packed` menyalin; `byte[] ↔
+  uint8[]` hanya berganti tipe (layout identik).
+- Builtin `Net.recvb/sendb/recv1/sendto/recvfrom` langsung menerima
+  buffer packed tanpa salinan. Varian pustaka: `File.readIntoB/
+  writeAllB/readAllB`, `Tcp.sendB/recvAllB/recvNB/catB/indexOfB`, dan
+  `Udp.sendToB/recvFromB`.
+
+Contoh koersi buffer "multiple":
+
+```java
+uint8[] u = new uint8[4];
+int[]   w = u;        // widen (salinan 8-byte slot)
+uint8[] v = w;        // narrow (salinan packed)
+byte[]  b = u;        // layout sama, tampilan bertanda
+uint8[] c = "AB";     // String → packed (salinan)
+String  s = c;        // packed → String (salinan)
+```
 
 ### Metode fungsional array (gula)
 

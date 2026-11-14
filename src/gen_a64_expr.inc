@@ -368,12 +368,94 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tsvc\t#0");
             return 0;                                  /* fd | -errno */
         }
-        if (e->ival == 7 || e->ival == 8) {
-            /* recvb(fd, buf) / sendb(fd, buf): buf adalah pointer 64-bit */
+        if (e->ival == 7 || e->ival == 8 || e->ival == 42 || e->ival == 43) {
+            /* recvb/sendb: buf adalah pointer 64-bit (slot atau packed) */
             for (Node *aa = e->a; aa; aa = aa->next) {
                 gen_expr(m, aa);
                 push_val(aa == e->a ? 0 : 1);          /* fd int, buf array */
             }
+        }
+        if (e->ival == 42) {             /* recvb packed 1 byte/elemen */
+            emit("\tldr\tx10, [sp]");                  /* buf */
+            emit("\tldr\tw11, [x10]");                 /* len */
+            emit("\tcmp\tw11, #0");
+            emit("\tb.le\t.LPV%dz", ln);
+            emit("\tmov\tw9, #0");                     /* got */
+            emit(".LPV%dl:", ln);
+            emit("\tcmp\tw9, w11");
+            emit("\tb.hs\t.LPV%df", ln);
+            emit("\tsub\tw12, w11, w9");
+            emit("\tcmp\tw12, #240");
+            emit("\tb.ls\t.LPV%dc", ln);
+            emit("\tmov\tw12, #240");
+            emit(".LPV%dc:", ln);
+            emit("\tadd\tx1, x10, #8");
+            emit("\tadd\tx1, x1, x9");
+            emit("\tmov\tw2, w12");
+            emit("\tldr\tw0, [sp, #16]");
+            emit("\tmov\tx8, #63");                    /* __NR_read */
+            emit("\tsvc\t#0");
+            emit("\tcmp\tx0, #0");
+            emit("\tb.lt\t.LPV%dry", ln);
+            emit("\tb.eq\t.LPV%df", ln);
+            emit("\tadd\tw9, w9, w0");
+            emit("\tb\t.LPV%dl", ln);
+            emit(".LPV%dry:", ln);
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tneg\tw0, wzr");
+            emit("\tb\t.LPV%dh", ln);
+            emit(".LPV%df:", ln);
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tmov\tw0, w9");
+            emit("\tb\t.LPV%dh", ln);
+            emit(".LPV%dz:", ln);
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tmov\tw0, wzr");
+            emit(".LPV%dh:", ln);
+            return 0;
+        }
+        if (e->ival == 43) {             /* sendb packed 1 byte/elemen */
+            emit("\tldr\tx10, [sp]");
+            emit("\tldr\tw11, [x10]");
+            emit("\tcmp\tw11, #0");
+            emit("\tb.le\t.LPS%df", ln);
+            emit("\tmov\tw9, #0");
+            emit(".LPS%dl:", ln);
+            emit("\tcmp\tw9, w11");
+            emit("\tb.hs\t.LPS%df", ln);
+            emit("\tsub\tw12, w11, w9");
+            emit("\tcmp\tw12, #240");
+            emit("\tb.ls\t.LPS%dc", ln);
+            emit("\tmov\tw12, #240");
+            emit(".LPS%dc:", ln);
+            emit("\tadd\tx1, x10, #8");
+            emit("\tadd\tx1, x1, x9");
+            emit("\tmov\tw2, w12");
+            emit("\tldr\tw0, [sp, #16]");
+            emit("\tmov\tx3, #16384");                 /* MSG_NOSIGNAL */
+            emit("\tmov\tx4, #0");
+            emit("\tmov\tx5, #0");
+            emit("\tmov\tx8, #206");                   /* __NR_sendto */
+            emit("\tsvc\t#0");
+            emit("\tcmn\tw0, #88");                    /* ENOTSOCK */
+            emit("\tb.ne\t.LPS%dso", ln);
+            emit("\tldr\tw0, [sp, #16]");
+            emit("\tmov\tx8, #64");                    /* __NR_write */
+            emit("\tsvc\t#0");
+            emit(".LPS%dso:", ln);
+            emit("\tcmp\tw0, #0");
+            emit("\tb.lt\t.LPS%de", ln);
+            emit("\tadd\tw9, w9, w0");
+            emit("\tb\t.LPS%dl", ln);
+            emit(".LPS%de:", ln);
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tneg\tw0, wzr");
+            emit("\tb\t.LPS%dh", ln);
+            emit(".LPS%df:", ln);
+            emit("\tadd\tsp, sp, #%d", 2 * 16);
+            emit("\tmov\tw0, wzr");
+            emit(".LPS%dh:", ln);
+            return 0;
         }
         if (e->ival == 7) {              /* recvb(fd, buf) → n | -1            */
             /* stack: [0..15]=buf (64-bit), [16..31]=fd; tmp via .comm */
@@ -500,12 +582,12 @@ static int gen_expr(Method *m, Node *e) {
             emit(".LRS%dh:", ln);
             return 0;
         }
-        if (e->ival >= 9 && e->ival <= 12) {
+        if ((e->ival >= 9 && e->ival <= 12) || e->ival == 45 || e->ival == 46) {
             /* bind/sendto/recvfrom/shutdown — argumen array di-push 64-bit */
             int idx = 0;
             for (Node *aa = e->a; aa; aa = aa->next, idx++) {
-                int isArr = (e->ival == 10 && idx == 3) ||
-                            (e->ival == 11 && (idx == 1 || idx == 2));
+                int isArr = ((e->ival == 10 || e->ival == 45) && idx == 3) ||
+                            ((e->ival == 11 || e->ival == 46) && (idx == 1 || idx == 2));
                 gen_expr(m, aa);
                 push_val(isArr);
             }
@@ -543,6 +625,89 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tmov\tx8, #210");                /* __NR_shutdown */
                 emit("\tsvc\t#0");
                 emit("\tadd\tsp, sp, #32");
+                return 0;
+            }
+            if (e->ival == 45) {            /* sendto packed */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tldr\tx10, [sp, #16]");         /* buf */
+                emit("\tldr\tw6, [sp, #48]");          /* ip */
+                emit("\tldr\tw7, [sp, #32]");          /* port */
+                emit("\tlsr\tw4, w7, #8");
+                emit("\tstrb\tw4, [sp, #2]");
+                emit("\tand\tw4, w7, #0xff");
+                emit("\tstrb\tw4, [sp, #3]");
+                emit("\tlsr\tw4, w6, #24");
+                emit("\tstrb\tw4, [sp, #4]");
+                emit("\tlsr\tw4, w6, #16");
+                emit("\tand\tw4, w4, #0xff");
+                emit("\tstrb\tw4, [sp, #5]");
+                emit("\tlsr\tw4, w6, #8");
+                emit("\tand\tw4, w4, #0xff");
+                emit("\tstrb\tw4, [sp, #6]");
+                emit("\tand\tw4, w6, #0xff");
+                emit("\tstrb\tw4, [sp, #7]");
+                emit("\tmovz\tw4, #2");
+                emit("\tstrb\tw4, [sp, #0]");
+                emit("\tldr\tw11, [x10]");
+                emit("\tmov\tw2, #1200");
+                emit("\tcmp\tw11, w2");
+                emit("\tb.ls\t.LSTP%dc", ln);
+                emit("\tmov\tw11, #1200");
+                emit(".LSTP%dc:", ln);
+                emit("\tadd\tx1, x10, #8");
+                emit("\tmov\tw2, w11");
+                emit("\tldr\tx0, [sp, #64]");          /* fd */
+                emit("\tmov\tx3, #0");
+                emit("\tmov\tx4, sp");
+                emit("\tmov\tx5, #16");
+                emit("\tmov\tx8, #206");               /* __NR_sendto */
+                emit("\tsvc\t#0");
+                emit("\tadd\tsp, sp, #80");
+                return 0;
+            }
+            if (e->ival == 46) {            /* recvfrom packed */
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tstp\txzr, xzr, [sp, #-16]!");
+                emit("\tmov\tw9, #16");
+                emit("\tstr\tw9, [sp]");
+                emit("\tldr\tx10, [sp, #48]");         /* buf */
+                emit("\tldr\tw11, [x10]");
+                emit("\tmov\tw2, #1200");
+                emit("\tcmp\tw11, w2");
+                emit("\tb.ls\t.LRFP%dc", ln);
+                emit("\tmov\tw11, #1200");
+                emit(".LRFP%dc:", ln);
+                emit("\tadd\tx1, x10, #8");
+                emit("\tmov\tw2, w11");
+                emit("\tldr\tx0, [sp, #64]");          /* fd */
+                emit("\tmov\tx3, #0");
+                emit("\tadd\tx4, sp, #16");
+                emit("\tmov\tx5, sp");
+                emit("\tmov\tx8, #207");               /* __NR_recvfrom */
+                emit("\tsvc\t#0");
+                emit("\tcmp\tx0, #0");
+                emit("\tb.lt\t.LRFP%dh", ln);
+                emit("\tmov\tw11, w0");
+                emit("\tldr\tx12, [sp, #32]");         /* from */
+                emit("\tldrb\tw6, [sp, #20]");
+                emit("\tlsl\tw6, w6, #24");
+                emit("\tldrb\tw4, [sp, #21]");
+                emit("\tlsl\tw4, w4, #16");
+                emit("\torr\tw6, w6, w4");
+                emit("\tldrb\tw4, [sp, #22]");
+                emit("\tlsl\tw4, w4, #8");
+                emit("\torr\tw6, w6, w4");
+                emit("\tldrb\tw4, [sp, #23]");
+                emit("\torr\tw6, w6, w4");
+                emit("\tldrb\tw3, [sp, #18]");
+                emit("\tlsl\tw3, w3, #8");
+                emit("\tldrb\tw4, [sp, #19]");
+                emit("\torr\tw3, w3, w4");
+                emit("\tstr\tw6, [x12, #8]");
+                emit("\tstr\tw3, [x12, #16]");
+                emit("\tmov\tw0, w11");
+                emit(".LRFP%dh:", ln);
+                emit("\tadd\tsp, sp, #80");
                 return 0;
             }
             if (e->ival == 10) {            /* sendto(fd, ip, port, buf) → n */
@@ -907,6 +1072,26 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tadd\tsp, sp, #16");
                 return 1;
             }
+        }
+        if (e->ival == 44) {                /* recv1 packed */
+            gen_expr(m, e->a);
+            push_val(0);
+            gen_expr(m, e->a->next);
+            push_val(1);
+            emit("\tldr\tx10, [sp]");
+            emit("\tldr\tw11, [x10]");
+            emit("\tmov\tw2, #4000");
+            emit("\tcmp\tw11, w2");
+            emit("\tb.ls\t.LR1P%dc", ln);
+            emit("\tmov\tw11, #4000");
+            emit(".LR1P%dc:", ln);
+            emit("\tadd\tx1, x10, #8");
+            emit("\tmov\tw2, w11");
+            emit("\tldr\tw0, [sp, #16]");
+            emit("\tmov\tx8, #63");
+            emit("\tsvc\t#0");
+            emit("\tadd\tsp, sp, #32");
+            return 0;
         }
         if (e->ival == 33) {                /* recv1(fd, buf) → n (satu read) */
             gen_expr(m, e->a);

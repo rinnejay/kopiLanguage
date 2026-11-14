@@ -66,6 +66,71 @@
                 blk[0] = n;
                 for (long i = 0; i < n; i++) blk[1 + i] = getb(src, i);
                 stackv[sp++] = (int64_t)blk;
+            } else if (bi == 42) {                /* recvb packed (v1.44) */
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                long len = (buf && in_heap(buf)) ? buf[0] : 0;
+                long nrd = 0;
+                if (len > 0) {
+                    nrd = read((int)fdi, (unsigned char *)(buf + 1), (size_t)len);
+                    if (nrd < 0) nrd = -1;
+                }
+                stackv[sp++] = (int64_t)nrd;
+            } else if (bi == 43) {                /* sendb packed (v1.44) */
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                long len = (buf && in_heap(buf)) ? buf[0] : 0;
+                long terkirim = 0;
+                while (terkirim < len) {
+                    ssize_t n = send((int)fdi, (unsigned char *)(buf + 1) + terkirim,
+                                     (size_t)(len - terkirim), MSG_NOSIGNAL);
+                    if (n < 0 && errno == ENOTSOCK)
+                        n = write((int)fdi, (unsigned char *)(buf + 1) + terkirim,
+                                  (size_t)(len - terkirim));
+                    if (n <= 0) { terkirim = -1; break; }
+                    terkirim += n;
+                }
+                stackv[sp++] = (terkirim >= 0) ? (int64_t)0 : (int64_t)-1;
+            } else if (bi == 44) {                /* recv1 packed (v1.44) */
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                long len = (buf && in_heap(buf)) ? buf[0] : 0;
+                if (len > 4000) len = 4000;
+                ssize_t n = read((int)fdi, (unsigned char *)(buf + 1),
+                                 (size_t)(len > 0 ? len : 1));
+                stackv[sp++] = (n < 0) ? -errno : (int64_t)n;
+            } else if (bi == 45) {                /* sendto packed (v1.44) */
+                long *buf = (long *)stackv[--sp];
+                int64_t port = stackv[--sp], ipbe = stackv[--sp], fdi = stackv[--sp];
+                struct sockaddr_in sa;
+                memset(&sa, 0, sizeof sa);
+                sa.sin_family = AF_INET;
+                sa.sin_port = htons((uint16_t)((long)port & 0xffff));
+                sa.sin_addr.s_addr = htonl((uint32_t)((long)ipbe & 0xffffffff));
+                long len = (buf && in_heap(buf)) ? buf[0] : 0;
+                if (len > 1200) len = 1200;
+                ssize_t n = sendto((int)fdi, (unsigned char *)(buf + 1), (size_t)len, 0,
+                                   (struct sockaddr *)&sa, sizeof sa);
+                stackv[sp++] = (n < 0) ? -errno : (int64_t)n;
+            } else if (bi == 46) {                /* recvfrom packed (v1.44) */
+                long *fromArr = (long *)stackv[--sp];
+                long *buf = (long *)stackv[--sp];
+                int64_t fdi = stackv[--sp];
+                struct sockaddr_in sa;
+                socklen_t sl = sizeof sa;
+                memset(&sa, 0, sizeof sa);
+                long cap = (buf && in_heap(buf)) ? buf[0] : 0;
+                if (cap > 1200) cap = 1200;
+                ssize_t n = recvfrom((int)fdi, (unsigned char *)(buf + 1),
+                                     (size_t)(cap > 0 ? cap : 1), 0,
+                                     (struct sockaddr *)&sa, &sl);
+                if (n < 0) {
+                    stackv[sp++] = -errno;
+                } else {
+                    fromArr[1] = (long)ntohl((uint32_t)sa.sin_addr.s_addr);
+                    fromArr[2] = (long)ntohs(sa.sin_port);
+                    stackv[sp++] = (int64_t)n;
+                }
             } else if (bi == 6) {                 /* Net.openr("literal") → fd */
                 uint16_t cp16 = (uint16_t)m->code[f->pc] | ((uint16_t)m->code[f->pc + 1] << 8);
                 f->pc += 2;

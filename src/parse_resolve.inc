@@ -14,6 +14,7 @@ static void resolve_stmt(Node *s) {
         /* v1.18: konversi representasi String ↔ buffer otomatis */
         if ((Ty)s->dty == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
         else if ((Ty)s->dty == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
+        else if (need_arrconv((Ty)s->dty, et)) et = wrap_arrconv(s->a, (Ty)s->dty);
         if (!ty_can_implicit((Ty)s->dty, et) && !fits_literal((Ty)s->dty, s->a))
             die("baris %d: inisialisasi '%s' tidak cocok dengan tipe deklarasinya (butuh cast)",
                 s->line, s->str);
@@ -27,6 +28,7 @@ static void resolve_stmt(Node *s) {
         /* v1.18: konversi representasi String ↔ buffer otomatis */
         if (v->ty == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
         else if (v->ty == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
+        else if (need_arrconv((Ty)v->ty, et)) et = wrap_arrconv(s->a, (Ty)v->ty);
         /* v1.20: rujukan tidak boleh lari ke variabel di luar malloc{} */
         if (reg_sp && is_ref_ty((Ty)v->ty) && is_ref_ty(et) &&
             (int)(v - scope) < reg_base[reg_sp - 1])
@@ -91,6 +93,7 @@ static void resolve_stmt(Node *s) {
             /* v1.18: konversi representasi String ↔ buffer otomatis */
             if (cur_method->ret == T_ARI && et == T_STR) { wrap_conv(s->a, "Net.strbytes"); et = T_ARI; }
             else if (cur_method->ret == T_STR && et == T_ARI) { wrap_conv(s->a, "Net.mkstr"); et = T_STR; }
+            else if (need_arrconv((Ty)cur_method->ret, et)) et = wrap_arrconv(s->a, (Ty)cur_method->ret);
             /* v1.20: nilai rujukan akan dibebaskan bila keluar lewat malloc{} */
             if (reg_sp && is_ref_ty(et))
                 die("baris %d: return bertipe rujukan dari dalam malloc{} belum didukung — hitung di dalam blok lalu return setelah blok (arena blok dibebaskan)",
@@ -131,6 +134,7 @@ static void resolve_stmt(Node *s) {
             die("baris %d: ruas kiri '%s.%s' bukan objek", s->line, s->a->kind == EX_VAR ? s->a->str : "?", s->str);
         Ty et = type_expr(s->c);
         Ty ft = (Ty)f->ty;
+        if (need_arrconv(ft, et)) et = wrap_arrconv(s->c, ft);
         int ok;
         if (!f->cls && ty_is_arr(ft)) {
             /* v1.29: field bertipe array — tipe elemen harus sama */
@@ -180,11 +184,12 @@ static void resolve_stmt(Node *s) {
         if (at == T_STRARR && et != T_STR)
             die("baris %d: elemen String[] harus String", s->line);
         if (at == T_BYTEARR || at == T_U8ARR) {
-            Ty want = ty_elem(at);
-            if (!ty_can_implicit(want, et) && !fits_literal(want, s->c))
-                die("baris %d: elemen %s harus %s (perlu cast eksplisit)",
-                    s->line, at == T_BYTEARR ? "byte[]" : "uint8[]",
-                    at == T_BYTEARR ? "byte" : "uint8");
+            /* v1.44: penyimpanan ke buffer packed memotong ke 8 bit;
+             * nilai integer apa pun diterima (seperti assignment Java
+             * dengan cast implisit di elemen buffer). */
+            if (!ty_is_int(et))
+                die("baris %d: elemen %s harus integer",
+                    s->line, at == T_BYTEARR ? "byte[]" : "uint8[]");
         }
         else if (at != T_STRARR && !ty_is_int(et))
             die("baris %d: elemen %s harus integer (perlu cast eksplisit)",

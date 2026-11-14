@@ -100,7 +100,7 @@ int[] balas = Rfc.daytime(serverIp);
 
 ## Tcp
 
-`lib/net/Tcp.kop` · 13 fungsi
+`lib/net/Tcp.kop` · 18 fungsi
 
 Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat.
 
@@ -128,11 +128,16 @@ Tcp.drop(fd);
 | `static int shutdown(int fd, int how)` | half-close: SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2 |
 | `static int send(int fd, int[] buf, int len)` | kirim len byte pertama buf. sukses → 0; gagal → kode negatif dan sisa byte tidak jadi terkirim (penelepon yang memutus). |
 | `static int sendBuf(int fd, int[] buf)` | kirim seluruh buf. sukses → 0; gagal → kode negatif |
+| `static int sendB(int fd, uint8[] buf)` | v1.44: varian buffer packed 1 byte/elemen. |
+| `static int recvAllB(int fd, uint8[] buf)` | — |
+| `static int recvNB(int fd, uint8[] buf, int n)` | — |
 | `static int recvAll(int fd, int[] buf)` | baca hingga EOF atau buf penuh. sukses → jumlah byte ≥ 0. satu syscall = satu byte, jadi galat baca builtin hanya muncul sekali lalu identik EOF: keduanya mengerucut ke akhir baca. |
 | `static int[] cat(int[] a, int[] b)` | gabung a lalu b jadi array baru |
 | `static int[] tail(int[] xs, int from)` | potong mulai indeks from sampai akhir |
 | `static int indexOf(int[] hay, int[] needle, int from)` | indeks pertama needle dalam hay mulai dari indeks from; -1 bila tak ada |
 | `static int recvN(int fd, int[] buf, int n)` | baca tepat n byte (atau berhenti di EOF/buf penuh); kembalikan jumlah byte yang benar-benar terbaca — untuk protokol berbatas panjang eksplisit (DNS-over-TCP misalnya) |
+| `static uint8[] catB(uint8[] a, uint8[] b)` | — |
+| `static int indexOfB(uint8[] hay, uint8[] needle, int from)` | — |
 | `static int[] num(int v)` | v ≥ 0 → digit ASCII desimal (tanpa tanda); dipakai Content-Length |
 
 ---
@@ -249,7 +254,7 @@ TlsServer.writeApp(ctx, Net.bytes("pong"));
 
 ## Udp
 
-`lib/net/Udp.kop` · 7 fungsi
+`lib/net/Udp.kop` · 9 fungsi
 
 Datagram UDP: bind, kirim/terima satu datagram, shutdown.
 
@@ -276,6 +281,8 @@ Udp.sendTo(s, from[0], from[1], Net.bytes("pong"));
 | `static int bind(int fd, int addr, int port)` | ikat ke alamat lokal → 0 / -errno |
 | `static int sendTo(int fd, int addr, int port, int[] data)` | kirim satu datagram: data[0..len-1] (maks 1200 byte) → n / -errno |
 | `static int recvFrom(int fd, int[] buf, int[] from)` | terima satu datagram ke buf; sumber diisi ke from[0]=ip, from[1]=port. hasil = jumlah byte (≥0) atau kode negatif. |
+| `static int sendToB(int fd, int addr, int port, uint8[] data)` | v1.44: varian buffer packed 1 byte/elemen. |
+| `static int recvFromB(int fd, uint8[] buf, int[] from)` | — |
 | `static int shutdown(int fd, int how)` | half-close (SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2) |
 | `static int close(int fd)` | tutup deskriptor |
 

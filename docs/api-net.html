@@ -193,7 +193,7 @@ int[] balas = Rfc.daytime(serverIp);</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="tcp">Tcp<a class="anchor" href="#tcp" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Tcp.kop</code> · 13 fungsi</p>
+<p><code>lib/net/Tcp.kop</code> · 18 fungsi</p>
 <p>Transport TCP di atas builtin <code>Net</code>: buka koneksi, kirim/terima buffer, shutdown, helper alamat.</p>
 <pre><code class="language-java">import Tcp;
 
@@ -241,6 +241,18 @@ Tcp.drop(fd);</code></pre>
 <td>kirim seluruh buf. sukses → 0; gagal → kode negatif</td>
 </tr>
 <tr>
+<td><code>static int sendB(int fd, uint8[] buf)</code></td>
+<td>v1.44: varian buffer packed 1 byte/elemen.</td>
+</tr>
+<tr>
+<td><code>static int recvAllB(int fd, uint8[] buf)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int recvNB(int fd, uint8[] buf, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static int recvAll(int fd, int[] buf)</code></td>
 <td>baca hingga EOF atau buf penuh. sukses → jumlah byte ≥ 0. satu syscall = satu byte, jadi galat baca builtin hanya muncul sekali lalu identik EOF: keduanya mengerucut ke akhir baca.</td>
 </tr>
@@ -259,6 +271,14 @@ Tcp.drop(fd);</code></pre>
 <tr>
 <td><code>static int recvN(int fd, int[] buf, int n)</code></td>
 <td>baca tepat n byte (atau berhenti di EOF/buf penuh); kembalikan jumlah byte yang benar-benar terbaca — untuk protokol berbatas panjang eksplisit (DNS-over-TCP misalnya)</td>
+</tr>
+<tr>
+<td><code>static uint8[] catB(uint8[] a, uint8[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int indexOfB(uint8[] hay, uint8[] needle, int from)</code></td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>static int[] num(int v)</code></td>
@@ -534,7 +554,7 @@ TlsServer.writeApp(ctx, Net.bytes("pong"));</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="udp">Udp<a class="anchor" href="#udp" aria-label="tautan">#</a></h2>
-<p><code>lib/net/Udp.kop</code> · 7 fungsi</p>
+<p><code>lib/net/Udp.kop</code> · 9 fungsi</p>
 <p>Datagram UDP: bind, kirim/terima satu datagram, shutdown.</p>
 <pre><code class="language-java">import Udp;
 
@@ -573,6 +593,14 @@ Udp.sendTo(s, from[0], from[1], Net.bytes("pong"));</code></pre>
 <tr>
 <td><code>static int recvFrom(int fd, int[] buf, int[] from)</code></td>
 <td>terima satu datagram ke buf; sumber diisi ke from[0]=ip, from[1]=port. hasil = jumlah byte (≥0) atau kode negatif.</td>
+</tr>
+<tr>
+<td><code>static int sendToB(int fd, int addr, int port, uint8[] data)</code></td>
+<td>v1.44: varian buffer packed 1 byte/elemen.</td>
+</tr>
+<tr>
+<td><code>static int recvFromB(int fd, uint8[] buf, int[] from)</code></td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>static int shutdown(int fd, int how)</code></td>

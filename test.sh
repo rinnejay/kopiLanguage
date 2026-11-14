@@ -1489,6 +1489,13 @@ check bytetest test/bytetest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/bytetest64.s" -o /dev/null \
     && echo "PASS  bytetest [x64]" || { echo "FAIL  bytetest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
+# ─── v1.44: buffer "multiple" int[]/byte[]/uint8[] + I/O packed ───────
+printf '200\n255\n44\n200\n44\n4\n255\n499\n499\n-56\n2\n65\n2\nAB\n3\n30\n32\n186\n891568578\n1\n0\n5\n65\n255\n3\n255\n5\n10\n5\n255\n1\n5\n5\n3\n97\n99\n1\n' > "$T/kopi/bufmulti.ref"
+check bufmulti test/bufmulti.kop
+./kopicc test/bufmulti.kop -t x64 -o "$T/kopi/bufmulti64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/bufmulti64.s" -o /dev/null \
+    && echo "PASS  bufmulti [x64]" || { echo "FAIL  bufmulti [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
 # ─── v1.42: seluruh modul lib dapat diimpor dari folder kategorinya ───
 {
     for f in $(find lib -name '*.kop' | sort); do

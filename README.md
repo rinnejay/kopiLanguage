@@ -57,9 +57,11 @@ class Main {
 - `String` native (1 byte/karakter, packed) + pustaka **`Str`** khusus
   teks (`trim`, `split/join`, `replace`, `pad`, `to*/from*` semua tipe
   skalar, hex, UTF-8) + metode instance + **template string** backtick.
-- **`Bytes`** untuk buffer `int[]` dan jembatan `byte[]`
-  (`lenB`, `widen`, `narrow`, `copyB`, `textB`, `printB`); konversi
-  eksplisit `Net.strbytes`/`Net.mkstr`.
+- **`Bytes`** untuk buffer `int[]` dan jembatan `byte[]`/`uint8[]`
+  (`lenB/widen/narrow/copyB/textB/printB` + varian `*U`); buffer
+  "multiple" (v1.44): `int[]` ↔ `byte[]`/`uint8[]` ↔ `String` dikonversi
+  otomatis di batas API, builtin `Net`/`File` menerima buffer packed,
+  varian `*B` di File/Tcp/Udp.
 - Pustaka teks ikut `String`: `File`, `Path`, `Time.format`, `Log`, `Url`,
   `Mime`, `Http` (teks request), `Dns`, `Resolv`, `Auth`, `Jwt`, `Session`,
   `Json`, dan kunci `MapStr`; buffer respons/payload tetap `int[]`.

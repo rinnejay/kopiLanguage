@@ -1,0 +1,138 @@
+// bufmulti.kop — v1.44: buffer "multiple" — int[], byte[], uint8[]
+// saling dipakai lewat koersi otomatis, dan builtin Net/File menerima
+// buffer packed 1 byte/elemen secara langsung.
+import File;
+import Bytes;
+import Udp;
+import Hash;
+import Checksum;
+
+class Main {
+    static int sum(int[] a) {
+        int s = 0;
+        for (int i = 0; i < a.length; i++) s += a[i];
+        return s;
+    }
+
+    static int sumU(uint8[] a) {
+        int s = 0;
+        for (int i = 0; i < a.length; i++) s += a[i];
+        return s;
+    }
+
+    static uint8[] fromInts() {
+        int[] a = new int[3];
+        a[0] = 1; a[1] = 2; a[2] = 3;
+        return a;
+    }
+
+    static int[] fromPacked() {
+        uint8[] u = new uint8[3];
+        u[0] = 10; u[1] = 20; u[2] = 30;
+        return u;
+    }
+
+    static void main() {
+        malloc {
+            /* ── koersi int[] ↔ uint8[] ↔ byte[] ↔ String ─────────── */
+            uint8[] u = new uint8[4];
+            u[0] = 200;
+            u[1] = 255;
+            u[2] = 300;                  // dipotong ke 8 bit → 44
+            System.out.println(u[0]);    // 200
+            System.out.println(u[1]);    // 255
+            System.out.println(u[2]);    // 44
+
+            int[] w = u;                 // widen implisit
+            System.out.println(w[0]);    // 200
+            System.out.println(w[2]);    // 44
+
+            uint8[] v = w;               // narrow implisit
+            System.out.println(v.length); // 4
+            System.out.println(v[1]);    // 255
+
+            System.out.println(sum(u));  // 499 (uint8[] → int[])
+            System.out.println(sumU(w)); // 499 (int[] → uint8[])
+
+            byte[] b = u;                // layout sama, tampilan bertanda
+            System.out.println(b[0]);    // -56
+
+            uint8[] c = "AB";            // String → packed (salinan)
+            System.out.println(c.length); // 2
+            System.out.println(c[0]);    // 65
+            String s = c;                // packed → String
+            System.out.println(s.length); // 2
+            System.out.println(s);       // AB
+
+            uint8[] f = fromInts();      // return int[] → uint8[]
+            System.out.println(f[2]);    // 3
+            int[] g = fromPacked();      // return uint8[] → int[]
+            System.out.println(g[2]);    // 30
+
+            /* ── API lib lama menerima buffer packed lewat koersi ── */
+            uint8[] abc = "abc";
+            uint8[] d = Hash.sha256(abc);       // uint8[] → int[] → uint8[]
+            System.out.println(d.length);       // 32
+            System.out.println(d[0]);           // 186 (0xba)
+            System.out.println(Checksum.crc32(abc)); // 891568578
+
+            /* ── File: varian packed ─────────────────────────────── */
+            String p = "/data/data/com.termux/files/usr/tmp/opencode/bufmulti.bin";
+            uint8[] data = new uint8[5];
+            data[0] = 0;
+            data[1] = 65;
+            data[2] = 255;
+            data[3] = 66;
+            data[4] = 10;
+            int fd = File.create(p);
+            System.out.println(fd >= 0);        // 1
+            System.out.println(File.writeAllB(fd, data)); // 0
+            File.close(fd);
+
+            uint8[] got = File.readAllB(p);
+            System.out.println(got.length);      // 5
+            System.out.println(got[1]);          // 65
+            System.out.println(got[2]);          // 255
+
+            int fd2 = File.openRead(p);
+            uint8[] part = new uint8[3];
+            System.out.println(File.readIntoB(fd2, part)); // 3
+            System.out.println(part[2]);         // 255
+            File.close(fd2);
+
+            int fd3 = File.openRead(p);
+            uint8[] one = new uint8[10];
+            System.out.println(Net.recv1(fd3, one)); // 5
+            System.out.println(one[4]);          // 10
+            File.close(fd3);
+
+            /* jalur int[] lama tetap berfungsi */
+            int fd4 = File.openRead(p);
+            int[] wide = new int[5];
+            System.out.println(File.readInto(fd4, wide)); // 5
+            System.out.println(wide[2]);         // 255
+            File.close(fd4);
+
+            System.out.println(Bytes.eq(data, wide)); // 1
+            System.out.println(Bytes.lenU(data));     // 5
+            System.out.println(Bytes.textU(data).length); // 5
+
+            /* ── UDP: datagram packed ────────────────────────────── */
+            int us = Udp.open();
+            Udp.bind(us, Udp.loopback(), 0);
+            int port = Net.localport(us);
+            uint8[] msg = "abc";
+            Udp.sendToB(us, Udp.loopback(), port, msg);
+            uint8[] rbuf = new uint8[8];
+            int[] from = new int[2];
+            int n = Udp.recvFromB(us, rbuf, from);
+            System.out.println(n);               // 3
+            System.out.println(rbuf[0]);         // 97
+            System.out.println(rbuf[2]);         // 99
+            System.out.println(from[1] > 0);     // 1
+            Udp.close(us);
+
+            File.remove(p);
+        }
+    }
+}

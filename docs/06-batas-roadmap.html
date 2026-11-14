@@ -52,9 +52,9 @@
 <td>region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler); batas blok dicek runtime</td>
 </tr>
 <tr>
-<td>~~Array bertipe (<code>String[]</code>, <code>long[]</code>)~~ <strong>✅ v1.16</strong> (elemen 64-bit slot; identitas referensi berlaku); <strong>✅ v1.43</strong> <code>byte[]</code>/<code>uint8[]</code> buffer packed 1 byte/elemen</td>
-<td>sisa: <code>double[]</code>; metode fungsional masih khusus <code>int[]</code>; builtin <code>Net</code>/<code>File</code> masih memakai <code>int[]</code> (jembatan <code>Bytes.widen/narrow</code>)</td>
-<td>array <code>long[]</code>/<code>String[]</code> pakai loop <code>for</code> biasa; buffer biner baru pakai <code>byte[]</code> + <code>Bytes.*</code></td>
+<td>~~Array bertipe (<code>String[]</code>, <code>long[]</code>)~~ <strong>✅ v1.16</strong> (elemen 64-bit slot; identitas referensi berlaku); <strong>✅ v1.43</strong> <code>byte[]</code>/<code>uint8[]</code> buffer packed 1 byte/elemen; <strong>✅ v1.44</strong> buffer "multiple" (<code>int[]</code>↔<code>byte[]</code>/<code>uint8[]</code>/<code>String</code> koersi otomatis, builtin <code>Net.recvb/sendb/recv1/sendto/recvfrom</code> menerima packed)</td>
+<td>sisa: <code>double[]</code>; metode fungsional masih khusus <code>int[]</code>; varian <code>*B</code> belum ada di semua modul lib; field instance <code>byte[]</code>/<code>uint8[]</code></td>
+<td>array angka tetap <code>int[]</code>; buffer biner baru pakai <code>byte[]</code>/<code>uint8[]</code> + <code>Bytes.*</code>/varian B</td>
 </tr>
 <tr>
 <td>~~String = <code>int[]</code>~~ <strong>✅ v1.17</strong> (String opaque; interop eksplisit <code>Net.mkstr</code>/<code>Net.strbytes</code>)</td>
@@ -286,7 +286,7 @@
 <li><strong>Keputusan desain</strong>: Kopi tidak meniru Java sepenuhnya. Alih-alih <code>interface</code>, Kopi akan memakai <strong><code>struct</code> ala C</strong> — agregat data + metode namespace / fungsi bebas — agar bahasanya terasa natural di antara C dan Java, bukan klon Java. Polymorphism (bila jadi) lewat struct ber-pola vtable sederhana, bukan hierarki tipe Java.</li>
 </ul></li>
 <li><strong>GC sederhana</strong> (mark-sweep) atau region eksplisit, agar server tidak wajib reset manual.</li>
-<li>~~Array bertipe~~ <strong>✅ v1.16</strong> (<code>long[]</code>/<code>String[]</code> elemen 64-bit slot; sisa: <code>double[]</code>, array literal, multi-dimensi). <strong>✅ v1.43</strong>: <code>byte[]</code>/<code>uint8[]</code> sebagai buffer packed 1 byte/elemen (header 8 byte) + helper <code>Bytes.lenB/widen/narrow/copyB/textB/printB</code>. Sisa: integrasi buffer packed langsung ke ABI builtin <code>Net</code>/<code>File</code> (saat ini lewat <code>Bytes.widen/narrow</code>), field instance <code>byte[]</code>.</li>
+<li>~~Array bertipe~~ <strong>✅ v1.16</strong> (<code>long[]</code>/<code>String[]</code> elemen 64-bit slot; sisa: <code>double[]</code>, array literal, multi-dimensi). <strong>✅ v1.43</strong>: <code>byte[]</code>/<code>uint8[]</code> sebagai buffer packed 1 byte/elemen (header 8 byte) + helper <code>Bytes.lenB/widen/narrow/copyB/textB/printB</code>. <strong>✅ v1.44</strong>: buffer "multiple" — koersi implisit <code>int[]</code> ↔ <code>byte[]</code>/<code>uint8[]</code> ↔ <code>String</code> di batas API, builtin I/O menerima buffer packed langsung (<code>recvb/sendb/recv1/sendto/recvfrom</code>), varian <code>*B</code> di File/Tcp/Udp + helper <code>Bytes.*U</code>. Sisa: varian <code>*B</code> di seluruh modul (crypto/compress/web masih API <code>int[]</code> lama, tetap bisa dipanggil dengan buffer packed lewat koersi), field instance <code>byte[]</code>.</li>
 <li><strong>TLS server</strong> ✅ v1.36 (<code>TlsServer</code>, oracle OpenSSL/Python). Sisa: verifikasi rantai/hostname di klien, mTLS, session resumption.</li>
 <li><strong>HTTP/2 (klien)</strong> ✅ v1.37 — <code>Http2</code> (gate TLS+ALPN h2, HPACK decode penuh + Huffman, dt dinamis); sisi server h2 &amp; HPACK encode dinamis belum.</li>
 <li><strong>DB client</strong> ✅ v1.38 — <code>Sqlite</code> (pembaca file <code>.db</code> read-only; Postgres/Redis via socket belum).</li>

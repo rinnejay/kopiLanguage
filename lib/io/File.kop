@@ -17,6 +17,25 @@ class File {
     static int writeAll(int fd, int[] data) { return Net.sendb(fd, data); }
     static int readInto(int fd, int[] buf)  { return Net.recvb(fd, buf); }
 
+    /* v1.44: varian buffer packed `byte[]`/`uint8[]` (1 byte/elemen). */
+    static int writeAllB(int fd, uint8[] data) { return Net.sendb(fd, data); }
+    static int readIntoB(int fd, uint8[] buf)  { return Net.recvb(fd, buf); }
+
+    static uint8[] readAllB(String path) {
+        int fd = openRead(path);
+        if (fd < 0) return new uint8[0];
+        int n = size(fd);
+        if (n < 0) n = 0;
+        uint8[] buf = new uint8[n > 0 ? n : 1];
+        int got = readIntoB(fd, buf);
+        Net.close(fd);
+        if (got < 0) got = 0;
+        if (got > n) got = n;
+        uint8[] out = new uint8[got];
+        for (int i = 0; i < got; i++) out[i] = buf[i];
+        return out;
+    }
+
     static int seekSet(int fd, int off) { return Net.seek(fd, off, 0); }
     static int seekCur(int fd, int off) { return Net.seek(fd, off, 1); }
     static int seekEnd(int fd, int off) { return Net.seek(fd, off, 2); }

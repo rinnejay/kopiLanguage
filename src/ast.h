@@ -38,6 +38,16 @@ static inline int ty_is_arr(Ty t) {
            t == T_BYTEARR || t == T_U8ARR;
 }
 
+/* v1.44: buffer packed — String, byte[], uint8[] berbagi layout
+ * header 8 byte + 1 byte/elemen, sehingga bisa dipandang bolak-balik. */
+static inline int ty_is_packedarr(Ty t) {
+    return t == T_BYTEARR || t == T_U8ARR;
+}
+
+static inline int ty_is_bufish(Ty t) {
+    return t == T_ARI || t == T_STR || t == T_BYTEARR || t == T_U8ARR;
+}
+
 static inline Ty ty_elem(Ty t) {
     switch (t) {
     case T_ARI:     return T_INT;

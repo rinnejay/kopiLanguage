@@ -6,7 +6,7 @@ Berkas, path, pembaca, dan penulis berbuffer. Semua signature di bawah diekstrak
 
 ## File
 
-`lib/io/File.kop` · 15 fungsi
+`lib/io/File.kop` · 18 fungsi
 
 I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.
 
@@ -36,6 +36,9 @@ File.close(r);
 | `static int close(int fd)` | tutup deskriptor |
 | `static int writeAll(int fd, int[] data)` | tulis seluruh data; jumlah byte tertulis |
 | `static int readInto(int fd, int[] buf)` | baca sampai buffer penuh/EOF; jumlah byte terbaca |
+| `static int writeAllB(int fd, uint8[] data)` | v1.44: varian buffer packed `byte[]`/`uint8[]` (1 byte/elemen). |
+| `static int readIntoB(int fd, uint8[] buf)` | — |
+| `static uint8[] readAllB(String path)` | — |
 | `static int seekSet(int fd, int off)` | lompat ke offset dari awal |
 | `static int seekCur(int fd, int off)` | lompat relatif dari posisi |
 | `static int seekEnd(int fd, int off)` | lompat relatif dari akhir |

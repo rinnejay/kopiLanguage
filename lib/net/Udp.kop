@@ -41,6 +41,15 @@ class Udp {
         return Net.recvfrom(fd, buf, from);
     }
 
+    /* v1.44: varian buffer packed 1 byte/elemen. */
+    static int sendToB(int fd, int addr, int port, uint8[] data) {
+        return Net.sendto(fd, addr, port, data);
+    }
+
+    static int recvFromB(int fd, uint8[] buf, int[] from) {
+        return Net.recvfrom(fd, buf, from);
+    }
+
     /* half-close (SHUT_RD=0, SHUT_WR=1, SHUT_RDWR=2) */
     static int shutdown(int fd, int how) {
         return Net.shutdown(fd, how);

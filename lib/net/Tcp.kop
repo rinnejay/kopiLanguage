@@ -76,6 +76,23 @@ class Tcp {
         return send(fd, buf, buf.length);
     }
 
+    /* v1.44: varian buffer packed 1 byte/elemen. */
+    static int sendB(int fd, uint8[] buf) { return Net.sendb(fd, buf); }
+
+    static int recvAllB(int fd, uint8[] buf) { return Net.recvb(fd, buf); }
+
+    static int recvNB(int fd, uint8[] buf, int n) {
+        if (n > buf.length) n = buf.length;
+        int got = 0;
+        while (got < n) {
+            int b = Net.rdb(fd);
+            if (b < 0) return got;
+            buf[got] = b;
+            got++;
+        }
+        return got;
+    }
+
     /* baca hingga EOF atau buf penuh. sukses → jumlah byte ≥ 0.
      * satu syscall = satu byte, jadi galat baca builtin hanya muncul
      * sekali lalu identik EOF: keduanya mengerucut ke akhir baca. */
@@ -135,6 +152,25 @@ class Tcp {
             got++;
         }
         return got;
+    }
+
+    static uint8[] catB(uint8[] a, uint8[] b) {
+        uint8[] out = new uint8[a.length + b.length];
+        int i = 0;
+        for (int k = 0; k < a.length; k++) { out[i] = a[k]; i++; }
+        for (int k = 0; k < b.length; k++) { out[i] = b[k]; i++; }
+        return out;
+    }
+
+    static int indexOfB(uint8[] hay, uint8[] needle, int from) {
+        if (needle.length == 0) return from;
+        int lim = hay.length - needle.length;
+        for (int i = from; i <= lim; i++) {
+            int j = 0;
+            while (j < needle.length && hay[i + j] == needle[j]) j++;
+            if (j == needle.length) return i;
+        }
+        return -1;
     }
 
     /* v ≥ 0 → digit ASCII desimal (tanpa tanda); dipakai Content-Length */

@@ -33,6 +33,10 @@ static Ty type_expr_raw(Node *e) {
                 /* template selalu String: buffer byte dimaterialisasi dulu */
                 wrap_conv(part, "Net.mkstr");
                 pt = T_STR;
+            } else if (ty_is_packedarr(pt)) {
+                /* layout packed == String; tampilkan byte sebagai teks */
+                part->dty = (int)T_STR;
+                pt = T_STR;
             }
             if (pt != T_STR) {
                 const char *fn = 0;
@@ -124,10 +128,12 @@ static Ty type_expr_raw(Node *e) {
         Ty r = t1;
         if (t1 == t2) {
             r = t1;
-        } else if ((t1 == T_STR || t1 == T_ARI) && (t2 == T_STR || t2 == T_ARI)) {
-            /* v1.18: cabang buffer dinormalisasi ke String packed */
-            if (t1 == T_ARI) wrap_conv(e->b, "Net.mkstr");
-            if (t2 == T_ARI) wrap_conv(e->c, "Net.mkstr");
+        } else if (ty_is_bufish(t1) && ty_is_bufish(t2)) {
+            /* v1.18/v1.44: cabang buffer dinormalisasi ke String packed */
+            if (t1 == T_ARI) { wrap_conv(e->b, "Net.mkstr"); t1 = T_STR; }
+            else if (ty_is_packedarr(t1)) { e->b->dty = (int)T_STR; }
+            if (t2 == T_ARI) { wrap_conv(e->c, "Net.mkstr"); t2 = T_STR; }
+            else if (ty_is_packedarr(t2)) { e->c->dty = (int)T_STR; }
             r = T_STR;
         } else {
             die("baris %d: cabang ternary harus bertipe sama (pakai cast)", e->line);
@@ -139,14 +145,16 @@ static Ty type_expr_raw(Node *e) {
         Ty lt = type_expr(e->a), rt = type_expr(e->b);
         char op = e->str[0];
         int two = e->str[1] != 0;
-        if (lt == T_STR || rt == T_STR) {
-            int ls = (lt == T_STR || lt == T_ARI);
-            int rs = (rt == T_STR || rt == T_ARI);
+        if (lt == T_STR || rt == T_STR || ty_is_packedarr(lt) || ty_is_packedarr(rt)) {
+            int ls = ty_is_bufish(lt);
+            int rs = ty_is_bufish(rt);
             if (!ls || !rs)
                 die("baris %d: operasi String hanya dengan String/teks", e->line);
-            /* v1.18: buffer byte dinormalisasi ke String packed dulu */
+            /* v1.18/v1.44: buffer byte dinormalisasi ke String packed dulu */
             if (lt == T_ARI) wrap_conv(e->a, "Net.mkstr");
+            else if (ty_is_packedarr(lt)) e->a->dty = (int)T_STR;
             if (rt == T_ARI) wrap_conv(e->b, "Net.mkstr");
+            else if (ty_is_packedarr(rt)) e->b->dty = (int)T_STR;
             if (op == '+' && !two)
                 return desugar_net2(e, 22, e->a, e->b, T_STR);
             if ((op == '=' || op == '!') && two)
@@ -278,6 +286,7 @@ static Ty type_expr_raw(Node *e) {
             }
             if (narg != want)
                 die("baris %d: Net.%s membutuhkan %d argumen, dapat %d", e->line, fn, want, narg);
+            int pkbuf = 0;              /* v1.44: buffer packed 1 byte/elemen */
             Node *aa = e->a;
             for (int i = 0; i < narg; i++, aa = aa->next) {
                 Ty t = type_expr(aa);
@@ -287,6 +296,12 @@ static Ty type_expr_raw(Node *e) {
                  * buffer yang diisi builtin: wajib int[] mentah. */
                 if (bi == 22 || bi == 23 || bi == 24) {
                     if (t == T_ARI) { wrap_conv(aa, "Net.mkstr"); t = T_STR; }
+                    else if (ty_is_packedarr(t)) { aa->dty = (int)T_STR; t = T_STR; }
+                } else if (ty_is_packedarr(t) &&
+                           (bi == 13 || bi == 14 || bi == 15 || bi == 16 ||
+                            bi == 32 || bi == 40 || bi == 39)) {
+                    /* path/mkstr/pollfd masih memakai layout slot 8-byte */
+                    t = wrap_arrconv(aa, T_ARI);
                 } else if (t == T_STR) {
                     int robuf = (bi == 3 || bi == 8) ? i == 1 :
                                 (bi == 10) ? i == 3 :
@@ -300,22 +315,25 @@ static Ty type_expr_raw(Node *e) {
                 if (bi == 7 || bi == 8) {
                     if (i == 0 && t != T_INT)
                         die("baris %d: Net.%s argumen %d harus int", e->line, i, fn);
-                    if (i == 1 && t != T_ARI && t != T_STR)
-                        die("baris %d: Net.%s argumen %d harus int[]/String buffer", e->line, i, fn);
+                    if (i == 1 && !ty_is_bufish(t))
+                        die("baris %d: Net.%s argumen %d harus int[]/String/byte[]/uint8[] buffer", e->line, i, fn);
+                    if (i == 1 && ty_is_packedarr(t)) pkbuf = 1;
                 } else if (bi == 9) {
                     if (t != T_INT)
                         die("baris %d: Net.bind membutuhkan (fd int, ip int, port int)", e->line);
                 } else if (bi == 10) {
                     if (i < 3 && t != T_INT)
                         die("baris %d: Net.sendto argumen %d harus int", e->line, i);
-                    if (i == 3 && t != T_ARI && t != T_STR)
-                        die("baris %d: Net.sendto argumen buffer harus int[]/String", e->line);
+                    if (i == 3 && !ty_is_bufish(t))
+                        die("baris %d: Net.sendto argumen buffer harus int[]/String/byte[]/uint8[]", e->line);
+                    if (i == 3 && ty_is_packedarr(t)) pkbuf = 1;
                 } else if (bi == 11) {
                     if (i == 0 && t != T_INT)
                         die("baris %d: Net.recvfrom argumen fd harus int", e->line);
-                    if (i == 1 && t != T_ARI && t != T_STR)
-                        die("baris %d: Net.recvfrom argumen buffer harus int[]/String", e->line);
-                    if (i == 2 && t != T_ARI && t != T_STR)
+                    if (i == 1 && !ty_is_bufish(t))
+                        die("baris %d: Net.recvfrom argumen buffer harus int[]/String/byte[]/uint8[]", e->line);
+                    if (i == 1 && ty_is_packedarr(t)) pkbuf = 1;
+                    if (i == 2 && t != T_ARI)
                         die("baris %d: Net.recvfrom argumen from harus int[2]", e->line);
                 } else if (bi == 12) {
                     if (t != T_INT)
@@ -343,8 +361,9 @@ static Ty type_expr_raw(Node *e) {
                 } else if (bi == 33) {
                     if (i == 0 && t != T_INT)
                         die("baris %d: Net.recv1 argumen fd harus int", e->line);
-                    if (i == 1 && t != T_ARI && t != T_STR)
-                        die("baris %d: Net.recv1 argumen buffer harus int[]/String", e->line);
+                    if (i == 1 && !ty_is_bufish(t))
+                        die("baris %d: Net.recv1 argumen buffer harus int[]/String/byte[]/uint8[]", e->line);
+                    if (i == 1 && ty_is_packedarr(t)) pkbuf = 1;
                 } else if (bi == 39) {
                     if ((i == 0 || i == 1) && t != T_ARI && t != T_STR)
                         die("baris %d: Net.pollfd argumen %d harus int[]", e->line, i + 1);
@@ -355,9 +374,9 @@ static Ty type_expr_raw(Node *e) {
                     if (t != T_ARI)
                         die("baris %d: Net.mkstr butuh int[] byte", e->line);
                 } else if (bi == 41) {
-                    /* Net.strbytes(String) → int[] salinan byte */
-                    if (t != T_STR)
-                        die("baris %d: Net.strbytes butuh String", e->line);
+                    /* Net.strbytes(String/packed) → int[] salinan byte */
+                    if (t != T_STR && !ty_is_packedarr(t))
+                        die("baris %d: Net.strbytes butuh String/buffer packed", e->line);
                 } else if (bi == 34 || bi == 36 || bi == 37 || bi == 38) {
                     if (t != T_INT)
                         die("baris %d: argumen Net.%s harus int", e->line, fn);
@@ -366,6 +385,13 @@ static Ty type_expr_raw(Node *e) {
                         die("baris %d: argumen Net.%s harus int", e->line, fn);
                 } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
+            }
+            if (pkbuf) {              /* pilih varian packed */
+                if (bi == 7) bi = 42;
+                else if (bi == 8) bi = 43;
+                else if (bi == 10) bi = 45;
+                else if (bi == 11) bi = 46;
+                else if (bi == 33) bi = 44;
             }
             e->kind = EX_NET;
             e->ival = bi;
@@ -546,6 +572,8 @@ static Ty type_expr_raw(Node *e) {
             }
             /* v1.18: String → param int[] = salinan byte eksplisit (auto) */
             if (pt == T_ARI && at == T_STR) { wrap_conv(aa, "Net.strbytes"); at = T_ARI; }
+            /* v1.44: koersi buffer packed ↔ int[]/String, arah mana pun */
+            else if (need_arrconv(pt, at)) at = wrap_arrconv(aa, pt);
             if (pt == T_FN) {
                 if (at != T_FN)
                     die("baris %d: argumen %s butuh lambda (fn)", e->line, e->str);

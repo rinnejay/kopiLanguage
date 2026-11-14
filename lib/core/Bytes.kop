@@ -381,6 +381,39 @@ class Bytes {
         Net.wrb(1, 10);
     }
 
+    /* v1.44: varian `uint8[]` (0..255) — semantik sama dengan buffer
+     * `int[]` lama, tetapi disimpan 1 byte/elemen. */
+    static int lenU(uint8[] b) { return b.length; }
+
+    static int[] widenU(uint8[] b) {
+        int[] o = new int[b.length];
+        for (int i = 0; i < b.length; i++) o[i] = b[i];
+        return o;
+    }
+
+    static uint8[] narrowU(int[] a) {
+        uint8[] o = new uint8[a.length];
+        for (int i = 0; i < a.length; i++) o[i] = a[i];
+        return o;
+    }
+
+    static uint8[] copyU(uint8[] b) {
+        uint8[] o = new uint8[b.length];
+        for (int i = 0; i < b.length; i++) o[i] = b[i];
+        return o;
+    }
+
+    static String textU(uint8[] b) { return Net.mkstr(widenU(b)); }
+
+    static void printU(uint8[] b) {
+        for (int i = 0; i < b.length; i++) Net.wrb(1, b[i] & 255);
+    }
+
+    static void lineU(uint8[] b) {
+        printU(b);
+        Net.wrb(1, 10);
+    }
+
     /* ── konversi representasi ───────────────────────────────────── */
 
     /* teks → salinan byte */

@@ -30,7 +30,7 @@
 <p>Berkas, path, pembaca, dan penulis berbuffer. Semua signature di bawah diekstrak langsung dari source <code>lib/io/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="file">File<a class="anchor" href="#file" aria-label="tautan">#</a></h2>
-<p><code>lib/io/File.kop</code> · 15 fungsi</p>
+<p><code>lib/io/File.kop</code> · 18 fungsi</p>
 <p>I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.</p>
 <pre><code class="language-java">import File;
 
@@ -75,6 +75,18 @@ File.close(r);</code></pre>
 <tr>
 <td><code>static int readInto(int fd, int[] buf)</code></td>
 <td>baca sampai buffer penuh/EOF; jumlah byte terbaca</td>
+</tr>
+<tr>
+<td><code>static int writeAllB(int fd, uint8[] data)</code></td>
+<td>v1.44: varian buffer packed <code>byte[]</code>/<code>uint8[]</code> (1 byte/elemen).</td>
+</tr>
+<tr>
+<td><code>static int readIntoB(int fd, uint8[] buf)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static uint8[] readAllB(String path)</code></td>
+<td>—</td>
 </tr>
 <tr>
 <td><code>static int seekSet(int fd, int off)</code></td>

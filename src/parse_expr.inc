@@ -248,6 +248,49 @@ static void wrap_conv(Node *aa, const char *fn) {
     type_expr(aa);
 }
 
+/* v1.44: koersi implisit antar-buffer.
+ *   int[] (8-byte slot)  ↔  byte[]/uint8[] (packed 1 byte)
+ *   String (packed)      ↔  byte[]/uint8[]
+ * byte[] ↔ uint8[] hanya berbagi layout (tanpa salin). String ↔ buffer
+ * packed selalu disalin agar String yang immutable tidak bisa dimutasi
+ * lewat elemen array. */
+static Ty wrap_arrconv(Node *aa, Ty dst) {
+    Ty src = type_expr(aa);
+    if (src == dst) return dst;
+    if (dst == T_BYTEARR || dst == T_U8ARR) {
+        if (ty_is_packedarr(src)) {          /* byte[] ↔ uint8[]: layout sama */
+            aa->dty = (int)dst;
+            return dst;
+        }
+        /* int[] → packed, atau String → packed (salin via int[] material) */
+        if (src == T_STR)
+            wrap_conv(aa, "Net.strbytes");
+        wrap_conv(aa, "Net.mkstr");
+        aa->dty = (int)dst;
+        return dst;
+    }
+    if (dst == T_ARI && ty_is_packedarr(src)) {
+        aa->dty = (int)T_STR;                /* lihat packed sebagai String */
+        wrap_conv(aa, "Net.strbytes");
+        return T_ARI;
+    }
+    if (dst == T_STR && ty_is_packedarr(src)) {
+        aa->dty = (int)T_STR;
+        wrap_conv(aa, "Net.strbytes");
+        wrap_conv(aa, "Net.mkstr");
+        return T_STR;
+    }
+    return src;
+}
+
+/* true bila kedua tipe buffer dan salah satunya packed; String↔int[]
+ * sudah ditangani jalur v1.18 lebih dulu. */
+static int need_arrconv(Ty dst, Ty src) {
+    if (dst == src) return 0;
+    if (!ty_is_bufish(dst) || !ty_is_bufish(src)) return 0;
+    return ty_is_packedarr(dst) || ty_is_packedarr(src);
+}
+
 static Node *parse_tstr(const char *raw, int line) {
     /* ekspresi di dalam `{...}` memakai nama berkas asli, bukan "<template>",
        agar pesan error bisa ditunjuk ke berkas/baris yang benar. */

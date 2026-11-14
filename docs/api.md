@@ -23,7 +23,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|---|
 | [`Arrays`](api-core.md#arrays) | `lib/core/Arrays.kop` | 23 | Operasi array `int[]`: agregat, potong/gabung, sort, pencarian, dan gaya fungsional (lambda). |
 | [`BigInt`](api-core.md#bigint) | `lib/core/BigInt.kop` | 22 | Bilangan bulat presisi sembarang: tambah, kali, bagi, pangkat modulo, invers modulo, FPB, konversi… |
-| [`Bytes`](api-core.md#bytes) | `lib/core/Bytes.kop` | 55 | Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`. |
+| [`Bytes`](api-core.md#bytes) | `lib/core/Bytes.kop` | 62 | Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`. |
 | [`Deque`](api-core.md#deque) | `lib/core/Deque.kop` | 11 | Antrean dua ujung (ring buffer) berkapasitas tetap: push/pop depan-belakang. |
 | [`Digits`](api-core.md#digits) | `lib/core/Digits.kop` | 11 | Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain. |
 | [`List`](api-core.md#list) | `lib/core/List.kop` | 25 | — |
@@ -61,7 +61,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Modul | File | Fungsi | Ringkasan |
 |---|---|---|---|
-| [`File`](api-io.md#file) | `lib/io/File.kop` | 15 | I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir. |
+| [`File`](api-io.md#file) | `lib/io/File.kop` | 18 | I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir. |
 | [`Path`](api-io.md#path) | `lib/io/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
 | [`Reader`](api-io.md#reader) | `lib/io/Reader.kop` | 1 | Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori. |
 | [`Writer`](api-io.md#writer) | `lib/io/Writer.kop` | 2 | Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh. |
@@ -121,10 +121,10 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 17 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
 | [`Resolv`](api-net.md#resolv) | `lib/net/Resolv.kop` | 5 | Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout. |
 | [`Rfc`](api-net.md#rfc) | `lib/net/Rfc.kop` | 5 | Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan. |
-| [`Tcp`](api-net.md#tcp) | `lib/net/Tcp.kop` | 13 | Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat. |
+| [`Tcp`](api-net.md#tcp) | `lib/net/Tcp.kop` | 18 | Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat. |
 | [`Tls`](api-net.md#tls) | `lib/net/Tls.kop` | 27 | Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah. |
 | [`TlsServer`](api-net.md#tlsserver) | `lib/net/TlsServer.kop` | 28 | Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,… |
-| [`Udp`](api-net.md#udp) | `lib/net/Udp.kop` | 7 | Datagram UDP: bind, kirim/terima satu datagram, shutdown. |
+| [`Udp`](api-net.md#udp) | `lib/net/Udp.kop` | 9 | Datagram UDP: bind, kirim/terima satu datagram, shutdown. |
 
 ### Web — [buka referensi](api-web.md)
 

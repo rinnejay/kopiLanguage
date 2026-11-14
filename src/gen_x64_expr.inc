@@ -378,11 +378,107 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tsyscall");
             return 0;                                    /* fd | -errno */
         }
-        if (e->ival == 7 || e->ival == 8) {
+        if (e->ival == 7 || e->ival == 8 || e->ival == 42 || e->ival == 43) {
             for (Node *aa = e->a; aa; aa = aa->next) {
                 gen_expr(m, aa);
                 spush();
             }
+        }
+        if (e->ival == 42) {             /* recvb packed */
+            emit("\tmovq (%%rsp), %%r10");
+            emit("\tmovl (%%r10), %%r8d");
+            emit("\ttestl %%r8d, %%r8d");
+            emit("\tjle .LPVX%dz", ln);
+            emit("\txorl %%r9d, %%r9d");
+            emit(".LPVX%dl:", ln);
+            emit("\tcmpl %%r8d, %%r9d");
+            emit("\tjge .LPVX%df", ln);
+            emit("\tmovl %%r8d, %%eax");
+            emit("\tsubl %%r9d, %%eax");
+            emit("\tcmpl $240, %%eax");
+            emit("\tjle .LPVX%dc", ln);
+            emit("\tmovl $240, %%eax");
+            emit(".LPVX%dc:", ln);
+            emit("\tmovl %%eax, %%edx");
+            emit("\tleaq 8(%%r10,%%r9), %%rsi");
+            emit("\tmovl 8(%%rsp), %%edi");
+            emit("\txorl %%eax, %%eax");
+            emit("\tsyscall");
+            emit("\ttestq %%rax, %%rax");
+            emit("\tjs .LPVX%dry", ln);
+            emit("\tje .LPVX%df", ln);
+            emit("\taddl %%eax, %%r9d");
+            emit("\tjmp .LPVX%dl", ln);
+            emit(".LPVX%dry:", ln);
+            emit("\tmovl $-1, %%eax");
+            emit("\tjmp .LPVX%dh", ln);
+            emit(".LPVX%df:", ln);
+            emit("\tmovl %%r9d, %%eax");
+            emit("\tjmp .LPVX%dh", ln);
+            emit(".LPVX%dz:", ln);
+            emit("\txorl %%eax, %%eax");
+            emit(".LPVX%dh:", ln);
+            emit("\taddq $16, %%rsp");
+            return 0;
+        }
+        if (e->ival == 43) {             /* sendb packed */
+            emit("\tmovq (%%rsp), %%r10");
+            emit("\tmovl (%%r10), %%r8d");
+            emit("\ttestl %%r8d, %%r8d");
+            emit("\tjle .LPSX%df", ln);
+            emit("\txorl %%r9d, %%r9d");
+            emit("\tpushq %%r10");
+            emit("\tpushq %%r8");
+            emit("\tpushq %%r9");
+            emit(".LPSX%dl:", ln);
+            emit("\tmovl (%%rsp), %%r9d");
+            emit("\tmovl 8(%%rsp), %%r8d");
+            emit("\tmovq 16(%%rsp), %%r10");
+            emit("\tcmpl %%r8d, %%r9d");
+            emit("\tjge .LPSX%df2", ln);
+            emit("\tmovl %%r8d, %%eax");
+            emit("\tsubl %%r9d, %%eax");
+            emit("\tcmpl $240, %%eax");
+            emit("\tjle .LPSX%dc", ln);
+            emit("\tmovl $240, %%eax");
+            emit(".LPSX%dc:", ln);
+            emit("\tmovl %%eax, %%edx");
+            emit("\tleaq 8(%%r10,%%r9), %%rsi");
+            emit("\tmovl 24(%%rsp), %%edi");
+            emit("\tmovl $16384, %%r10d");
+            emit("\txorl %%r8d, %%r8d");
+            emit("\txorl %%r9d, %%r9d");
+            emit("\tmovl $44, %%eax");
+            emit("\tsyscall");
+            emit("\tcmpl $-88, %%eax");
+            emit("\tjne .LPSX%dso", ln);
+            emit("\tmovl 24(%%rsp), %%edi");
+            emit("\tmovq 16(%%rsp), %%r10");
+            emit("\tmovl (%%rsp), %%r9d");
+            emit("\tleaq 8(%%r10,%%r9), %%rsi");
+            emit("\tmovl %%edx, %%edx");
+            emit("\tmovl $1, %%eax");
+            emit("\tsyscall");
+            emit(".LPSX%dso:", ln);
+            emit("\ttestq %%rax, %%rax");
+            emit("\tjs .LPSX%de", ln);
+            emit("\taddl %%eax, (%%rsp)");
+            emit("\tjmp .LPSX%dl", ln);
+            emit(".LPSX%de:", ln);
+            emit("\tpopq %%r9");
+            emit("\tpopq %%r8");
+            emit("\tpopq %%r10");
+            emit("\tmovl $-1, %%eax");
+            emit("\tjmp .LPSX%dh", ln);
+            emit(".LPSX%df2:", ln);
+            emit("\tpopq %%r9");
+            emit("\tpopq %%r8");
+            emit("\tpopq %%r10");
+            emit(".LPSX%df:", ln);
+            emit("\txorl %%eax, %%eax");
+            emit(".LPSX%dh:", ln);
+            emit("\taddq $16, %%rsp");
+            return 0;
         }
         if (e->ival == 7) {              /* recvb(fd, buf) → n | -1            */
             /* stack: [0]=buf (64-bit), [8]=fd; tmp via .comm kop_iobuf */
@@ -522,7 +618,7 @@ static int gen_expr(Method *m, Node *e) {
             emit(".LSX%dh:", ln);
             return 0;
         }
-        if (e->ival >= 9 && e->ival <= 12) {
+        if ((e->ival >= 9 && e->ival <= 12) || e->ival == 45 || e->ival == 46) {
             int idx = 0;
             for (Node *aa = e->a; aa; aa = aa->next, idx++) {
                 gen_expr(m, aa);
@@ -567,6 +663,82 @@ static int gen_expr(Method *m, Node *e) {
                 emit("\tsyscall");
                 emit("\taddq $32, %%rsp");
                 emit("\taddq $16, %%rsp");
+                return 0;
+            }
+            if (e->ival == 45) {                       /* sendto packed */
+                emit("\tmovq 32(%%rsp), %%r10");
+                emit("\tmovl 48(%%rsp), %%r8d");
+                emit("\tmovl 40(%%rsp), %%r9d");
+                emit("\tmovl %%r9d, %%eax");
+                emit("\tshrl $8, %%eax");
+                emit("\tmovb %%al, 2(%%rsp)");
+                emit("\tmovl %%r9d, %%eax");
+                emit("\tmovb %%al, 3(%%rsp)");
+                emit("\tmovl $4, %%ecx");
+                emit(".LSDP%da:", ln);
+                emit("\tmovl %%r8d, %%eax");
+                emit("\tshrl $24, %%eax");
+                emit("\tmovb %%al, (%%rsp,%%rcx)");
+                emit("\tshll $8, %%r8d");
+                emit("\tincl %%ecx");
+                emit("\tcmpl $8, %%ecx");
+                emit("\tjne .LSDP%da", ln);
+                emit("\tmovw $2, (%%rsp)");
+                emit("\tmovl (%%r10), %%r11d");
+                emit("\tcmpl $1200, %%r11d");
+                emit("\tjle .LSDP%dc", ln);
+                emit("\tmovl $1200, %%r11d");
+                emit(".LSDP%dc:", ln);
+                emit("\tmovl 56(%%rsp), %%edi");
+                emit("\tleaq 8(%%r10), %%rsi");
+                emit("\tmovl %%r11d, %%edx");
+                emit("\txorl %%r10d, %%r10d");
+                emit("\tmovq %%rsp, %%r8");
+                emit("\tmovl $16, %%r9d");
+                emit("\tmovl $44, %%eax");
+                emit("\tsyscall");
+                emit("\taddq $32, %%rsp");
+                emit("\taddq $32, %%rsp");
+                return 0;
+            }
+            if (e->ival == 46) {                       /* recvfrom packed */
+                emit("\tmovl $16, 16(%%rsp)");
+                emit("\tmovq 40(%%rsp), %%r10");
+                emit("\tmovl (%%r10), %%r11d");
+                emit("\tcmpl $1200, %%r11d");
+                emit("\tjle .LSFP%dc", ln);
+                emit("\tmovl $1200, %%r11d");
+                emit(".LSFP%dc:", ln);
+                emit("\tmovl 48(%%rsp), %%edi");
+                emit("\tleaq 8(%%r10), %%rsi");
+                emit("\tmovl %%r11d, %%edx");
+                emit("\txorl %%r10d, %%r10d");
+                emit("\tmovq %%rsp, %%r8");
+                emit("\tleaq 16(%%rsp), %%r9");
+                emit("\tmovl $45, %%eax");
+                emit("\tsyscall");
+                emit("\ttestq %%rax, %%rax");
+                emit("\tjs .LSFP%de", ln);
+                emit("\tmovq 32(%%rsp), %%r11");
+                emit("\tmovzbl 4(%%rsp), %%edx");
+                emit("\tshll $24, %%edx");
+                emit("\tmovzbl 5(%%rsp), %%esi");
+                emit("\tshll $16, %%esi");
+                emit("\torl %%esi, %%edx");
+                emit("\tmovzbl 6(%%rsp), %%esi");
+                emit("\tshll $8, %%esi");
+                emit("\torl %%esi, %%edx");
+                emit("\tmovzbl 7(%%rsp), %%esi");
+                emit("\torl %%esi, %%edx");
+                emit("\tmovzbl 2(%%rsp), %%esi");
+                emit("\tshll $8, %%esi");
+                emit("\tmovzbl 3(%%rsp), %%edi");
+                emit("\torl %%edi, %%esi");
+                emit("\tmovq %%rdx, 8(%%r11)");
+                emit("\tmovq %%rsi, 16(%%r11)");
+                emit(".LSFP%de:", ln);
+                emit("\taddq $32, %%rsp");
+                emit("\taddq $24, %%rsp");
                 return 0;
             }
             if (e->ival == 10) {                       /* sendto(fd,ip,port,buf) */
@@ -906,6 +1078,23 @@ static int gen_expr(Method *m, Node *e) {
                 par ^= need ? 0 : 1;
                 return 1;
             }
+        }
+        if (e->ival == 44) {                       /* recv1 packed */
+            gen_expr(m, e->a); spush();
+            gen_expr(m, e->a->next); spush();
+            emit("\tmovq (%%rsp), %%r10");
+            emit("\tmovl (%%r10), %%r11d");
+            emit("\tcmpl $4000, %%r11d");
+            emit("\tjle .LR1P%dc", ln);
+            emit("\tmovl $4000, %%r11d");
+            emit(".LR1P%dc:", ln);
+            emit("\tmovl 8(%%rsp), %%edi");
+            emit("\tleaq 8(%%r10), %%rsi");
+            emit("\tmovl %%r11d, %%edx");
+            emit("\txorl %%eax, %%eax");
+            emit("\tsyscall");
+            emit("\taddq $16, %%rsp");
+            return 0;
         }
         if (e->ival == 33) {                       /* recv1(fd, buf) */
             gen_expr(m, e->a); spush();
