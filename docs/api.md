@@ -23,7 +23,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|---|
 | [`Arrays`](api-core.md#arrays) | `lib/core/Arrays.kop` | 23 | Operasi array `int[]`: agregat, potong/gabung, sort, pencarian, dan gaya fungsional (lambda). |
 | [`BigInt`](api-core.md#bigint) | `lib/core/BigInt.kop` | 22 | Bilangan bulat presisi sembarang: tambah, kali, bagi, pangkat modulo, invers modulo, FPB, konversi… |
-| [`Bytes`](api-core.md#bytes) | `lib/core/Bytes.kop` | 48 | Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`. |
+| [`Bytes`](api-core.md#bytes) | `lib/core/Bytes.kop` | 55 | Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`. |
 | [`Deque`](api-core.md#deque) | `lib/core/Deque.kop` | 11 | Antrean dua ujung (ring buffer) berkapasitas tetap: push/pop depan-belakang. |
 | [`Digits`](api-core.md#digits) | `lib/core/Digits.kop` | 11 | Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain. |
 | [`List`](api-core.md#list) | `lib/core/List.kop` | 25 | — |

@@ -266,6 +266,26 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tcmp\tw0, #0");
         emit("\tb.lt\t.Karr");          /* ukuran salah */
         emit("\tsxtw\tx9, w0");
+        if ((Ty)e->dty == T_BYTEARR || (Ty)e->dty == T_U8ARR) {
+            /* v1.43: buffer byte packed — header 8 byte + n byte, dibulatkan */
+            emit("\tadd\tx0, x9, #7");
+            emit("\tlsr\tx0, x0, #3");
+            emit("\tlsl\tx0, x0, #3");
+            emit("\tadd\tx0, x0, #8");
+            emit("\tbl\tkopalloc");
+            emit("\tstr\tx9, [x0]");    /* len */
+            int L = arrlbl++;
+            emit("\tadd\tx10, x0, #8");
+            emit("\tmov\tx11, #0");
+            emit(".LNZB%d:", L);
+            emit("\tcmp\tx11, x9");
+            emit("\tb.hs\t.LNZB%de", L);
+            emit("\tstrb\twzr, [x10, x11]");
+            emit("\tadd\tx11, x11, #1");
+            emit("\tb\t.LNZB%d", L);
+            emit(".LNZB%de:", L);
+            return 1;
+        }
         emit("\tlsl\tx0, x9, #3");      /* 8*n */
         emit("\tadd\tx0, x0, #8");      /* + header len */
         emit("\tbl\tkopalloc");
@@ -294,6 +314,14 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tb.hs\t.Karr");          /* (>0 unsigned): negatif ikut tertangkap */
         emit("\tsxtw\tx9, w0");
         emit("\tadd\tx1, x1, #8");
+        if ((Ty)e->a->dty == T_BYTEARR) {   /* v1.43: buffer byte packed (signed) */
+            emit("\tldrsb\tw0, [x1, x9]");
+            return 0;
+        }
+        if ((Ty)e->a->dty == T_U8ARR) {     /* v1.43: buffer uint8 packed */
+            emit("\tldrb\tw0, [x1, x9]");
+            return 0;
+        }
         if ((Ty)e->a->dty == T_STR) {   /* v1.18: String packed — byte di dalam slot */
             emit("\tldrb\tw0, [x1, x9]");
             return 0;

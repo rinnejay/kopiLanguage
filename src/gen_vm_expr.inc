@@ -170,12 +170,16 @@ static void gen_expr(Node *e) {
         break;
     case EX_NEWARR:
         gen_expr(e->a);
-        em8(OP_NEWARR);
+        if ((Ty)e->dty == T_BYTEARR || (Ty)e->dty == T_U8ARR)
+            em8(OP_NEWARR_B);
+        else
+            em8(OP_NEWARR);
         break;
     case EX_IDX:
         /* v1.22: a[i] dengan a dan i lokal → satu opcode */
         if (e->a->kind == EX_VAR && e->b->kind == EX_VAR &&
-            (Ty)e->a->dty != T_STR) {
+            (Ty)e->a->dty != T_STR && (Ty)e->a->dty != T_BYTEARR &&
+            (Ty)e->a->dty != T_U8ARR) {
             em8(OP_IDXR_L);
             em16((int)e->a->ival); em16((int)e->b->ival);
             break;
@@ -183,6 +187,8 @@ static void gen_expr(Node *e) {
         gen_expr(e->a);          /* array pointer */
         gen_expr(e->b);          /* indeks */
         if ((Ty)e->a->dty == T_STR) em8(OP_IDXB);   /* v1.18: String packed */
+        else if ((Ty)e->a->dty == T_BYTEARR) em8(OP_IDXR_B);
+        else if ((Ty)e->a->dty == T_U8ARR) em8(OP_IDXR_UB);
         else em8(OP_IDXR);
         break;
     case EX_LEN:

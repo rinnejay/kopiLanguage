@@ -389,13 +389,17 @@ static Node *primary(void) {
         return n;
     }
     if (at(T_ID) && !strcmp(xs(t->text), "new") &&
-        (peek2()->type == KW_INT || peek2()->type == KW_LONG || peek2()->type == KW_STRING)) {
+        (peek2()->type == KW_INT || peek2()->type == KW_LONG ||
+         peek2()->type == KW_STRING || peek2()->type == KW_BYTE ||
+         peek2()->type == KW_INT8 || peek2()->type == KW_UINT8)) {
         Ty aty;
         if (peek2()->type == KW_INT)         aty = T_ARI;
         else if (peek2()->type == KW_LONG)   aty = T_LNGARR;
-        else                                 aty = T_STRARR;
+        else if (peek2()->type == KW_STRING) aty = T_STRARR;
+        else if (peek2()->type == KW_UINT8)  aty = T_U8ARR;
+        else                                 aty = T_BYTEARR;
         advance();                       /* new */
-        advance();                       /* int/long/String */
+        advance();                       /* int/long/String/byte/uint8 */
         expect('[', "'[' setelah 'new <tipe>'");
         Node *n = newnode(EX_NEWARR, line);
         n->dty = (int)aty;

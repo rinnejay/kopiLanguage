@@ -75,11 +75,19 @@ static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) |
     }
     if (at(KW_DOUBLE)) { advance(); return T_DOUBLE; }
     if (at(KW_FLOAT))  { advance(); return T_FLOAT; }
-    if (at(KW_UINT8))  { advance(); return T_UINT8; }
+    if (at(KW_UINT8))  {
+        advance();
+        if (at('[')) { advance(); expect(']', "']' setelah '[' pada uint8[]"); return T_U8ARR; }
+        return T_UINT8;
+    }
     if (at(KW_UINT16)) { advance(); return T_UINT16; }
     if (at(KW_UINT32)) { advance(); return T_UINT32; }
     if (at(KW_UINT64)) { advance(); return T_UINT64; }
-    if (at(KW_BYTE) || at(KW_INT8))   { advance(); return T_BYTE; }
+    if (at(KW_BYTE) || at(KW_INT8))   {
+        advance();
+        if (at('[')) { advance(); expect(']', "']' setelah '[' pada byte[]"); return T_BYTEARR; }
+        return T_BYTE;
+    }
     if (at(KW_SHORT) || at(KW_INT16)) { advance(); return T_SHORT; }
     if (at(KW_BOOL)) { advance(); return T_BOOL; }
     if (at(KW_VOID)) { advance(); return T_VOID; }

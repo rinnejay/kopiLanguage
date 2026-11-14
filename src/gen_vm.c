@@ -37,7 +37,9 @@ enum {
     OP_OP_STORE,                    /* [type][op][slot:2] — slot = slot op pop() */
     OP_IDXR_L,                      /* [slotArr:2][slotIdx:2] */
     OP_IDXW_L,                      /* [slotArr:2][slotIdx:2] — pop nilai */
-    OP_LOOP                         /* [type][cmp][slot:2][delta:4][imm:4][target:4] */
+    OP_LOOP,                        /* [type][cmp][slot:2][delta:4][imm:4][target:4] */
+    /* v1.43: buffer byte packed 1 byte/elemen */
+    OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B
 };
 
 typedef struct {
@@ -262,14 +264,18 @@ static void gen_stmt(Node *s) {
     case ST_IDXASG:
         gen_expr(s->c);          /* nilai - dipakai paling atas */
         /* v1.22: a[i] = v dengan a dan i variabel lokal → satu opcode */
-        if (s->a->kind == EX_VAR && s->b->kind == EX_VAR) {
+        if (s->a->kind == EX_VAR && s->b->kind == EX_VAR &&
+            (Ty)s->a->dty != T_BYTEARR && (Ty)s->a->dty != T_U8ARR) {
             em8(OP_IDXW_L);
             em16((int)s->a->ival); em16((int)s->b->ival);
             break;
         }
         gen_expr(s->a);          /* array pointer */
         gen_expr(s->b);          /* idx */
-        em8(OP_IDXW);
+        if ((Ty)s->a->dty == T_BYTEARR || (Ty)s->a->dty == T_U8ARR)
+            em8(OP_IDXW_B);
+        else
+            em8(OP_IDXW);
         break;
     default:
         die("gen_vm: statement kind=%d", s->kind);

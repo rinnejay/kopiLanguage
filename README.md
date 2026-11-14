@@ -51,13 +51,15 @@ class Main {
   `new`, identitas referensi, rantai field.
 - Tipe `int`, `long`, `byte`, `short`, `float`, `double`, `uint8..64`,
   `boolean`, `String`; cast, literal hex/biner, promosi campuran.
-- Array `int[]`, `long[]`, `String[]`; bounds check runtime, zero-init,
+- Array `int[]`, `long[]`, `String[]`; buffer biner **`byte[]`/`uint8[]`**
+  (packed 1 byte/elemen, v1.43); bounds check runtime, zero-init,
   `length`, helper `Arrays` + `.forEach/.map/.filter/.reduce`.
 - `String` native (1 byte/karakter, packed) + pustaka **`Str`** khusus
   teks (`trim`, `split/join`, `replace`, `pad`, `to*/from*` semua tipe
   skalar, hex, UTF-8) + metode instance + **template string** backtick.
-- **`Bytes`** untuk buffer `int[]` (I/O biner, jaringan, kriptografi);
-  konversi eksplisit `Net.strbytes`/`Net.mkstr`.
+- **`Bytes`** untuk buffer `int[]` dan jembatan `byte[]`
+  (`lenB`, `widen`, `narrow`, `copyB`, `textB`, `printB`); konversi
+  eksplisit `Net.strbytes`/`Net.mkstr`.
 - Pustaka teks ikut `String`: `File`, `Path`, `Time.format`, `Log`, `Url`,
   `Mime`, `Http` (teks request), `Dns`, `Resolv`, `Auth`, `Jwt`, `Session`,
   `Json`, dan kunci `MapStr`; buffer respons/payload tetap `int[]`.

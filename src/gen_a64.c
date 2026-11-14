@@ -234,7 +234,10 @@ static void gen_stmt(Method *m, Node *s) {
         emit("\tsxtw\tx9, w0");
         if (!v64) emit("\tsxtw\tx2, w2");
         emit("\tadd\tx1, x1, #8");
-        emit("\tstr\tx2, [x1, x9, lsl #3]");
+        if ((Ty)s->a->dty == T_BYTEARR || (Ty)s->a->dty == T_U8ARR)
+            emit("\tstrb\tw2, [x1, x9]");
+        else
+            emit("\tstr\tx2, [x1, x9, lsl #3]");
         break;
     }
     case ST_IF: {
@@ -315,12 +318,14 @@ static void gen_stmt(Method *m, Node *s) {
             emit("\tadrp\tx1, :got:cpool%d", (int)s->cp);
             emit("\tldr\tx1, [x1, :got_lo12:cpool%d]", (int)s->cp);
             emit("\tbl\tprintf");
-        } else if ((Ty)s->a->dty == T_ARI || (Ty)s->a->dty == T_STR) {
+        } else if ((Ty)s->a->dty == T_ARI || (Ty)s->a->dty == T_STR ||
+                   (Ty)s->a->dty == T_BYTEARR || (Ty)s->a->dty == T_U8ARR) {
             int lloop = nlab++, lend = nlab++;
             gen_expr(m, s->a);
             emit("\tsub\tsp, sp, #32");
             emit("\tstr\tx0, [sp]");
-            if ((Ty)s->a->dty == T_STR) {   /* v1.18: String packed */
+            if ((Ty)s->a->dty == T_STR || (Ty)s->a->dty == T_BYTEARR ||
+                (Ty)s->a->dty == T_U8ARR) {   /* packed byte buffer */
                 emit("\tstr\txzr, [sp, #8]");   /* counter 64-bit di stack */
                 emit(".L%d:", lloop);
                 emit("\tldr\tx14, [sp]");

@@ -235,6 +235,43 @@
             stackv[sp++] = getb(blk, idx);
             break;
         }
+        case OP_NEWARR_B: {                   /* v1.43: byte[] packed 1 B/elemen */
+            int64_t n = stackv[--sp];
+            if (n < 0) dievm2("ukuran array negatif", (long)n);
+            int64_t slots = (n + 7) / 8;
+            if (heap_used + slots + 1 > heap_cap) oom_arena();
+            long *blk = heap + heap_used;
+            heap_used += slots + 1;
+            blk[0] = (long)n;
+            if (n > 0) memset(blk + 1, 0, (size_t)n);
+            if (sp >= MAXSTACK) dievm("operand stack penuh");
+            stackv[sp++] = (int64_t)blk;
+            break;
+        }
+        case OP_IDXR_B:
+        case OP_IDXR_UB: {                    /* baca byte / uint8 dari buffer */
+            int64_t idx = stackv[--sp];
+            long *blk = (long *)stackv[--sp];
+            if (!blk || !in_heap(blk))
+                dievm("buffer byte tidak valid (di luar arena)");
+            if (idx < 0 || blk[0] <= idx)
+                dievm2("indeks buffer di luar batas", (long)idx);
+            uint8_t *p = (uint8_t *)(blk + 1);
+            stackv[sp++] = (op == OP_IDXR_B) ? (int64_t)(int8_t)p[idx]
+                                             : (int64_t)p[idx];
+            break;
+        }
+        case OP_IDXW_B: {                     /* tulis byte ke buffer */
+            int64_t idx = stackv[--sp];
+            long *blk = (long *)stackv[--sp];
+            int64_t val = stackv[--sp];
+            if (!blk || !in_heap(blk))
+                dievm("buffer byte tidak valid (di luar arena)");
+            if (idx < 0 || blk[0] <= idx)
+                dievm2("indeks buffer di luar batas", (long)idx);
+            ((uint8_t *)(blk + 1))[idx] = (uint8_t)val;
+            break;
+        }
         case OP_ALEN: {
             long *blk = (long *)stackv[--sp];
             stackv[sp++] = blk[0];

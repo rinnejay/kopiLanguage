@@ -59,7 +59,9 @@ enum {
     OP_OP_STORE,
     OP_IDXR_L,
     OP_IDXW_L,
-    OP_LOOP
+    OP_LOOP,
+    /* v1.43: buffer byte packed 1 byte/elemen */
+    OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B
 };
 
 #define MAXM 4096

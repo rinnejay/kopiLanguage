@@ -1482,6 +1482,13 @@ check staticfield test/staticfield.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/staticfield64.s" -o /dev/null \
     && echo "PASS  staticfield [x64]" || { echo "FAIL  staticfield [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
+# ─── v1.43: buffer byte packed `byte[]` / `uint8[]` + Bytes.* ─────────
+printf '5\n65\n-56\n-1\n0\n8\n0\n9\n3\n200\n255\n456\n5\n65\n200\n255\n0\n5\n-56\n-1\n-56\n-56\n7\n4\n3\n' > "$T/kopi/bytetest.ref"
+check bytetest test/bytetest.kop
+./kopicc test/bytetest.kop -t x64 -o "$T/kopi/bytetest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/bytetest64.s" -o /dev/null \
+    && echo "PASS  bytetest [x64]" || { echo "FAIL  bytetest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
 # ─── v1.42: seluruh modul lib dapat diimpor dari folder kategorinya ───
 {
     for f in $(find lib -name '*.kop' | sort); do

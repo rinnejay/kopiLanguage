@@ -43,6 +43,8 @@ class Main {
 | `double` | 64-bit IEEE-754 | sufiks `d` opsional |
 | `String` | pointer byte-array | tipe teks opaque (v1.17) |
 | `int[]` | array 64-bit-slot | elemen disimpan sign-extended |
+| `byte[]` | buffer packed 1 byte/elemen | dibaca bertanda (v1.43) |
+| `uint8[]` | buffer packed 1 byte/elemen | dibaca tanpa tanda (v1.43) |
 | `fn` | closure | lihat lambda |
 
 ```java
@@ -187,6 +189,32 @@ System.out.println(s.length);
 - Metode fungsional (`forEach`, `map`, ...) masih khusus `int[]`;
   untuk `long[]`/`String[]` tulis loop `for` biasa.
 - Belum ada array literal (`{1,2,3}`) atau array multi-dimensi.
+
+### Buffer byte `byte[]` / `uint8[]` (v1.43)
+
+```java
+byte[] buf = new byte[1024];  // 1 byte per elemen + header 8 byte
+buf[0] = 65;
+buf[1] = (byte)200;           // -56 (bertanda)
+System.out.println(buf[1]);   // -56
+
+uint8[] raw = new uint8[4];   // dibaca tanpa tanda
+raw[0] = (uint8)200;
+System.out.println(raw[0]);   // 200
+```
+
+- Berbeda dari `int[]` (satu elemen = satu slot 8 byte), elemen buffer
+  disimpan rapat 1 byte; `buf[i]` membaca `int8_t` dan `raw[i]` membaca
+  `uint8_t`. Lihat `Bytes.widen`/`narrow` untuk jembatan ke `int[]`.
+- `new byte[n]` mengalokasikan `header + ceil(n/8)` slot dan men-zero-kan
+  seluruh byte; `n` harus non-negatif.
+- Assignment elemen menerima `byte`/`uint8` yang sesuai atau literal yang
+  muat; nilai lain butuh cast eksplisit (`buf[i] = (byte)x;`).
+- Bounds check sama seperti array lain; pelanggaran menghentikan program.
+- Buffer bisa diparamkan/dikembalikan (`static int sum(byte[] b)`), dan
+  dicetak sebagai teks byte (debug), sama seperti `int[]`.
+- Helper `Bytes.lenB/widen/narrow/copyB/textB/printB/lineB` bekerja pada
+  buffer packed; helper `Bytes` lama tetap bekerja pada `int[]`.
 
 ### Metode fungsional array (gula)
 

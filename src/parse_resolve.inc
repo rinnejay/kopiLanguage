@@ -179,7 +179,14 @@ static void resolve_stmt(Node *s) {
         Ty et = type_expr(s->c);
         if (at == T_STRARR && et != T_STR)
             die("baris %d: elemen String[] harus String", s->line);
-        if (at != T_STRARR && !ty_is_int(et))
+        if (at == T_BYTEARR || at == T_U8ARR) {
+            Ty want = ty_elem(at);
+            if (!ty_can_implicit(want, et) && !fits_literal(want, s->c))
+                die("baris %d: elemen %s harus %s (perlu cast eksplisit)",
+                    s->line, at == T_BYTEARR ? "byte[]" : "uint8[]",
+                    at == T_BYTEARR ? "byte" : "uint8");
+        }
+        else if (at != T_STRARR && !ty_is_int(et))
             die("baris %d: elemen %s harus integer (perlu cast eksplisit)",
                 s->line, at == T_LNGARR ? "long[]" : "int[]");
         /* v1.20: rujukan tidak boleh disimpan ke array milik luar malloc{} */

@@ -99,7 +99,7 @@ System.out.println(BigInt.toDecimal(BigInt.mul(a, a)));
 
 ## Bytes
 
-`lib/core/Bytes.kop` · 48 fungsi
+`lib/core/Bytes.kop` · 55 fungsi
 
 Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`.
 
@@ -161,6 +161,13 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));
 | `static int[] fromLong(long v)` | — |
 | `static int toInt(int[] s)` | parse desimal dari buffer |
 | `static boolean isDigits(int[] s)` | — |
+| `static int lenB(byte[] b)` | — |
+| `static int[] widen(byte[] b)` | byte[] signed → int[] 0..255 (nilai mentah buffer) |
+| `static byte[] narrow(int[] a)` | int[] → byte[] (nilai dipotong ke 8 bit) |
+| `static byte[] copyB(byte[] b)` | — |
+| `static String textB(byte[] b)` | — |
+| `static void printB(byte[] b)` | — |
+| `static void lineB(byte[] b)` | — |
 | `static int[] of(String s)` | String → salinan byte |
 | `static String text(int[] s)` | buffer → String (materialisasi) |
 | `static int[] hex(int[] data)` | byte → teks hex lowercase (int[]) |

@@ -200,6 +200,10 @@ static void gen_stmt(Method *m, Node *s) {
         emit("\tcmpl (%r10), %%eax");
         emit("\tjae .Karr");
         emit("\tmovl %%eax, %%eax");     /* zero-extend idx */
+        if ((Ty)s->a->dty == T_BYTEARR || (Ty)s->a->dty == T_U8ARR) {
+            emit("\tmovb %%cl, 8(%%r10,%%rax)");
+            break;
+        }
         if (!v64) emit("\tmovslq %%ecx, %%rcx");   /* nilai sign-extend 64 */
         emit("\tmovq %%rcx, 8(%%r10,%%rax,8)");
         break;
@@ -284,12 +288,14 @@ static void gen_stmt(Method *m, Node *s) {
         if (s->str) {
             emit("\tleaq cpool%d(%%rip), %%rsi", (int)s->cp);
             emit("\tleaq .Lfmt_%s(%%rip), %%rdi", s->ival ? "sn" : "s");
-        } else if ((Ty)s->a->dty == T_ARI || (Ty)s->a->dty == T_STR) {
+        } else if ((Ty)s->a->dty == T_ARI || (Ty)s->a->dty == T_STR ||
+                   (Ty)s->a->dty == T_BYTEARR || (Ty)s->a->dty == T_U8ARR) {
             int lloop = nlab++, lend = nlab++;
             gen_expr(m, s->a);
             emit("\tsubq $32, %%rsp");
             emit("\tmovq %%rax, 16(%%rsp)");
-            if ((Ty)s->a->dty == T_STR) {   /* v1.18: String packed */
+            if ((Ty)s->a->dty == T_STR || (Ty)s->a->dty == T_BYTEARR ||
+                (Ty)s->a->dty == T_U8ARR) {   /* packed byte buffer */
                 emit("\tmovq $0, 8(%%rsp)");     /* counter 64-bit */
                 emit(".L%d:", lloop);
                 emit("\tmovq 16(%%rsp), %%r10");

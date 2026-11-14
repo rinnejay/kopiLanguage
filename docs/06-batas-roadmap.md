@@ -12,7 +12,7 @@ diuji, ditulis "belum".
 | ~~Instance class~~ **✅ v1.12–1.15** (field, `new`, method `this`, identitas referensi; field `long`/`String`/class; **constructor**) | sisa: tanpa inheritance/vtable; field `double`/`float` menyusul | dispatch statis; tanpa overload constructor |
 | ~~Field instance bertipe array~~ **✅ v1.29** (`int[]`, `long[]`, `String[]`; termasuk penugasan `p.field[i] = v`) | sisa: field `double[]`/`float[]` | simpan dulu ke variabel bila perlu |
 | GC / free | arena global 32 MB; `malloc { ... }` otomatis (mmap hingga 4096 MB, RAM sesuai kebutuhan) atau `malloc<N>` batas keras 1 kb–4096 MB; `memMark/memReset` manual opsional | region scope, bukan GC — rujukan tak boleh keluar blok (dicek compiler); batas blok dicek runtime |
-| ~~Array bertipe (`String[]`, `long[]`)~~ **✅ v1.16** (elemen 64-bit slot; identitas referensi berlaku) | sisa: `double[]`; metode fungsional masih khusus `int[]` | array `long[]`/`String[]` pakai loop `for` biasa |
+| ~~Array bertipe (`String[]`, `long[]`)~~ **✅ v1.16** (elemen 64-bit slot; identitas referensi berlaku); **✅ v1.43** `byte[]`/`uint8[]` buffer packed 1 byte/elemen | sisa: `double[]`; metode fungsional masih khusus `int[]`; builtin `Net`/`File` masih memakai `int[]` (jembatan `Bytes.widen/narrow`) | array `long[]`/`String[]` pakai loop `for` biasa; buffer biner baru pakai `byte[]` + `Bytes.*` |
 | ~~String = `int[]`~~ **✅ v1.17** (String opaque; interop eksplisit `Net.mkstr`/`Net.strbytes`) | ~~byte-per-slot~~ **✅ v1.18 packed** (1 byte/karakter); **✅ v1.23** `Str` hanya `String`, buffer biner di `Bytes` | alokasi String 5× lebih hemat; API teks tak lagi memakai array |
 | ~~Utilitas byte/teks bercampur~~ **✅ v1.23** (`Str` String, `Bytes` int[]) | sisa: normalisasi Unicode, `double[]` | `Str.utf8*` untuk hitung/validasi/potong code point |
 | `char` & literal char | `'a'` adalah String | pakai kode byte (`97`) atau `charAt` |
@@ -128,6 +128,10 @@ Batas angka:
    wajib reset manual.
 3. ~~Array bertipe~~ **✅ v1.16** (`long[]`/`String[]` elemen 64-bit slot;
    sisa: `double[]`, array literal, multi-dimensi).
+   **✅ v1.43**: `byte[]`/`uint8[]` sebagai buffer packed 1 byte/elemen
+   (header 8 byte) + helper `Bytes.lenB/widen/narrow/copyB/textB/printB`.
+   Sisa: integrasi buffer packed langsung ke ABI builtin `Net`/`File`
+   (saat ini lewat `Bytes.widen/narrow`), field instance `byte[]`.
 4. **TLS server** ✅ v1.36 (`TlsServer`, oracle OpenSSL/Python). Sisa:
    verifikasi rantai/hostname di klien, mTLS, session resumption.
 5. **HTTP/2 (klien)** ✅ v1.37 — `Http2` (gate TLS+ALPN h2, HPACK decode penuh + Huffman, dt dinamis); sisi server h2 & HPACK encode dinamis belum.

@@ -250,7 +250,7 @@ System.out.println(BigInt.toDecimal(BigInt.mul(a, a)));</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="bytes">Bytes<a class="anchor" href="#bytes" aria-label="tautan">#</a></h2>
-<p><code>lib/core/Bytes.kop</code> · 48 fungsi</p>
+<p><code>lib/core/Bytes.kop</code> · 55 fungsi</p>
 <p>Utilitas buffer byte <code>int[]</code>: I/O biner, jaringan, kriptografi. Untuk teks gunakan <code>Str</code>.</p>
 <pre><code class="language-java">import Bytes;
 
@@ -434,6 +434,34 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));</code></pre>
 </tr>
 <tr>
 <td><code>static boolean isDigits(int[] s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int lenB(byte[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] widen(byte[] b)</code></td>
+<td>byte[] signed → int[] 0..255 (nilai mentah buffer)</td>
+</tr>
+<tr>
+<td><code>static byte[] narrow(int[] a)</code></td>
+<td>int[] → byte[] (nilai dipotong ke 8 bit)</td>
+</tr>
+<tr>
+<td><code>static byte[] copyB(byte[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String textB(byte[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void printB(byte[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void lineB(byte[] b)</code></td>
 <td>—</td>
 </tr>
 <tr>

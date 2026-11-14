@@ -279,6 +279,30 @@ static int gen_expr(Method *m, Node *e) {
         emit("\ttestl %%eax, %%eax");
         emit("\tjl .Karr");             /* ukuran salah */
         emit("\tmovl %%eax, %%r10d");   /* simpan n */
+        if ((Ty)e->dty == T_BYTEARR || (Ty)e->dty == T_U8ARR) {
+            /* v1.43: buffer byte packed — header 8 byte + n byte */
+            emit("\tsubq $16, %%rsp");
+            emit("\tmovq %%r10, (%%rsp)");
+            emit("\taddq $7, %%r10");
+            emit("\tshrq $3, %%r10");
+            emit("\tshlq $3, %%r10");
+            emit("\taddq $8, %%r10");
+            emit("\tmovq %%r10, %%rdi");
+            emit("\tcall kopalloc");
+            emit("\tmovq (%%rsp), %%r10");      /* n */
+            emit("\taddq $16, %%rsp");
+            emit("\tmovq %%r10, (%%rax)");      /* len */
+            int L = arrlbl++;
+            emit("\txorl %%edx, %%edx");
+            emit(".LNZBX%d:", L);
+            emit("\tcmpq %%r10, %%rdx");
+            emit("\tjge .LNZBX%de", L);
+            emit("\tmovb $0, 8(%%rax,%%rdx)");
+            emit("\tincq %%rdx");
+            emit("\tjmp .LNZBX%d", L);
+            emit(".LNZBX%de:", L);
+            return 1;
+        }
         emit("\tshlq $3, %%r10");       /* 8*n */
         emit("\taddq $8, %%r10");       /* + header len */
         emit("\tmovq %%r10, %%rdi");
@@ -308,6 +332,14 @@ static int gen_expr(Method *m, Node *e) {
         emit("\tjae .Karr");            /* unsigned: negatif tertangkap */
         emit("\tmovl %%eax, %%eax");
         emit("\tcltq");
+        if ((Ty)e->a->dty == T_BYTEARR) {   /* v1.43: buffer byte packed (signed) */
+            emit("\tmovsbq 8(%%r10,%%rax), %%rax");
+            return 0;
+        }
+        if ((Ty)e->a->dty == T_U8ARR) {     /* v1.43: buffer uint8 packed */
+            emit("\tmovzbl 8(%%r10,%%rax), %%eax");
+            return 0;
+        }
         if ((Ty)e->a->dty == T_STR) {   /* v1.18: byte ke-i String packed */
             emit("\tmovzbl 8(%%r10,%%rax), %%eax");
             return 0;

@@ -1,0 +1,76 @@
+// bytetest.kop — v1.43: buffer byte packed `byte[]` / `uint8[]`.
+//
+// `byte[]` dan `uint8[]` bukan alias `int[]`: elemen disimpan 1 byte per
+// elemen (header 8 byte), byte[] dibaca bertanda dan uint8[] tanpa tanda.
+// Bytes.* menyediakan jembatan ke representasi `int[]` lama.
+import Bytes;
+
+class Main {
+    static int sum(byte[] b) {
+        int s = 0;
+        for (int i = 0; i < b.length; i++) s += b[i];
+        return s;
+    }
+
+    static int usum(uint8[] b) {
+        int s = 0;
+        for (int i = 0; i < b.length; i++) s += b[i];
+        return s;
+    }
+
+    static byte[] make(int n) {
+        byte[] b = new byte[n];
+        for (int i = 0; i < n; i++) b[i] = (byte)(i * 3);
+        return b;
+    }
+
+    static void main() {
+        malloc {
+            byte[] b = new byte[5];
+            b[0] = 65;
+            b[1] = (byte)200;          // -56
+            b[2] = -1;
+            System.out.println(b.length);       // 5
+            System.out.println(b[0]);           // 65
+            System.out.println(b[1]);           // -56
+            System.out.println(b[2]);           // -1
+            System.out.println(b[3]);           // 0
+            System.out.println(sum(b));         // 8
+
+            byte[] c = make(4);
+            System.out.println(c[0]);           // 0
+            System.out.println(c[3]);           // 9
+
+            uint8[] u = new uint8[3];
+            u[0] = (uint8)200;
+            u[1] = 255;
+            u[2] = 1;
+            System.out.println(u.length);       // 3
+            System.out.println(u[0]);           // 200
+            System.out.println(u[1]);           // 255
+            System.out.println(usum(u));        // 456
+
+            System.out.println(Bytes.lenB(b));  // 5
+            int[] w = Bytes.widen(b);           // 65,200,255,0,0
+            System.out.println(w[0]);
+            System.out.println(w[1]);
+            System.out.println(w[2]);
+            System.out.println(w[3]);
+            System.out.println(w.length);       // 5
+
+            byte[] n = Bytes.narrow(w);         // 65,-56,-1,0,0
+            System.out.println(n[1]);           // -56
+            System.out.println(n[2]);           // -1
+
+            byte[] cp = Bytes.copyB(b);
+            System.out.println(cp[1]);          // -56
+            cp[1] = 7;
+            System.out.println(b[1]);           // -56 (salinan mandiri)
+            System.out.println(cp[1]);          // 7
+
+            String t = Bytes.textB(c);          // byte 0,3,6,9
+            System.out.println(t.length);       // 4
+            System.out.println(t[1]);           // 3
+        }
+    }
+}
