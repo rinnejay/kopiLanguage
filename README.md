@@ -26,7 +26,7 @@ assembly/binary sendiri — tanpa JVM, tanpa bytecode vendor lain.
 ```sh
 make                 # kopicc + kopivm
 make test            # 155 uji lintas backend
-./kopicc --version   # kopicc 1.23.0 (Kopi) — target a64 | x64 | vm
+./kopicc --version   # kopicc 1.41.0 (Kopi) — target a64 | x64 | vm
 
 # binary asli (aarch64)
 ./kopicc examples/hello.kop -t a64 -o hello.s
@@ -130,7 +130,7 @@ test.sh     suite lintas backend
 
 ## Status
 
-`v1.23.0` — **155 pass, 0 fail**. Riwayat versi lengkap:
+`v1.41.0` — **193 pass, 0 fail**. Riwayat versi lengkap:
 [`CHANGELOG.md`](CHANGELOG.md). Batas jujur & rencana:
 [docs/06-batas-roadmap.md](docs/06-batas-roadmap.md).
 

@@ -81,7 +81,25 @@ static Ty type_expr_raw(Node *e) {
             die("baris %d: cast hanya antar tipe numerik", e->line);
         return to;
     }
-    case EX_VAR: { SVar *v = resolve_name(e->str, e->line); e->ival = v->slot; e->dty = (int)v->ty; return v->ty; }
+    case EX_VAR: {
+        /* v1.41: nama konstanta static di class aktif → panggil X(). */
+        if (!lookup_name(e->str) && cur_method && cur_method->cls) {
+            Method *cf = find_constfield(cur_method->cls, e->str);
+            if (cf) {
+                char *full = xmalloc(strlen(cf->cls) + strlen(cf->name) + 2);
+                sprintf(full, "%s.%s", cf->cls, cf->name);
+                e->kind = EX_CALL;
+                e->str = full;
+                e->a = 0;
+                e->ival = 0;
+                return type_expr_raw(e);
+            }
+        }
+        SVar *v = resolve_name(e->str, e->line);
+        e->ival = v->slot;
+        e->dty = (int)v->ty;
+        return v->ty;
+    }
     case EX_UN: {
         Ty t = type_expr(e->a);
         if (e->str[0] == '!') {
@@ -589,6 +607,20 @@ static Ty type_expr_raw(Node *e) {
         return T_ARI;
     }
     case EX_FLD: {
+        /* v1.41: `Class.KONSTANTA` → panggilan Class.KONSTANTA().
+         * Hanya bila `Class` bukan variabel lokal (variabel menang). */
+        if (e->a && e->a->kind == EX_VAR && !lookup_name(e->a->str)) {
+            Class *cc = find_class(e->a->str);
+            if (cc && find_constfield(cc->name, e->str)) {
+                char *full = xmalloc(strlen(cc->name) + strlen(e->str) + 2);
+                sprintf(full, "%s.%s", cc->name, e->str);
+                e->kind = EX_CALL;
+                e->str = full;
+                e->a = 0;
+                e->ival = 0;
+                return type_expr_raw(e);
+            }
+        }
         /* obj.field → obj[idx]; base boleh variabel ber-class atau
          * akses field berantai (v1.14). Class field tersimpan di e->cls
          * agar rantai field (k.pojok.x) dan penugasan dicek tipe-nya. */

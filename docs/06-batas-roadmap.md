@@ -18,7 +18,7 @@ diuji, ditulis "belum".
 | `char` & literal char | `'a'` adalah String | pakai kode byte (`97`) atau `charAt` |
 | Unicode/UTF-8 penuh | `length` = byte; `upper/lower` ASCII | `utf8Count`; batasi input ke ASCII |
 | ~~`switch`~~ **✅ v1.19** (desugar if/else; tanpa fall-through; selector int-ish dievaluasi sekali; break/continue milik loop terluar) `try/catch`, `throw`, `assert`, `goto` | kontrol alur terbatas | `if/else`, kode error negatif |
-| static field & inisialisasi kelas | konstanta harus method | `static int W() { return 60; }` |
+| ~~static field & inisialisasi kelas~~ **✅ v1.41** (`static T X = v;` sebagai konstanta read-only; `Class.X` / `X`) | sisa: static field yang bisa diubah, static array/tipe class, inisialisasi berurutan saat startup | pakai konstanta; untuk state yang berubah pakai objek singleton |
 | generic, enum, anotasi, overloading | API harus unik per nama | sufiks nama (`getInt/getStr`) |
 | `finally`/RAII | resource harus ditutup manual | `Net.close`, `File.close` |
 | Field instance bertipe `double`/`float` | butuh jalur register float di 3 backend | simpan sebagai `long`/`String` dulu, atau field `int` + pembagian |

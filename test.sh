@@ -1475,6 +1475,13 @@ check dochtour docs/contoh/tour.kop
 cp test/langtest.ref "$T/kopi/langtest.ref"
 check langtest test/langtest.kop
 
+# ─── v1.41: static field konstanta (`static T X = v;`) ───
+printf '888\n1777\n890\n1\nkopi\n1099511627776\n7\n1776\n1776\n1\n1\n3553\n127\n' > "$T/kopi/staticfield.ref"
+check staticfield test/staticfield.kop
+./kopicc test/staticfield.kop -t x64 -o "$T/kopi/staticfield64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/staticfield64.s" -o /dev/null \
+    && echo "PASS  staticfield [x64]" || { echo "FAIL  staticfield [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
 # ─── fitur bahasa v1.12: class instance (new, field, method this) ───
 cp test/objtest.ref "$T/kopi/objtest.ref"
 check objtest test/objtest.kop

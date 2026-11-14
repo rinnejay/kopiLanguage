@@ -378,6 +378,38 @@ class Main {
 - Maksimum **8 parameter** (batas backend native).
 - Tidak ada overloading: dua metode dengan nama sama (di seluruh unit
   compile) ditolak, meskipun beda parameter.
+
+### 9.1 Konstanta static
+
+Sejak v1.41 field static boleh langsung diberi nilai — enak dibaca dan
+tidak perlu menulis method:
+
+```java
+class LzmaStream {
+    static int FORMAT_XZ = 1;
+    static int CHECK_CRC64 = 4;
+    static String NAMA = "lzma";
+}
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(LzmaStream.FORMAT_XZ);    // 1
+        System.out.println(LzmaStream.CHECK_CRC64);  // 4
+        System.out.println(LzmaStream.NAMA == "lzma");
+    }
+}
+```
+
+- Tipe yang didukung: `int`, `boolean`, `byte`, `short`, `uint8`,
+  `uint16`, `long`, `String`. Array dan tipe class belum.
+- **Wajib punya nilai awal**; `static int X;` ditolak.
+- Nilai boleh memakai konstanta lain: `static int B = A + 1;`.
+- Akses lewat `Class.NAMA` atau `NAMA` di dalam class yang sama.
+- Ini **konstanta read-only**: `Class.NAMA = v`, `+=`, `++` ditolak
+  compiler.
+- Implementasinya didesugar menjadi metode static 0-argumen; nilai
+  dihitung ulang tiap akses (tidak ada storage global yang bisa
+  berubah).
 - Rekursi didukung. `return` tanpa nilai hanya untuk `void`.
 - `public`/`private` diterima tetapi belum menegakkan akses.
 

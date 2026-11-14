@@ -49,6 +49,8 @@ static Node *block(void);
 static int tokat(int d, int t);
 static int lambda_ahead(void);
 static Method *find_method(const char *cls, const char *name);
+static Method *find_constfield(const char *cls, const char *name);
+static Class *find_class(const char *name);
 static Method *cur_method;
 
 /* ---------- tipe ---------- */

@@ -67,6 +67,22 @@ def parse_file(path):
             pending.append(ln[2:].strip())
             i += 1
             continue
+        # v1.41: `static T NAMA = nilai;` — konstanta class (bukan method)
+        mf = re.match(
+            r"^(public\s+)?static\s+"
+            r"(?:long|int|boolean|String|byte|short|uint8|uint16|uint32|uint64)"
+            r"\s+([A-Z][A-Z0-9_]*)\s*=\s*[^;]+;\s*$", ln)
+        if mf:
+            sig = re.sub(r"^public\s+", "", ln).strip().rstrip(";").strip()
+            sig = re.sub(r"\s+", " ", sig)
+            doc = clean_comment(pending)
+            if is_banner(doc):
+                doc = ""
+            pending = []
+            item = {"sig": sig, "name": mf.group(2), "doc": doc}
+            consts.append(item)
+            i += 1
+            continue
         m = re.match(r"^(public\s+)?static\s+", ln)
         if m and "(" in ln:
             sig = ln

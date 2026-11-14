@@ -179,6 +179,7 @@ typedef struct Method {
     int capcopy[32];
     Ty captty[32];
     int hidden;        /* metode lambda tersembunyi — jangan di-resolve ulang */
+    int is_constfield; /* hasil desugar `static T X = v;` → metode X()     */
     int is_inst;       /* metode instance (param pertama = this)          */
     const char *retcls; /* tipe kembalian class (ret = T_ARI + retcls)    */
     struct Method *next;

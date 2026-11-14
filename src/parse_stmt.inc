@@ -159,6 +159,12 @@ static Node *stmt_single(void) {
         if (t2 == '=') return parse_assignment(line, 1);
         /* p.field = v; / p.field1.field2 = v; — penugasan field instance */
         if (t2 == '.' && tokat(2, T_ID)) {
+            /* v1.41: Class.KONSTANTA++ / += ... → tolak jelas. */
+            if (find_class(xs(t->text)) &&
+                find_constfield(xs(t->text), xs(ts[ti + 2].text)) &&
+                is_incuptok(ts[ti + 3].type))
+                die("baris %d: '%s.%s' konstanta static — tidak bisa diubah",
+                    line, t->text, ts[ti + 2].text);
             /* v1.29: p.field[i] = v — indeks pada field bertipe array */
             if (tokat(3, '[')) {
                 Node *s = newnode(ST_IDXASG, line);

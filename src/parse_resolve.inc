@@ -117,6 +117,13 @@ static void resolve_stmt(Node *s) {
         }
         break;
     case ST_FLDASG: {
+        /* v1.41: Class.KONSTANTA = v → tolak dengan pesan jelas. */
+        if (s->a && s->a->kind == EX_VAR && !lookup_name(s->a->str)) {
+            Class *cc = find_class(s->a->str);
+            if (cc && find_constfield(cc->name, s->str))
+                die("baris %d: '%s.%s' konstanta static — tidak bisa diubah",
+                    s->line, cc->name, s->str);
+        }
         /* obj.field = v → ST_IDXASG(obj, idx, v) dengan cek tipe field */
         Field *f = field_of(s->a, s->str, s->line);
         Ty vt = type_expr(s->a);

@@ -1,0 +1,39 @@
+// staticfield.kop — v1.41: `static T X = v;` sebagai konstanta class.
+import Str;
+
+class Config {
+    static int A = 888;
+    static int B = Config.A + A + 1;
+    static boolean ON = true;
+    static String NAME = "kopi";
+    static long BIG = 1L << 40;
+    static byte SMALL = 127;
+    public static int PUB = 7;
+
+    static int sum(int x) { return x + A; }
+}
+
+class Other {
+    static int C = Config.A * 2;
+}
+
+class Main {
+
+    static void main() {
+        malloc {
+            System.out.println(Config.A);
+            System.out.println(Config.B);
+            System.out.println(Config.sum(2));
+            System.out.println(Config.ON);
+            System.out.println(Config.NAME);
+            System.out.println(Config.BIG);
+            System.out.println(Config.PUB);
+            System.out.println(Config.A * 2);
+            System.out.println(Other.C);
+            System.out.println(Config.A > 100);
+            System.out.println(Config.NAME == "kopi");
+            System.out.println(Config.B + Other.C);
+            System.out.println(Config.SMALL);
+        }
+    }
+}

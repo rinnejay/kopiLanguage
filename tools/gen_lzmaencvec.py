@@ -580,17 +580,17 @@ add("""            LzmaDecompressor bad = LzmaDecompressor.xz();
                 * (trunc.isError() ? 0 : 1));""" % (
     hexstr(bytes(api_bad)), hexstr(api_good[:len(api_good) // 2])), "api")
 
-add("""            int c = (LzmaStream.FORMAT_AUTO() == 0 ? 1 : 0)
-                  * (LzmaStream.FORMAT_XZ() == 1 ? 1 : 0)
-                  * (LzmaStream.FORMAT_ALONE() == 2 ? 1 : 0)
-                  * (LzmaStream.FORMAT_RAW() == 3 ? 1 : 0)
-                  * (LzmaStream.CHECK_CRC64() == 4 ? 1 : 0)
-                  * (LzmaStream.CHECK_SHA256() == 10 ? 1 : 0);
-            int f = (LzmaStream.FILTER_LZMA2() == 0x21 ? 1 : 0)
-                  * (LzmaStream.FILTER_DELTA() == 3 ? 1 : 0)
-                  * (LzmaStream.FILTER_X86() == 4 ? 1 : 0)
-                  * (LzmaStream.FILTER_ARM64() == 10 ? 1 : 0)
-                  * (LzmaStream.FILTER_LZMA1() == 4611686018427387905L ? 1 : 0);
+add("""            int c = (LzmaStream.FORMAT_AUTO == 0 ? 1 : 0)
+                  * (LzmaStream.FORMAT_XZ == 1 ? 1 : 0)
+                  * (LzmaStream.FORMAT_ALONE == 2 ? 1 : 0)
+                  * (LzmaStream.FORMAT_RAW == 3 ? 1 : 0)
+                  * (LzmaStream.CHECK_CRC64 == 4 ? 1 : 0)
+                  * (LzmaStream.CHECK_SHA256 == 10 ? 1 : 0);
+            int f = (LzmaStream.FILTER_LZMA2 == 0x21 ? 1 : 0)
+                  * (LzmaStream.FILTER_DELTA == 3 ? 1 : 0)
+                  * (LzmaStream.FILTER_X86 == 4 ? 1 : 0)
+                  * (LzmaStream.FILTER_ARM64 == 10 ? 1 : 0)
+                  * (LzmaStream.FILTER_LZMA1 == 4611686018427387905L ? 1 : 0);
             int k = (LzmaStream.isCheckSupported(0) ? 1 : 0)
                   * (LzmaStream.isCheckSupported(1) ? 1 : 0)
                   * (LzmaStream.isCheckSupported(4) ? 1 : 0)

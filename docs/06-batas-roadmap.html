@@ -82,9 +82,9 @@
 <td><code>if/else</code>, kode error negatif</td>
 </tr>
 <tr>
-<td>static field &amp; inisialisasi kelas</td>
-<td>konstanta harus method</td>
-<td><code>static int W() { return 60; }</code></td>
+<td>~~static field &amp; inisialisasi kelas~~ <strong>✅ v1.41</strong> (<code>static T X = v;</code> sebagai konstanta read-only; <code>Class.X</code> / <code>X</code>)</td>
+<td>sisa: static field yang bisa diubah, static array/tipe class, inisialisasi berurutan saat startup</td>
+<td>pakai konstanta; untuk state yang berubah pakai objek singleton</td>
 </tr>
 <tr>
 <td>generic, enum, anotasi, overloading</td>

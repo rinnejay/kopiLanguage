@@ -32,27 +32,27 @@ import Xz;
 class LzmaStream {
 
     /* Nilai konstanta sama dengan modul lzma Python. */
-    static int FORMAT_AUTO()  { return 0; }
-    static int FORMAT_XZ()    { return 1; }
-    static int FORMAT_ALONE() { return 2; }
-    static int FORMAT_RAW()   { return 3; }
+    static int FORMAT_AUTO = 0;
+    static int FORMAT_XZ = 1;
+    static int FORMAT_ALONE = 2;
+    static int FORMAT_RAW = 3;
 
-    static int CHECK_NONE()   { return 0; }
-    static int CHECK_CRC32()  { return 1; }
-    static int CHECK_CRC64()  { return 4; }
-    static int CHECK_SHA256() { return 10; }
+    static int CHECK_NONE = 0;
+    static int CHECK_CRC32 = 1;
+    static int CHECK_CRC64 = 4;
+    static int CHECK_SHA256 = 10;
 
     /* ID filter Python; sama dengan ID XZ kecuali LZMA1. */
-    static long FILTER_LZMA1()   { return 4611686018427387905L; }
-    static int FILTER_LZMA2()    { return 0x21; }
-    static int FILTER_DELTA()    { return 0x03; }
-    static int FILTER_X86()      { return 0x04; }
-    static int FILTER_POWERPC()  { return 0x05; }
-    static int FILTER_IA64()     { return 0x06; }
-    static int FILTER_ARM()      { return 0x07; }
-    static int FILTER_ARMTHUMB() { return 0x08; }
-    static int FILTER_SPARC()    { return 0x09; }
-    static int FILTER_ARM64()    { return 0x0A; }
+    static long FILTER_LZMA1 = 4611686018427387905L;
+    static int FILTER_LZMA2 = 0x21;
+    static int FILTER_DELTA = 0x03;
+    static int FILTER_X86 = 0x04;
+    static int FILTER_POWERPC = 0x05;
+    static int FILTER_IA64 = 0x06;
+    static int FILTER_ARM = 0x07;
+    static int FILTER_ARMTHUMB = 0x08;
+    static int FILTER_SPARC = 0x09;
+    static int FILTER_ARM64 = 0x0A;
 
     /* liblzma mendukung keempat check ini; nilai lain tidak didukung. */
     static boolean isCheckSupported(int check) {

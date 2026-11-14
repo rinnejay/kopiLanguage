@@ -859,24 +859,24 @@ Modul pustaka Kopi.
 
 | Nama | Keterangan |
 |---|---|
-| `static int FORMAT_AUTO()` | Nilai konstanta sama dengan modul lzma Python. |
-| `static int FORMAT_XZ()` | — |
-| `static int FORMAT_ALONE()` | — |
-| `static int FORMAT_RAW()` | — |
-| `static int CHECK_NONE()` | — |
-| `static int CHECK_CRC32()` | — |
-| `static int CHECK_CRC64()` | — |
-| `static int CHECK_SHA256()` | — |
-| `static long FILTER_LZMA1()` | ID filter Python; sama dengan ID XZ kecuali LZMA1. |
-| `static int FILTER_LZMA2()` | — |
-| `static int FILTER_DELTA()` | — |
-| `static int FILTER_X86()` | — |
-| `static int FILTER_POWERPC()` | — |
-| `static int FILTER_IA64()` | — |
-| `static int FILTER_ARM()` | — |
-| `static int FILTER_ARMTHUMB()` | — |
-| `static int FILTER_SPARC()` | — |
-| `static int FILTER_ARM64()` | — |
+| `static int FORMAT_AUTO = 0` | Nilai konstanta sama dengan modul lzma Python. |
+| `static int FORMAT_XZ = 1` | — |
+| `static int FORMAT_ALONE = 2` | — |
+| `static int FORMAT_RAW = 3` | — |
+| `static int CHECK_NONE = 0` | — |
+| `static int CHECK_CRC32 = 1` | — |
+| `static int CHECK_CRC64 = 4` | — |
+| `static int CHECK_SHA256 = 10` | — |
+| `static long FILTER_LZMA1 = 4611686018427387905L` | ID filter Python; sama dengan ID XZ kecuali LZMA1. |
+| `static int FILTER_LZMA2 = 0x21` | — |
+| `static int FILTER_DELTA = 0x03` | — |
+| `static int FILTER_X86 = 0x04` | — |
+| `static int FILTER_POWERPC = 0x05` | — |
+| `static int FILTER_IA64 = 0x06` | — |
+| `static int FILTER_ARM = 0x07` | — |
+| `static int FILTER_ARMTHUMB = 0x08` | — |
+| `static int FILTER_SPARC = 0x09` | — |
+| `static int FILTER_ARM64 = 0x0A` | — |
 
 ---
 

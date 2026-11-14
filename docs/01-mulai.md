@@ -62,7 +62,8 @@ cc hello64.s -o hello64
 
 - Wajib ada satu metode bernama `main` di class mana pun:
   `static void main()` atau `static void main(String[] args)`.
-- Class hanya berisi **metode static** (belum ada instance/field).
+- Class berisi metode static, metode instance, field instance, dan
+  konstanta static (`static int X = 1;`).
 - Semua file `.kop` yang diimpor digabung jadi satu unit compile.
 - Tidak ada `package`; nama class harus unik dalam satu build.
 

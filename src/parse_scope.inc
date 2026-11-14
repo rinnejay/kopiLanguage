@@ -123,6 +123,15 @@ static Method *find_method(const char *cls, const char *name) {
     return 0;
 }
 
+/* v1.41: konstanta `static T X = v;` didesugar menjadi metode X().
+ * Dipakai untuk menerjemahkan akses Class.X / X → Class.X(). */
+static Method *find_constfield(const char *cls, const char *name) {
+    for (Method *m = prog.methods; m; m = m->next)
+        if (m->is_constfield && !strcmp(m->cls, cls) &&
+            !strcmp(m->name, name)) return m;
+    return 0;
+}
+
 static void resolve_stmts(Node *lst);      /* deklarasi maju */
 static void collect_cp_stmt(Node *s);
 static Ty type_expr(Node *e);

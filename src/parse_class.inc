@@ -112,8 +112,10 @@ static void parse_class(void) {
             expect(T_ID, "nama field");
             advance();                       /* ';' */
             if (was_static)
-                die("baris %d: static field belum didukung — pakai method konstanta (static int W())", fn->line);
-            if (class_field(c, xs(fn->text)))
+                die("baris %d: static field bertipe class belum didukung — "
+                    "pakai static method yang mengembalikan objek", fn->line);
+            if (class_field(c, xs(fn->text)) ||
+                find_constfield(c->name, xs(fn->text)))
                 die("baris %d: field '%s' dideklarasikan dua kali", fn->line, fn->text);
             Field *f = xmalloc(sizeof(Field));
             f->name = xs(fn->text);
@@ -124,6 +126,10 @@ static void parse_class(void) {
             c->fields = f;
             continue;
         }
+        if (was_static && at(T_ID) && tokat(1, T_ID) &&
+            (tokat(2, '=') || tokat(2, ';')))
+            die("baris %d: static field bertipe class belum didukung — "
+                "pakai static method yang mengembalikan objek", rt->line);
         Ty ret;
         const char *retcls = 0;
         if (at(T_ID) && tokat(1, T_ID) && tokat(2, '(') && find_class(xs(rt->text))) {
@@ -139,8 +145,39 @@ static void parse_class(void) {
         expect(T_ID, "nama metode");
         /* setelah nama: '(' → metode; ';' atau '=' → deklarasi field */
         if (at(';') || at('=')) {
-            if (was_static)
-                die("baris %d: static field belum didukung — pakai method konstanta (static int W())", mn->line);
+            if (was_static) {
+                /* v1.41: `static T X = v;` didesugar menjadi metode static
+                 * tanpa parameter X(). Semua akses `Class.X` / `X` di
+                 * dalam class diubah menjadi panggilan X(). Tidak ada
+                 * storage global; nilai dihitung ulang tiap akses. */
+                if (at(';'))
+                    die("baris %d: static field '%s' butuh nilai awal — "
+                        "tulis `static <tipe> %s = ...;`",
+                        mn->line, mn->text, mn->text);
+                if (!field_ty_ok(ret) || ty_is_arr(ret))
+                    die("baris %d: static field '%s' hanya mendukung "
+                        "int/boolean/byte/short/uint8/uint16/long/String",
+                        mn->line, mn->text);
+                if (class_field(c, xs(mn->text)) ||
+                    find_method(c->name, xs(mn->text)))
+                    die("baris %d: '%s' dideklarasikan dua kali", mn->line, mn->text);
+                advance();                       /* '=' */
+                Node *val = expr();
+                expect(';', "';' setelah nilai static field");
+                Method *sm = xmalloc(sizeof(Method));
+                sm->cls = c->name;
+                sm->name = xs(mn->text);
+                sm->ret = ret;
+                sm->is_inst = 0;
+                sm->is_constfield = 1;
+                Node *rv = newnode(ST_RETURN, mn->line);
+                rv->a = val;
+                sm->body = rv;
+                sm->next = prog.methods;
+                prog.methods = sm;
+                prog.nmethods++;
+                continue;
+            }
             if (!field_ty_ok(ret) && !retcls)
                 die("baris %d: field '%s' bertipe ini belum didukung — "
                     "didukung: int/boolean/byte/short/uint8/uint16/long/String, "
@@ -153,7 +190,8 @@ static void parse_class(void) {
                     mn->line, mn->text, c->name);
             }
             advance();   /* ';' */
-            if (class_field(c, xs(mn->text)))
+            if (class_field(c, xs(mn->text)) ||
+                find_constfield(c->name, xs(mn->text)))
                 die("baris %d: field '%s' dideklarasikan dua kali", mn->line, mn->text);
             Field *f = xmalloc(sizeof(Field));
             f->name = xs(mn->text);
