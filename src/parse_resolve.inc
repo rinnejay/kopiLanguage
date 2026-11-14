@@ -201,6 +201,55 @@ static void resolve_stmt(Node *s) {
                 s->line, s->a->str);
         break;
     }
+    case ST_THREAD: {
+        /* v1.45: thread [h] { ... } — badan jadi lambda 0-arg, spawn,
+         * hasil handle long disimpan ke variabel/elemen long[]. */
+        Ty bt = type_expr(s->a);
+        if (bt != T_FN)
+            die("baris %d: badan thread harus blok kode", s->line);
+        Node *call = newnode(EX_NET, s->line);
+        call->ival = 47;                 /* Net.threadspawn */
+        call->a = s->a;
+        call->dty = (int)T_LONG;
+        call->typed = 1;
+        call->file = s->file;
+        s->a = 0;
+        if (!s->b) {                     /* tanpa target: detached */
+            s->kind = ST_EXPR;
+            s->a = call;
+            s->dty = (int)T_VOID;
+            break;
+        }
+        Node tmp;
+        memset(&tmp, 0, sizeof tmp);
+        tmp.line = s->line;
+        tmp.file = s->file;
+        if (s->b->kind == EX_VAR) {
+            SVar *hv = lookup_name(s->b->str);
+            if (!hv || (hv->ty != T_LONG && hv->ty != T_UINT64))
+                die("baris %d: target thread '%s' harus variabel long",
+                    s->line, s->b->str);
+            tmp.kind = ST_ASSIGN;
+            tmp.str = s->b->str;
+            tmp.a = call;
+        } else if (s->b->kind == EX_IDX) {
+            Node *arr = s->b->a, *ix = s->b->b;
+            Ty at = type_expr(arr);
+            if (at != T_LNGARR)
+                die("baris %d: target thread a[i] harus long[] (handle 64-bit)", s->line);
+            tmp.kind = ST_IDXASG;
+            tmp.a = arr;
+            tmp.b = ix;
+            tmp.c = call;
+        } else {
+            die("baris %d: target thread harus variabel long atau long[i]", s->line);
+        }
+        resolve_stmt(&tmp);
+        Node *nx = s->next;
+        *s = tmp;
+        s->next = nx;
+        break;
+    }
     case ST_REGION: {
         /* v1.20: malloc { ... } — scope sendiri + arena blok otomatis.
          * v1.21: ukuran arena (s->cp, byte) dari malloc<64mb>.

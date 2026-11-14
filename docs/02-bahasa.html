@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="02-bahasa-kopi-tutorial-lengkap">02 — Bahasa Kopi: tutorial lengkap<a class="anchor" href="#02-bahasa-kopi-tutorial-lengkap" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bentuk-program">1. Bentuk program</a></li><li class="toc-h2"><a href="#2-komentar">2. Komentar</a></li><li class="toc-h2"><a href="#3-tipe">3. Tipe</a></li><li class="toc-h3"><a href="#cast-promosi">Cast &amp; promosi</a></li><li class="toc-h2"><a href="#4-variabel-scope">4. Variabel &amp; scope</a></li><li class="toc-h2"><a href="#5-operator">5. Operator</a></li><li class="toc-h2"><a href="#6-kontrol-alir">6. Kontrol alir</a></li><li class="toc-h3"><a href="#switch-v1-19">switch (v1.19)</a></li><li class="toc-h2"><a href="#7-array">7. Array</a></li><li class="toc-h3"><a href="#buffer-byte-byte-uint8-v1-43-v1-44">Buffer byte byte[] / uint8[] (v1.43–v1.44)</a></li><li class="toc-h3"><a href="#metode-fungsional-array-gula">Metode fungsional array (gula)</a></li><li class="toc-h2"><a href="#8-string">8. String</a></li><li class="toc-h3"><a href="#konversi-skalar">Konversi skalar</a></li><li class="toc-h3"><a href="#metode-instance-butuh-import-str">Metode instance (butuh import Str;)</a></li><li class="toc-h3"><a href="#buffer-byte-bytes">Buffer byte: Bytes</a></li><li class="toc-h3"><a href="#template-string-backtick">Template string (backtick)</a></li><li class="toc-h2"><a href="#9-fungsi">9. Fungsi</a></li><li class="toc-h3"><a href="#9-1-konstanta-static">9.1 Konstanta static</a></li><li class="toc-h2"><a href="#10-lambda-fn">10. Lambda &amp; fn</a></li><li class="toc-h2"><a href="#11-class-sebagai-namespace">11. Class sebagai namespace</a></li><li class="toc-h2"><a href="#12-class-instance">12. Class instance</a></li><li class="toc-h2"><a href="#13-json-literal">13. JSON literal</a></li><li class="toc-h2"><a href="#14-memori-malloc-arena-per-blok-tanpa-gc">14. Memori: malloc&lt;...&gt; { ... }, arena per blok, tanpa GC</a></li><li class="toc-h3"><a href="#aturan-keamanan">Aturan keamanan</a></li><li class="toc-h3"><a href="#memmark-memreset-manual-opsional">memMark / memReset manual (opsional)</a></li><li class="toc-h2"><a href="#15-keluar-kode-status">15. Keluar &amp; kode status</a></li><li class="toc-h3"><a href="#error-runtime-nomor-baris-stack-trace">Error runtime: nomor baris + stack trace</a></li><li class="toc-h2"><a href="#16-contoh-tur-lengkap">16. Contoh tur lengkap</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-bentuk-program">1. Bentuk program</a></li><li class="toc-h2"><a href="#2-komentar">2. Komentar</a></li><li class="toc-h2"><a href="#3-tipe">3. Tipe</a></li><li class="toc-h3"><a href="#cast-promosi">Cast &amp; promosi</a></li><li class="toc-h2"><a href="#4-variabel-scope">4. Variabel &amp; scope</a></li><li class="toc-h2"><a href="#5-operator">5. Operator</a></li><li class="toc-h2"><a href="#6-kontrol-alir">6. Kontrol alir</a></li><li class="toc-h3"><a href="#switch-v1-19">switch (v1.19)</a></li><li class="toc-h2"><a href="#7-array">7. Array</a></li><li class="toc-h3"><a href="#buffer-byte-byte-uint8-v1-43-v1-44">Buffer byte byte[] / uint8[] (v1.43–v1.44)</a></li><li class="toc-h3"><a href="#metode-fungsional-array-gula">Metode fungsional array (gula)</a></li><li class="toc-h2"><a href="#8-string">8. String</a></li><li class="toc-h3"><a href="#konversi-skalar">Konversi skalar</a></li><li class="toc-h3"><a href="#metode-instance-butuh-import-str">Metode instance (butuh import Str;)</a></li><li class="toc-h3"><a href="#buffer-byte-bytes">Buffer byte: Bytes</a></li><li class="toc-h3"><a href="#template-string-backtick">Template string (backtick)</a></li><li class="toc-h2"><a href="#9-fungsi">9. Fungsi</a></li><li class="toc-h3"><a href="#9-1-konstanta-static">9.1 Konstanta static</a></li><li class="toc-h2"><a href="#10-lambda-fn">10. Lambda &amp; fn</a></li><li class="toc-h2"><a href="#11-class-sebagai-namespace">11. Class sebagai namespace</a></li><li class="toc-h2"><a href="#12-class-instance">12. Class instance</a></li><li class="toc-h2"><a href="#13-json-literal">13. JSON literal</a></li><li class="toc-h2"><a href="#14-memori-malloc-arena-per-blok-tanpa-gc">14. Memori: malloc&lt;...&gt; { ... }, arena per blok, tanpa GC</a></li><li class="toc-h3"><a href="#aturan-keamanan">Aturan keamanan</a></li><li class="toc-h3"><a href="#memmark-memreset-manual-opsional">memMark / memReset manual (opsional)</a></li><li class="toc-h2"><a href="#15-keluar-kode-status">15. Keluar &amp; kode status</a></li><li class="toc-h3"><a href="#error-runtime-nomor-baris-stack-trace">Error runtime: nomor baris + stack trace</a></li><li class="toc-h2"><a href="#16-thread-os-thread-wait">16. Thread OS: thread &amp; wait</a></li><li class="toc-h2"><a href="#17-contoh-tur-lengkap">17. Contoh tur lengkap</a></li></ul></nav>
 <p>Dokumen ini adalah referensi sintaks dan semantik yang berlaku di v1.20. Semua contoh bisa dikompilasi ke a64 dan VM (kecuali ditandai).</p>
 <hr>
 <h2 id="1-bentuk-program">1. Bentuk program<a class="anchor" href="#1-bentuk-program" aria-label="tautan">#</a></h2>
@@ -632,7 +632,38 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <li>Backend native (a64/x64) saat ini tetap mencetak pesan singkat tanpa trace — ini fitur VM (lihat roadmap: trap berline untuk native).</li>
 <li>Error saat <em>kompilasi</em> (<code>kopicc</code>) selalu sudah berline sejak awal.</li>
 </ul>
-<h2 id="16-contoh-tur-lengkap">16. Contoh tur lengkap<a class="anchor" href="#16-contoh-tur-lengkap" aria-label="tautan">#</a></h2>
+<h2 id="16-thread-os-thread-wait">16. Thread OS: <code>thread</code> &amp; <code>wait</code><a class="anchor" href="#16-thread-os-thread-wait" aria-label="tautan">#</a></h2>
+<p>Sejak v1.45 Kopi punya thread OS sungguhan (pthread) dengan sintaks khas Kopi — bukan <code>new Thread(...)</code>:</p>
+<pre><code class="language-java">class Main {
+    static int sq(int x) { return x * x; }
+
+    static void main() {
+        malloc {
+            int[] out = new int[8];
+            long[] hs = new long[8];        // handle thread bertipe long
+            for (int i = 0; i &lt; 8; i++) {
+                thread hs[i] {              // mulai thread, simpan handle
+                    out[i] = sq(i + 1);
+                    return out[i];          // nilai `return` = hasil join
+                }
+            }
+            int total = 0;
+            for (int i = 0; i &lt; 8; i++) total += wait hs[i];
+            System.out.println(total);      // 204
+        }
+    }
+}</code></pre>
+<p>Bentuk pernyataan: <code>thread &lt;target&gt; { ... }</code> atau <code>thread { ... }</code>.</p>
+<ul>
+<li><code>&lt;target&gt;</code> adalah variabel <code>long</code> atau elemen <code>long[]</code>; handle disimpan di sana (pointer TCB 64-bit), jadi banyak thread bisa ditampung dalam satu <code>long[]</code>.</li>
+<li>Tanpa target = <strong>detached</strong>: thread berjalan sendiri dan tidak bisa di-<code>wait</code>.</li>
+<li>Badan thread adalah lambda 0-argumen, jadi aturan capture sama: variabel ditangkap <strong>by-value</strong> saat <code>thread</code> dijalankan, sedangkan array/objek tetap referensi sehingga bisa dipakai berbagi data.</li>
+<li><code>wait h</code> menunggu thread selesai (join) dan mengembalikan <strong><code>int</code></strong> nilai <code>return</code> badan thread (0 bila tidak ada <code>return</code>).</li>
+<li><code>wait h;</code> boleh berdiri sebagai pernyataan bila hasilnya tidak dipakai.</li>
+</ul>
+<p>Sinkronisasi: join adalah titik sinkronisasi; setelah <code>wait</code>, tulisan thread terlihat oleh thread yang menunggu. Belum ada mutex/semaphore/ channel, jadi untuk data bersama pakai pola "satu penulis per sel" lalu join sebelum membaca. Setiap thread punya arena alokasi sendiri (a64 lewat TLS, VM lewat heap per-thread); objek yang dibuat di arena induk tetap sah selama induk belum keluar dari blok <code>malloc{}</code> — join dulu sebelum blok berakhir.</p>
+<p>Batas: tidak ada thread pool, cancel, prioritas, atau <code>wait</code> ganda; panggil <code>wait</code> satu kali per handle. <code>thread</code> tidak bisa dipakai di dalam badan thread lain tanpa handle sendiri (nested spawn biasa saja, tetap perlu <code>long</code> penampung).</p>
+<h2 id="17-contoh-tur-lengkap">17. Contoh tur lengkap<a class="anchor" href="#17-contoh-tur-lengkap" aria-label="tautan">#</a></h2>
 <p>Lihat <code>docs/contoh/tour.kop</code> (dijalankan oleh <code>docs/check.sh</code>). Isinya menggabungkan: tipe, ternary, loop, array fungsional, String method, template, lambda, JSON, dan memMark/memReset.</p>
 <p>Lanjut ke <a href="03-pustaka.html">03 — Pustaka</a>.</p>
 <footer class="foot">

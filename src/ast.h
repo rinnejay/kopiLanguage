@@ -153,6 +153,7 @@ enum {
     ST_FLDASG,     /* obj.field = v : a=objek, str=field, c=value expr    */
     ST_BLOCK,      /* blok { ... } : d=statement list (scope sendiri)      */
     ST_REGION,     /* malloc { ... } : d=isi; ival=slot penanda arena      */
+    ST_THREAD,     /* thread [h] { ... } : a=lambda badan, b=tujuan handle */
 };
 
 typedef struct Node {

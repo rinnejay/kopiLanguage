@@ -667,17 +667,155 @@ void gen_x64(const char *outpath) {
     emit(".text");
     emit("\t.globl kopalloc");
     emit("kopalloc:");
+    /* v1.45: bump atomik — aman dipakai beberapa thread (arena global x64
+     * dipakai bersama; x64 hanya diverifikasi sintaks di suite aarch64). */
+    emit("\tmovq %%rdi, %%rdx");
     emit("\tmovq kop_arena_used(%%rip), %%rax");
-    emit("\taddq %%rdi, %%rax");
-    emit("\tcmpq kop_arena_cap(%%rip), %%rax");
+    emit(".KALXretry:");
+    emit("\tmovq %%rax, %%rcx");
+    emit("\taddq %%rdx, %%rcx");
+    emit("\tcmpq kop_arena_cap(%%rip), %%rcx");
     emit("\tjge .Koom");
-    emit("\tmovq %%rax, kop_arena_used(%%rip)");
-    emit("\tsubq %%rdi, %%rax");
+    emit("\tlock cmpxchgq %%rcx, kop_arena_used(%%rip)");
+    emit("\tjne .KALXretry");
     emit("\taddq kop_arena_base(%%rip), %%rax");
+    emit("\tret");
+
+    /* ── v1.45: thread OS (pthread) ──────────────────────────────── */
+    emit(".text");
+    emit("\t.globl kop_thread_spawn");
+    emit("kop_thread_spawn:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tpushq %%rbx");
+    emit("\tpushq %%r12");
+    emit("\tpushq %%r13");
+    emit("\tsubq $8, %%rsp");
+    emit("\tmovq %%rdi, %%rbx");              /* env closure */
+    emit("\tmovq $32, %%rdi");
+    emit("\tcall malloc@PLT");
+    emit("\ttestq %%rax, %%rax");
+    emit("\tje .KTSXfail");
+    emit("\tmovq %%rax, %%r12");              /* tcb */
+    emit("\tmovq $0, 0(%%r12)");
+    emit("\tmovq $0, 8(%%r12)");
+    emit("\tmovq $0, 16(%%r12)");
+    emit("\tmovq $0, 24(%%r12)");
+    emit("\tmovq $16, %%rdi");
+    emit("\tcall malloc@PLT");
+    emit("\ttestq %%rax, %%rax");
+    emit("\tje .KTSXfail");
+    emit("\tmovq %%rax, %%r13");              /* ctx {env,tcb} */
+    emit("\tmovq %%rbx, 0(%%r13)");
+    emit("\tmovq %%r12, 8(%%r13)");
+    emit("\tmovq kop_thread_next(%%rip), %%rax");
+    emit("\tleaq 1(%%rax), %%rcx");
+    emit("\tmovq %%rcx, kop_thread_next(%%rip)");
+    emit("\tmovl %%eax, 24(%%r12)");          /* id */
+    emit("\tmovq %%r12, %%rdi");
+    emit("\txorl %%esi, %%esi");
+    emit("\tleaq kop_thread_trampoline(%%rip), %%rdx");
+    emit("\tmovq %%r13, %%rcx");
+    emit("\tcall pthread_create@PLT");
+    emit("\ttestl %%eax, %%eax");
+    emit("\tjne .KTSXfail");
+    emit("\tmovq %%r12, %%rax");
+    emit("\taddq $8, %%rsp");
+    emit("\tpopq %%r13");
+    emit("\tpopq %%r12");
+    emit("\tpopq %%rbx");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+    emit(".KTSXfail:");
+    emit("\txorl %%eax, %%eax");
+    emit("\taddq $8, %%rsp");
+    emit("\tpopq %%r13");
+    emit("\tpopq %%r12");
+    emit("\tpopq %%rbx");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+
+    /* rdi = ctx {env,tcb}; jalankan closure tanpa parameter */
+    emit(".text");
+    emit("kop_thread_trampoline:");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tpushq %%rbx");
+    emit("\tpushq %%r12");
+    emit("\tmovq %%rdi, %%rbx");
+    emit("\tmovq 8(%%rbx), %%r12");           /* tcb */
+    emit("\tmovq 0(%%rbx), %%r10");           /* env closure */
+    emit("\tmovl 16(%%r10), %%eax");          /* nuser */
+    emit("\ttestl %%eax, %%eax");
+    emit("\tjne .Klam");
+    emit("\tmovq (%%r10), %%r11");            /* kode lambda */
+    emit("\tmovq %%r10, %%rdi");
+    emit("\tcall *%%r11");
+    emit("\tmovl %%eax, 16(%%r12)");          /* nilai balik */
+    emit("\tmovl $1, 8(%%r12)");              /* done */
+    emit("\txorl %%eax, %%eax");
+    emit("\tpopq %%r12");
+    emit("\tpopq %%rbx");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_join");
+    emit("kop_thread_join:");
+    emit("\ttestq %%rdi, %%rdi");
+    emit("\tje .KTJXz");
+    emit("\tpushq %%rbp");
+    emit("\tmovq %%rsp, %%rbp");
+    emit("\tpushq %%rbx");
+    emit("\tsubq $8, %%rsp");
+    emit("\tmovq %%rdi, %%rbx");
+    emit("\tmovq 0(%%rbx), %%rdi");
+    emit("\txorl %%esi, %%esi");
+    emit("\tcall pthread_join@PLT");
+    emit("\tmovl 16(%%rbx), %%eax");
+    emit("\taddq $8, %%rsp");
+    emit("\tpopq %%rbx");
+    emit("\tpopq %%rbp");
+    emit("\tret");
+    emit(".KTJXz:");
+    emit("\txorl %%eax, %%eax");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_alive");
+    emit("kop_thread_alive:");
+    emit("\ttestq %%rdi, %%rdi");
+    emit("\tje .KTAXz");
+    emit("\tmovl 8(%%rdi), %%eax");
+    emit("\txorl $1, %%eax");
+    emit("\tret");
+    emit(".KTAXz:");
+    emit("\txorl %%eax, %%eax");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_id");
+    emit("kop_thread_id:");
+    emit("\ttestq %%rdi, %%rdi");
+    emit("\tje .KTIXz");
+    emit("\tmovl 24(%%rdi), %%eax");
+    emit("\tret");
+    emit(".KTIXz:");
+    emit("\txorl %%eax, %%eax");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_self");
+    emit("kop_thread_self:");
+    emit("\tsubq $8, %%rsp");
+    emit("\tcall pthread_self@PLT");
+    emit("\tandl $0x7fffffff, %%eax");
+    emit("\taddq $8, %%rsp");
     emit("\tret");
 
     emit("\t.section .data");
     emit("\t.align 8");
+    emit("kop_thread_next: .quad 2");
     emit("kop_arena_base: .quad 0");
     emit("kop_arena_cap: .quad 0");
     emit("kop_arena_used: .quad 0");

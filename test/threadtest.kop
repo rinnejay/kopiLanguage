@@ -1,0 +1,69 @@
+// threadtest.kop — v1.45: thread OS (sintaks `thread` + `wait`)
+//
+// Cakupan: satu thread dengan nilai balik, banyak thread lewat long[],
+// data bersama (int[]), nilai balik badan thread, dan thread detached.
+// Semua cetakan dilakukan thread utama agar urutannya deterministik.
+
+class Main {
+    static int sq(int x) { return x * x; }
+
+    static void main() {
+        malloc {
+            /* 1) satu thread, `wait` mengembalikan nilai badan thread */
+            long t = 0;
+            thread t { return 7; }
+            System.out.println(wait t);              // 7
+
+            /* 2) banyak thread: handle disimpan di long[] */
+            int[] out = new int[8];
+            long[] hs = new long[8];
+            for (int i = 0; i < 8; i++) {
+                thread hs[i] {
+                    out[i] = sq(i + 1);
+                    return out[i];
+                }
+            }
+            int sum = 0;
+            for (int i = 0; i < 8; i++) sum += wait hs[i];
+            System.out.println(sum);                 // 204 (1..8 kuadrat)
+
+            int s2 = 0;
+            for (int i = 0; i < 8; i++) s2 += out[i];
+            System.out.println(s2);                  // 204
+
+            /* 3) nilai balik tiap badan thread */
+            long[] rs = new long[4];
+            for (int i = 0; i < 4; i++) {
+                thread rs[i] { return (i + 1) * 10; }
+            }
+            int tot = 0;
+            for (int i = 0; i < 4; i++) tot += wait rs[i];
+            System.out.println(tot);                 // 100
+
+            /* 3b) nilai balik > 255 tidak boleh dipotong (VM == a64) */
+            long big = 0;
+            thread big { return 1000; }
+            System.out.println(wait big);            // 1000
+
+            /* 4) thread detached (tanpa target) tetap berjalan;
+             *    `wait` pada thread lain dipakai sebagai sinkronisasi */
+            int[] flag = new int[1];
+            long j = 0;
+            thread { Net.sleep(20); flag[0] = 99; }
+            thread j { Net.sleep(80); }
+            wait j;
+            System.out.println(flag[0]);             // 99
+
+            /* 5) objek String dibagikan (referensi) ke badan thread */
+            String[] nama = new String[2];
+            long n0 = 0;
+            long n1 = 0;
+            thread n0 { nama[0] = "kopi"; }
+            thread n1 { nama[1] = "thread"; }
+            wait n0;
+            wait n1;
+            System.out.println(nama[0] + "-" + nama[1]);
+        }
+        System.out.println("selesai");
+    }
+}

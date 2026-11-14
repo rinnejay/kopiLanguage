@@ -368,6 +368,26 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tsvc\t#0");
             return 0;                                  /* fd | -errno */
         }
+        if (e->ival == 47 || (e->ival >= 48 && e->ival <= 50)) {
+            /* v1.45: threadspawn(fn) → handle long; join/alive/id(handle) */
+            gen_expr(m, e->a);
+            push_val(1);                              /* env/handle 64-bit */
+            emit("\tldr\tx0, [sp], #16");
+            if (e->ival == 47)      { emit("\tbl\tkop_thread_spawn"); return 1; }
+            else if (e->ival == 48) { emit("\tbl\tkop_thread_join");  return 0; }
+            else if (e->ival == 49) { emit("\tbl\tkop_thread_alive"); return 0; }
+            else                    { emit("\tbl\tkop_thread_id");    return 0; }
+        }
+        if (e->ival == 51) {            /* threadself() → id int */
+            emit("\tbl\tkop_thread_self");
+            return 0;
+        }
+        if (e->ival == 52) {            /* threadyield() → 0 */
+            emit("\tmov\tx8, #124");                  /* __NR_sched_yield */
+            emit("\tsvc\t#0");
+            emit("\tmov\tw0, wzr");
+            return 0;
+        }
         if (e->ival == 7 || e->ival == 8 || e->ival == 42 || e->ival == 43) {
             /* recvb/sendb: buf adalah pointer 64-bit (slot atau packed) */
             for (Node *aa = e->a; aa; aa = aa->next) {
@@ -1003,25 +1023,12 @@ static int gen_expr(Method *m, Node *e) {
                 return 0;
             }
             if (e->ival == 28) {             /* memmark() */
-                emit("\tadrp\tx9, kop_arena_used");
-                emit("\tadd\tx9, x9, :lo12:kop_arena_used");
-                emit("\tldr\tw0, [x9]");
+                emit("\tbl\tkop_arena_mark");
                 return 0;
             }
             if (e->ival == 29) {             /* memreset(mark) */
                 emit("\tldr\tw0, [sp, #0]");
-                emit("\tadrp\tx9, kop_arena_used");
-                emit("\tadd\tx9, x9, :lo12:kop_arena_used");
-                emit("\tcmp\tw0, #0");
-                emit("\tb.ge\t.LMR%dP", ln);
-                emit("\tmov\tw0, wzr");
-                emit(".LMR%dP:", ln);
-                emit("\tldr\tw10, [x9]");
-                emit("\tcmp\tw0, w10");
-                emit("\tb.le\t.LMR%dS", ln);
-                emit("\tmov\tw0, w10");
-                emit(".LMR%dS:", ln);
-                emit("\tstr\tw0, [x9]");
+                emit("\tbl\tkop_arena_reset");
                 emit("\tadd\tsp, sp, #16");
                 return 0;
             }

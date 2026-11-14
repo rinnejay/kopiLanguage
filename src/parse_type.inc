@@ -263,6 +263,13 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "pollfd"))   { bi = 39; want = 3; }
             else if (!strcmp(fn, "mkstr"))    { bi = 40; want = 1; }
             else if (!strcmp(fn, "strbytes")) { bi = 41; want = 1; }
+            /* v1.45: thread OS (lambda tanpa argumen sebagai badan) */
+            else if (!strcmp(fn, "threadspawn")) { bi = 47; want = 1; }
+            else if (!strcmp(fn, "threadjoin"))  { bi = 48; want = 1; }
+            else if (!strcmp(fn, "threadalive")) { bi = 49; want = 1; }
+            else if (!strcmp(fn, "threadid"))    { bi = 50; want = 1; }
+            else if (!strcmp(fn, "threadself"))  { bi = 51; want = 0; }
+            else if (!strcmp(fn, "threadyield")) { bi = 52; want = 0; }
             else die("baris %d: fungsi Net.%s tidak ada", e->line, fn);
 
             int narg = (int)e->ival;
@@ -383,6 +390,13 @@ static Ty type_expr_raw(Node *e) {
                 } else if (bi == 25 || bi == 26 || bi == 27 || bi == 29 || bi == 31) {
                     if (t != T_INT)
                         die("baris %d: argumen Net.%s harus int", e->line, fn);
+                } else if (bi == 47) {
+                    /* badan thread: lambda tanpa parameter */
+                    if (t != T_FN)
+                        die("baris %d: Net.threadspawn butuh lambda/fn", e->line);
+                } else if (bi >= 48 && bi <= 50) {
+                    if (t != T_LONG && t != T_UINT64)
+                        die("baris %d: argumen Net.%s harus handle long", e->line, fn);
                 } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
             }
@@ -395,7 +409,7 @@ static Ty type_expr_raw(Node *e) {
             }
             e->kind = EX_NET;
             e->ival = bi;
-            if (bi == 19) { e->dty = (int)T_LONG; return T_LONG; }
+            if (bi == 19 || bi == 47) { e->dty = (int)T_LONG; return T_LONG; }
             if (bi == 22 || bi == 31 || bi == 32 || bi == 40) { e->dty = (int)T_STR; return T_STR; }
             if (bi == 23 || bi == 24) { e->dty = (int)T_BOOL; return T_BOOL; }
             if (bi == 41) { e->dty = (int)T_ARI; return T_ARI; }

@@ -111,14 +111,20 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
 - `brk_lab/cont_lab` menangani `break`/`continue` bersarang.
 - Panggilan libc (`getenv`, `system`, `poll`) memakai `bl`; simpan
   register caller-saved yang masih dibutuhkan setelah panggilan.
-- Entry `main`: alokasi arena global 32 MB via `malloc`, simpan argc/argv,
-  lalu panggil `main` Kopi.
+- Entry `main`: arena awal 32 MB lewat `kop_arena_init_main` (state di
+  TLS), simpan argc/argv, lalu panggil `main` Kopi.
 - Blok `malloc` memakai helper `kop_arena_enter`/`kop_arena_leave`:
   handler menyimpan (base, cap, used, flag mmap/auto) arena luar, lalu
   menyiapkan arena baru. Ukuran 0 = **otomatis**: `mmap` 4096 MB dengan
   `MAP_NORESERVE` (RAM sesuai halaman yang disentuh); ukuran eksplisit =
   `malloc`. Saat keluar, arena auto di-`munmap`, arena eksplisit di-`free`.
-  `kopalloc` membaca batas dari `kop_arena_cap`, bukan konstanta 32 MB.
+  `kopalloc` membaca batas arena aktif dari TLS (`kop_tls`), bukan konstanta.
+- v1.45: state arena thread-lokal di `.tbss` (`kop_tls`, 64-byte aligned;
+  bionic menolak TLS underaligned). `kop_thread_spawn` memakai
+  `pthread_create`; TCB 32 byte `[pthread_t][done][ret][id]`. Trampoline
+  menyiapkan arena thread (`kop_arena_thread_init`) lalu memanggil
+  closure langsung (tanpa `nuser`); `wait` = `pthread_join` + baca `ret`.
+  Id 1 = thread utama, sisanya dari `kop_thread_next` (atomic).
 
 ### x86-64 (`gen_x64.c`)
 
@@ -136,11 +142,18 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
 - Nilai selalu 64-bit; operasi int32 harus dinormalisasi (`OP_NORM`)
   agar semantik sama dengan native.
 - `OP_NET` + field `bi` memetakan builtin `Net.*` ke syscall host.
-- Heap global 32 MB (`HEAPLEN` = 4M elemen 64-bit); `new` men-zero-kan.
+- Heap per-thread 32 MB (`HEAPLEN` = 4M elemen 64-bit); `new` men-zero-kan.
   Blok `malloc` mengalokasi heap sendiri (`OP_RENTER`) dan membebaskannya
   (`OP_RLEAVE`); ukuran 0 = auto (`mmap` 4096 MB), selain itu `malloc`.
   `heap_cap` menyesuaikan batas aktif; `heap_mmapped`/`heap_auto`
   menentukan `munmap` vs `free` dan pesan OOM.
+- v1.45: seluruh state interpreter (stack operand, frame, locals, arena)
+  ada di `VState` dan diakses lewat `_Thread_local VState *vt`. Registry
+  `heapreg` menyimpan rentang heap semua thread yang hidup sehingga
+  `in_heap` menerima objek lintas-thread; arena thread tidak dibebaskan
+  saat thread selesai (join = sinkronisasi). Thread = `pthread`, handle
+  `long` = pointer `VMThread`; `bi` 47–52 melayani
+  spawn/join/alive/id/self/yield.
 - v1.22: loop panas memakai superinstruksi (`OP_LOOP`, `OP_CMP_JMP*`,
   `OP_OP_STORE`, `OP_IDXR_L`, `OP_IDXW_L`, `OP_BIN_L`) + lipat konstanta;
   emitter ada di `gen_vm_fuse.inc`.

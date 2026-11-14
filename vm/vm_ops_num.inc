@@ -207,11 +207,13 @@
             heap_used = 0;
             heap_mmapped = auto_mode;
             heap_auto = auto_mode;
+            heap_register(heap, heap_cap);
             break;
         }
         case OP_RLEAVE:                        /* v1.21: keluar blok malloc */
             if (asp <= 0) dievm("internal: keluar arena tanpa masuk");
             asp--;
+            heap_unregister(heap);
             if (heap_mmapped) munmap(heap, (size_t)heap_cap * 8);
             else free(heap);
             heap = astk[asp].base;

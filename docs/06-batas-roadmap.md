@@ -41,15 +41,17 @@ Batas teknis lain:
 | aarch64 native | **dijalankan** di Termux/ARM, diuji suite |
 | VM KOP1 | **dijalankan**, diuji suite |
 | x86-64 native | **hanya verifikasi sintaks** (`cc -target x86_64-linux-gnu -c`); belum dieksekusi di CI |
-| Thread / fork / async | tidak ada; server single-thread |
+| Thread OS | **✅ v1.45** — sintaks `thread <long> { ... }` + `wait h` (pthread; a64 & VM; handle `long`/`long[]`). Belum ada mutex/channel/thread pool. `fork`/`async` belum ada |
 | Signal handler / graceful shutdown | tidak ada |
 | Diagnostik runtime | nomor baris + stack trace + `saran:` perbaikan |
-| Arena | global 32 MB (a64/x64/VM); `malloc{}` otomatis (mmap hingga 4096 MB) atau `malloc<N>` 1 kb–4096 MB; tanpa GC |
+| Arena | per-thread (a64 TLS, VM heap/thread, x64 global); `malloc{}` otomatis (mmap hingga 4096 MB) atau `malloc<N>` 1 kb–4096 MB; tanpa GC |
 | Cross-compile | a64 hanya di ARM; x64 hanya di x86-64 |
 
-Konsekuensi: service CPU-bound memblokir semua klien; satu request
-lambat menahan loop (kecuali I/O non-blocking). Untuk produksi:
-reverse proxy + beberapa proses.
+Konsekuensi: thread OS tersedia untuk tugas CPU-bound (v1.45), tetapi
+contoh server tetap **single-thread**; belum ada mutex/channel sehingga
+berbagi state antar-thread harus lewat pola join / satu penulis per sel.
+Service yang butuh isolasi penuh tetap paling aman dijalankan sebagai
+beberapa proses di belakang reverse proxy.
 
 ## 3. Jaringan
 

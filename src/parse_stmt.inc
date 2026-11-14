@@ -107,6 +107,36 @@ static Node *stmt_single(void) {
     case KW_CONTINUE: { advance(); expect(';', "';'"); Node *n = newnode(ST_CONT, line); return n; }
     case KW_SWITCH: return parse_switch(line);   /* v1.19 */
     case KW_MALLOC: return parse_malloc(line);   /* v1.20 */
+    case KW_THREAD: {                            /* v1.45: thread [h] { ... } */
+        advance();
+        Node *tgt = 0;
+        if (!at('{')) {
+            Tok *vt = peek();
+            expect(T_ID, "nama variabel handle thread (long)");
+            Node *v = newnode(EX_VAR, vt->line);
+            v->str = xs(vt->text);
+            if (at('[')) {
+                advance();
+                Node *ix = expr();
+                expect(']', "']' setelah indeks target thread");
+                Node *idxn = newnode(EX_IDX, vt->line);
+                idxn->a = v;
+                idxn->b = ix;
+                tgt = idxn;
+            } else {
+                tgt = v;
+            }
+        }
+        if (!at('{'))
+            die("baris %d: setelah target thread butuh '{' badan thread", line);
+        Node *ar = newnode(EX_ARROW, line);
+        ar->c = 0;                               /* lambda tanpa parameter */
+        ar->d = block();
+        Node *n = newnode(ST_THREAD, line);
+        n->a = ar;
+        n->b = tgt;
+        return n;
+    }
     case '{': {
         Node *n = newnode(ST_BLOCK, line);
         n->d = block();
@@ -136,6 +166,14 @@ static Node *stmt_single(void) {
         }
         expect(')', "')' setelah pernyataan print");
         expect(';', "';'");
+        return n;
+    }
+
+    /* v1.45: `wait h;` sebagai pernyataan (join tanpa memakai hasil) */
+    if (at(KW_WAIT)) {
+        Node *n = newnode(ST_EXPR, line);
+        n->a = expr();
+        expect(';', "';' setelah wait");
         return n;
     }
 

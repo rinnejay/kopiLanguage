@@ -773,7 +773,61 @@ kopivm: error: indeks array di luar batas (5)
   trace — ini fitur VM (lihat roadmap: trap berline untuk native).
 - Error saat *kompilasi* (`kopicc`) selalu sudah berline sejak awal.
 
-## 16. Contoh tur lengkap
+## 16. Thread OS: `thread` & `wait`
+
+Sejak v1.45 Kopi punya thread OS sungguhan (pthread) dengan sintaks
+khas Kopi — bukan `new Thread(...)`:
+
+```java
+class Main {
+    static int sq(int x) { return x * x; }
+
+    static void main() {
+        malloc {
+            int[] out = new int[8];
+            long[] hs = new long[8];        // handle thread bertipe long
+            for (int i = 0; i < 8; i++) {
+                thread hs[i] {              // mulai thread, simpan handle
+                    out[i] = sq(i + 1);
+                    return out[i];          // nilai `return` = hasil join
+                }
+            }
+            int total = 0;
+            for (int i = 0; i < 8; i++) total += wait hs[i];
+            System.out.println(total);      // 204
+        }
+    }
+}
+```
+
+Bentuk pernyataan: `thread <target> { ... }` atau `thread { ... }`.
+
+- `<target>` adalah variabel `long` atau elemen `long[]`; handle
+  disimpan di sana (pointer TCB 64-bit), jadi banyak thread bisa
+  ditampung dalam satu `long[]`.
+- Tanpa target = **detached**: thread berjalan sendiri dan tidak bisa
+  di-`wait`.
+- Badan thread adalah lambda 0-argumen, jadi aturan capture sama:
+  variabel ditangkap **by-value** saat `thread` dijalankan, sedangkan
+  array/objek tetap referensi sehingga bisa dipakai berbagi data.
+- `wait h` menunggu thread selesai (join) dan mengembalikan **`int`**
+  nilai `return` badan thread (0 bila tidak ada `return`).
+- `wait h;` boleh berdiri sebagai pernyataan bila hasilnya tidak dipakai.
+
+Sinkronisasi: join adalah titik sinkronisasi; setelah `wait`, tulisan
+thread terlihat oleh thread yang menunggu. Belum ada mutex/semaphore/
+channel, jadi untuk data bersama pakai pola "satu penulis per sel" lalu
+join sebelum membaca. Setiap thread punya arena alokasi sendiri (a64
+lewat TLS, VM lewat heap per-thread); objek yang dibuat di arena induk
+tetap sah selama induk belum keluar dari blok `malloc{}` — join dulu
+sebelum blok berakhir.
+
+Batas: tidak ada thread pool, cancel, prioritas, atau `wait` ganda;
+panggil `wait` satu kali per handle. `thread` tidak bisa dipakai di
+dalam badan thread lain tanpa handle sendiri (nested spawn biasa saja,
+tetap perlu `long` penampung).
+
+## 17. Contoh tur lengkap
 
 Lihat `docs/contoh/tour.kop` (dijalankan oleh `docs/check.sh`). Isinya
 menggabungkan: tipe, ternary, loop, array fungsional, String method,

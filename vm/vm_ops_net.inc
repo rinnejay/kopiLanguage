@@ -385,6 +385,23 @@
                 int64_t on = stackv[--sp];
                 int r = system(on ? "stty raw -echo 2>/dev/null" : "stty sane 2>/dev/null");
                 stackv[sp++] = (r == -1) ? -1 : 0;
+            } else if (bi == 47) {                /* v1.45: threadspawn(fn) */
+                int64_t clo = stackv[--sp];
+                stackv[sp++] = vm_thread_spawn(clo);
+            } else if (bi == 48) {                /* threadjoin(handle) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_thread_join((long)h);
+            } else if (bi == 49) {                /* threadalive(handle) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_thread_alive((long)h);
+            } else if (bi == 50) {                /* threadid(handle) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_thread_id((long)h);
+            } else if (bi == 51) {                /* threadself() */
+                stackv[sp++] = vm_thread_self();
+            } else if (bi == 52) {                /* threadyield() */
+                sched_yield();
+                stackv[sp++] = 0;
             } else {
                 dievm("Net builtin tidak dikenal");
             }

@@ -105,6 +105,24 @@ Untuk melayani banyak koneksi tanpa thread, pakai `Net.pollfd`.
 `examples/server/ServerEvent.kop` adalah implementasi lengkap (32 koneksi,
 buffer 8 KiB/koneksi, keep-alive, timeout 20 dtk).
 
+### 4.1 Tugas CPU-bound dengan `thread` (v1.45)
+
+Event loop tetap pilihan terbaik untuk I/O; untuk pekerjaan CPU-bound
+yang tidak boleh memblokir loop, pakai thread OS:
+
+```java
+long w = 0;
+thread w { hasil = kerjaBerat(data); }
+// ... layani koneksi lain / pollfd ...
+wait w;                       // join; tulisan thread terlihat setelahnya
+```
+
+Badan thread adalah lambda 0-argumen: variabel ditangkap by-value,
+array/objek dipakai lewat referensi. Setiap thread punya arena sendiri
+(a64/VM), jadi alokasi di dalam thread aman; join dulu sebelum blok
+`malloc{}` induk berakhir. Belum ada mutex/channel — pakai satu penulis
+per sel data bersama.
+
 Kerangka:
 
 ```java

@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="04-jaringan-server">04 — Jaringan &amp; server<a class="anchor" href="#04-jaringan-server" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-builtin-net-yang-tersedia">1. Builtin Net yang tersedia</a></li><li class="toc-h2"><a href="#2-server-tcp-minimal-blocking">2. Server TCP minimal (blocking)</a></li><li class="toc-h2"><a href="#3-http-server-blocking-keep-alive">3. HTTP server blocking + keep-alive</a></li><li class="toc-h3"><a href="#helper-respons">Helper respons</a></li><li class="toc-h2"><a href="#4-event-loop-banyak-klien-satu-proses">4. Event loop: banyak klien, satu proses</a></li><li class="toc-h2"><a href="#5-websocket">5. WebSocket</a></li><li class="toc-h2"><a href="#6-tls-klien">6. TLS klien</a></li><li class="toc-h2"><a href="#7-auth-session-jwt-di-server">7. Auth, session, JWT di server</a></li><li class="toc-h2"><a href="#8-game-realtime-udp">8. Game realtime (UDP)</a></li><li class="toc-h2"><a href="#9-deployment-operasional">9. Deployment &amp; operasional</a></li><li class="toc-h2"><a href="#10-menguji-server">10. Menguji server</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#1-builtin-net-yang-tersedia">1. Builtin Net yang tersedia</a></li><li class="toc-h2"><a href="#2-server-tcp-minimal-blocking">2. Server TCP minimal (blocking)</a></li><li class="toc-h2"><a href="#3-http-server-blocking-keep-alive">3. HTTP server blocking + keep-alive</a></li><li class="toc-h3"><a href="#helper-respons">Helper respons</a></li><li class="toc-h2"><a href="#4-event-loop-banyak-klien-satu-proses">4. Event loop: banyak klien, satu proses</a></li><li class="toc-h3"><a href="#4-1-tugas-cpu-bound-dengan-thread-v1-45">4.1 Tugas CPU-bound dengan thread (v1.45)</a></li><li class="toc-h2"><a href="#5-websocket">5. WebSocket</a></li><li class="toc-h2"><a href="#6-tls-klien">6. TLS klien</a></li><li class="toc-h2"><a href="#7-auth-session-jwt-di-server">7. Auth, session, JWT di server</a></li><li class="toc-h2"><a href="#8-game-realtime-udp">8. Game realtime (UDP)</a></li><li class="toc-h2"><a href="#9-deployment-operasional">9. Deployment &amp; operasional</a></li><li class="toc-h2"><a href="#10-menguji-server">10. Menguji server</a></li></ul></nav>
 <p>Dokumen ini menghubungkan builtin <code>Net.*</code> dengan pola server yang sudah diuji di repo. Semua contoh ada versi lengkapnya di <code>examples/</code>.</p>
 <hr>
 <h2 id="1-builtin-net-yang-tersedia">1. Builtin <code>Net</code> yang tersedia<a class="anchor" href="#1-builtin-net-yang-tersedia" aria-label="tautan">#</a></h2>
@@ -159,6 +159,13 @@ HttpServer.bodyAny(req);       // mendukung Transfer-Encoding: chunked
 HttpServer.keepAlive(req);     // HTTP/1.1 default keep-alive</code></pre>
 <h2 id="4-event-loop-banyak-klien-satu-proses">4. Event loop: banyak klien, satu proses<a class="anchor" href="#4-event-loop-banyak-klien-satu-proses" aria-label="tautan">#</a></h2>
 <p>Untuk melayani banyak koneksi tanpa thread, pakai <code>Net.pollfd</code>. <code>examples/server/ServerEvent.kop</code> adalah implementasi lengkap (32 koneksi, buffer 8 KiB/koneksi, keep-alive, timeout 20 dtk).</p>
+<h3 id="4-1-tugas-cpu-bound-dengan-thread-v1-45">4.1 Tugas CPU-bound dengan <code>thread</code> (v1.45)<a class="anchor" href="#4-1-tugas-cpu-bound-dengan-thread-v1-45" aria-label="tautan">#</a></h3>
+<p>Event loop tetap pilihan terbaik untuk I/O; untuk pekerjaan CPU-bound yang tidak boleh memblokir loop, pakai thread OS:</p>
+<pre><code class="language-java">long w = 0;
+thread w { hasil = kerjaBerat(data); }
+// ... layani koneksi lain / pollfd ...
+wait w;                       // join; tulisan thread terlihat setelahnya</code></pre>
+<p>Badan thread adalah lambda 0-argumen: variabel ditangkap by-value, array/objek dipakai lewat referensi. Setiap thread punya arena sendiri (a64/VM), jadi alokasi di dalam thread aman; join dulu sebelum blok <code>malloc{}</code> induk berakhir. Belum ada mutex/channel — pakai satu penulis per sel data bersama.</p>
 <p>Kerangka:</p>
 <pre><code class="language-java">int lfd = Net.socket(2, 1);
 Net.setsockopt(lfd, 1, 2, 1);

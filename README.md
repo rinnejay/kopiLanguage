@@ -25,8 +25,8 @@ assembly/binary sendiri — tanpa JVM, tanpa bytecode vendor lain.
 
 ```sh
 make                 # kopicc + kopivm
-make test            # 155 uji lintas backend
-./kopicc --version   # kopicc 1.42.0 (Kopi) — target a64 | x64 | vm
+make test            # 201 uji lintas backend
+./kopicc --version   # kopicc 1.45.0 (Kopi) — target a64 | x64 | vm
 
 # binary asli (aarch64)
 ./kopicc examples/hello.kop -t a64 -o hello.s
@@ -68,6 +68,10 @@ class Main {
 - Kontrol alir: `if/else`, `while`, `do/while`, `for`, `break`,
   `continue`, ternary, **`switch`** tanpa fall-through.
 - Lambda/closure sejati (`fn`), capture by-value.
+- **Thread OS** (`thread` / `wait`, v1.45): `thread h { ... }` menjalankan
+  badan thread (lambda 0-argumen) dan menyimpan handle `long`;
+  `long[]` menampung banyak thread; `wait h` join dan mengembalikan
+  nilai `return` badan thread. Tanpa target = detached.
 - **`malloc { ... }` otomatis** — arena sampai 4096 MB (RAM sesuai
   kebutuhan), tanpa menebak ukuran; `malloc<64mb>` untuk batas keras
   (`b/kb/mb/gb`), dibebaskan di semua jalur keluar blok.
@@ -140,7 +144,7 @@ test.sh     suite lintas backend
 
 ## Status
 
-`v1.42.0` — **193 pass, 0 fail**. Riwayat versi lengkap:
+`v1.45.0` — **201 pass, 0 fail**. Riwayat versi lengkap:
 [`CHANGELOG.md`](CHANGELOG.md). Batas jujur & rencana:
 [docs/06-batas-roadmap.md](docs/06-batas-roadmap.md).
 

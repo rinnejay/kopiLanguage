@@ -16,6 +16,7 @@ enum {
     KW_TRUE, KW_FALSE, KW_BREAK, KW_CONTINUE, KW_IMPORT, KW_FN, KW_JSON,
     KW_SWITCH, KW_CASE, KW_DEFAULT,          /* v1.19 */
     KW_MALLOC,                               /* v1.20 */
+    KW_THREAD, KW_WAIT,                      /* v1.45: thread OS + join */
 
     T_PP, T_MM, T_ADDEQ, T_SUBEQ, T_MULEQ, T_DIVEQ, T_MODEQ,
     T_ARROW,       /* => */

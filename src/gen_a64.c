@@ -150,6 +150,14 @@ static void emit_imm64(const char *reg, unsigned long v) {
     }
 }
 
+/* v1.45: alamat state arena thread-lokal (TLS) ke reg — base,cap,used,
+ * mmapped,auto,id di offset 0,8,16,24,32,40. */
+static void tls_addr(const char *reg) {
+    emit("\tmrs\t%s, tpidr_el0", reg);
+    emit("\tadd\t%s, %s, :tprel_hi12:kop_tls", reg, reg);
+    emit("\tadd\t%s, %s, :tprel_lo12_nc:kop_tls", reg, reg);
+}
+
 /* v1.21: masuk arena blok — alokasi arena baru sebesar bytes, simpan handle */
 static void emit_region_enter(int slot, long bytes) {
     emit_imm64("x0", (unsigned long)bytes);
@@ -517,15 +525,10 @@ void gen_a64(const char *outpath) {
     emit("\tadd\tx9, x9, :lo12:kop_argv");
     emit("\tadd\tx11, x1, #8");
     emit("\tstr\tx11, [x9]");
-    /* init arena: blok 32 MB sekali via malloc (X25519 ladder mengalokasi
-     * ~2,5 MB per panggilan; 6 vektor RFC butuh ~15 MB) */
-    emit_imm64("x0", 32UL * 1024 * 1024);   /* arena global default 32 MB */
-    emit("\tbl\tmalloc");
-    emit("\tadrp\tx1, kop_arena_base");
-    emit("\tstr\tx0, [x1, :lo12:kop_arena_base]");
-    emit_imm64("x9", 32UL * 1024 * 1024);
-    emit("\tadrp\tx1, kop_arena_cap");
-    emit("\tstr\tx9, [x1, :lo12:kop_arena_cap]");
+    /* v1.45: arena awal 32 MB diinisialisasi thread-lokal di runtime
+     * (X25519 ladder mengalokasi ~2,5 MB per panggilan; 6 vektor RFC
+     * butuh ~15 MB). */
+    emit("\tbl\tkop_arena_init_main");
     emit("\tmov\tw0, wzr");                 /* arg main (abaikan argc/argv) */
     emit("\tbl\t%s__%s", entry->cls, entry->name);   /* class main: ret balik */
     emit("\tmov\tw0, wzr");                 /* exit status 0 */

@@ -91,7 +91,7 @@
             if (mm->nlocals >= MAXLOC) dievm("terlalu banyak local");
             long base = sp - cn;
             if (base < 0) dievm("stack korup");
-            memset(localsv[nframes], 0, sizeof localsv[nframes]);
+            memset(localsv[nframes], 0, (size_t)MAXLOC * sizeof(int64_t));
             for (int i = 0; i < cn; i++) localsv[nframes][i] = stackv[base + i];
             sp = base;
             frames[nframes].meth = cm;
@@ -166,7 +166,7 @@
             if (mm->nlocals >= MAXLOC) dievm("terlalu banyak local (lambda)");
             long base = sp - cn;
             if (base < 0) dievm("stack korup (CALLIND args)");
-            memset(localsv[nframes], 0, sizeof localsv[nframes]);
+            memset(localsv[nframes], 0, (size_t)MAXLOC * sizeof(int64_t));
             localsv[nframes][0] = clo;
             for (int i = 0; i < (int)cn; i++)
                 localsv[nframes][i + 1] = stackv[base + i];

@@ -1308,6 +1308,35 @@ static int gen_expr(Method *m, Node *e) {
             emit("\taddq $16, %%rsp");
             return 0;
         }
+        if (e->ival == 47 || (e->ival >= 48 && e->ival <= 50)) {
+            /* v1.45: threadspawn(fn) → handle; join/alive/id(handle) */
+            gen_expr(m, e->a);
+            spush();
+            emit("\tmovq (%%rsp), %%rdi");
+            emit("\taddq $8, %%rsp");
+            par ^= 1;
+            int need = par;
+            if (need) emit("\tsubq $8, %%rsp");
+            if (e->ival == 47)      emit("\tcall kop_thread_spawn");
+            else if (e->ival == 48) emit("\tcall kop_thread_join");
+            else if (e->ival == 49) emit("\tcall kop_thread_alive");
+            else                    emit("\tcall kop_thread_id");
+            if (need) emit("\taddq $8, %%rsp");
+            return e->ival == 47 ? 1 : 0;
+        }
+        if (e->ival == 51) {                       /* threadself() */
+            int need = par;
+            if (need) emit("\tsubq $8, %%rsp");
+            emit("\tcall kop_thread_self");
+            if (need) emit("\taddq $8, %%rsp");
+            return 0;
+        }
+        if (e->ival == 52) {                       /* threadyield() */
+            emit("\tmovl $24, %%eax");             /* __NR_sched_yield */
+            emit("\tsyscall");
+            emit("\txorl %%eax, %%eax");
+            return 0;
+        }
         int n = 0;
         for (Node *aa = e->a; aa; aa = aa->next) {
             gen_expr(m, aa);

@@ -18,6 +18,9 @@
 #include <errno.h>
 #include <math.h>
 #include <sys/mman.h>
+#include <pthread.h>
+#include <stdatomic.h>
+#include <sched.h>
 #include "ast.h"
 
 enum {
@@ -84,19 +87,15 @@ static char *cpool[65536];
 static int ncp;
 
 static void dievm(const char *m);
-static void dievm2(const char *m, long v);
 
 /* heap untuk closure & array (bump arena; GC belum ada).
  * Arena global 32 MB; setiap blok malloc<...> mendapat arena sendiri.
  * v1.22: blok `malloc { ... }` (tanpa ukuran) = OTOMATIS — mmap 4096 MB
- * dengan MAP_NORESERVE, sehingga RAM baru terpakai saat disentuh. */
+ * dengan MAP_NORESERVE, sehingga RAM baru terpakai saat disentuh.
+ * v1.45: setiap thread punya arena sendiri; semua arena hidup didaftarkan
+ * agar objek lintas-thread tetap dianggap valid oleh in_heap. */
 #define HEAPLEN (1 << 22)          /* slot long (32 MB) */
 #define AUTOCAP (4096L * 1024 * 1024)   /* batas arena otomatis */
-static long *heap;
-static long heap_cap;              /* kapasitas arena aktif, satuan slot */
-static long heap_used;
-static int heap_mmapped;           /* arena aktif hasil mmap? */
-static int heap_auto;              /* batas otomatis (pesan error) */
 
 /* tumpukan konteks arena untuk malloc{} bersarang */
 typedef struct {
@@ -104,18 +103,122 @@ typedef struct {
     int mmapped, auto_mode;
 } ArenaCtx;
 #define MAXARENA 64
-static ArenaCtx astk[MAXARENA];
-static int asp;
 
-/* pointer berasal dari arena aktif atau salah satu arena luar (nested) */
+typedef struct { int meth; long pc; long retbase; int line; const char *file; } Frame;
+
+/* state interpreter yang dimiliki satu thread (v1.45) */
+typedef struct {
+    int64_t *stackv;
+    long sp;
+    Frame *frames;
+    int nframes;
+    int64_t (*localsv)[MAXLOC];    /* MAXFRAMES baris */
+    long *heap;
+    long heap_cap, heap_used;
+    int heap_mmapped, heap_auto;
+    ArenaCtx astk[MAXARENA];
+    int asp;
+    int id;                        /* id thread (1 = utama) */
+} VState;
+
+static _Thread_local VState *vt;
+
+#define stackv (vt->stackv)
+#define sp     (vt->sp)
+#define frames (vt->frames)
+#define nframes (vt->nframes)
+#define localsv (vt->localsv)
+#define heap   (vt->heap)
+#define heap_cap (vt->heap_cap)
+#define heap_used (vt->heap_used)
+#define heap_mmapped (vt->heap_mmapped)
+#define heap_auto (vt->heap_auto)
+#define astk   (vt->astk)
+#define asp    (vt->asp)
+
+/* registry rentang heap hidup dari semua thread; slot mati dipakai ulang */
+typedef struct { _Atomic(long *) base; _Atomic long cap; } HeapRange;
+#define MAXHEAPREG 8192
+static HeapRange heapreg[MAXHEAPREG];
+static _Atomic int nheapreg;
+static pthread_mutex_t heapreg_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static void heap_register(long *base, long cap) {
+    if (!base || cap <= 0) return;
+    pthread_mutex_lock(&heapreg_mu);
+    int n = atomic_load_explicit(&nheapreg, memory_order_relaxed);
+    if (n > MAXHEAPREG) n = MAXHEAPREG;
+    int slot = -1;
+    for (int i = 0; i < n; i++)
+        if (atomic_load_explicit(&heapreg[i].base, memory_order_relaxed) == 0)
+            { slot = i; break; }
+    if (slot < 0) {
+        slot = n;
+        if (n < MAXHEAPREG)
+            atomic_store_explicit(&nheapreg, n + 1, memory_order_release);
+    }
+    if (slot < MAXHEAPREG) {
+        atomic_store_explicit(&heapreg[slot].base, base, memory_order_relaxed);
+        atomic_store_explicit(&heapreg[slot].cap, cap, memory_order_release);
+    }
+    pthread_mutex_unlock(&heapreg_mu);
+}
+
+static void heap_unregister(long *base) {
+    pthread_mutex_lock(&heapreg_mu);
+    int n = atomic_load_explicit(&nheapreg, memory_order_relaxed);
+    if (n > MAXHEAPREG) n = MAXHEAPREG;
+    for (int i = 0; i < n; i++)
+        if (atomic_load_explicit(&heapreg[i].base, memory_order_relaxed) == base) {
+            atomic_store_explicit(&heapreg[i].cap, 0, memory_order_relaxed);
+            atomic_store_explicit(&heapreg[i].base, 0, memory_order_release);
+        }
+    pthread_mutex_unlock(&heapreg_mu);
+}
+
+/* pointer berasal dari salah satu arena hidup (thread ini atau thread lain) */
 static int in_heap(const long *p) {
-    if (p >= heap && p < heap + heap_cap) return 1;
-    for (int i = asp - 1; i >= 0; i--)
-        if (p >= astk[i].base && p < astk[i].base + astk[i].cap) return 1;
+    if (!p) return 0;
+    int n = atomic_load_explicit(&nheapreg, memory_order_acquire);
+    if (n > MAXHEAPREG) n = MAXHEAPREG;
+    for (int i = 0; i < n; i++) {
+        long *b = atomic_load_explicit(&heapreg[i].base, memory_order_acquire);
+        long cap = atomic_load_explicit(&heapreg[i].cap, memory_order_relaxed);
+        if (b && p >= b && p < b + cap) return 1;
+    }
     return 0;
 }
 
 static void dievm2(const char *m, long v);
+
+/* v1.45: runtime thread (didefinisikan di kopivm.c) */
+static VState *vstate_new(int id);
+static long vm_thread_spawn(int64_t clo);
+static long vm_thread_join(long h);
+static long vm_thread_alive(long h);
+static long vm_thread_id(long h);
+static long vm_thread_self(void);
+
+static VState *vstate_new(int id) {
+    VState *prev = vt;
+    VState *v = calloc(1, sizeof *v);
+    if (!v) {
+        fprintf(stderr, "kopivm: error: state thread gagal dialokasi\n");
+        exit(1);
+    }
+    vt = v;
+    v->id = id;
+    stackv = calloc(MAXSTACK, sizeof(int64_t));
+    frames = calloc(MAXFRAMES, sizeof(Frame));
+    localsv = calloc(MAXFRAMES, sizeof(int64_t) * MAXLOC);
+    heap = malloc(sizeof(long) * (size_t)HEAPLEN);
+    if (!stackv || !frames || !localsv || !heap)
+        dievm("heap/stack thread gagal dialokasi");
+    heap_cap = HEAPLEN;
+    heap_register(heap, heap_cap);
+    vt = prev;                 /* pemanggil tetap memakai state-nya sendiri */
+    return v;
+}
 
 static uint8_t rd8(size_t *p) { return img[(*p)++]; }
 static uint16_t rd16(size_t *p) { uint16_t v = rd8(p); v |= (uint16_t)rd8(p) << 8; return v; }
@@ -164,13 +267,6 @@ static void load(const char *path) {
     }
 }
 
-typedef struct { int meth; long pc; long retbase; int line; const char *file; } Frame;
-
-static int64_t stackv[MAXSTACK];
-static long sp;
-static Frame frames[MAXFRAMES];
-static int nframes;
-
 /* error runtime + stack trace: setiap frame menyimpan baris/file sumber
  * (diisi opcode OP_LINE / OP_SRCFILE yang dipancarkan compiler) */
 /* rekomendasi singkat untuk error runtime yang umum */
@@ -212,7 +308,6 @@ static void dievm2(const char *m, long v) {
     snprintf(buf, sizeof buf, "%s (%ld)", m, v);
     dievm(buf);
 }
-static int64_t localsv[MAXFRAMES][MAXLOC];
 
 static uint64_t rd64code(Meth *m, long *pc) {
     uint64_t v = 0;

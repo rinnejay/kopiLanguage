@@ -1945,6 +1945,13 @@ else
     echo "FAIL  tlssrv [a64]: build gagal"; FAIL=$((FAIL+1))
 fi
 
+# ─── fitur bahasa v1.45: thread OS (`thread` / `wait`) + banyak thread ───
+printf '7\n204\n204\n100\n1000\n99\nkopi-thread\nselesai\n' > "$T/kopi/threadtest.ref"
+check threadtest test/threadtest.kop
+./kopicc test/threadtest.kop -t x64 -o "$T/kopi/threadtest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/threadtest64.s" -o /dev/null \
+    && echo "PASS  threadtest [x64]" || { echo "FAIL  threadtest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
 # ─── situs dokumentasi HTML (GitHub Pages) ───
 # gen_libref dulu: signature lib/*.kop harus sinkron dengan docs/api-*.md
 if python3 tools/gen_libref.py > "$T/kopi/libref.out" 2>&1 &&

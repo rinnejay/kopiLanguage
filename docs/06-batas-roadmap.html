@@ -144,8 +144,8 @@
 <td><strong>hanya verifikasi sintaks</strong> (<code>cc -target x86_64-linux-gnu -c</code>); belum dieksekusi di CI</td>
 </tr>
 <tr>
-<td>Thread / fork / async</td>
-<td>tidak ada; server single-thread</td>
+<td>Thread OS</td>
+<td><strong>✅ v1.45</strong> — sintaks <code>thread &lt;long&gt; { ... }</code> + <code>wait h</code> (pthread; a64 &amp; VM; handle <code>long</code>/<code>long[]</code>). Belum ada mutex/channel/thread pool. <code>fork</code>/<code>async</code> belum ada</td>
 </tr>
 <tr>
 <td>Signal handler / graceful shutdown</td>
@@ -157,14 +157,14 @@
 </tr>
 <tr>
 <td>Arena</td>
-<td>global 32 MB (a64/x64/VM); <code>malloc{}</code> otomatis (mmap hingga 4096 MB) atau <code>malloc&lt;N&gt;</code> 1 kb–4096 MB; tanpa GC</td>
+<td>per-thread (a64 TLS, VM heap/thread, x64 global); <code>malloc{}</code> otomatis (mmap hingga 4096 MB) atau <code>malloc&lt;N&gt;</code> 1 kb–4096 MB; tanpa GC</td>
 </tr>
 <tr>
 <td>Cross-compile</td>
 <td>a64 hanya di ARM; x64 hanya di x86-64</td>
 </tr>
 </tbody></table></div>
-<p>Konsekuensi: service CPU-bound memblokir semua klien; satu request lambat menahan loop (kecuali I/O non-blocking). Untuk produksi: reverse proxy + beberapa proses.</p>
+<p>Konsekuensi: thread OS tersedia untuk tugas CPU-bound (v1.45), tetapi contoh server tetap <strong>single-thread</strong>; belum ada mutex/channel sehingga berbagi state antar-thread harus lewat pola join / satu penulis per sel. Service yang butuh isolasi penuh tetap paling aman dijalankan sebagai beberapa proses di belakang reverse proxy.</p>
 <h2 id="3-jaringan">3. Jaringan<a class="anchor" href="#3-jaringan" aria-label="tautan">#</a></h2>
 <div class="table-wrap"><table>
 <thead><tr>

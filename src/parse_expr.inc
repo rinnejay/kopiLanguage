@@ -387,6 +387,14 @@ static Node *primary(void) {
             die("baris %d: setelah 'json' butuh objek '{...}' atau array '[...]'", line);
         return json_value();
     }
+    if (at(KW_WAIT)) {                /* v1.45: wait h → join, hasil int */
+        advance();
+        Node *h = postfix();
+        Node *n = newnode(EX_NET, line);
+        n->ival = 48;                 /* Net.threadjoin */
+        n->a = h;                     /* tipe+slot diresolusi oleh type_expr */
+        return n;
+    }
     /* cast eksplisit gaya Java: (tipe) unary — tipe numerik saja */
     if (at('(') && is_type_tok(ts[ti + 1].type)) {
         advance();

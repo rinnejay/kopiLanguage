@@ -30,13 +30,11 @@ static void gen_a64_runtime(void) {
     emit("\tblr\tx9");
 
     emit(".Koom:");
-    emit("\tadrp\tx9, kop_arena_auto");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_auto");
-    emit("\tldr\tx9, [x9]");
+    tls_addr("x9");
+    emit("\tldr\tx9, [x9, #32]");           /* auto? */
     emit("\tcbnz\tx9, .KoomAuto");
-    emit("\tadrp\tx9, kop_arena_cap");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
-    emit("\tldr\tx1, [x9]");
+    tls_addr("x9");
+    emit("\tldr\tx1, [x9, #8]");            /* cap */
     emit("\tmovz\tx10, #0x10, lsl #16");     /* 1 MB */
     emit("\tcmp\tx1, x10");
     emit("\tb.hs\t.KoomMB");
@@ -63,24 +61,20 @@ static void gen_a64_runtime(void) {
     emit(".text");
     emit("\t.globl kopalloc");
     emit("kopalloc:");
-    emit("\tadrp\tx1, kop_arena_used");
-    emit("\tadd\tx1, x1, :lo12:kop_arena_used");
-    emit("\tldr\tx2, [x1]");
+    tls_addr("x1");
+    emit("\tldr\tx2, [x1, #16]");           /* used */
     emit("\tadd\tx2, x2, x0");
-    emit("\tadrp\tx3, kop_arena_cap");
-    emit("\tadd\tx3, x3, :lo12:kop_arena_cap");
-    emit("\tldr\tx3, [x3]");
+    emit("\tldr\tx3, [x1, #8]");            /* cap */
     emit("\tcmp\tx2, x3");
     emit("\tb.ge\t.Koom");
-    emit("\tstr\tx2, [x1]");
+    emit("\tstr\tx2, [x1, #16]");
     emit("\tsub\tx2, x2, x0");
-    emit("\tadrp\tx3, kop_arena_base");
-    emit("\tadd\tx3, x3, :lo12:kop_arena_base");
-    emit("\tldr\tx3, [x3]");
+    emit("\tldr\tx3, [x1, #0]");            /* base */
     emit("\tadd\tx0, x3, x2");
     emit("\tret");
 
-    /* v1.22: kop_arena_enter(x0 = byte) -> x1 = handle (40 byte).
+    /* v1.22/v1.45: kop_arena_enter(x0 = byte) -> x1 = handle (40 byte).
+       State arena aktif disimpan thread-lokal (TLS kop_tls).
        0 = OTOMATIS: mmap 4 GB MAP_NORESERVE (RAM hanya sesuai kebutuhan).
        Handle: [0]=base, [8]=cap, [16]=used, [24]=mmapped, [32]=auto. */
     emit(".text");
@@ -94,26 +88,17 @@ static void gen_a64_runtime(void) {
     emit("\tbl\tmalloc");
     emit("\tcbz\tx0, .Koom");                  /* gagal alokasi handle */
     emit("\tmov\tx20, x0");
-    /* simpan konteks arena luar + flag */
-    emit("\tadrp\tx9, kop_arena_base");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
-    emit("\tldr\tx10, [x9]");
+    /* simpan konteks arena luar + flag di handle */
+    tls_addr("x9");
+    emit("\tldr\tx10, [x9, #0]");
     emit("\tstr\tx10, [x20, #0]");
-    emit("\tadrp\tx9, kop_arena_cap");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
-    emit("\tldr\tx10, [x9]");
+    emit("\tldr\tx10, [x9, #8]");
     emit("\tstr\tx10, [x20, #8]");
-    emit("\tadrp\tx9, kop_arena_used");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
-    emit("\tldr\tx10, [x9]");
+    emit("\tldr\tx10, [x9, #16]");
     emit("\tstr\tx10, [x20, #16]");
-    emit("\tadrp\tx9, kop_arena_mmapped");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_mmapped");
-    emit("\tldr\tx10, [x9]");
+    emit("\tldr\tx10, [x9, #24]");
     emit("\tstr\tx10, [x20, #24]");
-    emit("\tadrp\tx9, kop_arena_auto");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_auto");
-    emit("\tldr\tx10, [x9]");
+    emit("\tldr\tx10, [x9, #32]");
     emit("\tstr\tx10, [x20, #32]");
     /* mode otomatis? */
     emit("\tcmp\tx19, #0");
@@ -129,44 +114,26 @@ static void gen_a64_runtime(void) {
     emit("\tmov\tx9, #-1");
     emit("\tcmp\tx0, x9");
     emit("\tb.eq\t.KenterAutoFail");
-    emit("\tadrp\tx9, kop_arena_base");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
-    emit("\tstr\tx0, [x9]");
+    tls_addr("x9");
+    emit("\tstr\tx0, [x9, #0]");              /* base */
     emit("\tmov\tx1, #1");
     emit("\tlsl\tx1, x1, #32");
-    emit("\tadrp\tx9, kop_arena_cap");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
-    emit("\tstr\tx1, [x9]");
-    emit("\tadrp\tx9, kop_arena_used");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
-    emit("\tstr\txzr, [x9]");
+    emit("\tstr\tx1, [x9, #8]");              /* cap */
+    emit("\tstr\txzr, [x9, #16]");            /* used */
     emit("\tmov\tx1, #1");
-    emit("\tadrp\tx9, kop_arena_mmapped");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_mmapped");
-    emit("\tstr\tx1, [x9]");
-    emit("\tadrp\tx9, kop_arena_auto");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_auto");
-    emit("\tstr\tx1, [x9]");
+    emit("\tstr\tx1, [x9, #24]");             /* mmapped */
+    emit("\tstr\tx1, [x9, #32]");             /* auto */
     emit("\tb\t.KenterDone");
     emit(".KenterExplicit:");
     emit("\tmov\tx0, x19");
     emit("\tbl\tmalloc");
     emit("\tcbz\tx0, .KenterOom");
-    emit("\tadrp\tx9, kop_arena_base");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
-    emit("\tstr\tx0, [x9]");
-    emit("\tadrp\tx9, kop_arena_cap");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
-    emit("\tstr\tx19, [x9]");
-    emit("\tadrp\tx9, kop_arena_used");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_used");
-    emit("\tstr\txzr, [x9]");
-    emit("\tadrp\tx9, kop_arena_mmapped");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_mmapped");
-    emit("\tstr\txzr, [x9]");
-    emit("\tadrp\tx9, kop_arena_auto");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_auto");
-    emit("\tstr\txzr, [x9]");
+    tls_addr("x9");
+    emit("\tstr\tx0, [x9, #0]");
+    emit("\tstr\tx19, [x9, #8]");
+    emit("\tstr\txzr, [x9, #16]");
+    emit("\tstr\txzr, [x9, #24]");
+    emit("\tstr\txzr, [x9, #32]");
     emit(".KenterDone:");
     emit("\tmov\tx1, x20");
     emit("\tldp\tx19, x20, [sp, #16]");
@@ -187,59 +154,246 @@ static void gen_a64_runtime(void) {
     emit("\tldr\tx9, [x9, :got_lo12:exit]");
     emit("\tblr\tx9");
 
-    /* v1.22: kop_arena_leave(x1 = handle) — bebas arena blok (munmap bila
-       mmap), pulihkan arena luar + flag; x0 (nilai balik) dipertahankan. */
+    /* v1.22/v1.45: kop_arena_leave(x1 = handle) — bebas arena blok (munmap
+       bila mmap), pulihkan arena luar + flag; x0 (nilai balik) dipertahankan. */
     emit(".text");
     emit("\t.globl kop_arena_leave");
     emit("kop_arena_leave:");
-    emit("\tstp\tx29, x30, [sp, #-32]!");
+    emit("\tstp\tx29, x30, [sp, #-48]!");
     emit("\tmov\tx29, sp");
     emit("\tstp\tx19, x20, [sp, #16]");
+    emit("\tstp\tx21, x22, [sp, #32]");
     emit("\tmov\tx19, x0");                    /* simpan nilai balik */
-    emit("\tmov\tx20, x1");                    /* handle */
-    emit("\tadrp\tx9, kop_arena_mmapped");     /* arena aktif hasil mmap? */
-    emit("\tadd\tx9, x9, :lo12:kop_arena_mmapped");
-    emit("\tldr\tx9, [x9]");
+    emit("\tmov\tx20, x1");                    /* handle (berisi arena luar) */
+    tls_addr("x21");
+    emit("\tldr\tx9, [x21, #24]");             /* mmapped? */
     emit("\tcbz\tx9, .KleaveFree");
-    emit("\tadrp\tx9, kop_arena_base");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
-    emit("\tldr\tx0, [x9]");
-    emit("\tadrp\tx9, kop_arena_cap");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_cap");
-    emit("\tldr\tx1, [x9]");
+    emit("\tldr\tx0, [x21, #0]");              /* base arena aktif */
+    emit("\tldr\tx1, [x21, #8]");              /* cap arena aktif */
     emit("\tbl\tmunmap");
     emit("\tb\t.KleaveRestore");
     emit(".KleaveFree:");
-    emit("\tadrp\tx9, kop_arena_base");
-    emit("\tadd\tx9, x9, :lo12:kop_arena_base");
-    emit("\tldr\tx0, [x9]");
+    emit("\tldr\tx0, [x21, #0]");
     emit("\tbl\tfree");
     emit(".KleaveRestore:");
-    emit("\tldr\tx9, [x20, #0]");
-    emit("\tadrp\tx10, kop_arena_base");
-    emit("\tadd\tx10, x10, :lo12:kop_arena_base");
-    emit("\tstr\tx9, [x10]");
-    emit("\tldr\tx9, [x20, #8]");
-    emit("\tadrp\tx10, kop_arena_cap");
-    emit("\tadd\tx10, x10, :lo12:kop_arena_cap");
-    emit("\tstr\tx9, [x10]");
-    emit("\tldr\tx9, [x20, #16]");
-    emit("\tadrp\tx10, kop_arena_used");
-    emit("\tadd\tx10, x10, :lo12:kop_arena_used");
-    emit("\tstr\tx9, [x10]");
-    emit("\tldr\tx9, [x20, #24]");
-    emit("\tadrp\tx10, kop_arena_mmapped");
-    emit("\tadd\tx10, x10, :lo12:kop_arena_mmapped");
-    emit("\tstr\tx9, [x10]");
-    emit("\tldr\tx9, [x20, #32]");
-    emit("\tadrp\tx10, kop_arena_auto");
-    emit("\tadd\tx10, x10, :lo12:kop_arena_auto");
-    emit("\tstr\tx9, [x10]");
+    tls_addr("x9");
+    emit("\tldr\tx10, [x20, #0]");
+    emit("\tstr\tx10, [x9, #0]");
+    emit("\tldr\tx10, [x20, #8]");
+    emit("\tstr\tx10, [x9, #8]");
+    emit("\tldr\tx10, [x20, #16]");
+    emit("\tstr\tx10, [x9, #16]");
+    emit("\tldr\tx10, [x20, #24]");
+    emit("\tstr\tx10, [x9, #24]");
+    emit("\tldr\tx10, [x20, #32]");
+    emit("\tstr\tx10, [x9, #32]");
     emit("\tmov\tx0, x20");
     emit("\tbl\tfree");
     emit("\tmov\tx0, x19");
+    emit("\tldp\tx21, x22, [sp, #32]");
+    emit("\tldp\tx19, x20, [sp, #16]");
+    emit("\tldp\tx29, x30, [sp], #48");
+    emit("\tret");
+
+    /* v1.45: arena awal thread utama — 32 MB, id = 1 */
+    emit(".text");
+    emit("\t.globl kop_arena_init_main");
+    emit("kop_arena_init_main:");
+    emit("\tstp\tx29, x30, [sp, #-32]!");
+    emit("\tmov\tx29, sp");
+    emit("\tstp\tx19, x20, [sp, #16]");
+    emit_imm64("x0", 32UL * 1024 * 1024);
+    emit("\tbl\tmalloc");
+    emit("\tcbz\tx0, .Koom");
+    emit("\tmov\tx19, x0");
+    tls_addr("x9");
+    emit("\tstr\tx19, [x9, #0]");
+    emit_imm64("x10", 32UL * 1024 * 1024);
+    emit("\tstr\tx10, [x9, #8]");
+    emit("\tstr\txzr, [x9, #16]");
+    emit("\tstr\txzr, [x9, #24]");
+    emit("\tstr\txzr, [x9, #32]");
+    emit("\tmov\tw10, #1");
+    emit("\tstr\tx10, [x9, #40]");            /* id thread utama */
     emit("\tldp\tx19, x20, [sp, #16]");
     emit("\tldp\tx29, x30, [sp], #32");
+    emit("\tret");
+
+    /* v1.45: arena thread baru — 32 MB sendiri, id dari counter global */
+    emit(".text");
+    emit("\t.globl kop_arena_thread_init");
+    emit("kop_arena_thread_init:");
+    emit("\tstp\tx29, x30, [sp, #-32]!");
+    emit("\tmov\tx29, sp");
+    emit("\tstp\tx19, x20, [sp, #16]");
+    emit_imm64("x0", 32UL * 1024 * 1024);
+    emit("\tbl\tmalloc");
+    emit("\tcbz\tx0, .Koom");
+    emit("\tmov\tx19, x0");
+    tls_addr("x9");
+    emit("\tstr\tx19, [x9, #0]");
+    emit_imm64("x10", 32UL * 1024 * 1024);
+    emit("\tstr\tx10, [x9, #8]");
+    emit("\tstr\txzr, [x9, #16]");
+    emit("\tstr\txzr, [x9, #24]");
+    emit("\tstr\txzr, [x9, #32]");
+    emit("\tadrp\tx10, kop_thread_next");
+    emit("\tadd\tx10, x10, :lo12:kop_thread_next");
+    emit(".Ltidinit:");
+    emit("\tldaxr\tw11, [x10]");
+    emit("\tadd\tw12, w11, #1");
+    emit("\tstlxr\tw13, w12, [x10]");
+    emit("\tcbnz\tw13, .Ltidinit");
+    emit("\tstr\tw11, [x9, #40]");
+    emit("\tldp\tx19, x20, [sp, #16]");
+    emit("\tldp\tx29, x30, [sp], #32");
+    emit("\tret");
+
+    /* v1.45: memMark/memReset memakai state TLS */
+    emit(".text");
+    emit("\t.globl kop_arena_mark");
+    emit("kop_arena_mark:");
+    tls_addr("x9");
+    emit("\tldr\tw0, [x9, #16]");
+    emit("\tret");
+    emit("\t.globl kop_arena_reset");
+    emit("kop_arena_reset:");
+    tls_addr("x9");
+    emit("\tcmp\tw0, #0");
+    emit("\tb.ge\t.LARS0");
+    emit("\tmov\tw0, wzr");
+    emit(".LARS0:");
+    emit("\tldr\tw10, [x9, #16]");
+    emit("\tcmp\tw0, w10");
+    emit("\tb.le\t.LARS1");
+    emit("\tmov\tw0, w10");
+    emit(".LARS1:");
+    emit("\tstr\tw0, [x9, #16]");
+    emit("\tret");
+
+    /* ── v1.45: thread OS di atas pthread (libc) ─────────────────── */
+
+    /* x0 = env closure -> x0 = tcb | 0.
+       tcb: [0]=pthread_t, [8]=done, [16]=ret, [24]=id (32 byte) */
+    emit(".text");
+    emit("\t.globl kop_thread_spawn");
+    emit("kop_thread_spawn:");
+    emit("\tstp\tx29, x30, [sp, #-48]!");
+    emit("\tmov\tx29, sp");
+    emit("\tstp\tx19, x20, [sp, #16]");
+    emit("\tstp\tx21, x22, [sp, #32]");
+    emit("\tmov\tx19, x0");                    /* env */
+    emit("\tmov\tx0, #32");
+    emit("\tbl\tmalloc");
+    emit("\tcbz\tx0, .KTSfail");
+    emit("\tmov\tx20, x0");                    /* tcb */
+    emit("\tstp\txzr, xzr, [x20]");
+    emit("\tstp\txzr, xzr, [x20, #16]");
+    emit("\tmov\tx0, #16");
+    emit("\tbl\tmalloc");
+    emit("\tcbz\tx0, .KTSfail");
+    emit("\tmov\tx21, x0");                    /* ctx */
+    emit("\tstr\tx19, [x21, #0]");
+    emit("\tstr\tx20, [x21, #8]");
+    /* id unik */
+    emit("\tadrp\tx10, kop_thread_next");
+    emit("\tadd\tx10, x10, :lo12:kop_thread_next");
+    emit(".Ltidspawn:");
+    emit("\tldaxr\tw11, [x10]");
+    emit("\tadd\tw12, w11, #1");
+    emit("\tstlxr\tw13, w12, [x10]");
+    emit("\tcbnz\tw13, .Ltidspawn");
+    emit("\tstr\tw11, [x20, #24]");
+    /* pthread_create(&tcb->tid, NULL, trampoline, ctx) */
+    emit("\tmov\tx0, x20");
+    emit("\tmov\tx1, #0");
+    emit("\tadrp\tx2, kop_thread_trampoline");
+    emit("\tadd\tx2, x2, :lo12:kop_thread_trampoline");
+    emit("\tmov\tx3, x21");
+    emit("\tbl\tpthread_create");
+    emit("\tcbnz\tw0, .KTSfail");
+    emit("\tmov\tx0, x20");
+    emit("\tldp\tx21, x22, [sp, #32]");
+    emit("\tldp\tx19, x20, [sp, #16]");
+    emit("\tldp\tx29, x30, [sp], #48");
+    emit("\tret");
+    emit(".KTSfail:");
+    emit("\tmov\tx0, #0");
+    emit("\tldp\tx21, x22, [sp, #32]");
+    emit("\tldp\tx19, x20, [sp, #16]");
+    emit("\tldp\tx29, x30, [sp], #48");
+    emit("\tret");
+
+    /* x0 = ctx {env, tcb} — badan thread: init arena, panggil closure */
+    emit(".text");
+    emit("kop_thread_trampoline:");
+    emit("\tstp\tx29, x30, [sp, #-32]!");
+    emit("\tmov\tx29, sp");
+    emit("\tstp\tx19, x20, [sp, #16]");
+    emit("\tmov\tx19, x0");
+    emit("\tldr\tx20, [x19, #8]");             /* tcb */
+    emit("\tbl\tkop_arena_thread_init");
+    emit("\tldr\tx9, [x19, #0]");              /* env closure */
+    emit("\tldr\tw10, [x9, #16]");             /* nuser */
+    emit("\tcbnz\tw10, .Klam");                /* badan harus tanpa parameter */
+    emit("\tldr\tx11, [x9]");                  /* kode lambda */
+    emit("\tmov\tx0, x9");                     /* arg0 = env */
+    emit("\tblr\tx11");
+    emit("\tstr\tw0, [x20, #16]");             /* ret */
+    emit("\tmov\tw9, #1");
+    emit("\tadd\tx10, x20, #8");
+    emit("\tstlr\tw9, [x10]");                 /* done = 1 */
+    emit("\tmov\tx0, #0");
+    emit("\tldp\tx19, x20, [sp, #16]");
+    emit("\tldp\tx29, x30, [sp], #32");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_join");
+    emit("kop_thread_join:");
+    emit("\tcbz\tx0, .KTJz");
+    emit("\tstp\tx29, x30, [sp, #-16]!");
+    emit("\tmov\tx29, sp");
+    emit("\tstp\tx19, x20, [sp, #-16]!");
+    emit("\tmov\tx19, x0");
+    emit("\tldr\tx0, [x19, #0]");
+    emit("\tmov\tx1, #0");
+    emit("\tbl\tpthread_join");
+    emit("\tldr\tw0, [x19, #16]");
+    emit("\tldp\tx19, x20, [sp], #16");
+    emit("\tldp\tx29, x30, [sp], #16");
+    emit("\tret");
+    emit(".KTJz:");
+    emit("\tmov\tw0, wzr");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_alive");
+    emit("kop_thread_alive:");
+    emit("\tcbz\tx0, .KTAz");
+    emit("\tadd\tx9, x0, #8");
+    emit("\tldar\tw0, [x9]");
+    emit("\teor\tw0, w0, #1");
+    emit("\tret");
+    emit(".KTAz:");
+    emit("\tmov\tw0, wzr");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_id");
+    emit("kop_thread_id:");
+    emit("\tcbz\tx0, .KTIz");
+    emit("\tldr\tw0, [x0, #24]");
+    emit("\tret");
+    emit(".KTIz:");
+    emit("\tmov\tw0, wzr");
+    emit("\tret");
+
+    emit(".text");
+    emit("\t.globl kop_thread_self");
+    emit("kop_thread_self:");
+    tls_addr("x9");
+    emit("\tldr\tw0, [x9, #40]");
     emit("\tret");
 
     /* x0 = char* C → x0 = String packed (v1.18: 8 byte per slot) */
@@ -499,13 +653,12 @@ static void gen_a64_runtime(void) {
     emit("\tret");
 
 
+    emit("\t.section .tbss,\"awT\",@nobits");
+    emit("\t.balign 64");
+    emit("kop_tls: .zero 48");              /* base,cap,used,mmapped,auto,id */
     emit("\t.section .data");
     emit("\t.align 3");
-    emit("kop_arena_base: .quad 0");
-    emit("kop_arena_cap: .quad 0");
-    emit("kop_arena_used: .quad 0");
-    emit("kop_arena_mmapped: .quad 0");
-    emit("kop_arena_auto: .quad 0");
+    emit("kop_thread_next: .quad 2");       /* id thread berikut (1 = utama) */
     emit("kop_argc: .quad 0");
     emit("kop_argv: .quad 0");
     emit(".comm kop_iobuf, 4096, 32");      /* penyangga syscall rekursi builtin */

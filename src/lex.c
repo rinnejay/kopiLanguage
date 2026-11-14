@@ -35,6 +35,7 @@ static struct { const char *kw; int type; } kws[] = {
     {"fn", KW_FN}, {"json", KW_JSON},
     {"switch", KW_SWITCH}, {"case", KW_CASE}, {"default", KW_DEFAULT},   /* v1.19 */
     {"malloc", KW_MALLOC},                                              /* v1.20 */
+    {"thread", KW_THREAD}, {"wait", KW_WAIT},                           /* v1.45 */
     {0, 0},
 };
 
