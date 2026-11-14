@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bigint">BigInt</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#regex">Regex</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bigint">BigInt</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#lzma">Lzma</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#regex">Regex</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
@@ -1812,6 +1812,32 @@ Log.error("db", "gagal konek");</code></pre>
 </tr>
 <tr>
 <td><code>static int OFF()</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="lzma">Lzma<a class="anchor" href="#lzma" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Lzma.kop</code> · 4 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>LZMA alone: props + dictSize + uncompressedSize + data</td>
+</tr>
+<tr>
+<td><code>static int[] decompressRaw(int[] comp, int props, int outSize)</code></td>
+<td>LZMA1 raw tanpa header. props = (pb 5+lp) 9+lc. outSize = ukuran hasil yang diharapkan, atau -1 jika tidak diketahui.</td>
+</tr>
+<tr>
+<td><code>static int propsOf(int lc, int lp, int pb)</code></td>
+<td>utilitas: byte properti dari lc/lp/pb; -1 jika di luar jangkauan</td>
+</tr>
+<tr>
+<td><code>static String decompressText(int[] data)</code></td>
 <td>—</td>
 </tr>
 </tbody></table></div>

@@ -698,6 +698,21 @@ Log.error("db", "gagal konek");
 
 ---
 
+## Lzma
+
+`lib/core/Lzma.kop` · 4 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] decompress(int[] data)` | LZMA alone: props + dictSize + uncompressedSize + data |
+| `static int[] decompressRaw(int[] comp, int props, int outSize)` | LZMA1 raw tanpa header. props = (pb 5+lp) 9+lc. outSize = ukuran hasil yang diharapkan, atau -1 jika tidak diketahui. |
+| `static int propsOf(int lc, int lp, int pb)` | utilitas: byte properti dari lc/lp/pb; -1 jika di luar jangkauan |
+| `static String decompressText(int[] data)` | — |
+
+---
+
 ## Map
 
 `lib/core/Map.kop` · 13 fungsi

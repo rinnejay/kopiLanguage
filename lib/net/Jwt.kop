@@ -18,6 +18,7 @@
 import Str;
 import Hash;
 import Cipher;
+import Ecdsa;
 import Json;
 import Rsa;
 import Rsa;
@@ -104,6 +105,7 @@ class Jwt {
         if (Str.contains(head, "HS512")) return "HS512";
         if (Str.contains(head, "HS256")) return "HS256";
         if (Str.contains(head, "RS256")) return "RS256";
+        if (Str.contains(head, "ES256")) return "ES256";
         return "";
     }
 
@@ -178,6 +180,38 @@ class Jwt {
         int[] sig = unb64(s);
         int[] digest = Hash.sha256(Net.strbytes(h + "." + p));
         boolean ok = Rsa.verify(pubKeyDer, digest, sig, "SHA-256");
+        if (payloadOut.length > 0) {
+            int[] raw = unb64(p);
+            for (int i = 0; i < payloadOut.length; i++) {
+                if (i < raw.length) payloadOut[i] = raw[i];
+                else payloadOut[i] = 0;
+            }
+        }
+        if (ok) return 1;
+        return 0;
+    }
+
+    /* ── ES256 (ECDSA P-256 + SHA-256) ─────────────────────────────── */
+
+    /* tanda tangani payload dengan kunci privat 32 byte (skalar P-256) */
+    static String signEs256(String payload, int[] priv32) {
+        String input = b64(Net.strbytes(headerFor("ES256"))) + "." + b64(Net.strbytes(payload));
+        int[] sig = Ecdsa.sign(priv32, Net.strbytes(input));
+        return input + "." + b64(sig);
+    }
+
+    /* verifikasi token ES256 dengan kunci publik 64 byte (X || Y).
+     * hasil: 1 sah, 0 tanda tangan salah, -1 bentuk/alg tak didukung */
+    static int verifyEs256(String token, int[] pub64, int[] payloadOut) {
+        int[] d = dots(token);
+        if (d[0] <= 0 || d[1] <= d[0]) return -1;
+        String h = Str.sub(token, 0, d[0]);
+        String p = Str.sub(token, d[0] + 1, d[1] - d[0] - 1);
+        String s = Str.sub(token, d[1] + 1, token.length - d[1] - 1);
+        String alg = algOf(token);
+        if (alg != "ES256") return -1;
+        int[] sig = unb64(s);
+        boolean ok = Ecdsa.verify(pub64, Net.strbytes(h + "." + p), sig);
         if (payloadOut.length > 0) {
             int[] raw = unb64(p);
             for (int i = 0; i < payloadOut.length; i++) {

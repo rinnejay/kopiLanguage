@@ -51,6 +51,14 @@ python3 tools/gen_aesvec.py "$T/kopi/aesvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n' > "$T/kopi/aesvec.ref"
 check aesvec "$T/kopi/aesvec.kop"
 
+# ─── LZMA: decoder murni — alone + raw, berbagai lc/lp/pb (oracle lzma) ──
+N=$(python3 tools/gen_lzmavec.py "$T/kopi/lzmavec.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
+python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/lzmavec.ref"
+check lzmavec "$T/kopi/lzmavec.kop"
+./kopicc "$T/kopi/lzmavec.kop" -t x64 -o "$T/kopi/lzmavec64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/lzmavec64.s" -o /dev/null \
+    && echo "PASS  lzmavec [x64]" || { echo "FAIL  lzmavec [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
 # ─── BLAKE2b + scrypt (RFC 7693 / RFC 7914 lewat vektor python) ──────────
 python3 tools/gen_blakevec.py > "$T/kopi/blakevec.ref"
 check blakevec test/blakevec.kop

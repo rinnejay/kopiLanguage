@@ -1,0 +1,408 @@
+// Lzma.kop — decoder LZMA1 murni Kopi (v1.39).
+//
+// Mendukung dua bentuk input:
+//
+//   1) LZMA "alone" / .lzma (FORMAT_ALONE):
+//        1 byte  props   = (pb * 5 + lp) * 9 + lc
+//        4 byte  dictSize (LE)
+//        8 byte  uncompressedSize (LE, semua 0xFF = tidak diketahui)
+//        ...data terkompresi...
+//      Pakai Lzma.decompress(data).
+//
+//   2) LZMA1 raw tanpa header (FORMAT_RAW):
+//        ...data terkompresi... (5 byte pertama = range coder init)
+//      Pakai Lzma.decompressRaw(comp, props, outSize).
+//
+// Properti bebas: lc 0..8, lp 0..4 (lc+lp <= 8), pb 0..4.
+// outSize -1 berarti ukuran tidak diketahui: decoder berhenti pada
+// end-of-stream marker atau saat input habis.
+//
+// Implementasi mengikuti LZMA SDK (Igor Pavlov, public domain):
+// range coder, 12-state machine, literal + matched literal,
+// rep/match, length coder, posSlot, specPos, align.
+
+import Str;
+
+class Lzma {
+
+    /* ══ Range decoder ══════════════════════════════════════════════
+     * state: int[3] = [range, pos, code]
+     * range/code diperlakukan sebagai uint32; perbandingan memakai
+     * ult() karena int di Kopi bertanda.
+     */
+
+    private static boolean ult(int a, int b) {
+        int ah = a >>> 24;
+        int bh = b >>> 24;
+        if (ah != bh) return ah < bh;
+        return (a & 0xFFFFFF) < (b & 0xFFFFFF);
+    }
+
+    private static int rangeInit(int[] buf, int off, int[] st) {
+        if (buf.length < off + 5) return -1;
+        if ((buf[off] & 255) != 0) return -1;
+        st[0] = -1;                                    // 0xFFFFFFFF
+        st[1] = off + 5;
+        st[2] = ((buf[off + 1] & 255) << 24) | ((buf[off + 2] & 255) << 16)
+              | ((buf[off + 3] & 255) << 8) | (buf[off + 4] & 255);
+        return 0;
+    }
+
+    private static int rangeNormalize(int[] buf, int[] st) {
+        int pos = st[1];
+        int range = st[0];
+        int code = st[2];
+        while ((range >>> 24) == 0) {
+            if (pos >= buf.length) return -1;
+            range = range << 8;
+            code = (code << 8) | (buf[pos] & 255);
+            pos++;
+        }
+        st[0] = range;
+        st[1] = pos;
+        st[2] = code;
+        return 0;
+    }
+
+    private static int decBit(int[] buf, int[] st, int[] probs, int idx) {
+        if (rangeNormalize(buf, st) != 0) return -1;
+        int prob = probs[idx];
+        int range = st[0];
+        int bound = (range >>> 11) * prob;
+        if (ult(st[2], bound)) {
+            st[0] = bound;
+            probs[idx] = prob + ((2048 - prob) >>> 5);
+            return 0;
+        }
+        st[0] = range - bound;
+        st[2] = st[2] - bound;
+        probs[idx] = prob - (prob >>> 5);
+        return 1;
+    }
+
+    private static int decDirect(int[] buf, int[] st, int n) {
+        int v = 0;
+        for (int i = 0; i < n; i++) {
+            if (rangeNormalize(buf, st) != 0) return -1;
+            st[0] = st[0] >>> 1;
+            v = v << 1;
+            if (!ult(st[2], st[0])) {
+                st[2] = st[2] - st[0];
+                v = v | 1;
+            }
+        }
+        return v;
+    }
+
+    /* pohon biner n-bit: index prob 1..2^n-1, hasil 0..2^n-1 */
+    private static int treeDecode(int[] buf, int[] st, int[] probs, int base, int nbits) {
+        int m = 1;
+        for (int i = 0; i < nbits; i++) {
+            int b = decBit(buf, st, probs, base + m);
+            if (b < 0) return -1;
+            m = (m << 1) | b;
+        }
+        return m - (1 << nbits);
+    }
+
+    private static int[] mkprobs(int n) {
+        int[] p = new int[n];
+        for (int i = 0; i < n; i++) p[i] = 1024;
+        return p;
+    }
+
+    private static int[] grow(int[] a) {
+        int[] b = new int[a.length * 2];
+        for (int i = 0; i < a.length; i++) b[i] = a[i];
+        return b;
+    }
+
+    /* ══ Length decoder ════════════════════════════════════════════
+     * layout: [0]=choice [1]=choice2,
+     *         low  = 2 + posState*8                (tree 3 bit)
+     *         mid  = 2 + posStates*8 + posState*8  (tree 3 bit)
+     *         high = 2 + posStates*16              (tree 8 bit)
+     * hasil: 2..273 (sudah termasuk kMatchMinLen=2)
+     */
+
+    private static int lenDecode(int[] buf, int[] st, int[] lp, int posStates, int posState) {
+        int b = decBit(buf, st, lp, 0);
+        if (b < 0) return -1;
+        if (b == 0) {
+            int v = treeDecode(buf, st, lp, 2 + posState * 8, 3);
+            if (v < 0) return -1;
+            return 2 + v;
+        }
+        b = decBit(buf, st, lp, 1);
+        if (b < 0) return -1;
+        if (b == 0) {
+            int v = treeDecode(buf, st, lp, 2 + posStates * 8 + posState * 8, 3);
+            if (v < 0) return -1;
+            return 10 + v;
+        }
+        int v = treeDecode(buf, st, lp, 2 + posStates * 16, 8);
+        if (v < 0) return -1;
+        return 18 + v;
+    }
+
+    /* ══ Distance decoder ══════════════════════════════════════════
+     * return jarak 0-based, -1 = error range coder,
+     * -2 = end-of-stream marker (jarak 0xFFFFFFFF).
+     */
+
+    private static int distDecode(int[] buf, int[] st, int[] specPos, int[] align, int slot) {
+        if (slot < 4) return slot;
+        int n = (slot >>> 1) - 1;
+        if (slot < 14) {
+            int dist = (2 | (slot & 1)) << n;
+            dist = dist + 1;
+            int m = 1;
+            for (int i = 0; i < n; i++) {
+                int b = decBit(buf, st, specPos, dist);
+                if (b < 0) return -1;
+                if (b == 0) {
+                    dist = dist + m;
+                    m = m + m;
+                } else {
+                    m = m + m;
+                    dist = dist + m;
+                }
+            }
+            return dist - m;
+        }
+        int d = 2 | (slot & 1);
+        int nd = n - 4;
+        for (int i = 0; i < nd; i++) {
+            int b = decDirect(buf, st, 1);
+            if (b < 0) return -1;
+            d = (d << 1) | b;
+        }
+        d = d << 4;
+        int a = treeDecode(buf, st, align, 0, 4);
+        if (a < 0) return -1;
+        d = d | a;
+        if (d == -1) return -2;
+        return d;
+    }
+
+    /* ══ Decoder utama ═════════════════════════════════════════════ */
+
+    private static int[] decodeStream(int[] buf, int off, int lc, int lp, int pb, int outSize) {
+        int[] st = new int[3];
+        if (rangeInit(buf, off, st) != 0) return new int[0];
+
+        int posStates = 1 << pb;
+        int lpMask = (1 << lp) - 1;
+        int litStates = 1 << (lc + lp);
+        int lenSize = 2 + posStates * 16 + 256;
+
+        int[] isMatch = mkprobs(192);
+        int[] isRep = mkprobs(12);
+        int[] isRepG0 = mkprobs(12);
+        int[] isRepG1 = mkprobs(12);
+        int[] isRepG2 = mkprobs(12);
+        int[] isRep0Long = mkprobs(192);
+        int[] posSlot = mkprobs(256);
+        int[] specPos = mkprobs(128);
+        int[] align = mkprobs(16);
+        int[] matchLen = mkprobs(lenSize);
+        int[] repLen = mkprobs(lenSize);
+        int[] literal = mkprobs(litStates * 768);
+
+        int cap = 1024;
+        if (outSize > 0) cap = outSize;
+        int[] out = new int[cap];
+        int dictPos = 0;
+
+        int rep0 = 1;
+        int rep1 = 1;
+        int rep2 = 1;
+        int rep3 = 1;
+        int state = 0;
+        int prevByte = 0;
+        int done = 0;
+
+        while (done == 0) {
+            if (outSize >= 0 && dictPos >= outSize) break;
+
+            int posState = dictPos & (posStates - 1);
+            int idx = (state << 4) | posState;
+
+            int b = decBit(buf, st, isMatch, idx);
+            if (b < 0) break;
+
+            if (b == 0) {
+                /* literal */
+                int litState = ((dictPos & lpMask) << lc) | (prevByte >>> (8 - lc));
+                int base = litState * 768;
+                int sym = 1;
+
+                if (state < 7) {
+                    for (int i = 0; i < 8; i++) {
+                        int bitv = decBit(buf, st, literal, base + sym);
+                        if (bitv < 0) { done = 1; break; }
+                        sym = (sym << 1) | bitv;
+                    }
+                    if (done != 0) break;
+                    if (state < 4) state = 0;
+                    else if (state < 10) state = state - 3;
+                    else state = state - 6;
+                } else {
+                    int src = dictPos - rep0;
+                    if (src < 0) break;
+                    int matchByte = out[src] & 255;
+                    int offs = 0x100;
+                    for (int i = 0; i < 8; i++) {
+                        matchByte = matchByte << 1;
+                        int bitv = offs;
+                        offs = offs & matchByte;
+                        int bb = decBit(buf, st, literal, base + offs + bitv + sym);
+                        if (bb < 0) { done = 1; break; }
+                        sym = (sym << 1) | bb;
+                        if (bb == 0) offs = offs ^ bitv;
+                    }
+                    if (done != 0) break;
+                    state = state < 10 ? state - 3 : state - 6;
+                }
+
+                if (dictPos >= out.length) out = grow(out);
+                out[dictPos] = (sym - 256) & 255;
+                prevByte = out[dictPos];
+                dictPos++;
+                continue;
+            }
+
+            b = decBit(buf, st, isRep, state);
+            if (b < 0) break;
+
+            int len = 0;
+
+            if (b == 1) {
+                /* rep match */
+                b = decBit(buf, st, isRepG0, state);
+                if (b < 0) break;
+
+                if (b == 0) {
+                    b = decBit(buf, st, isRep0Long, idx);
+                    if (b < 0) break;
+                    if (b == 0) {
+                        /* short rep: panjang 1 */
+                        int src = dictPos - rep0;
+                        if (src < 0) break;
+                        if (dictPos >= out.length) out = grow(out);
+                        out[dictPos] = out[src] & 255;
+                        prevByte = out[dictPos];
+                        dictPos++;
+                        state = state < 7 ? 9 : 11;
+                        continue;
+                    }
+                    /* rep0 dengan panjang */
+                    len = lenDecode(buf, st, repLen, posStates, posState);
+                    if (len < 0) break;
+                    state = state < 7 ? 8 : 11;
+                } else {
+                    b = decBit(buf, st, isRepG1, state);
+                    if (b < 0) break;
+                    int dist = 0;
+                    if (b == 0) {
+                        dist = rep1;
+                    } else {
+                        b = decBit(buf, st, isRepG2, state);
+                        if (b < 0) break;
+                        if (b == 0) {
+                            dist = rep2;
+                            rep2 = rep1;
+                        } else {
+                            dist = rep3;
+                            rep3 = rep2;
+                            rep2 = rep1;
+                        }
+                    }
+                    rep1 = rep0;
+                    rep0 = dist;
+                    len = lenDecode(buf, st, repLen, posStates, posState);
+                    if (len < 0) break;
+                    state = state < 7 ? 8 : 11;
+                }
+            } else {
+                /* match normal */
+                len = lenDecode(buf, st, matchLen, posStates, posState);
+                if (len < 0) break;
+
+                int lenState = len - 2;
+                if (lenState > 3) lenState = 3;
+                int slot = treeDecode(buf, st, posSlot, lenState * 64, 6);
+                if (slot < 0) break;
+
+                int dist = distDecode(buf, st, specPos, align, slot);
+                if (dist == -1) break;
+                if (dist == -2) break;                  /* end marker */
+
+                rep3 = rep2;
+                rep2 = rep1;
+                rep1 = rep0;
+                rep0 = dist + 1;
+                state = state < 7 ? 7 : 10;
+            }
+
+            /* salin len byte dari jarak rep0 */
+            for (int i = 0; i < len; i++) {
+                int src = dictPos - rep0;
+                if (src < 0) { done = 1; break; }
+                if (dictPos >= out.length) out = grow(out);
+                out[dictPos] = out[src] & 255;
+                prevByte = out[dictPos];
+                dictPos++;
+            }
+            if (done != 0) break;
+        }
+
+        int[] res = new int[dictPos];
+        for (int i = 0; i < dictPos; i++) res[i] = out[i];
+        return res;
+    }
+
+    /* ══ API publik ════════════════════════════════════════════════ */
+
+    /* LZMA alone: props + dictSize + uncompressedSize + data */
+    static int[] decompress(int[] data) {
+        if (data.length < 13) return new int[0];
+        int props = data[0] & 255;
+        if (props >= 225) return new int[0];
+        int lc = props % 9;
+        int r = props / 9;
+        int lp = r % 5;
+        int pb = r / 5;
+
+        int lo = (data[5] & 255) | ((data[6] & 255) << 8)
+               | ((data[7] & 255) << 16) | ((data[8] & 255) << 24);
+        int hi = (data[9] & 255) | ((data[10] & 255) << 8)
+               | ((data[11] & 255) << 16) | ((data[12] & 255) << 24);
+        int outSize = -1;
+        if (!(lo == -1 && hi == -1)) {
+            if (hi == 0 && lo >= 0) outSize = lo;
+        }
+        return decodeStream(data, 13, lc, lp, pb, outSize);
+    }
+
+    /* LZMA1 raw tanpa header. props = (pb*5+lp)*9+lc.
+     * outSize = ukuran hasil yang diharapkan, atau -1 jika tidak diketahui. */
+    static int[] decompressRaw(int[] comp, int props, int outSize) {
+        if (props < 0 || props >= 225) return new int[0];
+        int lc = props % 9;
+        int r = props / 9;
+        int lp = r % 5;
+        int pb = r / 5;
+        return decodeStream(comp, 0, lc, lp, pb, outSize);
+    }
+
+    /* utilitas: byte properti dari lc/lp/pb; -1 jika di luar jangkauan */
+    static int propsOf(int lc, int lp, int pb) {
+        if (lc < 0 || lc > 8 || lp < 0 || lp > 4 || pb < 0 || pb > 4) return -1;
+        return (pb * 5 + lp) * 9 + lc;
+    }
+
+    static String decompressText(int[] data) {
+        return Net.mkstr(decompress(data));
+    }
+}
