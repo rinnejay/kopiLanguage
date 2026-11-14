@@ -4,7 +4,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Kelompok | Folder | Modul |
 |---|---|---|
-| **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Checksum`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Filter`, `Json`, `List`, `ListStr`, `Log`, `LzmaDec`, `Lzma2`, `LzmaAuto`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid`, `Xz` |
+| **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Checksum`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Filter`, `Json`, `List`, `ListStr`, `Log`, `LzmaDec`, `Lzma2`, `LzmaAuto`, `LzmaStream`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid`, `Xz` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `Http2`, `Http2Tabel`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `TlsServer`, `Udp`, `Url`, `WebSocket`, `WsClient` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
@@ -35,9 +35,10 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`List`](api-core.md#list) | `lib/core/List.kop` | 25 | — |
 | [`ListStr`](api-core.md#liststr) | `lib/core/ListStr.kop` | 24 | — |
 | [`Log`](api-core.md#log) | `lib/core/Log.kop` | 18 | Logging ke stderr dengan timestamp UTC dan level. |
-| [`LzmaDec`](api-core.md#lzmadec) | `lib/core/Lzma.kop` | 19 | — |
-| [`Lzma2`](api-core.md#lzma2) | `lib/core/Lzma2.kop` | 8 | — |
+| [`LzmaDec`](api-core.md#lzmadec) | `lib/core/Lzma.kop` | 22 | — |
+| [`Lzma2`](api-core.md#lzma2) | `lib/core/Lzma2.kop` | 15 | — |
 | [`LzmaAuto`](api-core.md#lzmaauto) | `lib/core/LzmaAuto.kop` | 3 | — |
+| [`LzmaStream`](api-core.md#lzmastream) | `lib/core/LzmaStream.kop` | 15 | — |
 | [`Map`](api-core.md#map) | `lib/core/Map.kop` | 13 | Hash map int→int dengan open addressing dan `grow` eksplisit. |
 | [`MapSS`](api-core.md#mapss) | `lib/core/MapSS.kop` | 19 | — |
 | [`MapStr`](api-core.md#mapstr) | `lib/core/MapStr.kop` | 14 | Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan… |
@@ -55,7 +56,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Text`](api-core.md#text) | `lib/core/Text.kop` | 19 | — |
 | [`Time`](api-core.md#time) | `lib/core/Time.kop` | 32 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
 | [`Uuid`](api-core.md#uuid) | `lib/core/Uuid.kop` | 6 | UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID. |
-| [`Xz`](api-core.md#xz) | `lib/core/Xz.kop` | 15 | — |
+| [`Xz`](api-core.md#xz) | `lib/core/Xz.kop` | 21 | — |
 
 ### Net — [buka referensi](api-net.md)
 

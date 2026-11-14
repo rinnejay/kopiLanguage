@@ -1,0 +1,350 @@
+// LzmaStream.kop — API mirip modul `lzma` Python (v1.40.1).
+//
+// Padanan kelas Python:
+//   lzma.LZMACompressor  -> LzmaCompressor
+//   lzma.LZMADecompressor-> LzmaDecompressor
+//   lzma.open()          -> LzmaFiles (helper baca/tulis + kompres berkas)
+//
+// Perbedaan yang disengaja:
+//   - Tidak ada exception `LZMAError`; kegagalan ditandai isError().
+//   - Kompresor menampung data sampai flush() (buffered), bukan streaming
+//     byte-per-byte seperti liblzma. Hasil gabungan compress()+flush()
+//     tetap identik dengan encoder sekali-jalan.
+//   - Dekompresor juga menampung input; output baru keluar setelah stream
+//     lengkap. needsInput() menandai input masih terpotong.
+//   - Parameter `max_length` Python belum ada; unused_data() hanya terisi
+//     untuk byte yang dikirim setelah stream selesai.
+//
+//   LzmaCompressor c = LzmaCompressor.create();      // XZ, CRC64, preset 6
+//   int[] part1 = c.compress(data1);
+//   int[] part2 = c.flush();
+//
+//   LzmaDecompressor d = LzmaDecompressor.create();  // auto .xz / alone
+//   int[] out = d.decompress(comp);
+//   if (d.isEof() && !d.isError()) { ... }
+
+import File;
+import Lzma;
+import Lzma2;
+import LzmaAuto;
+import Xz;
+
+class LzmaStream {
+
+    /* Nilai konstanta sama dengan modul lzma Python. */
+    static int FORMAT_AUTO()  { return 0; }
+    static int FORMAT_XZ()    { return 1; }
+    static int FORMAT_ALONE() { return 2; }
+    static int FORMAT_RAW()   { return 3; }
+
+    static int CHECK_NONE()   { return 0; }
+    static int CHECK_CRC32()  { return 1; }
+    static int CHECK_CRC64()  { return 4; }
+    static int CHECK_SHA256() { return 10; }
+
+    /* ID filter Python; sama dengan ID XZ kecuali LZMA1. */
+    static long FILTER_LZMA1()   { return 4611686018427387905L; }
+    static int FILTER_LZMA2()    { return 0x21; }
+    static int FILTER_DELTA()    { return 0x03; }
+    static int FILTER_X86()      { return 0x04; }
+    static int FILTER_POWERPC()  { return 0x05; }
+    static int FILTER_IA64()     { return 0x06; }
+    static int FILTER_ARM()      { return 0x07; }
+    static int FILTER_ARMTHUMB() { return 0x08; }
+    static int FILTER_SPARC()    { return 0x09; }
+    static int FILTER_ARM64()    { return 0x0A; }
+
+    /* liblzma mendukung keempat check ini; nilai lain tidak didukung. */
+    static boolean isCheckSupported(int check) {
+        return check == 0 || check == 1 || check == 4 || check == 10;
+    }
+}
+
+class LzmaCompressor {
+
+    int format;
+    int check;
+    int preset;
+    int dictSize;
+    int[] ids;
+    int[] args;
+    int[] buf;
+    int bufLen;
+    int finished;
+
+    /* dictSize 0 berarti ikut tabel preset. */
+    LzmaCompressor(int format0, int check0, int preset0, int dict0) {
+        this.format = format0;
+        /* Python: check -1 berarti default liblzma (CRC64 untuk XZ). */
+        this.check = check0 < 0 ? 4 : check0;
+        this.preset = preset0;
+        this.dictSize = dict0;
+        this.ids = new int[0];
+        this.args = new int[0];
+        this.buf = new int[1024];
+        this.bufLen = 0;
+        this.finished = 0;
+    }
+
+    /* Default Python: FORMAT_XZ, check -1 (liblzma memakai CRC64), preset 6. */
+    static LzmaCompressor create() {
+        return new LzmaCompressor(1, 4, 6, 0);
+    }
+
+    static LzmaCompressor xz(int check0, int preset0) {
+        return new LzmaCompressor(1, check0, preset0, 0);
+    }
+
+    static LzmaCompressor alone(int preset0) {
+        return new LzmaCompressor(2, 0, preset0, 0);
+    }
+
+    /* Raw LZMA2 dengan ukuran kamus eksplisit. */
+    static LzmaCompressor raw(int dict0) {
+        return new LzmaCompressor(3, 0, 6, dict0);
+    }
+
+    /* XZ dengan filter chain pra-LZMA2 (id/arg seperti Xz.compressChain). */
+    static LzmaCompressor chain(int[] fids, int[] fargs, int dict0, int check0) {
+        LzmaCompressor c = new LzmaCompressor(1, check0, 6, dict0);
+        c.ids = fids;
+        c.args = fargs;
+        return c;
+    }
+
+    void ensure(int need) {
+        if (this.bufLen + need <= this.buf.length) return;
+        int cap = this.buf.length * 2;
+        while (cap < this.bufLen + need) cap = cap * 2;
+        int[] n = new int[cap];
+        for (int i = 0; i < this.bufLen; i++) n[i] = this.buf[i];
+        this.buf = n;
+    }
+
+    int[] take() {
+        int[] r = new int[this.bufLen];
+        for (int i = 0; i < this.bufLen; i++) r[i] = this.buf[i] & 255;
+        this.bufLen = 0;
+        return r;
+    }
+
+    /* Menampung data; keluaran sebenarnya muncul di flush(). */
+    int[] compress(int[] data) {
+        if (this.finished != 0) return new int[0];
+        this.ensure(data.length);
+        for (int i = 0; i < data.length; i++) {
+            this.buf[this.bufLen] = data[i] & 255;
+            this.bufLen = this.bufLen + 1;
+        }
+        return new int[0];
+    }
+
+    int[] flush() {
+        if (this.finished != 0) return new int[0];
+        this.finished = 1;
+        int[] d = this.take();
+
+        if (this.format == 2) {
+            /* LZMA alone: check tidak dipakai. */
+            return Lzma.compressPreset(d, this.preset);
+        }
+        if (this.format == 3) {
+            int dict = this.dictSize;
+            if (dict <= 0) dict = Lzma.presetDict(this.preset);
+            return Lzma2.compressWith(d, 3, 0, 2, dict);
+        }
+        /* FORMAT_XZ dan FORMAT_AUTO (auto hanya masuk akal saat dekompresi). */
+        if (this.ids.length > 0) {
+            int dict = this.dictSize;
+            if (dict <= 0) dict = Lzma.presetDict(this.preset);
+            return Xz.compressChain(d, this.check, this.ids, this.args, dict);
+        }
+        return Xz.compressPresetCheck(d, this.preset, this.check);
+    }
+}
+
+class LzmaDecompressor {
+
+    int format;
+    int[] buf;
+    int bufLen;
+    int[] unused;
+    int unusedLen;
+    int flagEof;
+    int flagNeed;
+    int flagErr;
+    int code;
+
+    LzmaDecompressor(int format0) {
+        this.format = format0;
+        this.buf = new int[1024];
+        this.bufLen = 0;
+        this.unused = new int[0];
+        this.unusedLen = 0;
+        this.flagEof = 0;
+        this.flagNeed = 1;
+        this.flagErr = 0;
+        this.code = 0;
+    }
+
+    static LzmaDecompressor create() {
+        return new LzmaDecompressor(0);
+    }
+
+    static LzmaDecompressor xz() {
+        return new LzmaDecompressor(1);
+    }
+
+    static LzmaDecompressor alone() {
+        return new LzmaDecompressor(2);
+    }
+
+    static LzmaDecompressor raw() {
+        return new LzmaDecompressor(3);
+    }
+
+    void ensure(int need) {
+        if (this.bufLen + need <= this.buf.length) return;
+        int cap = this.buf.length * 2;
+        while (cap < this.bufLen + need) cap = cap * 2;
+        int[] n = new int[cap];
+        for (int i = 0; i < this.bufLen; i++) n[i] = this.buf[i];
+        this.buf = n;
+    }
+
+    void appendUnused(int[] data) {
+        int[] n = new int[this.unusedLen + data.length];
+        for (int i = 0; i < this.unusedLen; i++) n[i] = this.unused[i];
+        for (int i = 0; i < data.length; i++) {
+            n[this.unusedLen + i] = data[i] & 255;
+        }
+        this.unused = n;
+        this.unusedLen = n.length;
+    }
+
+    /* true bila stream sudah selesai dan check (bila ada) cocok. */
+    boolean isEof()    { return this.flagEof != 0; }
+    boolean needsInput() { return this.flagNeed != 0; }
+    boolean isError()  { return this.flagErr != 0; }
+
+    /* 0 sukses, -1 rusak, -2 terpotong, -3 check salah (XZ). */
+    int status() { return this.code; }
+
+    int[] unusedData() {
+        int[] r = new int[this.unusedLen];
+        for (int i = 0; i < this.unusedLen; i++) r[i] = this.unused[i];
+        return r;
+    }
+
+    int[] decompress(int[] data) {
+        if (this.flagEof != 0) {
+            /* Seperti Python: byte setelah akhir stream masuk unused_data. */
+            this.appendUnused(data);
+            return new int[0];
+        }
+        if (this.flagErr != 0) return new int[0];
+
+        this.ensure(data.length);
+        for (int i = 0; i < data.length; i++) {
+            this.buf[this.bufLen] = data[i] & 255;
+            this.bufLen = this.bufLen + 1;
+        }
+
+        int[] d = new int[this.bufLen];
+        for (int i = 0; i < this.bufLen; i++) d[i] = this.buf[i];
+
+        int[] st = new int[1];
+        st[0] = 0;
+        int[] out = new int[0];
+        if (this.format == 3) {
+            out = Lzma2.decode(d, st);
+        } else if (this.format == 2) {
+            out = LzmaAuto.decode(d, st);
+        } else if (this.format == 1) {
+            out = Xz.decode(d, st);
+        } else {
+            out = LzmaAuto.decode(d, st);
+        }
+
+        this.code = st[0];
+        if (st[0] == 0) {
+            this.flagEof = 1;
+            this.flagNeed = 0;
+            this.flagErr = 0;
+            this.bufLen = 0;
+            return out;
+        }
+        /* Input yang masih pendek belum tentu rusak: minta tambahan. */
+        if (st[0] == -2 || (st[0] == -1 && d.length < 13)) {
+            this.flagNeed = 1;
+            this.flagErr = 0;
+            return new int[0];
+        }
+        this.flagNeed = 0;
+        this.flagErr = 1;
+        return new int[0];
+    }
+}
+
+class LzmaFiles {
+
+    static boolean exists(String path) {
+        int fd = File.openRead(path);
+        if (fd < 0) return false;
+        File.close(fd);
+        return true;
+    }
+
+    /* Membaca seluruh berkas; array kosong bila gagal atau berkas kosong. */
+    static int[] read(String path) {
+        int fd = File.openRead(path);
+        if (fd < 0) return new int[0];
+        int n = File.size(fd);
+        if (n < 0) n = 0;
+        int[] out = new int[n];
+        int got = 0;
+        while (got < n) {
+            int want = n - got;
+            if (want > 65536) want = 65536;
+            int[] tmp = new int[want];
+            int r = File.readInto(fd, tmp);
+            if (r <= 0) break;
+            if (r > want) r = want;
+            for (int i = 0; i < r; i++) out[got + i] = tmp[i] & 255;
+            got = got + r;
+        }
+        File.close(fd);
+        if (got == n) return out;
+        int[] r2 = new int[got];
+        for (int i = 0; i < got; i++) r2[i] = out[i];
+        return r2;
+    }
+
+    static boolean write(String path, int[] data) {
+        int fd = File.create(path);
+        if (fd < 0) return false;
+        int n = File.writeAll(fd, data);
+        File.close(fd);
+        /* Net.sendb mengembalikan 0 saat sukses, < 0 saat galat. */
+        return n >= 0;
+    }
+
+    /* Kompres berkas src (XZ, CRC32) ke dst. */
+    static boolean compress(String src, String dst, int preset) {
+        if (!LzmaFiles.exists(src)) return false;
+        int[] data = LzmaFiles.read(src);
+        int[] comp = Xz.compressPresetCheck(data, preset, 1);
+        return LzmaFiles.write(dst, comp);
+    }
+
+    /* Dekompres .xz atau LZMA alone dari src ke dst. */
+    static boolean decompress(String src, String dst) {
+        if (!LzmaFiles.exists(src)) return false;
+        int[] data = LzmaFiles.read(src);
+        int[] st = new int[1];
+        st[0] = 0;
+        int[] out = LzmaAuto.decode(data, st);
+        if (st[0] != 0 && out.length == 0) return false;
+        return LzmaFiles.write(dst, out);
+    }
+}

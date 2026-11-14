@@ -1011,6 +1011,34 @@ class Lzma {
         return d.takeResult();
     }
 
+    /* ══ preset (kompatibel dengan skala 0–9 Python/liblzma) ════════ */
+
+    static int presetDict(int preset) {
+        int p = preset;
+        if (p < 0) p = 0;
+        if (p > 9) p = 9;
+        if (p == 0) return 1 << 18;   /* 256 KiB */
+        if (p == 1) return 1 << 20;   /* 1 MiB */
+        if (p == 2) return 1 << 21;   /* 2 MiB */
+        if (p == 3) return 1 << 22;   /* 4 MiB */
+        if (p == 4) return 1 << 22;   /* 4 MiB */
+        if (p == 5) return 1 << 23;   /* 8 MiB */
+        if (p == 6) return 1 << 23;   /* 8 MiB */
+        if (p == 7) return 1 << 24;   /* 16 MiB */
+        if (p == 8) return 1 << 25;   /* 32 MiB */
+        return 1 << 26;               /* 64 MiB */
+    }
+
+    /* LZMA alone memakai lc=3, lp=0, pb=2 seperti preset Python. */
+    static int[] compressPreset(int[] data, int preset) {
+        return Lzma.compressWith(data, 3, 0, 2, Lzma.presetDict(preset));
+    }
+
+    /* LZMA1 raw dengan end marker, dict mengikuti preset. */
+    static int[] compressRawPreset(int[] data, int preset) {
+        return Lzma.compressRaw(data, 93, Lzma.presetDict(preset));
+    }
+
     static int[] decompressRaw(int[] comp, int props, int outSize) {
         if (props < 0 || props >= 225) return new int[0];
         int lc = props % 9;

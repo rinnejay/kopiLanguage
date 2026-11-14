@@ -760,7 +760,7 @@ Log.error("db", "gagal konek");
 
 ## LzmaDec
 
-`lib/core/Lzma.kop` · 19 fungsi
+`lib/core/Lzma.kop` · 22 fungsi
 
 Modul pustaka Kopi.
 
@@ -779,6 +779,9 @@ Modul pustaka Kopi.
 | `static int[] raw(int[] src, int props, int dictSize)` | — |
 | `static int[] chunk(int[] src, int props, int dictSize)` | — |
 | `static int[] decompress(int[] data)` | ══ API publik ════════════════════════════════════════════════ |
+| `static int presetDict(int preset)` | ══ preset (kompatibel dengan skala 0–9 Python/liblzma) ════════ |
+| `static int[] compressPreset(int[] data, int preset)` | LZMA alone memakai lc=3, lp=0, pb=2 seperti preset Python. |
+| `static int[] compressRawPreset(int[] data, int preset)` | LZMA1 raw dengan end marker, dict mengikuti preset. |
 | `static int[] decompressRaw(int[] comp, int props, int outSize)` | — |
 | `static int propsOf(int lc, int lp, int pb)` | — |
 | `static int[] compressRaw(int[] data, int props, int dictSize)` | LZMA1 raw (tanpa header) dengan end marker. |
@@ -790,7 +793,7 @@ Modul pustaka Kopi.
 
 ## Lzma2
 
-`lib/core/Lzma2.kop` · 8 fungsi
+`lib/core/Lzma2.kop` · 15 fungsi
 
 Modul pustaka Kopi.
 
@@ -798,9 +801,16 @@ Modul pustaka Kopi.
 |---|---|
 | `static int[] decompress(int[] data)` | — |
 | `static int[] decode(int[] data, int[] status)` | — |
-| `static int streamSize(int[] data, int off)` | panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak |
-| `static int[] compress(int[] data)` | ══ encoder ═══════════════════════════════════════════════════ Sederhana namun valid: pecah data per 64 KiB, setiap chunk memakai reset penuh (control 0xE0) sehingga stream inde… |
-| `static void encChunk(int[] out, int[] p, int[] part, int props, int dictSize)` | — |
+| `static int streamSizeStatus(int[] data, int off, int[] state)` | Panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak/terpotong; state[0] = -1 rusak, -2 terpotong. |
+| `static int streamSize(int[] data, int off)` | — |
+| `static int maxChunkSize()` | ══ encoder ═══════════════════════════════════════════════════ Chunk adaptif: mulai dari 1 MiB; bila hasil LZMA melebihi batas csize LZMA2 (64 KiB), chunk diperkecil bertahap. S… |
+| `static int minChunkSize()` | — |
+| `static int[] slice(int[] data, int off, int n)` | — |
+| `static void emitComp(int[] out, int[] p, int[] part, int[] comp, int props)` | — |
+| `static void emitRaw(int[] out, int[] p, int[] part)` | — |
+| `static int encAdaptive(int[] out, int[] p, int[] data, int off, int avail, int props, int dictSize)` | Enkode satu chunk dari data[off..off+avail); kembalikan panjang chunk yang dipakai (bisa lebih kecil dari avail). |
+| `static int[] compress(int[] data)` | — |
+| `static int[] compressPreset(int[] data, int preset)` | — |
 | `static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)` | — |
 | `static int[] decodeFrom(int[] data, int off, int[] status)` | — |
 | `static Lzma2EncStream create()` | buat/buka file |
@@ -818,6 +828,55 @@ Modul pustaka Kopi.
 | `static boolean isXz(int[] data)` | — |
 | `static int[] decompress(int[] data)` | — |
 | `static int[] decode(int[] data, int[] status)` | — |
+
+---
+
+## LzmaStream
+
+`lib/core/LzmaStream.kop` · 15 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static boolean isCheckSupported(int check)` | liblzma mendukung keempat check ini; nilai lain tidak didukung. |
+| `static LzmaCompressor create()` | Default Python: FORMAT_XZ, check -1 (liblzma memakai CRC64), preset 6. |
+| `static LzmaCompressor xz(int check0, int preset0)` | — |
+| `static LzmaCompressor alone(int preset0)` | — |
+| `static LzmaCompressor raw(int dict0)` | Raw LZMA2 dengan ukuran kamus eksplisit. |
+| `static LzmaCompressor chain(int[] fids, int[] fargs, int dict0, int check0)` | XZ dengan filter chain pra-LZMA2 (id/arg seperti Xz.compressChain). |
+| `static LzmaDecompressor create()` | buat/buka file |
+| `static LzmaDecompressor xz()` | — |
+| `static LzmaDecompressor alone()` | — |
+| `static LzmaDecompressor raw()` | — |
+| `static boolean exists(String path)` | — |
+| `static int[] read(String path)` | Membaca seluruh berkas; array kosong bila gagal atau berkas kosong. |
+| `static boolean write(String path, int[] data)` | — |
+| `static boolean compress(String src, String dst, int preset)` | Kompres berkas src (XZ, CRC32) ke dst. |
+| `static boolean decompress(String src, String dst)` | Dekompres .xz atau LZMA alone dari src ke dst. |
+
+**Konstanta**
+
+| Nama | Keterangan |
+|---|---|
+| `static int FORMAT_AUTO()` | Nilai konstanta sama dengan modul lzma Python. |
+| `static int FORMAT_XZ()` | — |
+| `static int FORMAT_ALONE()` | — |
+| `static int FORMAT_RAW()` | — |
+| `static int CHECK_NONE()` | — |
+| `static int CHECK_CRC32()` | — |
+| `static int CHECK_CRC64()` | — |
+| `static int CHECK_SHA256()` | — |
+| `static long FILTER_LZMA1()` | ID filter Python; sama dengan ID XZ kecuali LZMA1. |
+| `static int FILTER_LZMA2()` | — |
+| `static int FILTER_DELTA()` | — |
+| `static int FILTER_X86()` | — |
+| `static int FILTER_POWERPC()` | — |
+| `static int FILTER_IA64()` | — |
+| `static int FILTER_ARM()` | — |
+| `static int FILTER_ARMTHUMB()` | — |
+| `static int FILTER_SPARC()` | — |
+| `static int FILTER_ARM64()` | — |
 
 ---
 
@@ -1547,7 +1606,7 @@ System.out.println(Uuid.valid(id));
 
 ## Xz
 
-`lib/core/Xz.kop` · 15 fungsi
+`lib/core/Xz.kop` · 21 fungsi
 
 Modul pustaka Kopi.
 
@@ -1564,7 +1623,13 @@ Modul pustaka Kopi.
 | `static void put32le(int[] out, int[] p, int v)` | — |
 | `static void putVli(int[] out, int[] p, long v)` | — |
 | `static int[] compress(int[] data)` | — |
-| `static int[] compressCheck(int[] data, int checkType)` | checkType: 0 None, 1 CRC32, 4 CRC64, 10 SHA-256 |
+| `static int dictProp(int dict)` | Nilai properti filter LZMA2 untuk ukuran kamus (XZ spec). |
+| `static int[] compressPreset(int[] data, int preset)` | — |
+| `static int[] compressPresetCheck(int[] data, int preset, int checkType)` | — |
+| `static int[] compressDelta(int[] data, int dist, int checkType)` | Satu filter tambahan: delta (id 0x03, arg jarak 1..256). |
+| `static int[] compressBcj(int[] data, int id, int startOffset, int checkType)` | Satu filter BCJ (id 0x04..0x0A, arg startOffset). |
+| `static int[] compressChain(int[] data, int checkType, int[] ids, int[] args, int dictSize)` | Filter chain: `ids`/`args` adalah filter pra-LZMA2 (data-first), LZMA2 selalu ditambahkan sebagai filter terakhir. checkType: 0 None, 1 CRC32, 4 CRC64, 10 SHA-256. |
+| `static int[] compressCheck(int[] data, int checkType)` | — |
 | `static int[] decompress(int[] data)` | — |
 | `static int[] decodeStream(int[] data, int start, int[] state)` | decode satu stream mulai start; state[0] = posisi akhir, state[1] = status. |
 | `static int[] decode(int[] data, int[] status)` | — |

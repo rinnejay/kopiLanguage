@@ -70,6 +70,11 @@ N=$(python3 tools/gen_lzmaencvec.py "$T/kopi/lzmaencvec.kop" | sed -n 's/^kasus:
 python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/lzmaencvec.ref"
 check lzmaencvec "$T/kopi/lzmaencvec.kop"
 
+# API ala modul lzma Python: LzmaCompressor/LzmaDecompressor/LzmaFile
+printf '1\n1\n1\n1\n1\n13\n1\n1\n1\n0\n0\n0\n' > "$T/kopi/lzmaapi.ref"
+check lzmaapi test/lzmaapi.kop
+rm -f lzmastream_tmp1.bin lzmastream_tmp2.xz lzmastream_tmp3.bin
+
 # sintaks x64 decoder/encoder LZMA (tidak dieksekusi di aarch64)
 for t in checksumvec filtervec lzma2vec xzvec lzmaencvec; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" \

@@ -1,0 +1,49 @@
+// lzmastream.kop — helper berkas LzmaFiles (kompres/dekompres .xz).
+import File;
+import LzmaStream;
+import Bytes;
+
+class Main {
+
+    static int hexv(int c) {
+        if (c <= 57) return c - 48;
+        if (c <= 70) return c - 55;
+        return c - 87;
+    }
+
+    static int[] unpack(String h) {
+        int n = Str.len(h) / 2;
+        int[] v = new int[n];
+        for (int i = 0; i < n; i++) {
+            v[i] = (hexv(Str.at(h, i * 2)) << 4) | hexv(Str.at(h, i * 2 + 1));
+        }
+        return v;
+    }
+
+    static void main() {
+        malloc {
+            String p1 = "lzmastream_tmp1.bin";
+            String p2 = "lzmastream_tmp2.xz";
+            String p3 = "lzmastream_tmp3.bin";
+            int[] d = unpack("48656c6c6f2c204c5a4d412121");
+            System.out.println(LzmaFiles.write(p1, d));
+            System.out.println(LzmaFiles.compress(p1, p2, 6));
+            System.out.println(LzmaFiles.exists(p2));
+            System.out.println(LzmaFiles.decompress(p2, p3));
+            System.out.println(Bytes.eq(LzmaFiles.read(p3), d));
+            System.out.println(LzmaFiles.read(p1).length);
+
+            System.out.println(LzmaFiles.write(p1, new int[0]));
+            System.out.println(LzmaFiles.compress(p1, p2, 0));
+            System.out.println(LzmaFiles.decompress(p2, p3));
+            System.out.println(LzmaFiles.read(p3).length);
+
+            System.out.println(LzmaFiles.compress("lzmastream_none.bin", p2, 6));
+            System.out.println(LzmaFiles.decompress("lzmastream_none.xz", p3));
+
+            File.remove(p1);
+            File.remove(p2);
+            File.remove(p3);
+        }
+    }
+}

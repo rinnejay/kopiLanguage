@@ -31,84 +31,130 @@ class Lzma2 {
         return Lzma2.decodeFrom(data, 0, status);
     }
 
-    /* panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak */
-    static int streamSize(int[] data, int off) {
+    /* Panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak/terpotong;
+     * state[0] = -1 rusak, -2 terpotong. */
+    static int streamSizeStatus(int[] data, int off, int[] state) {
+        state[0] = 0;
         int p = off;
         while (p < data.length) {
             int control = data[p] & 255;
             p = p + 1;
             if (control == 0x00) return p - off;
             if (control < 0x80) {
-                if (control > 2 || p + 2 > data.length) return -1;
+                if (control > 2) { state[0] = -1; return -1; }
+                if (p + 2 > data.length) { state[0] = -2; return -1; }
                 int sz = (((data[p] & 255) << 8) | (data[p + 1] & 255)) + 1;
                 p = p + 2;
-                if (p + sz > data.length) return -1;
+                if (p + sz > data.length) { state[0] = -2; return -1; }
                 p = p + sz;
             } else {
-                if (p + 4 > data.length) return -1;
+                if (p + 4 > data.length) { state[0] = -2; return -1; }
                 int csize = (((data[p + 2] & 255) << 8)
                            | (data[p + 3] & 255)) + 1;
                 int reset = (control >>> 5) & 3;
                 p = p + 4;
                 if (reset >= 2) p = p + 1;
-                if (p + csize > data.length) return -1;
+                if (p + csize > data.length) { state[0] = -2; return -1; }
                 p = p + csize;
             }
         }
+        state[0] = -2;
         return -1;
     }
 
+    static int streamSize(int[] data, int off) {
+        int[] st = new int[1];
+        return Lzma2.streamSizeStatus(data, off, st);
+    }
+
     /* ══ encoder ═══════════════════════════════════════════════════
-     * Sederhana namun valid: pecah data per 64 KiB, setiap chunk
-     * memakai reset penuh (control 0xE0) sehingga stream independen.
-     * Bila hasil kompresi tidak lebih kecil, pakai chunk mentah 0x01.
+     * Chunk adaptif: mulai dari 1 MiB; bila hasil LZMA melebihi batas
+     * csize LZMA2 (64 KiB), chunk diperkecil bertahap. Setiap chunk
+     * memakai reset penuh (control 0xE0) atau chunk mentah 0x01.
      * ═══════════════════════════════════════════════════════════════ */
+
+    static int maxChunkSize() { return 1 << 20; }
+    static int minChunkSize() { return 4096; }
+
+    static int[] slice(int[] data, int off, int n) {
+        int[] r = new int[n];
+        for (int i = 0; i < n; i++) r[i] = data[off + i] & 255;
+        return r;
+    }
+
+    static void emitComp(int[] out, int[] p, int[] part, int[] comp, int props) {
+        int u1 = part.length - 1;
+        int c1 = comp.length - 1;
+        out[p[0]] = 0xE0 | ((u1 >>> 16) & 31); p[0] = p[0] + 1;
+        out[p[0]] = (u1 >>> 8) & 255; p[0] = p[0] + 1;
+        out[p[0]] = u1 & 255; p[0] = p[0] + 1;
+        out[p[0]] = (c1 >>> 8) & 255; p[0] = p[0] + 1;
+        out[p[0]] = c1 & 255; p[0] = p[0] + 1;
+        out[p[0]] = props; p[0] = p[0] + 1;
+        for (int i = 0; i < comp.length; i++) {
+            out[p[0]] = comp[i] & 255;
+            p[0] = p[0] + 1;
+        }
+    }
+
+    static void emitRaw(int[] out, int[] p, int[] part) {
+        int u1 = part.length - 1;
+        out[p[0]] = 0x01; p[0] = p[0] + 1;
+        out[p[0]] = (u1 >>> 8) & 255; p[0] = p[0] + 1;
+        out[p[0]] = u1 & 255; p[0] = p[0] + 1;
+        for (int i = 0; i < part.length; i++) {
+            out[p[0]] = part[i] & 255;
+            p[0] = p[0] + 1;
+        }
+    }
+
+    /* Enkode satu chunk dari data[off..off+avail); kembalikan panjang
+     * chunk yang dipakai (bisa lebih kecil dari avail). */
+    static int encAdaptive(int[] out, int[] p, int[] data, int off,
+                           int avail, int props, int dictSize) {
+        int chunk = avail;
+        if (chunk > Lzma2.maxChunkSize()) chunk = Lzma2.maxChunkSize();
+        int[] part = Lzma2.slice(data, off, chunk);
+        int[] comp = LzmaEnc.chunk(part, props, dictSize);
+
+        if (comp.length >= chunk) {
+            Lzma2.emitRaw(out, p, part);
+            return chunk;
+        }
+        while (comp.length > 65536 && chunk > Lzma2.minChunkSize()) {
+            int next = chunk / 2;
+            if (next < Lzma2.minChunkSize()) next = Lzma2.minChunkSize();
+            if (next >= chunk) break;
+            chunk = next;
+            part = Lzma2.slice(data, off, chunk);
+            comp = LzmaEnc.chunk(part, props, dictSize);
+        }
+        if (comp.length < chunk && comp.length <= 65536) {
+            Lzma2.emitComp(out, p, part, comp, props);
+        } else {
+            Lzma2.emitRaw(out, p, part);
+        }
+        return chunk;
+    }
 
     static int[] compress(int[] data) {
         return Lzma2.compressWith(data, 3, 0, 2, 1 << 16);
     }
 
-    static void encChunk(int[] out, int[] p, int[] part, int props, int dictSize) {
-        int chunk = part.length;
-        int[] comp = LzmaEnc.chunk(part, props, dictSize);
-        int u1 = chunk - 1;
-        if (comp.length < chunk) {
-            int c1 = comp.length - 1;
-            out[p[0]] = 0xE0 | ((u1 >>> 16) & 31); p[0] = p[0] + 1;
-            out[p[0]] = (u1 >>> 8) & 255; p[0] = p[0] + 1;
-            out[p[0]] = u1 & 255; p[0] = p[0] + 1;
-            out[p[0]] = (c1 >>> 8) & 255; p[0] = p[0] + 1;
-            out[p[0]] = c1 & 255; p[0] = p[0] + 1;
-            out[p[0]] = props; p[0] = p[0] + 1;
-            for (int i = 0; i < comp.length; i++) {
-                out[p[0]] = comp[i] & 255;
-                p[0] = p[0] + 1;
-            }
-        } else {
-            out[p[0]] = 0x01; p[0] = p[0] + 1;
-            out[p[0]] = (u1 >>> 8) & 255; p[0] = p[0] + 1;
-            out[p[0]] = u1 & 255; p[0] = p[0] + 1;
-            for (int i = 0; i < chunk; i++) {
-                out[p[0]] = part[i] & 255;
-                p[0] = p[0] + 1;
-            }
-        }
+    static int[] compressPreset(int[] data, int preset) {
+        return Lzma2.compressWith(data, 3, 0, 2, Lzma.presetDict(preset));
     }
 
     static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize) {
         int props = (pb * 5 + lp) * 9 + lc;
-        int cap = data.length + (data.length / 65536 + 2) * 8 + 16;
+        int cap = data.length + (data.length / 4096 + 2) * 8 + 16;
         int[] out = new int[cap];
         int[] p = new int[1];
         p[0] = 0;
         int off = 0;
         while (off < data.length) {
-            int chunk = data.length - off;
-            if (chunk > 65536) chunk = 65536;
-            int[] part = new int[chunk];
-            for (int i = 0; i < chunk; i++) part[i] = data[off + i] & 255;
-            Lzma2.encChunk(out, p, part, props, dictSize);
-            off = off + chunk;
+            off = off + Lzma2.encAdaptive(out, p, data, off,
+                                          data.length - off, props, dictSize);
         }
         out[p[0]] = 0x00; p[0] = p[0] + 1;
         int[] r = new int[p[0]];
@@ -411,6 +457,11 @@ class Lzma2EncStream {
         return r;
     }
 
+    void shift(int k) {
+        this.len = this.len - k;
+        for (int i = 0; i < this.len; i++) this.buf[i] = this.buf[i + k];
+    }
+
     int[] push(int[] data) {
         if (this.finished != 0) return new int[0];
         this.ensureBuf(data.length);
@@ -418,31 +469,28 @@ class Lzma2EncStream {
             this.buf[this.len] = data[i] & 255;
             this.len = this.len + 1;
         }
-        while (this.len >= 65536) {
-            int[] part = new int[65536];
-            for (int i = 0; i < 65536; i++) part[i] = this.buf[i];
-            this.len = this.len - 65536;
-            for (int i = 0; i < this.len; i++) this.buf[i] = this.buf[i + 65536];
-            this.ensureOut(65536 + 8);
+        while (this.len >= Lzma2.maxChunkSize()) {
+            this.ensureOut(Lzma2.maxChunkSize() + 16);
             int[] p = new int[1];
             p[0] = this.outLen;
-            Lzma2.encChunk(this.out, p, part, this.props, this.dictSize);
+            int k = Lzma2.encAdaptive(this.out, p, this.buf, 0, this.len,
+                                      this.props, this.dictSize);
             this.outLen = p[0];
+            this.shift(k);
         }
         return this.drain();
     }
 
     int[] finish() {
         if (this.finished != 0) return new int[0];
-        if (this.len > 0) {
-            int[] part = new int[this.len];
-            for (int i = 0; i < this.len; i++) part[i] = this.buf[i];
-            this.len = 0;
-            this.ensureOut(65536 + 8);
+        while (this.len > 0) {
+            this.ensureOut(Lzma2.maxChunkSize() + 16);
             int[] p = new int[1];
             p[0] = this.outLen;
-            Lzma2.encChunk(this.out, p, part, this.props, this.dictSize);
+            int k = Lzma2.encAdaptive(this.out, p, this.buf, 0, this.len,
+                                      this.props, this.dictSize);
             this.outLen = p[0];
+            this.shift(k);
         }
         this.ensureOut(1);
         this.out[this.outLen] = 0;
