@@ -4,10 +4,15 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Kelompok | Folder | Modul |
 |---|---|---|
-| **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Checksum`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Filter`, `Json`, `List`, `ListStr`, `Log`, `LzmaDec`, `Lzma2`, `LzmaAuto`, `LzmaStream`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid`, `Xz` |
-| **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `Http2`, `Http2Tabel`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `TlsServer`, `Udp`, `Url`, `WebSocket`, `WsClient` |
+| **Core** | `lib/core/` | `Arrays`, `BigInt`, `Bytes`, `Deque`, `Digits`, `List`, `ListStr`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `Set`, `SetStr`, `Stats`, `Test` |
+| **Text** | `lib/text/` | `Regex`, `Str`, `Text` |
+| **Data** | `lib/data/` | `Cbor`, `Config`, `Cookie`, `Csv`, `Json`, `MessagePack` |
+| **IO** | `lib/io/` | `File`, `Path`, `Reader`, `Writer` |
+| **System** | `lib/system/` | `Args`, `Env`, `Log`, `Time`, `Uuid` |
+| **Compress** | `lib/compress/` | `Checksum`, `Compress`, `Filter`, `LzmaDec`, `Lzma2`, `LzmaAuto`, `LzmaStream`, `Xz` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
-| **IO** | `lib/io/` | `Reader`, `Writer` |
+| **Net** | `lib/net/` | `Dns`, `Resolv`, `Rfc`, `Tcp`, `Tls`, `TlsServer`, `Udp` |
+| **Web** | `lib/web/` | `Auth`, `Http`, `Http2`, `Http2Tabel`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Router`, `Session`, `Static`, `Url`, `WebSocket`, `WsClient` |
 | **Database** | `lib/db/` | `Sqlite` |
 
 ## Daftar modul
@@ -16,72 +21,73 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Modul | File | Fungsi | Ringkasan |
 |---|---|---|---|
-| [`Args`](api-core.md#args) | `lib/core/Args.kop` | 10 | — |
 | [`Arrays`](api-core.md#arrays) | `lib/core/Arrays.kop` | 23 | Operasi array `int[]`: agregat, potong/gabung, sort, pencarian, dan gaya fungsional (lambda). |
 | [`BigInt`](api-core.md#bigint) | `lib/core/BigInt.kop` | 22 | Bilangan bulat presisi sembarang: tambah, kali, bagi, pangkat modulo, invers modulo, FPB, konversi… |
 | [`Bytes`](api-core.md#bytes) | `lib/core/Bytes.kop` | 48 | Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`. |
-| [`Cbor`](api-core.md#cbor) | `lib/core/Cbor.kop` | 11 | — |
-| [`Checksum`](api-core.md#checksum) | `lib/core/Checksum.kop` | 11 | — |
-| [`Compress`](api-core.md#compress) | `lib/core/Compress.kop` | 29 | — |
-| [`Config`](api-core.md#config) | `lib/core/Config.kop` | 9 | — |
-| [`Cookie`](api-core.md#cookie) | `lib/core/Cookie.kop` | 16 | — |
-| [`Csv`](api-core.md#csv) | `lib/core/Csv.kop` | 5 | Baca & tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF. |
 | [`Deque`](api-core.md#deque) | `lib/core/Deque.kop` | 11 | Antrean dua ujung (ring buffer) berkapasitas tetap: push/pop depan-belakang. |
 | [`Digits`](api-core.md#digits) | `lib/core/Digits.kop` | 11 | Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain. |
-| [`Env`](api-core.md#env) | `lib/core/Env.kop` | 11 | — |
-| [`File`](api-core.md#file) | `lib/core/File.kop` | 15 | I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir. |
-| [`Filter`](api-core.md#filter) | `lib/core/Filter.kop` | 27 | — |
-| [`Json`](api-core.md#json) | `lib/core/Json.kop` | 72 | Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape `int[]`; literal bahasa memakai… |
 | [`List`](api-core.md#list) | `lib/core/List.kop` | 25 | — |
 | [`ListStr`](api-core.md#liststr) | `lib/core/ListStr.kop` | 24 | — |
-| [`Log`](api-core.md#log) | `lib/core/Log.kop` | 18 | Logging ke stderr dengan timestamp UTC dan level. |
-| [`LzmaDec`](api-core.md#lzmadec) | `lib/core/Lzma.kop` | 22 | — |
-| [`Lzma2`](api-core.md#lzma2) | `lib/core/Lzma2.kop` | 15 | — |
-| [`LzmaAuto`](api-core.md#lzmaauto) | `lib/core/LzmaAuto.kop` | 3 | — |
-| [`LzmaStream`](api-core.md#lzmastream) | `lib/core/LzmaStream.kop` | 15 | — |
 | [`Map`](api-core.md#map) | `lib/core/Map.kop` | 13 | Hash map int→int dengan open addressing dan `grow` eksplisit. |
 | [`MapSS`](api-core.md#mapss) | `lib/core/MapSS.kop` | 19 | — |
 | [`MapStr`](api-core.md#mapstr) | `lib/core/MapStr.kop` | 14 | Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan… |
 | [`Math`](api-core.md#math) | `lib/core/Math.kop` | 72 | Matematika integer 32-bit: bit, pangkat/akar/log, FPB/modular, prima, kombinatorika, dan geometri. |
 | [`Matrix`](api-core.md#matrix) | `lib/core/Matrix.kop` | 15 | Matriks persegi yang disimpan sebagai `int[]` datar (baris demi baris): aritmetika, transpose, trace,… |
-| [`MessagePack`](api-core.md#messagepack) | `lib/core/MessagePack.kop` | 11 | — |
-| [`Path`](api-core.md#path) | `lib/core/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
-| [`Regex`](api-core.md#regex) | `lib/core/Regex.kop` | 6 | Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor. |
-| [`Router`](api-core.md#router) | `lib/core/Router.kop` | 14 | — |
 | [`Set`](api-core.md#set) | `lib/core/Set.kop` | 8 | Himpunan int di atas Map: tambah/hapus/uji keanggotaan. |
 | [`SetStr`](api-core.md#setstr) | `lib/core/SetStr.kop` | 11 | — |
 | [`Stats`](api-core.md#stats) | `lib/core/Stats.kop` | 14 | Statistik deskriptif sederhana untuk array int: mean, median, modus, variansi, standar deviasi. |
-| [`Str`](api-core.md#str) | `lib/core/Str.kop` | 109 | Utilitas teks native `String`: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding,… |
 | [`Test`](api-core.md#test) | `lib/core/Test.kop` | 16 | — |
-| [`Text`](api-core.md#text) | `lib/core/Text.kop` | 19 | — |
-| [`Time`](api-core.md#time) | `lib/core/Time.kop` | 32 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
-| [`Uuid`](api-core.md#uuid) | `lib/core/Uuid.kop` | 6 | UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID. |
-| [`Xz`](api-core.md#xz) | `lib/core/Xz.kop` | 21 | — |
 
-### Net — [buka referensi](api-net.md)
+### Text — [buka referensi](api-text.md)
 
 | Modul | File | Fungsi | Ringkasan |
 |---|---|---|---|
-| [`Auth`](api-net.md#auth) | `lib/net/Auth.kop` | 8 | Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401. |
-| [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 17 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
-| [`Http`](api-net.md#http) | `lib/net/Http.kop` | 44 | Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik. |
-| [`Http2`](api-net.md#http2) | `lib/net/Http2.kop` | 23 | Klien HTTP/2 (RFC 9113/7540) di atas Tls: gate TLS+ALPN h2+preface, request HEADERS+DATA (stream id… |
-| [`Http2Tabel`](api-net.md#http2tabel) | `lib/net/Http2Tabel.kop` | 6 | Tabel HPACK (RFC 7541) untuk Http2: kode Huffman kanonik 257 simbol (Appendix B) dan tabel statik 61 entri… |
-| [`HttpServer`](api-net.md#httpserver) | `lib/net/HttpServer.kop` | 47 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
-| [`Jwt`](api-net.md#jwt) | `lib/net/Jwt.kop` | 18 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
-| [`Mime`](api-net.md#mime) | `lib/net/Mime.kop` | 1 | Pemetaan ekstensi file → header Content-Type. |
-| [`Multipart`](api-net.md#multipart) | `lib/net/Multipart.kop` | 17 | — |
-| [`Resolv`](api-net.md#resolv) | `lib/net/Resolv.kop` | 5 | Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout. |
-| [`Rfc`](api-net.md#rfc) | `lib/net/Rfc.kop` | 5 | Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan. |
-| [`Session`](api-net.md#session) | `lib/net/Session.kop` | 6 | Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry). |
-| [`Static`](api-net.md#static) | `lib/net/Static.kop` | 7 | Penyajian file statis + MIME; menolak path traversal `..`. |
-| [`Tcp`](api-net.md#tcp) | `lib/net/Tcp.kop` | 13 | Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat. |
-| [`Tls`](api-net.md#tls) | `lib/net/Tls.kop` | 27 | Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah. |
-| [`TlsServer`](api-net.md#tlsserver) | `lib/net/TlsServer.kop` | 28 | Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,… |
-| [`Udp`](api-net.md#udp) | `lib/net/Udp.kop` | 7 | Datagram UDP: bind, kirim/terima satu datagram, shutdown. |
-| [`Url`](api-net.md#url) | `lib/net/Url.kop` | 26 | URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4. |
-| [`WebSocket`](api-net.md#websocket) | `lib/net/WebSocket.kop` | 12 | Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask. |
-| [`WsClient`](api-net.md#wsclient) | `lib/net/WsClient.kop` | 15 | — |
+| [`Regex`](api-text.md#regex) | `lib/text/Regex.kop` | 6 | Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor. |
+| [`Str`](api-text.md#str) | `lib/text/Str.kop` | 109 | Utilitas teks native `String`: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding,… |
+| [`Text`](api-text.md#text) | `lib/text/Text.kop` | 19 | — |
+
+### Data — [buka referensi](api-data.md)
+
+| Modul | File | Fungsi | Ringkasan |
+|---|---|---|---|
+| [`Cbor`](api-data.md#cbor) | `lib/data/Cbor.kop` | 11 | — |
+| [`Config`](api-data.md#config) | `lib/data/Config.kop` | 9 | — |
+| [`Cookie`](api-data.md#cookie) | `lib/data/Cookie.kop` | 16 | — |
+| [`Csv`](api-data.md#csv) | `lib/data/Csv.kop` | 5 | Baca & tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF. |
+| [`Json`](api-data.md#json) | `lib/data/Json.kop` | 72 | Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape `int[]`; literal bahasa memakai… |
+| [`MessagePack`](api-data.md#messagepack) | `lib/data/MessagePack.kop` | 11 | — |
+
+### IO — [buka referensi](api-io.md)
+
+| Modul | File | Fungsi | Ringkasan |
+|---|---|---|---|
+| [`File`](api-io.md#file) | `lib/io/File.kop` | 15 | I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir. |
+| [`Path`](api-io.md#path) | `lib/io/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
+| [`Reader`](api-io.md#reader) | `lib/io/Reader.kop` | 1 | Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori. |
+| [`Writer`](api-io.md#writer) | `lib/io/Writer.kop` | 2 | Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh. |
+
+### System — [buka referensi](api-system.md)
+
+| Modul | File | Fungsi | Ringkasan |
+|---|---|---|---|
+| [`Args`](api-system.md#args) | `lib/system/Args.kop` | 10 | — |
+| [`Env`](api-system.md#env) | `lib/system/Env.kop` | 11 | — |
+| [`Log`](api-system.md#log) | `lib/system/Log.kop` | 18 | Logging ke stderr dengan timestamp UTC dan level. |
+| [`Time`](api-system.md#time) | `lib/system/Time.kop` | 32 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
+| [`Uuid`](api-system.md#uuid) | `lib/system/Uuid.kop` | 6 | UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID. |
+
+### Compress — [buka referensi](api-compress.md)
+
+| Modul | File | Fungsi | Ringkasan |
+|---|---|---|---|
+| [`Checksum`](api-compress.md#checksum) | `lib/compress/Checksum.kop` | 11 | — |
+| [`Compress`](api-compress.md#compress) | `lib/compress/Compress.kop` | 29 | — |
+| [`Filter`](api-compress.md#filter) | `lib/compress/Filter.kop` | 27 | — |
+| [`LzmaDec`](api-compress.md#lzmadec) | `lib/compress/Lzma.kop` | 22 | — |
+| [`Lzma2`](api-compress.md#lzma2) | `lib/compress/Lzma2.kop` | 15 | — |
+| [`LzmaAuto`](api-compress.md#lzmaauto) | `lib/compress/LzmaAuto.kop` | 3 | — |
+| [`LzmaStream`](api-compress.md#lzmastream) | `lib/compress/LzmaStream.kop` | 15 | — |
+| [`Xz`](api-compress.md#xz) | `lib/compress/Xz.kop` | 21 | — |
 
 ### Crypto — [buka referensi](api-crypto.md)
 
@@ -108,12 +114,36 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`X25519`](api-crypto.md#x25519) | `lib/crypto/X25519.kop` | 2 | Pertukaran kunci X25519 (RFC 7748) untuk TLS 1.3. |
 | [`X509`](api-crypto.md#x509) | `lib/crypto/X509.kop` | 11 | Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik. |
 
-### IO — [buka referensi](api-io.md)
+### Net — [buka referensi](api-net.md)
 
 | Modul | File | Fungsi | Ringkasan |
 |---|---|---|---|
-| [`Reader`](api-io.md#reader) | `lib/io/Reader.kop` | 1 | Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori. |
-| [`Writer`](api-io.md#writer) | `lib/io/Writer.kop` | 2 | Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh. |
+| [`Dns`](api-net.md#dns) | `lib/net/Dns.kop` | 17 | Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban. |
+| [`Resolv`](api-net.md#resolv) | `lib/net/Resolv.kop` | 5 | Resolver DNS UDP + pembaca `/etc/resolv.conf`, dengan timeout. |
+| [`Rfc`](api-net.md#rfc) | `lib/net/Rfc.kop` | 5 | Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan. |
+| [`Tcp`](api-net.md#tcp) | `lib/net/Tcp.kop` | 13 | Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat. |
+| [`Tls`](api-net.md#tls) | `lib/net/Tls.kop` | 27 | Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah. |
+| [`TlsServer`](api-net.md#tlsserver) | `lib/net/TlsServer.kop` | 28 | Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,… |
+| [`Udp`](api-net.md#udp) | `lib/net/Udp.kop` | 7 | Datagram UDP: bind, kirim/terima satu datagram, shutdown. |
+
+### Web — [buka referensi](api-web.md)
+
+| Modul | File | Fungsi | Ringkasan |
+|---|---|---|---|
+| [`Auth`](api-web.md#auth) | `lib/web/Auth.kop` | 8 | Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401. |
+| [`Http`](api-web.md#http) | `lib/web/Http.kop` | 44 | Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik. |
+| [`Http2`](api-web.md#http2) | `lib/web/Http2.kop` | 23 | Klien HTTP/2 (RFC 9113/7540) di atas Tls: gate TLS+ALPN h2+preface, request HEADERS+DATA (stream id… |
+| [`Http2Tabel`](api-web.md#http2tabel) | `lib/web/Http2Tabel.kop` | 6 | Tabel HPACK (RFC 7541) untuk Http2: kode Huffman kanonik 257 simbol (Appendix B) dan tabel statik 61 entri… |
+| [`HttpServer`](api-web.md#httpserver) | `lib/web/HttpServer.kop` | 47 | Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,… |
+| [`Jwt`](api-web.md#jwt) | `lib/web/Jwt.kop` | 18 | JWT HS256: tanda tangan, verifikasi, ambil payload. |
+| [`Mime`](api-web.md#mime) | `lib/web/Mime.kop` | 1 | Pemetaan ekstensi file → header Content-Type. |
+| [`Multipart`](api-web.md#multipart) | `lib/web/Multipart.kop` | 17 | — |
+| [`Router`](api-web.md#router) | `lib/web/Router.kop` | 14 | — |
+| [`Session`](api-web.md#session) | `lib/web/Session.kop` | 6 | Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry). |
+| [`Static`](api-web.md#static) | `lib/web/Static.kop` | 7 | Penyajian file statis + MIME; menolak path traversal `..`. |
+| [`Url`](api-web.md#url) | `lib/web/Url.kop` | 26 | URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4. |
+| [`WebSocket`](api-web.md#websocket) | `lib/web/WebSocket.kop` | 12 | Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask. |
+| [`WsClient`](api-web.md#wsclient) | `lib/web/WsClient.kop` | 15 | — |
 
 ### Database — [buka referensi](api-db.md)
 

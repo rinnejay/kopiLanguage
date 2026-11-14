@@ -5,8 +5,8 @@
 
 class Map {
 
-    static int EMPTY() { return (int)-2147483648L; }
-    static int TOMB()  { return (int)-2147483647L; }
+    static int EMPTY = (int)-2147483648L;
+    static int TOMB = (int)-2147483647L;
 
     static int[] make(int cap) {
         int c = 1;

@@ -30,7 +30,7 @@ server, tidak butuh internet.
 | `.../KopiProject/<nama>/build/` | berkas antara |
 | `.../KopiProject/<nama>/out/` | bytecode `.kbc` + hasil |
 | `/data/data/com.rinnejay.kopiide/files/lib/` | **biner compiler & VM** (dipisah dari proyek) |
-| `.../files/lib/lib/` | modul bahasa (`core/Str.kop`, `net/*.kop`, …) diekstrak dari `assets/kopilib.zip` |
+| `.../files/lib/lib/` | modul bahasa (`core/Str.kop`, `text/Str.kop`, `net/*.kop`, `web/*.kop`, …) diekstrak dari `assets/kopilib.zip` |
 | `/data/data/com.rinnejay.kopiide/files/tmp/` | scratch eksekusi (`TMPDIR`) |
 
 Tombol **＋** membuat proyek baru lengkap dengan `src/Main.kop` contoh.
@@ -49,7 +49,7 @@ Bila PackageManager tidak mengekstrak `jniLibs`, bridge mengambil biner
 langsung dari dalam APK (`lib/arm64-v8a/lib*.so`) lalu menaruhnya di
 `files/lib`. Jadi tidak bergantung pada `extractNativeLibs`.
 
-Modul bahasa (`lib/core/Str.kop`, `lib/net/Net.kop`, …) ikut dibundel
+Modul bahasa (`lib/text/Str.kop`, `lib/net/Tcp.kop`, `lib/web/Http.kop`, …) ikut dibundel
 sebagai `assets/kopilib.zip` dan diekstrak ke `files/lib/lib`. `kopicc`
 dijalankan dengan `KOPPATH=files/lib/lib`, sehingga `import Str;` dan
 kawan-kawan menemukan berkas modulnya di perangkat.

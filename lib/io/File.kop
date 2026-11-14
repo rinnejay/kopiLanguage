@@ -2,12 +2,12 @@
 // Flag openat standar Linux; mode 0644 = 420.
 
 class File {
-    static int O_RDONLY() { return 0; }
-    static int O_WRONLY() { return 1; }
-    static int O_CREAT()  { return 64; }
-    static int O_TRUNC()  { return 512; }
-    static int O_APPEND() { return 1024; }
-    static int MODE_0644() { return 420; }
+    static int O_RDONLY = 0;
+    static int O_WRONLY = 1;
+    static int O_CREAT = 64;
+    static int O_TRUNC = 512;
+    static int O_APPEND = 1024;
+    static int MODE_0644 = 420;
 
     static int openRead(String path)  { return Net.openb(path, 0, 0); }
     static int create(String path)    { return Net.openb(path, 577, 420); }

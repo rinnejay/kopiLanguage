@@ -119,7 +119,7 @@ Urutan pencarian modul `import Nama;`:
 
 1. folder file pengimpor — `Nama.kop`, lalu `nama.kop` (lokal menang)
 2. `lib/` di samping `kopicc` (bisa dioverride `KOPPATH`)
-3. subfolder `lib/<kategori>/Nama.kop` (`core/`, `net/`, `crypto/`)
+3. subfolder `lib/<kategori>/Nama.kop` (`core/`, `text/`, `data/`, `io/`, `system/`, `compress/`, `crypto/`, `net/`, `web/`, `db/`)
 
 File yang sama (realpath) hanya dimuat sekali. **Jebakan**: file lokal
 bernama sama dengan modul (tanpa peduli huruf besar/kecil) akan menang,

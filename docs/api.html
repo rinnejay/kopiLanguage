@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-pustaka">Referensi pustaka<a class="anchor" href="#referensi-pustaka" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — buka referensi</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — buka referensi</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — buka referensi</a></li><li class="toc-h3"><a href="#io-buka-referensi-api-io-md">IO — buka referensi</a></li><li class="toc-h3"><a href="#database-buka-referensi-api-db-md">Database — buka referensi</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — buka referensi</a></li><li class="toc-h3"><a href="#text-buka-referensi-api-text-md">Text — buka referensi</a></li><li class="toc-h3"><a href="#data-buka-referensi-api-data-md">Data — buka referensi</a></li><li class="toc-h3"><a href="#io-buka-referensi-api-io-md">IO — buka referensi</a></li><li class="toc-h3"><a href="#system-buka-referensi-api-system-md">System — buka referensi</a></li><li class="toc-h3"><a href="#compress-buka-referensi-api-compress-md">Compress — buka referensi</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — buka referensi</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — buka referensi</a></li><li class="toc-h3"><a href="#web-buka-referensi-api-web-md">Web — buka referensi</a></li><li class="toc-h3"><a href="#database-buka-referensi-api-db-md">Database — buka referensi</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
 <p>Ringkasan semua modul di <code>lib/</code>. Setiap modul adalah class Kopi dengan method static; impor memakai nama class.</p>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -37,12 +37,32 @@
 <tr>
 <td><strong>Core</strong></td>
 <td><code>lib/core/</code></td>
-<td><code>Args</code>, <code>Arrays</code>, <code>BigInt</code>, <code>Bytes</code>, <code>Cbor</code>, <code>Checksum</code>, <code>Compress</code>, <code>Config</code>, <code>Cookie</code>, <code>Csv</code>, <code>Deque</code>, <code>Digits</code>, <code>Env</code>, <code>File</code>, <code>Filter</code>, <code>Json</code>, <code>List</code>, <code>ListStr</code>, <code>Log</code>, <code>LzmaDec</code>, <code>Lzma2</code>, <code>LzmaAuto</code>, <code>LzmaStream</code>, <code>Map</code>, <code>MapSS</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>MessagePack</code>, <code>Path</code>, <code>Regex</code>, <code>Router</code>, <code>Set</code>, <code>SetStr</code>, <code>Stats</code>, <code>Str</code>, <code>Test</code>, <code>Text</code>, <code>Time</code>, <code>Uuid</code>, <code>Xz</code></td>
+<td><code>Arrays</code>, <code>BigInt</code>, <code>Bytes</code>, <code>Deque</code>, <code>Digits</code>, <code>List</code>, <code>ListStr</code>, <code>Map</code>, <code>MapSS</code>, <code>MapStr</code>, <code>Math</code>, <code>Matrix</code>, <code>Set</code>, <code>SetStr</code>, <code>Stats</code>, <code>Test</code></td>
 </tr>
 <tr>
-<td><strong>Net</strong></td>
-<td><code>lib/net/</code></td>
-<td><code>Auth</code>, <code>Dns</code>, <code>Http</code>, <code>Http2</code>, <code>Http2Tabel</code>, <code>HttpServer</code>, <code>Jwt</code>, <code>Mime</code>, <code>Multipart</code>, <code>Resolv</code>, <code>Rfc</code>, <code>Session</code>, <code>Static</code>, <code>Tcp</code>, <code>Tls</code>, <code>TlsServer</code>, <code>Udp</code>, <code>Url</code>, <code>WebSocket</code>, <code>WsClient</code></td>
+<td><strong>Text</strong></td>
+<td><code>lib/text/</code></td>
+<td><code>Regex</code>, <code>Str</code>, <code>Text</code></td>
+</tr>
+<tr>
+<td><strong>Data</strong></td>
+<td><code>lib/data/</code></td>
+<td><code>Cbor</code>, <code>Config</code>, <code>Cookie</code>, <code>Csv</code>, <code>Json</code>, <code>MessagePack</code></td>
+</tr>
+<tr>
+<td><strong>IO</strong></td>
+<td><code>lib/io/</code></td>
+<td><code>File</code>, <code>Path</code>, <code>Reader</code>, <code>Writer</code></td>
+</tr>
+<tr>
+<td><strong>System</strong></td>
+<td><code>lib/system/</code></td>
+<td><code>Args</code>, <code>Env</code>, <code>Log</code>, <code>Time</code>, <code>Uuid</code></td>
+</tr>
+<tr>
+<td><strong>Compress</strong></td>
+<td><code>lib/compress/</code></td>
+<td><code>Checksum</code>, <code>Compress</code>, <code>Filter</code>, <code>LzmaDec</code>, <code>Lzma2</code>, <code>LzmaAuto</code>, <code>LzmaStream</code>, <code>Xz</code></td>
 </tr>
 <tr>
 <td><strong>Crypto</strong></td>
@@ -50,9 +70,14 @@
 <td><code>Aead</code>, <code>Aes</code>, <code>Big</code>, <code>Blake2b</code>, <code>ChaCha</code>, <code>Cipher</code>, <code>Crypto</code>, <code>Der</code>, <code>Ecdsa</code>, <code>Gcm</code>, <code>Hash</code>, <code>Kdf</code>, <code>Pbkdf2</code>, <code>Pem</code>, <code>Poly</code>, <code>Rand</code>, <code>Rsa</code>, <code>Scrypt</code>, <code>X25519</code>, <code>X509</code></td>
 </tr>
 <tr>
-<td><strong>IO</strong></td>
-<td><code>lib/io/</code></td>
-<td><code>Reader</code>, <code>Writer</code></td>
+<td><strong>Net</strong></td>
+<td><code>lib/net/</code></td>
+<td><code>Dns</code>, <code>Resolv</code>, <code>Rfc</code>, <code>Tcp</code>, <code>Tls</code>, <code>TlsServer</code>, <code>Udp</code></td>
+</tr>
+<tr>
+<td><strong>Web</strong></td>
+<td><code>lib/web/</code></td>
+<td><code>Auth</code>, <code>Http</code>, <code>Http2</code>, <code>Http2Tabel</code>, <code>HttpServer</code>, <code>Jwt</code>, <code>Mime</code>, <code>Multipart</code>, <code>Router</code>, <code>Session</code>, <code>Static</code>, <code>Url</code>, <code>WebSocket</code>, <code>WsClient</code></td>
 </tr>
 <tr>
 <td><strong>Database</strong></td>
@@ -69,12 +94,6 @@
 <th>Fungsi</th>
 <th>Ringkasan</th>
 </tr></thead><tbody>
-<tr>
-<td><a href="api-core.html#args"><code>Args</code></a></td>
-<td><code>lib/core/Args.kop</code></td>
-<td>10</td>
-<td>—</td>
-</tr>
 <tr>
 <td><a href="api-core.html#arrays"><code>Arrays</code></a></td>
 <td><code>lib/core/Arrays.kop</code></td>
@@ -94,42 +113,6 @@
 <td>Utilitas buffer byte <code>int[]</code>: I/O biner, jaringan, kriptografi. Untuk teks gunakan <code>Str</code>.</td>
 </tr>
 <tr>
-<td><a href="api-core.html#cbor"><code>Cbor</code></a></td>
-<td><code>lib/core/Cbor.kop</code></td>
-<td>11</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#checksum"><code>Checksum</code></a></td>
-<td><code>lib/core/Checksum.kop</code></td>
-<td>11</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#compress"><code>Compress</code></a></td>
-<td><code>lib/core/Compress.kop</code></td>
-<td>29</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#config"><code>Config</code></a></td>
-<td><code>lib/core/Config.kop</code></td>
-<td>9</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#cookie"><code>Cookie</code></a></td>
-<td><code>lib/core/Cookie.kop</code></td>
-<td>16</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#csv"><code>Csv</code></a></td>
-<td><code>lib/core/Csv.kop</code></td>
-<td>5</td>
-<td>Baca &amp; tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF.</td>
-</tr>
-<tr>
 <td><a href="api-core.html#deque"><code>Deque</code></a></td>
 <td><code>lib/core/Deque.kop</code></td>
 <td>11</td>
@@ -142,30 +125,6 @@
 <td>Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain.</td>
 </tr>
 <tr>
-<td><a href="api-core.html#env"><code>Env</code></a></td>
-<td><code>lib/core/Env.kop</code></td>
-<td>11</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#file"><code>File</code></a></td>
-<td><code>lib/core/File.kop</code></td>
-<td>15</td>
-<td>I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.</td>
-</tr>
-<tr>
-<td><a href="api-core.html#filter"><code>Filter</code></a></td>
-<td><code>lib/core/Filter.kop</code></td>
-<td>27</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#json"><code>Json</code></a></td>
-<td><code>lib/core/Json.kop</code></td>
-<td>72</td>
-<td>Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape <code>int[]</code>; literal bahasa memakai…</td>
-</tr>
-<tr>
 <td><a href="api-core.html#list"><code>List</code></a></td>
 <td><code>lib/core/List.kop</code></td>
 <td>25</td>
@@ -175,36 +134,6 @@
 <td><a href="api-core.html#liststr"><code>ListStr</code></a></td>
 <td><code>lib/core/ListStr.kop</code></td>
 <td>24</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#log"><code>Log</code></a></td>
-<td><code>lib/core/Log.kop</code></td>
-<td>18</td>
-<td>Logging ke stderr dengan timestamp UTC dan level.</td>
-</tr>
-<tr>
-<td><a href="api-core.html#lzmadec"><code>LzmaDec</code></a></td>
-<td><code>lib/core/Lzma.kop</code></td>
-<td>22</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#lzma2"><code>Lzma2</code></a></td>
-<td><code>lib/core/Lzma2.kop</code></td>
-<td>15</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#lzmaauto"><code>LzmaAuto</code></a></td>
-<td><code>lib/core/LzmaAuto.kop</code></td>
-<td>3</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#lzmastream"><code>LzmaStream</code></a></td>
-<td><code>lib/core/LzmaStream.kop</code></td>
-<td>15</td>
 <td>—</td>
 </tr>
 <tr>
@@ -238,30 +167,6 @@
 <td>Matriks persegi yang disimpan sebagai <code>int[]</code> datar (baris demi baris): aritmetika, transpose, trace,…</td>
 </tr>
 <tr>
-<td><a href="api-core.html#messagepack"><code>MessagePack</code></a></td>
-<td><code>lib/core/MessagePack.kop</code></td>
-<td>11</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#path"><code>Path</code></a></td>
-<td><code>lib/core/Path.kop</code></td>
-<td>6</td>
-<td>Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut.</td>
-</tr>
-<tr>
-<td><a href="api-core.html#regex"><code>Regex</code></a></td>
-<td><code>lib/core/Regex.kop</code></td>
-<td>6</td>
-<td>Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor.</td>
-</tr>
-<tr>
-<td><a href="api-core.html#router"><code>Router</code></a></td>
-<td><code>lib/core/Router.kop</code></td>
-<td>14</td>
-<td>—</td>
-</tr>
-<tr>
 <td><a href="api-core.html#set"><code>Set</code></a></td>
 <td><code>lib/core/Set.kop</code></td>
 <td>8</td>
@@ -280,43 +185,13 @@
 <td>Statistik deskriptif sederhana untuk array int: mean, median, modus, variansi, standar deviasi.</td>
 </tr>
 <tr>
-<td><a href="api-core.html#str"><code>Str</code></a></td>
-<td><code>lib/core/Str.kop</code></td>
-<td>109</td>
-<td>Utilitas teks native <code>String</code>: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding,…</td>
-</tr>
-<tr>
 <td><a href="api-core.html#test"><code>Test</code></a></td>
 <td><code>lib/core/Test.kop</code></td>
 <td>16</td>
 <td>—</td>
 </tr>
-<tr>
-<td><a href="api-core.html#text"><code>Text</code></a></td>
-<td><code>lib/core/Text.kop</code></td>
-<td>19</td>
-<td>—</td>
-</tr>
-<tr>
-<td><a href="api-core.html#time"><code>Time</code></a></td>
-<td><code>lib/core/Time.kop</code></td>
-<td>32</td>
-<td>Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.</td>
-</tr>
-<tr>
-<td><a href="api-core.html#uuid"><code>Uuid</code></a></td>
-<td><code>lib/core/Uuid.kop</code></td>
-<td>6</td>
-<td>UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID.</td>
-</tr>
-<tr>
-<td><a href="api-core.html#xz"><code>Xz</code></a></td>
-<td><code>lib/core/Xz.kop</code></td>
-<td>21</td>
-<td>—</td>
-</tr>
 </tbody></table></div>
-<h3 id="net-buka-referensi-api-net-md">Net — <a href="api-net.html">buka referensi</a><a class="anchor" href="#net-buka-referensi-api-net-md" aria-label="tautan">#</a></h3>
+<h3 id="text-buka-referensi-api-text-md">Text — <a href="api-text.html">buka referensi</a><a class="anchor" href="#text-buka-referensi-api-text-md" aria-label="tautan">#</a></h3>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Modul</th>
@@ -325,123 +200,195 @@
 <th>Ringkasan</th>
 </tr></thead><tbody>
 <tr>
-<td><a href="api-net.html#auth"><code>Auth</code></a></td>
-<td><code>lib/net/Auth.kop</code></td>
-<td>8</td>
-<td>Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#dns"><code>Dns</code></a></td>
-<td><code>lib/net/Dns.kop</code></td>
-<td>17</td>
-<td>Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#http"><code>Http</code></a></td>
-<td><code>lib/net/Http.kop</code></td>
-<td>44</td>
-<td>Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#http2"><code>Http2</code></a></td>
-<td><code>lib/net/Http2.kop</code></td>
-<td>23</td>
-<td>Klien HTTP/2 (RFC 9113/7540) di atas Tls: gate TLS+ALPN h2+preface, request HEADERS+DATA (stream id…</td>
-</tr>
-<tr>
-<td><a href="api-net.html#http2tabel"><code>Http2Tabel</code></a></td>
-<td><code>lib/net/Http2Tabel.kop</code></td>
+<td><a href="api-text.html#regex"><code>Regex</code></a></td>
+<td><code>lib/text/Regex.kop</code></td>
 <td>6</td>
-<td>Tabel HPACK (RFC 7541) untuk Http2: kode Huffman kanonik 257 simbol (Appendix B) dan tabel statik 61 entri…</td>
+<td>Mesin regex backtracking (mirip PCRE/Python): kelas, kuantifier, grup, alternasi, anchor.</td>
 </tr>
 <tr>
-<td><a href="api-net.html#httpserver"><code>HttpServer</code></a></td>
-<td><code>lib/net/HttpServer.kop</code></td>
-<td>47</td>
-<td>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,…</td>
+<td><a href="api-text.html#str"><code>Str</code></a></td>
+<td><code>lib/text/Str.kop</code></td>
+<td>109</td>
+<td>Utilitas teks native <code>String</code>: perbandingan, potong/gabung, cari/ganti, trim/case, split/join, padding,…</td>
 </tr>
 <tr>
-<td><a href="api-net.html#jwt"><code>Jwt</code></a></td>
-<td><code>lib/net/Jwt.kop</code></td>
-<td>18</td>
-<td>JWT HS256: tanda tangan, verifikasi, ambil payload.</td>
+<td><a href="api-text.html#text"><code>Text</code></a></td>
+<td><code>lib/text/Text.kop</code></td>
+<td>19</td>
+<td>—</td>
 </tr>
+</tbody></table></div>
+<h3 id="data-buka-referensi-api-data-md">Data — <a href="api-data.html">buka referensi</a><a class="anchor" href="#data-buka-referensi-api-data-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
 <tr>
-<td><a href="api-net.html#mime"><code>Mime</code></a></td>
-<td><code>lib/net/Mime.kop</code></td>
-<td>1</td>
-<td>Pemetaan ekstensi file → header Content-Type.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#multipart"><code>Multipart</code></a></td>
-<td><code>lib/net/Multipart.kop</code></td>
-<td>17</td>
+<td><a href="api-data.html#cbor"><code>Cbor</code></a></td>
+<td><code>lib/data/Cbor.kop</code></td>
+<td>11</td>
 <td>—</td>
 </tr>
 <tr>
-<td><a href="api-net.html#resolv"><code>Resolv</code></a></td>
-<td><code>lib/net/Resolv.kop</code></td>
+<td><a href="api-data.html#config"><code>Config</code></a></td>
+<td><code>lib/data/Config.kop</code></td>
+<td>9</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-data.html#cookie"><code>Cookie</code></a></td>
+<td><code>lib/data/Cookie.kop</code></td>
+<td>16</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-data.html#csv"><code>Csv</code></a></td>
+<td><code>lib/data/Csv.kop</code></td>
 <td>5</td>
-<td>Resolver DNS UDP + pembaca <code>/etc/resolv.conf</code>, dengan timeout.</td>
+<td>Baca &amp; tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF.</td>
 </tr>
 <tr>
-<td><a href="api-net.html#rfc"><code>Rfc</code></a></td>
-<td><code>lib/net/Rfc.kop</code></td>
-<td>5</td>
-<td>Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan.</td>
+<td><a href="api-data.html#json"><code>Json</code></a></td>
+<td><code>lib/data/Json.kop</code></td>
+<td>72</td>
+<td>Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape <code>int[]</code>; literal bahasa memakai…</td>
 </tr>
 <tr>
-<td><a href="api-net.html#session"><code>Session</code></a></td>
-<td><code>lib/net/Session.kop</code></td>
-<td>6</td>
-<td>Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry).</td>
+<td><a href="api-data.html#messagepack"><code>MessagePack</code></a></td>
+<td><code>lib/data/MessagePack.kop</code></td>
+<td>11</td>
+<td>—</td>
 </tr>
+</tbody></table></div>
+<h3 id="io-buka-referensi-api-io-md">IO — <a href="api-io.html">buka referensi</a><a class="anchor" href="#io-buka-referensi-api-io-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
 <tr>
-<td><a href="api-net.html#static"><code>Static</code></a></td>
-<td><code>lib/net/Static.kop</code></td>
-<td>7</td>
-<td>Penyajian file statis + MIME; menolak path traversal <code>..</code>.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#tcp"><code>Tcp</code></a></td>
-<td><code>lib/net/Tcp.kop</code></td>
-<td>13</td>
-<td>Transport TCP di atas builtin <code>Net</code>: buka koneksi, kirim/terima buffer, shutdown, helper alamat.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#tls"><code>Tls</code></a></td>
-<td><code>lib/net/Tls.kop</code></td>
-<td>27</td>
-<td>Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#tlsserver"><code>TlsServer</code></a></td>
-<td><code>lib/net/TlsServer.kop</code></td>
-<td>28</td>
-<td>Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,…</td>
-</tr>
-<tr>
-<td><a href="api-net.html#udp"><code>Udp</code></a></td>
-<td><code>lib/net/Udp.kop</code></td>
-<td>7</td>
-<td>Datagram UDP: bind, kirim/terima satu datagram, shutdown.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#url"><code>Url</code></a></td>
-<td><code>lib/net/Url.kop</code></td>
-<td>26</td>
-<td>URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#websocket"><code>WebSocket</code></a></td>
-<td><code>lib/net/WebSocket.kop</code></td>
-<td>12</td>
-<td>Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask.</td>
-</tr>
-<tr>
-<td><a href="api-net.html#wsclient"><code>WsClient</code></a></td>
-<td><code>lib/net/WsClient.kop</code></td>
+<td><a href="api-io.html#file"><code>File</code></a></td>
+<td><code>lib/io/File.kop</code></td>
 <td>15</td>
+<td>I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.</td>
+</tr>
+<tr>
+<td><a href="api-io.html#path"><code>Path</code></a></td>
+<td><code>lib/io/Path.kop</code></td>
+<td>6</td>
+<td>Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut.</td>
+</tr>
+<tr>
+<td><a href="api-io.html#reader"><code>Reader</code></a></td>
+<td><code>lib/io/Reader.kop</code></td>
+<td>1</td>
+<td>Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.</td>
+</tr>
+<tr>
+<td><a href="api-io.html#writer"><code>Writer</code></a></td>
+<td><code>lib/io/Writer.kop</code></td>
+<td>2</td>
+<td>Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.</td>
+</tr>
+</tbody></table></div>
+<h3 id="system-buka-referensi-api-system-md">System — <a href="api-system.html">buka referensi</a><a class="anchor" href="#system-buka-referensi-api-system-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-system.html#args"><code>Args</code></a></td>
+<td><code>lib/system/Args.kop</code></td>
+<td>10</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-system.html#env"><code>Env</code></a></td>
+<td><code>lib/system/Env.kop</code></td>
+<td>11</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-system.html#log"><code>Log</code></a></td>
+<td><code>lib/system/Log.kop</code></td>
+<td>18</td>
+<td>Logging ke stderr dengan timestamp UTC dan level.</td>
+</tr>
+<tr>
+<td><a href="api-system.html#time"><code>Time</code></a></td>
+<td><code>lib/system/Time.kop</code></td>
+<td>32</td>
+<td>Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.</td>
+</tr>
+<tr>
+<td><a href="api-system.html#uuid"><code>Uuid</code></a></td>
+<td><code>lib/system/Uuid.kop</code></td>
+<td>6</td>
+<td>UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID.</td>
+</tr>
+</tbody></table></div>
+<h3 id="compress-buka-referensi-api-compress-md">Compress — <a href="api-compress.html">buka referensi</a><a class="anchor" href="#compress-buka-referensi-api-compress-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-compress.html#checksum"><code>Checksum</code></a></td>
+<td><code>lib/compress/Checksum.kop</code></td>
+<td>11</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-compress.html#compress"><code>Compress</code></a></td>
+<td><code>lib/compress/Compress.kop</code></td>
+<td>29</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-compress.html#filter"><code>Filter</code></a></td>
+<td><code>lib/compress/Filter.kop</code></td>
+<td>27</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-compress.html#lzmadec"><code>LzmaDec</code></a></td>
+<td><code>lib/compress/Lzma.kop</code></td>
+<td>22</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-compress.html#lzma2"><code>Lzma2</code></a></td>
+<td><code>lib/compress/Lzma2.kop</code></td>
+<td>15</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-compress.html#lzmaauto"><code>LzmaAuto</code></a></td>
+<td><code>lib/compress/LzmaAuto.kop</code></td>
+<td>3</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-compress.html#lzmastream"><code>LzmaStream</code></a></td>
+<td><code>lib/compress/LzmaStream.kop</code></td>
+<td>15</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-compress.html#xz"><code>Xz</code></a></td>
+<td><code>lib/compress/Xz.kop</code></td>
+<td>21</td>
 <td>—</td>
 </tr>
 </tbody></table></div>
@@ -574,7 +521,7 @@
 <td>Parsing sertifikat X.509 (RFC 5280): subject, issuer, masa berlaku, SPKI, pin, kunci publik.</td>
 </tr>
 </tbody></table></div>
-<h3 id="io-buka-referensi-api-io-md">IO — <a href="api-io.html">buka referensi</a><a class="anchor" href="#io-buka-referensi-api-io-md" aria-label="tautan">#</a></h3>
+<h3 id="net-buka-referensi-api-net-md">Net — <a href="api-net.html">buka referensi</a><a class="anchor" href="#net-buka-referensi-api-net-md" aria-label="tautan">#</a></h3>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Modul</th>
@@ -583,16 +530,139 @@
 <th>Ringkasan</th>
 </tr></thead><tbody>
 <tr>
-<td><a href="api-io.html#reader"><code>Reader</code></a></td>
-<td><code>lib/io/Reader.kop</code></td>
-<td>1</td>
-<td>Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.</td>
+<td><a href="api-net.html#dns"><code>Dns</code></a></td>
+<td><code>lib/net/Dns.kop</code></td>
+<td>17</td>
+<td>Klien DNS-over-TCP (RFC 1035/7766) ke server eksplisit; query A + parser jawaban.</td>
 </tr>
 <tr>
-<td><a href="api-io.html#writer"><code>Writer</code></a></td>
-<td><code>lib/io/Writer.kop</code></td>
-<td>2</td>
-<td>Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.</td>
+<td><a href="api-net.html#resolv"><code>Resolv</code></a></td>
+<td><code>lib/net/Resolv.kop</code></td>
+<td>5</td>
+<td>Resolver DNS UDP + pembaca <code>/etc/resolv.conf</code>, dengan timeout.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#rfc"><code>Rfc</code></a></td>
+<td><code>lib/net/Rfc.kop</code></td>
+<td>5</td>
+<td>Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#tcp"><code>Tcp</code></a></td>
+<td><code>lib/net/Tcp.kop</code></td>
+<td>13</td>
+<td>Transport TCP di atas builtin <code>Net</code>: buka koneksi, kirim/terima buffer, shutdown, helper alamat.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#tls"><code>Tls</code></a></td>
+<td><code>lib/net/Tls.kop</code></td>
+<td>27</td>
+<td>Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah.</td>
+</tr>
+<tr>
+<td><a href="api-net.html#tlsserver"><code>TlsServer</code></a></td>
+<td><code>lib/net/TlsServer.kop</code></td>
+<td>28</td>
+<td>Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,…</td>
+</tr>
+<tr>
+<td><a href="api-net.html#udp"><code>Udp</code></a></td>
+<td><code>lib/net/Udp.kop</code></td>
+<td>7</td>
+<td>Datagram UDP: bind, kirim/terima satu datagram, shutdown.</td>
+</tr>
+</tbody></table></div>
+<h3 id="web-buka-referensi-api-web-md">Web — <a href="api-web.html">buka referensi</a><a class="anchor" href="#web-buka-referensi-api-web-md" aria-label="tautan">#</a></h3>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Modul</th>
+<th>File</th>
+<th>Fungsi</th>
+<th>Ringkasan</th>
+</tr></thead><tbody>
+<tr>
+<td><a href="api-web.html#auth"><code>Auth</code></a></td>
+<td><code>lib/web/Auth.kop</code></td>
+<td>8</td>
+<td>Parser header Authorization: skema, Basic (user:pass), Bearer, tantangan 401.</td>
+</tr>
+<tr>
+<td><a href="api-web.html#http"><code>Http</code></a></td>
+<td><code>lib/web/Http.kop</code></td>
+<td>44</td>
+<td>Klien HTTP/1.1: GET/POST, header kustom, chunked, redirect, basic auth, timeout 5 detik.</td>
+</tr>
+<tr>
+<td><a href="api-web.html#http2"><code>Http2</code></a></td>
+<td><code>lib/web/Http2.kop</code></td>
+<td>23</td>
+<td>Klien HTTP/2 (RFC 9113/7540) di atas Tls: gate TLS+ALPN h2+preface, request HEADERS+DATA (stream id…</td>
+</tr>
+<tr>
+<td><a href="api-web.html#http2tabel"><code>Http2Tabel</code></a></td>
+<td><code>lib/web/Http2Tabel.kop</code></td>
+<td>6</td>
+<td>Tabel HPACK (RFC 7541) untuk Http2: kode Huffman kanonik 257 simbol (Appendix B) dan tabel statik 61 entri…</td>
+</tr>
+<tr>
+<td><a href="api-web.html#httpserver"><code>HttpServer</code></a></td>
+<td><code>lib/web/HttpServer.kop</code></td>
+<td>47</td>
+<td>Parser request HTTP/1.1 dan pembangun respons: method/path/query/header/body, keep-alive, HEAD, cookie,…</td>
+</tr>
+<tr>
+<td><a href="api-web.html#jwt"><code>Jwt</code></a></td>
+<td><code>lib/web/Jwt.kop</code></td>
+<td>18</td>
+<td>JWT HS256: tanda tangan, verifikasi, ambil payload.</td>
+</tr>
+<tr>
+<td><a href="api-web.html#mime"><code>Mime</code></a></td>
+<td><code>lib/web/Mime.kop</code></td>
+<td>1</td>
+<td>Pemetaan ekstensi file → header Content-Type.</td>
+</tr>
+<tr>
+<td><a href="api-web.html#multipart"><code>Multipart</code></a></td>
+<td><code>lib/web/Multipart.kop</code></td>
+<td>17</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-web.html#router"><code>Router</code></a></td>
+<td><code>lib/web/Router.kop</code></td>
+<td>14</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="api-web.html#session"><code>Session</code></a></td>
+<td><code>lib/web/Session.kop</code></td>
+<td>6</td>
+<td>Sesi in-memory ber-expiry di atas dua MapStr (id→uid, id→expiry).</td>
+</tr>
+<tr>
+<td><a href="api-web.html#static"><code>Static</code></a></td>
+<td><code>lib/web/Static.kop</code></td>
+<td>7</td>
+<td>Penyajian file statis + MIME; menolak path traversal <code>..</code>.</td>
+</tr>
+<tr>
+<td><a href="api-web.html#url"><code>Url</code></a></td>
+<td><code>lib/web/Url.kop</code></td>
+<td>26</td>
+<td>URL/URI RFC 3986: percent-encoding, form encoding, parsing komponen, resolusi relatif, normalisasi path, IPv4.</td>
+</tr>
+<tr>
+<td><a href="api-web.html#websocket"><code>WebSocket</code></a></td>
+<td><code>lib/web/WebSocket.kop</code></td>
+<td>12</td>
+<td>Server WebSocket RFC 6455: handshake, frame teks/biner/ping/pong/close, decode frame klien bermask.</td>
+</tr>
+<tr>
+<td><a href="api-web.html#wsclient"><code>WsClient</code></a></td>
+<td><code>lib/web/WsClient.kop</code></td>
+<td>15</td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <h3 id="database-buka-referensi-api-db-md">Database — <a href="api-db.html">buka referensi</a><a class="anchor" href="#database-buka-referensi-api-db-md" aria-label="tautan">#</a></h3>

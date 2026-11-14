@@ -25,9 +25,7 @@ import Rsa;
 
 class Jwt {
 
-    static String HEADER() {
-        return "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
-    }
+    static String HEADER = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
 
     /* header untuk algoritma tertentu */
     static String headerFor(String alg) {

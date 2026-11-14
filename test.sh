@@ -1482,6 +1482,26 @@ check staticfield test/staticfield.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/staticfield64.s" -o /dev/null \
     && echo "PASS  staticfield [x64]" || { echo "FAIL  staticfield [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
+# ─── v1.42: seluruh modul lib dapat diimpor dari folder kategorinya ───
+{
+    for f in $(find lib -name '*.kop' | sort); do
+        b=$(basename "$f" .kop)
+        echo "import $b;"
+    done
+    cat <<'EOF'
+class Main {
+    static void main() {
+        malloc { System.out.println("all-lib-ok"); }
+    }
+}
+EOF
+} > "$T/kopi/alllib.kop"
+printf 'all-lib-ok\n' > "$T/kopi/alllib.ref"
+check alllib "$T/kopi/alllib.kop"
+./kopicc "$T/kopi/alllib.kop" -t x64 -o "$T/kopi/alllib64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/alllib64.s" -o /dev/null \
+    && echo "PASS  alllib [x64]" || { echo "FAIL  alllib [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
 # ─── fitur bahasa v1.12: class instance (new, field, method this) ───
 cp test/objtest.ref "$T/kopi/objtest.ref"
 check objtest test/objtest.kop

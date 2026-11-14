@@ -38,30 +38,46 @@ import HttpServer;</code></pre>
 </tr></thead><tbody>
 <tr>
 <td><code>lib/core/</code></td>
-<td><code>Str</code> <code>Bytes</code> <code>Math</code> <code>Digits</code> <code>Stats</code> <code>Matrix</code> <code>Arrays</code> <code>Json</code> <code>Map</code> <code>MapStr</code> <code>Set</code> <code>Deque</code> <code>File</code> <code>Path</code> <code>Time</code> <code>Log</code></td>
+<td><code>Arrays</code> <code>BigInt</code> <code>Bytes</code> <code>Deque</code> <code>Digits</code> <code>List</code> <code>ListStr</code> <code>Map</code> <code>MapSS</code> <code>MapStr</code> <code>Math</code> <code>Matrix</code> <code>Set</code> <code>SetStr</code> <code>Stats</code> <code>Test</code></td>
 </tr>
 <tr>
-<td><code>lib/net/</code></td>
-<td><code>Tcp</code> <code>Udp</code> <code>Dns</code> <code>Resolv</code> <code>Http</code> <code>HttpServer</code> <code>Static</code> <code>Mime</code> <code>Url</code> <code>WebSocket</code> <code>Jwt</code> <code>Session</code> <code>Auth</code> <code>Rfc</code> <code>Tls</code> <code>TlsServer</code> <code>Http2</code> <code>Http2Tabel</code></td>
+<td><code>lib/text/</code></td>
+<td><code>Str</code> <code>Text</code> <code>Regex</code> (mesin regex backtracking)</td>
 </tr>
 <tr>
-<td><code>lib/crypto/</code></td>
-<td><code>Crypto</code> <code>Cipher</code> <code>Hash</code> <code>Aes</code> <code>Gcm</code> <code>Pem</code> <code>X509</code> <code>Pbkdf2</code> <code>Kdf</code> <code>Big</code> <code>X25519</code> <code>ChaCha</code> <code>Poly</code> <code>Aead</code> <code>Rand</code> <code>Der</code></td>
+<td><code>lib/data/</code></td>
+<td><code>Cbor</code> <code>Config</code> <code>Cookie</code> <code>Csv</code> <code>Json</code> <code>MessagePack</code></td>
 </tr>
 <tr>
 <td><code>lib/io/</code></td>
-<td><code>Reader</code> <code>Writer</code></td>
+<td><code>File</code> <code>Path</code> <code>Reader</code> <code>Writer</code></td>
+</tr>
+<tr>
+<td><code>lib/system/</code></td>
+<td><code>Args</code> <code>Env</code> <code>Log</code> <code>Time</code> <code>Uuid</code></td>
+</tr>
+<tr>
+<td><code>lib/compress/</code></td>
+<td><code>Checksum</code> <code>Compress</code> <code>Filter</code> <code>Lzma</code> <code>Lzma2</code> <code>LzmaAuto</code> <code>LzmaStream</code> <code>Xz</code></td>
+</tr>
+<tr>
+<td><code>lib/crypto/</code></td>
+<td><code>Aead</code> <code>Aes</code> <code>Big</code> <code>Blake2b</code> <code>ChaCha</code> <code>Cipher</code> <code>Crypto</code> <code>Der</code> <code>Ecdsa</code> <code>Gcm</code> <code>Hash</code> <code>Kdf</code> <code>Pbkdf2</code> <code>Pem</code> <code>Poly</code> <code>Rand</code> <code>Rsa</code> <code>Scrypt</code> <code>X25519</code> <code>X509</code></td>
+</tr>
+<tr>
+<td><code>lib/net/</code></td>
+<td><code>Dns</code> <code>Resolv</code> <code>Rfc</code> <code>Tcp</code> <code>Tls</code> <code>TlsServer</code> <code>Udp</code></td>
+</tr>
+<tr>
+<td><code>lib/web/</code></td>
+<td><code>Auth</code> <code>Http</code> <code>Http2</code> <code>Http2Tabel</code> <code>HttpServer</code> <code>Jwt</code> <code>Mime</code> <code>Multipart</code> <code>Router</code> <code>Session</code> <code>Static</code> <code>Url</code> <code>WebSocket</code> <code>WsClient</code></td>
 </tr>
 <tr>
 <td><code>lib/db/</code></td>
 <td><code>Sqlite</code> (pembaca file <code>.db</code> read-only)</td>
 </tr>
-<tr>
-<td><code>lib/core/</code></td>
-<td><code>Regex</code> (mesin regex backtracking) <code>BigInt</code> (bilangan presisi sembarang)</td>
-</tr>
 </tbody></table></div>
-<blockquote><strong>Referensi API lengkap</strong> (signature semua fungsi diekstrak langsung dari source): <a href="api.html">Referensi pustaka</a> → <a href="api-core.html">Core</a> · <a href="api-net.html">Net</a> · <a href="api-crypto.html">Crypto</a>. Halaman di bawah ini adalah turunan berisi modul yang paling sering dipakai dengan pola pemakaian.</blockquote>
+<blockquote><strong>Referensi API lengkap</strong> (signature semua fungsi diekstrak langsung dari source): <a href="api.html">Referensi pustaka</a> → <a href="api-core.html">Core</a> · <a href="api-text.html">Text</a> · <a href="api-data.html">Data</a> · <a href="api-io.html">IO</a> · <a href="api-system.html">System</a> · <a href="api-compress.html">Compress</a> · <a href="api-crypto.html">Crypto</a> · <a href="api-net.html">Net</a> · <a href="api-web.html">Web</a> · <a href="api-db.html">Database</a>. Halaman di bawah ini adalah turunan berisi modul yang paling sering dipakai dengan pola pemakaian.</blockquote>
 <hr>
 <h2 id="1-str-teks-native-string">1. <code>Str</code> — teks native <code>String</code><a class="anchor" href="#1-str-teks-native-string" aria-label="tautan">#</a></h2>
 <p>Sejak <strong>v1.23</strong> <code>Str</code> hanya memakai <code>String</code>: parameter dan hasil teks tidak lagi berupa <code>int[]</code>. Buffer byte ada di modul terpisah <code>Bytes</code>.</p>

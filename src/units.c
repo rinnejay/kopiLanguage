@@ -9,7 +9,8 @@
  *   1) folder file pengimpor (Nama.kop lalu nama.kop) — lokal menang
  *   2) lib standar rata: <folder kopicc>/lib (atau $KOPPATH jika diset)
  *   3) subfolder lib standar: lib/<kategori>/Nama.kop — pustaka
- *      dikelompokkan per fungsi (core/, crypto/, net/)
+ *      dikelompokkan per fungsi (core/, text/, data/, io/, system/,
+ *      compress/, crypto/, net/, web/, db/)
  */
 #include <limits.h>
 #include <stdio.h>
@@ -89,7 +90,8 @@ static const char *libdir(void) {
  * 1) folder file pengimpor (kasus asli & lowercase) — lokal menang
  * 2) folder lib standar (kasus asli & lowercase) — file rata
  * 3) subfolder lib standar (lib/<kategori>/Nama.kop, tak peduli huruf) —
- *    pustaka dikumpulkan per fungsi: core/, crypto/, net/ */
+ *    pustaka dikumpulkan per fungsi: core/, text/, data/, io/, system/,
+ *    compress/, crypto/, net/, web/, db/ */
 static char *find_module(const char *dir, const char *name, int line) {
     char low[512];
     name_lower(name, low, sizeof low);

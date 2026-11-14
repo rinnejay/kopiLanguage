@@ -11,16 +11,23 @@ import HttpServer;
 
 | Folder | Modul |
 |---|---|
-| `lib/core/` | `Str` `Bytes` `Math` `Digits` `Stats` `Matrix` `Arrays` `Json` `Map` `MapStr` `Set` `Deque` `File` `Path` `Time` `Log` |
-| `lib/net/` | `Tcp` `Udp` `Dns` `Resolv` `Http` `HttpServer` `Static` `Mime` `Url` `WebSocket` `Jwt` `Session` `Auth` `Rfc` `Tls` `TlsServer` `Http2` `Http2Tabel` |
-| `lib/crypto/` | `Crypto` `Cipher` `Hash` `Aes` `Gcm` `Pem` `X509` `Pbkdf2` `Kdf` `Big` `X25519` `ChaCha` `Poly` `Aead` `Rand` `Der` |
-| `lib/io/` | `Reader` `Writer` |
+| `lib/core/` | `Arrays` `BigInt` `Bytes` `Deque` `Digits` `List` `ListStr` `Map` `MapSS` `MapStr` `Math` `Matrix` `Set` `SetStr` `Stats` `Test` |
+| `lib/text/` | `Str` `Text` `Regex` (mesin regex backtracking) |
+| `lib/data/` | `Cbor` `Config` `Cookie` `Csv` `Json` `MessagePack` |
+| `lib/io/` | `File` `Path` `Reader` `Writer` |
+| `lib/system/` | `Args` `Env` `Log` `Time` `Uuid` |
+| `lib/compress/` | `Checksum` `Compress` `Filter` `Lzma` `Lzma2` `LzmaAuto` `LzmaStream` `Xz` |
+| `lib/crypto/` | `Aead` `Aes` `Big` `Blake2b` `ChaCha` `Cipher` `Crypto` `Der` `Ecdsa` `Gcm` `Hash` `Kdf` `Pbkdf2` `Pem` `Poly` `Rand` `Rsa` `Scrypt` `X25519` `X509` |
+| `lib/net/` | `Dns` `Resolv` `Rfc` `Tcp` `Tls` `TlsServer` `Udp` |
+| `lib/web/` | `Auth` `Http` `Http2` `Http2Tabel` `HttpServer` `Jwt` `Mime` `Multipart` `Router` `Session` `Static` `Url` `WebSocket` `WsClient` |
 | `lib/db/` | `Sqlite` (pembaca file `.db` read-only) |
-| `lib/core/` | `Regex` (mesin regex backtracking) `BigInt` (bilangan presisi sembarang) |
 
 > **Referensi API lengkap** (signature semua fungsi diekstrak langsung dari
 > source): [Referensi pustaka](api.md) → [Core](api-core.md) ·
-> [Net](api-net.md) · [Crypto](api-crypto.md). Halaman di bawah ini adalah
+> [Text](api-text.md) · [Data](api-data.md) · [IO](api-io.md) ·
+> [System](api-system.md) · [Compress](api-compress.md) ·
+> [Crypto](api-crypto.md) · [Net](api-net.md) · [Web](api-web.md) ·
+> [Database](api-db.md). Halaman di bawah ini adalah
 > turunan berisi modul yang paling sering dipakai dengan pola pemakaian.
 
 ---

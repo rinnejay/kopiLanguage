@@ -1,4 +1,4 @@
-// regexvec.kop — uji mesin Regex (lib/core/Regex.kop) vs oracle python `re`.
+// regexvec.kop — uji mesin Regex (lib/text/Regex.kop) vs oracle python `re`.
 import Regex;
 import Str;
 

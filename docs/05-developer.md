@@ -192,7 +192,7 @@ sempat, tolak di parser dengan pesan jelas.
 3. `gen_x64.c`: blok setara; perhatikan `par` dan register caller-saved.
 4. `vm/kopivm.c`: cabang `bi == N` di `OP_NET`; konversi pointer array
    (`long*`) dan hasil.
-5. Bungkus dengan API `.kop` bila perlu (`lib/net/*.kop`).
+5. Bungkus dengan API `.kop` bila perlu (`lib/net/*.kop`, `lib/web/*.kop`).
 6. Uji a64 + VM (nilai harus sama), lalu `cc -target x86_64-linux-gnu -c`
    untuk asm x64.
 
@@ -201,7 +201,7 @@ Contoh yang bisa ditiru: `Net.pollfd`, `Net.settimeout`,
 
 ### Pustaka teks vs buffer (v1.23)
 
-- `lib/core/Str.kop` — **hanya `String`**: parameter dan hasil teks tidak
+- `lib/text/Str.kop` — **hanya `String`**: parameter dan hasil teks tidak
   memakai `int[]`. Berisi trim/case, potong/cari, split/join/lines/words,
   padding, konversi skalar (`fromShort/fromFloat/...`, `toLong/toBool/...`),
   hex, dan utilitas UTF-8.
@@ -223,7 +223,7 @@ Contoh yang bisa ditiru: `Net.pollfd`, `Net.settimeout`,
 - Cukup buat `lib/<kategori>/Nama.kop` dengan `class Nama { static ... }`.
 - Import relatif: modul boleh `import` modul lain; hindari siklus.
 - Ingat aturan pencarian: file lokal menang; **jangan menamai file uji
-  sama dengan modul** (mis. `test/Str.kop` akan menutupi `lib/core/Str`).
+  sama dengan modul** (mis. `test/Str.kop` akan menutupi `lib/text/Str`).
 - Tulis uji deterministik: program `.kop` yang mencetak hasil, ref dari
   oracle Python bila ada standar (mis. `hashlib`, `urllib.parse`).
 

@@ -1,0 +1,449 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi API — System · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-api-system">Referensi API — System<a class="anchor" href="#referensi-api-system" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
+<p>Argumen, environment, waktu, log, dan UUID. Semua signature di bawah diekstrak langsung dari source <code>lib/system/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
+<p><code>lib/system/Args.kop</code> · 10 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int count()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String at(int i)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String[] all()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isFlag(String a)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean hasFlag(String flag)</code></td>
+<td>cocokkan "--nama", "-n", atau "--nama=nilai"</td>
+</tr>
+<tr>
+<td><code>static String value(String flag, String def)</code></td>
+<td>nilai "--nama=nilai", "--nama nilai", atau "-n=nilai"</td>
+</tr>
+<tr>
+<td><code>static int intValue(String flag, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String[] positionals()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String command()</code></td>
+<td>perintah = positional pertama, "" bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static String[] flags()</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="env">Env<a class="anchor" href="#env" aria-label="tautan">#</a></h2>
+<p><code>lib/system/Env.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String get(String name)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(String name, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static boolean has(String name)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static int getInt(String name, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean getBool(String name, boolean def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String home()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String user()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String shell()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String tmpdir()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String pwd()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String lang()</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="log">Log<a class="anchor" href="#log" aria-label="tautan">#</a></h2>
+<p><code>lib/system/Log.kop</code> · 18 fungsi</p>
+<p>Logging ke stderr dengan timestamp UTC dan level.</p>
+<pre><code class="language-java">import Log;
+
+Log.info("boot", "server siap");
+Log.error("db", "gagal konek");</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>stderr tidak di-buffer; aman untuk supervisor.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static void emit(String level, String tag, String msg)</code></td>
+<td>(internal) tulis baris level + pesan ke stderr</td>
+</tr>
+<tr>
+<td><code>static void info(String tag, String msg)</code></td>
+<td>log INFO</td>
+</tr>
+<tr>
+<td><code>static void warn(String tag, String msg)</code></td>
+<td>log WARN</td>
+</tr>
+<tr>
+<td><code>static void error(String tag, String msg)</code></td>
+<td>log ERROR</td>
+</tr>
+<tr>
+<td><code>static String levelName(int level)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean enabled(int minLevel, int level)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void emitTo(int fd, int minLevel, int level, String tag, String msg)</code></td>
+<td>tulis ke deskriptor tertentu (2 = stderr, 1 = stdout)</td>
+</tr>
+<tr>
+<td><code>static void debug(String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void infoMin(int minLevel, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void warnMin(int minLevel, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void errorMin(int minLevel, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String lineOf(int level, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean toFile(String path, int minLevel, int level, String tag, String msg)</code></td>
+<td>tulis ke file (append) bila level lolos; true bila ditulis</td>
+</tr>
+<tr>
+<td><code>static int fileSize(String path)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean rotate(String path, int maxBytes, int keep)</code></td>
+<td>rotasi sederhana: path → path.1 → path.2 ... (keep=0 tanpa arsip)</td>
+</tr>
+<tr>
+<td><code>static boolean toFileRotating(String path, int maxBytes, int keep, int minLevel, int level, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String jsonLine(int level, String tag, String msg)</code></td>
+<td>satu baris JSON: {"ts":...,"level":"INFO","tag":"...","msg":"..."}</td>
+</tr>
+<tr>
+<td><code>static boolean jsonToFile(String path, int level, String tag, String msg)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int DEBUG = 0</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int INFO = 1</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int WARN = 2</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int ERROR = 3</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int OFF = 4</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="time">Time<a class="anchor" href="#time" aria-label="tautan">#</a></h2>
+<p><code>lib/system/Time.kop</code> · 32 fungsi</p>
+<p>Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari.</p>
+<pre><code class="language-java">import Time;
+
+System.out.println(Time.format(Time.epoch()));
+Time.sleepMs(10);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>epoch()</code> 32-bit (batas 2038); <code>monoMs()</code> 64-bit.</li>
+<li>Format selalu UTC; timezone lokal belum ada.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int epoch()</code></td>
+<td>detik sejak 1970 (UTC, 32-bit)</td>
+</tr>
+<tr>
+<td><code>static long monoMs()</code></td>
+<td>milidetik monotonic (tidak mundur)</td>
+</tr>
+<tr>
+<td><code>static int sleepMs(int ms)</code></td>
+<td>tidur ms milidetik</td>
+</tr>
+<tr>
+<td><code>static int[] civil(int sec)</code></td>
+<td>[tahun, bulan(1..12), hari(1..31), jam, menit, detik] UTC</td>
+</tr>
+<tr>
+<td><code>static int weekday(int sec)</code></td>
+<td>nama hari dari epoch detik</td>
+</tr>
+<tr>
+<td><code>static String format(int sec)</code></td>
+<td>format "YYYY-MM-DD HH:MM:SS" UTC</td>
+</tr>
+<tr>
+<td><code>static boolean isLeap(int y)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int daysInMonth(int y, int m)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int daysFromCivil(int y, int m, int d)</code></td>
+<td>tanggal → jumlah hari sejak 1970-01-01 (algoritma Hinnant)</td>
+</tr>
+<tr>
+<td><code>static int fromCivil(int y, int m, int d, int hh, int mm, int ss)</code></td>
+<td>epoch dari komponen UTC; -1 bila komponen tidak valid</td>
+</tr>
+<tr>
+<td><code>static int[] civilZone(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int startOfDay(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int startOfMonth(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int parseOffset(String s, int at)</code></td>
+<td>"+07:00" / "-0530" → detik; 0 bila polos/Z</td>
+</tr>
+<tr>
+<td><code>static int parseISO(String s)</code></td>
+<td>"2026-11-12", "2026-11-12T08:30:00", "...Z", "...+07:00"</td>
+</tr>
+<tr>
+<td><code>static int parseISOOr(String s, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String isoDate(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String isoTime(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String formatISO(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String formatISOZone(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String formatZone(int sec, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addSeconds(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addMinutes(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addHours(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addDays(int sec, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int addMonths(int sec, int n)</code></td>
+<td>tambah bulan kalender dengan clamp akhir bulan</td>
+</tr>
+<tr>
+<td><code>static int diffSeconds(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int diffDays(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int diffMinutes(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int diffHours(int a, int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String duration(int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String nowISO()</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="uuid">Uuid<a class="anchor" href="#uuid" aria-label="tautan">#</a></h2>
+<p><code>lib/system/Uuid.kop</code> · 6 fungsi</p>
+<p>UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID.</p>
+<pre><code class="language-java">import Uuid;
+
+String id = Uuid.v4();
+System.out.println(Uuid.valid(id));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Format 8-4-4-4-12; versi 4 &amp; varian RFC 4122.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String v4()</code></td>
+<td>UUID acak versi 4</td>
+</tr>
+<tr>
+<td><code>static String nil()</code></td>
+<td>UUID kosong</td>
+</tr>
+<tr>
+<td><code>static String format(int[] b)</code></td>
+<td>16 byte → teks UUID</td>
+</tr>
+<tr>
+<td><code>static int[] parse(String s)</code></td>
+<td>teks UUID → 16 byte</td>
+</tr>
+<tr>
+<td><code>static boolean valid(String s)</code></td>
+<td>true bila teks UUID valid</td>
+</tr>
+<tr>
+<td><code>static int version(String s)</code></td>
+<td>versi UUID (1..5)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.20 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-system.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

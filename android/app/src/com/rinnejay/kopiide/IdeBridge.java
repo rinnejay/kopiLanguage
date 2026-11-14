@@ -170,7 +170,7 @@ public class IdeBridge {
     }
 
     /**
-     * Ekstrak modul bahasa (lib/core/*.kop, lib/net/*.kop, ...) dari
+     * Ekstrak modul bahasa (lib/core/*.kop, lib/text/*.kop, lib/net/*.kop, lib/web/*.kop, ...) dari
      * assets/kopilib.zip ke files/lib/lib. kopicc mencari import di
      * <dir biner>/lib; dengan biner di files/lib, hasilnya files/lib/lib.
      */
@@ -340,7 +340,7 @@ public class IdeBridge {
             o.put("kopLib", new File(libDir, "lib").getAbsolutePath());
             o.put("kopModules", countKop(new File(libDir, "lib")));
 
-            /* uji end-to-end: import Str; (butuh lib/core/Str.kop) lalu run */
+            /* uji end-to-end: import Str; (butuh lib/text/Str.kop) lalu run */
             JSONObject e2e = new JSONObject();
             try {
                 File src = new File(tmpDir, "selftest.kop");

@@ -170,13 +170,13 @@ cc (link libc)  atau  kopivm</code></pre>
 <li><code>gen_a64.c</code>: blok <code>if (e-&gt;ival == N)</code>, hitung layout stack (arg ×16), syscall/libc, <strong>bersihkan <code>sp</code> persis</strong>.</li>
 <li><code>gen_x64.c</code>: blok setara; perhatikan <code>par</code> dan register caller-saved.</li>
 <li><code>vm/kopivm.c</code>: cabang <code>bi == N</code> di <code>OP_NET</code>; konversi pointer array (<code>long*</code>) dan hasil.</li>
-<li>Bungkus dengan API <code>.kop</code> bila perlu (<code>lib/net/*.kop</code>).</li>
+<li>Bungkus dengan API <code>.kop</code> bila perlu (<code>lib/net/*.kop</code>, <code>lib/web/*.kop</code>).</li>
 <li>Uji a64 + VM (nilai harus sama), lalu <code>cc -target x86_64-linux-gnu -c</code> untuk asm x64.</li>
 </ol>
 <p>Contoh yang bisa ditiru: <code>Net.pollfd</code>, <code>Net.settimeout</code>, <code>Net.recv1</code>, <code>Net.localport</code>.</p>
 <h3 id="pustaka-teks-vs-buffer-v1-23">Pustaka teks vs buffer (v1.23)<a class="anchor" href="#pustaka-teks-vs-buffer-v1-23" aria-label="tautan">#</a></h3>
 <ul>
-<li><code>lib/core/Str.kop</code> — <strong>hanya <code>String</code></strong>: parameter dan hasil teks tidak memakai <code>int[]</code>. Berisi trim/case, potong/cari, split/join/lines/words, padding, konversi skalar (<code>fromShort/fromFloat/...</code>, <code>toLong/toBool/...</code>), hex, dan utilitas UTF-8.</li>
+<li><code>lib/text/Str.kop</code> — <strong>hanya <code>String</code></strong>: parameter dan hasil teks tidak memakai <code>int[]</code>. Berisi trim/case, potong/cari, split/join/lines/words, padding, konversi skalar (<code>fromShort/fromFloat/...</code>, <code>toLong/toBool/...</code>), hex, dan utilitas UTF-8.</li>
 <li><code>lib/core/Bytes.kop</code> — <strong>hanya <code>int[]</code></strong>: buffer I/O biner, jaringan, kriptografi (<code>cat/slice/indexOf/trim/hex/...</code>).</li>
 <li>Pustaka teks lain sudah <code>String</code> di API publik: <code>File</code>, <code>Path</code>, <code>Time.format</code>, <code>Log</code>, <code>Url</code>, <code>Mime</code>, <code>Http</code> (baris/header/body request), <code>Dns</code>, <code>Resolv</code>, <code>Auth</code>, <code>Jwt</code>, <code>Session</code>, <code>Json</code>, dan kunci <code>MapStr</code>. Buffer respons/HTTP, TCP/TLS, hash, cipher, DER, dan tape JSON internal tetap <code>int[]</code>.</li>
 <li>Pindah representasi eksplisit: <code>Net.strbytes(String) → int[]</code>, <code>Net.mkstr(int[]) → String</code> (atau <code>Bytes.of</code> / <code>Bytes.text</code>).</li>
@@ -186,7 +186,7 @@ cc (link libc)  atau  kopivm</code></pre>
 <ul>
 <li>Cukup buat <code>lib/&lt;kategori&gt;/Nama.kop</code> dengan <code>class Nama { static ... }</code>.</li>
 <li>Import relatif: modul boleh <code>import</code> modul lain; hindari siklus.</li>
-<li>Ingat aturan pencarian: file lokal menang; <strong>jangan menamai file uji sama dengan modul</strong> (mis. <code>test/Str.kop</code> akan menutupi <code>lib/core/Str</code>).</li>
+<li>Ingat aturan pencarian: file lokal menang; <strong>jangan menamai file uji sama dengan modul</strong> (mis. <code>test/Str.kop</code> akan menutupi <code>lib/text/Str</code>).</li>
 <li>Tulis uji deterministik: program <code>.kop</code> yang mencetak hasil, ref dari oracle Python bila ada standar (mis. <code>hashlib</code>, <code>urllib.parse</code>).</li>
 </ul>
 <h2 id="10-uji-kualitas">10. Uji &amp; kualitas<a class="anchor" href="#10-uji-kualitas" aria-label="tautan">#</a></h2>

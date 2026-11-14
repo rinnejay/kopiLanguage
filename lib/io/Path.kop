@@ -2,7 +2,7 @@
 import Str;
 
 class Path {
-    static int SEP() { return 47; }
+    static int SEP = 47;
     static String sep() { return "/"; }
 
     static String join(String a, String b) {

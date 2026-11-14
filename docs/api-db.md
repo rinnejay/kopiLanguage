@@ -52,12 +52,4 @@ if (ctx[0] >= 0) {
 | `static int findIpk(String sql)` | (internal) indeks kolom INTEGER PRIMARY KEY |
 | `static int query(int[] ctx, String table)` | siapkan scan tabel; hasil = jumlah kolom, <0 galat |
 
-**Konstanta**
-
-| Nama | Keterangan |
-|---|---|
-| `static int MAXPAY()` | — |
-| `static int MAXCOL()` | — |
-| `static int MAXDEPTH()` | — |
-
 ---

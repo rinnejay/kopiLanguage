@@ -12,7 +12,7 @@ import Str;
 
 class MapSS {
 
-    static int TOMB() { return 2147483647; }
+    static int TOMB = 2147483647;
 
     static int[] make(int cap, int poolCap) {
         int c = 2;

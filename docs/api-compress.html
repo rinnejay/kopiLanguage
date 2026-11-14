@@ -1,0 +1,770 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi API — Compress · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-api-compress">Referensi API — Compress<a class="anchor" href="#referensi-api-compress" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#checksum">Checksum</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#filter">Filter</a></li><li class="toc-h2"><a href="#lzmadec">LzmaDec</a></li><li class="toc-h2"><a href="#lzma2">Lzma2</a></li><li class="toc-h2"><a href="#lzmaauto">LzmaAuto</a></li><li class="toc-h2"><a href="#lzmastream">LzmaStream</a></li><li class="toc-h2"><a href="#xz">Xz</a></li></ul></nav>
+<p>LZMA/LZMA2/XZ, checksum, filter, dan kompresi umum. Semua signature di bawah diekstrak langsung dari source <code>lib/compress/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="checksum">Checksum<a class="anchor" href="#checksum" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/Checksum.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int crc32Init()</code></td>
+<td>══ CRC-32 (polinom 0xEDB88320, refleksi) ═════════════════════</td>
+</tr>
+<tr>
+<td><code>static int crc32Update(int crc, int[] a, int off, int len)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int crc32Final(int crc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int crc32(int[] a)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long crc64Init()</code></td>
+<td>══ CRC-64/XZ (ECMA-182, polinom refleksi 0xC96C5795D7870F42) ═</td>
+</tr>
+<tr>
+<td><code>static long crc64Update(long crc, int[] a, int off, int len)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long crc64Final(long crc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long crc64(int[] a)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int vliSize(int[] a, int off)</code></td>
+<td>══ VLI (variable-length integer) — format XZ ═════════════════ Setiap byte menyumbang 7 bit (little-endian); bit 0x80 menandakan masih ada byte lanjutan.</td>
+</tr>
+<tr>
+<td><code>static long vliDecode(int[] a, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] vliEncode(long v)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="compress">Compress<a class="anchor" href="#compress" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/Compress.kop</code> · 29 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] push(int[] a, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] push16(int[] a, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] push32(int[] a, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get16(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get32(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get32be(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int crc32(int[] data)</code></td>
+<td>CRC-32 (polinom 0xEDB88320)</td>
+</tr>
+<tr>
+<td><code>static int adler32(int[] data)</code></td>
+<td>Adler-32 (RFC 1950)</td>
+</tr>
+<tr>
+<td><code>static int[] deflateRaw(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] zlib(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] gzip(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void align(int[] st)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int bit(int[] in, int[] st)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int bits(int[] in, int[] st, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int byteAt(int[] in, int[] st)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] huff(int[] lengths)</code></td>
+<td>hasil: [0]=maxBits, count[len] @1+len, simbol mulai @max+2</td>
+</tr>
+<tr>
+<td><code>static int decode(int[] in, int[] st, int[] t)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] fixedLit()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] fixedDist()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int lenBase(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int lenExtra(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int distBase(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int distExtra(int s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int inflateInto(int[] in, int from, int to, int[] out, int cap)</code></td>
+<td>tulis hasil ke out; -1 bila galat atau melebihi kapasitas</td>
+</tr>
+<tr>
+<td><code>static int[] inflateRaw(int[] data, int cap)</code></td>
+<td>deflate mentah dengan kapasitas keluaran eksplisit</td>
+</tr>
+<tr>
+<td><code>static int[] unzlib(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] gunzip(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String gunzipText(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] gzipText(String s)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="filter">Filter<a class="anchor" href="#filter" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/Filter.kop</code> · 27 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] copy(int[] a)</code></td>
+<td>salinan (array baru)</td>
+</tr>
+<tr>
+<td><code>static boolean msByte(int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] deltaEncode(int[] a, int dist)</code></td>
+<td>══ delta ═════════════════════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] deltaDecode(int[] a, int dist)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] x86Encode(int[] a, int start)</code></td>
+<td>══ x86 BCJ (E8/E9 rel32) ═════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] x86Decode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] x86(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] armEncode(int[] a, int start)</code></td>
+<td>══ ARM (BL, 24-bit rel) ══════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] armDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arm(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] armthumbEncode(int[] a, int start)</code></td>
+<td>══ ARM-Thumb (BL pair) ══════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] armthumbDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] armthumb(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] powerpcEncode(int[] a, int start)</code></td>
+<td>══ PowerPC (b/BL, 24-bit) ═══════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] powerpcDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] powerpc(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] ia64Encode(int[] a, int start)</code></td>
+<td>══ IA-64 (bundles, branch slot) ═════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] ia64Decode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] ia64(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] sparcEncode(int[] a, int start)</code></td>
+<td>══ SPARC (call, 30-bit) ═════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] sparcDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] sparc(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arm64Encode(int[] a, int start)</code></td>
+<td>══ ARM64 (BL + ADRP) ════════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] arm64Decode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arm64(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encode(int id, int[] a, int arg)</code></td>
+<td>══ dispatcher ═══════════════════════════════════════════════ id = filter ID XZ arg = jarak delta (1..256) untuk 0x03, startOffset untuk BCJ</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int id, int[] a, int arg)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="lzmadec">LzmaDec<a class="anchor" href="#lzmadec" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/Lzma.kop</code> · 22 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] mk(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void fill(int[] p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean ult(int a, int b)</code></td>
+<td>══ range decoder (static, state eksplisit) ═══════════════════</td>
+</tr>
+<tr>
+<td><code>static int rInit(int[] b, int off, int[] r)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int rNorm(int[] b, int[] r)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int rBit(int[] b, int[] r, int[] probs, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int rDirect(int[] b, int[] r, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int treeDec(int[] b, int[] r, int[] probs, int base, int nbits)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] mk(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] neg(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] raw(int[] src, int props, int dictSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] chunk(int[] src, int props, int dictSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>══ API publik ════════════════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int presetDict(int preset)</code></td>
+<td>══ preset (kompatibel dengan skala 0–9 Python/liblzma) ════════</td>
+</tr>
+<tr>
+<td><code>static int[] compressPreset(int[] data, int preset)</code></td>
+<td>LZMA alone memakai lc=3, lp=0, pb=2 seperti preset Python.</td>
+</tr>
+<tr>
+<td><code>static int[] compressRawPreset(int[] data, int preset)</code></td>
+<td>LZMA1 raw dengan end marker, dict mengikuti preset.</td>
+</tr>
+<tr>
+<td><code>static int[] decompressRaw(int[] comp, int props, int outSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int propsOf(int lc, int lp, int pb)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressRaw(int[] data, int props, int dictSize)</code></td>
+<td>LZMA1 raw (tanpa header) dengan end marker.</td>
+</tr>
+<tr>
+<td><code>static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)</code></td>
+<td>LZMA alone (.lzma): header 13 byte + raw; uncompressed size = -1.</td>
+</tr>
+<tr>
+<td><code>static int[] compress(int[] data)</code></td>
+<td>Default: lc=3, lp=0, pb=2, dict=64 KiB (sama dengan vektor raw).</td>
+</tr>
+<tr>
+<td><code>static String decompressText(int[] data)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="lzma2">Lzma2<a class="anchor" href="#lzma2" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/Lzma2.kop</code> · 15 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int[] data, int[] status)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int streamSizeStatus(int[] data, int off, int[] state)</code></td>
+<td>Panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak/terpotong; state[0] = -1 rusak, -2 terpotong.</td>
+</tr>
+<tr>
+<td><code>static int streamSize(int[] data, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int maxChunkSize()</code></td>
+<td>══ encoder ═══════════════════════════════════════════════════ Chunk adaptif: mulai dari 1 MiB; bila hasil LZMA melebihi batas csize LZMA2 (64 KiB), chunk diperkecil bertahap. S…</td>
+</tr>
+<tr>
+<td><code>static int minChunkSize()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] slice(int[] data, int off, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void emitComp(int[] out, int[] p, int[] part, int[] comp, int props)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void emitRaw(int[] out, int[] p, int[] part)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int encAdaptive(int[] out, int[] p, int[] data, int off, int avail, int props, int dictSize)</code></td>
+<td>Enkode satu chunk dari data[off..off+avail); kembalikan panjang chunk yang dipakai (bisa lebih kecil dari avail).</td>
+</tr>
+<tr>
+<td><code>static int[] compress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressPreset(int[] data, int preset)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decodeFrom(int[] data, int off, int[] status)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static Lzma2EncStream create()</code></td>
+<td>buat/buka file</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="lzmaauto">LzmaAuto<a class="anchor" href="#lzmaauto" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/LzmaAuto.kop</code> · 3 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static boolean isXz(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int[] data, int[] status)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="lzmastream">LzmaStream<a class="anchor" href="#lzmastream" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/LzmaStream.kop</code> · 15 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static boolean isCheckSupported(int check)</code></td>
+<td>liblzma mendukung keempat check ini; nilai lain tidak didukung.</td>
+</tr>
+<tr>
+<td><code>static LzmaCompressor create()</code></td>
+<td>Default Python: FORMAT_XZ, check -1 (liblzma memakai CRC64), preset 6.</td>
+</tr>
+<tr>
+<td><code>static LzmaCompressor xz(int check0, int preset0)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static LzmaCompressor alone(int preset0)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static LzmaCompressor raw(int dict0)</code></td>
+<td>Raw LZMA2 dengan ukuran kamus eksplisit.</td>
+</tr>
+<tr>
+<td><code>static LzmaCompressor chain(int[] fids, int[] fargs, int dict0, int check0)</code></td>
+<td>XZ dengan filter chain pra-LZMA2 (id/arg seperti Xz.compressChain).</td>
+</tr>
+<tr>
+<td><code>static LzmaDecompressor create()</code></td>
+<td>buat/buka file</td>
+</tr>
+<tr>
+<td><code>static LzmaDecompressor xz()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static LzmaDecompressor alone()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static LzmaDecompressor raw()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean exists(String path)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] read(String path)</code></td>
+<td>Membaca seluruh berkas; array kosong bila gagal atau berkas kosong.</td>
+</tr>
+<tr>
+<td><code>static boolean write(String path, int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean compress(String src, String dst, int preset)</code></td>
+<td>Kompres berkas src (XZ, CRC32) ke dst.</td>
+</tr>
+<tr>
+<td><code>static boolean decompress(String src, String dst)</code></td>
+<td>Dekompres .xz atau LZMA alone dari src ke dst.</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int FORMAT_AUTO = 0</code></td>
+<td>Nilai konstanta sama dengan modul lzma Python.</td>
+</tr>
+<tr>
+<td><code>static int FORMAT_XZ = 1</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FORMAT_ALONE = 2</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FORMAT_RAW = 3</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int CHECK_NONE = 0</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int CHECK_CRC32 = 1</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int CHECK_CRC64 = 4</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int CHECK_SHA256 = 10</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long FILTER_LZMA1 = 4611686018427387905L</code></td>
+<td>ID filter Python; sama dengan ID XZ kecuali LZMA1.</td>
+</tr>
+<tr>
+<td><code>static int FILTER_LZMA2 = 0x21</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_DELTA = 0x03</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_X86 = 0x04</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_POWERPC = 0x05</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_IA64 = 0x06</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_ARM = 0x07</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_ARMTHUMB = 0x08</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_SPARC = 0x09</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int FILTER_ARM64 = 0x0A</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="xz">Xz<a class="anchor" href="#xz" aria-label="tautan">#</a></h2>
+<p><code>lib/compress/Xz.kop</code> · 21 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static boolean isXz(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isXzAt(int[] data, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get32le(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long get64le(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] append(int[] a, int[] b)</code></td>
+<td>buka untuk menambah di akhir</td>
+</tr>
+<tr>
+<td><code>static int checkLen(int type)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int verifyCheck(int type, int[] a, int off, int[] data)</code></td>
+<td>verifikasi check; return 0 cocok, -3 tidak, -1 tipe tak didukung</td>
+</tr>
+<tr>
+<td><code>static void put(int[] out, int[] p, int v)</code></td>
+<td>══ encoder .xz (satu block, filter LZMA2) ════════════════════</td>
+</tr>
+<tr>
+<td><code>static void put32le(int[] out, int[] p, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void putVli(int[] out, int[] p, long v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int dictProp(int dict)</code></td>
+<td>Nilai properti filter LZMA2 untuk ukuran kamus (XZ spec).</td>
+</tr>
+<tr>
+<td><code>static int[] compressPreset(int[] data, int preset)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressPresetCheck(int[] data, int preset, int checkType)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressDelta(int[] data, int dist, int checkType)</code></td>
+<td>Satu filter tambahan: delta (id 0x03, arg jarak 1..256).</td>
+</tr>
+<tr>
+<td><code>static int[] compressBcj(int[] data, int id, int startOffset, int checkType)</code></td>
+<td>Satu filter BCJ (id 0x04..0x0A, arg startOffset).</td>
+</tr>
+<tr>
+<td><code>static int[] compressChain(int[] data, int checkType, int[] ids, int[] args, int dictSize)</code></td>
+<td>Filter chain: <code>ids</code>/<code>args</code> adalah filter pra-LZMA2 (data-first), LZMA2 selalu ditambahkan sebagai filter terakhir. checkType: 0 None, 1 CRC32, 4 CRC64, 10 SHA-256.</td>
+</tr>
+<tr>
+<td><code>static int[] compressCheck(int[] data, int checkType)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decodeStream(int[] data, int start, int[] state)</code></td>
+<td>decode satu stream mulai start; state[0] = posisi akhir, state[1] = status.</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int[] data, int[] status)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.20 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-compress.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

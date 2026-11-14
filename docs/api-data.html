@@ -1,0 +1,645 @@
+<!doctype html>
+<!-- dibuat otomatis oleh tools/md2html.py; sunting file .md -->
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referensi API — Data · Kopi</title>
+<meta name="description" content="Dokumentasi bahasa Kopi: tutorial, pustaka, server, dan arsitektur compiler.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav"><a class="brand" href="index.html">☕ Kopi</a>
+<a href="index.html">Beranda</a>
+<a href="01-mulai.html">Mulai</a>
+<a href="02-bahasa.html">Bahasa</a>
+<a href="03-pustaka.html">Pustaka</a>
+<a href="04-server.html">Server</a>
+<a href="05-developer.html">Developer</a>
+<a href="06-batas-roadmap.html">Batas</a>
+<a href="api.html">API</a>
+<a class="gh" href="https://github.com/rinnejay/kopiLanguage">GitHub</a></nav>
+  </div>
+</header>
+<div class="wrap layout">
+  <main class="content">
+<h1 id="referensi-api-data">Referensi API — Data<a class="anchor" href="#referensi-api-data" aria-label="tautan">#</a></h1>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li></ul></nav>
+<p>JSON, CBOR, MessagePack, CSV, konfigurasi, cookie. Semua signature di bawah diekstrak langsung dari source <code>lib/data/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="cbor">Cbor<a class="anchor" href="#cbor" aria-label="tautan">#</a></h2>
+<p><code>lib/data/Cbor.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] one(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encNil()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBool(int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encInt(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBin(int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encStr(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arrHead(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] mapHead(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encArr(int[] items, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encMap(int[] pairs, int n)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="config">Config<a class="anchor" href="#config" aria-label="tautan">#</a></h2>
+<p><code>lib/data/Config.kop</code> · 9 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] parse(String text)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] parseFile(String path)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String get(int[] cfg, String key)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(int[] cfg, String key, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static int getInt(int[] cfg, String key, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean getBool(int[] cfg, String key, boolean def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean has(int[] cfg, String key)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static String[] keys(int[] cfg)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] section(int[] cfg, String name)</code></td>
+<td>ambil semua kunci dalam satu seksi, tanpa prefiks "seksi."</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="cookie">Cookie<a class="anchor" href="#cookie" aria-label="tautan">#</a></h2>
+<p><code>lib/data/Cookie.kop</code> · 16 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] parse(String header)</code></td>
+<td>header "Cookie: a=1; b=2" → peta nama→nilai</td>
+</tr>
+<tr>
+<td><code>static String get(int[] jar, String name)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static String getOr(int[] jar, String name, String def)</code></td>
+<td>ambil nilai atau default bila tidak ada</td>
+</tr>
+<tr>
+<td><code>static boolean has(int[] jar, String name)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static String[] names(int[] jar)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String make(String name, String value)</code></td>
+<td>buat struktur baru dengan kapasitas awal</td>
+</tr>
+<tr>
+<td><code>static String withPath(String c, String p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withDomain(String c, String d)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withMaxAge(String c, int sec)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withExpires(String c, int epoch)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withFlags(String c, boolean httpOnly, boolean secure)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String withSameSite(String c, String mode)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String headerFull(String name, String value, String path, int maxAge, boolean httpOnly, boolean secure, String sameSite)</code></td>
+<td>Set-Cookie lengkap; maxAge &lt; 0 berarti tanpa Max-Age</td>
+</tr>
+<tr>
+<td><code>static String header(String c)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String expired(String name, String path)</code></td>
+<td>cookie yang menghapus (Max-Age=0)</td>
+</tr>
+<tr>
+<td><code>static String httpDate(int epoch)</code></td>
+<td>"Thu, 12 Nov 2026 00:00:00 GMT" (RFC 1123)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="csv">Csv<a class="anchor" href="#csv" aria-label="tautan">#</a></h2>
+<p><code>lib/data/Csv.kop</code> · 5 fungsi</p>
+<p>Baca &amp; tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF.</p>
+<pre><code class="language-java">import Csv;
+
+String[] row = Csv.parseRow("a,"b,c"");
+System.out.println(Csv.formatRow(row));</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>parseRow</code> menangani satu baris; pakai <code>lines</code> untuk memisahkan baris.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String[] parseRow(String line)</code></td>
+<td>pecah satu baris CSV menjadi field</td>
+</tr>
+<tr>
+<td><code>static String formatRow(String[] fields)</code></td>
+<td>susun field menjadi satu baris CSV</td>
+</tr>
+<tr>
+<td><code>static String[] lines(String text)</code></td>
+<td>pecah teks menjadi baris</td>
+</tr>
+<tr>
+<td><code>static int countRows(String text)</code></td>
+<td>jumlah baris dalam teks</td>
+</tr>
+<tr>
+<td><code>static int[] rowLengths(String text)</code></td>
+<td>jumlah field tiap baris</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="json">Json<a class="anchor" href="#json" aria-label="tautan">#</a></h2>
+<p><code>lib/data/Json.kop</code> · 72 fungsi</p>
+<p>Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape <code>int[]</code>; literal bahasa memakai <code>json {...}</code> / <code>json [...]</code>.</p>
+<pre><code class="language-java">import Json;
+
+int[] u = json {"nama": "budi", "umur": 20};
+System.out.println(Json.write(u));
+int umur = Json.asInt(Json.get(u, "umur"));   // 20</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>put</code>/<code>del</code>/<code>add</code> bersifat immutable: mengembalikan tape baru.</li>
+<li>Literal <code>json</code> maksimum 8 entri; untuk lebih banyak susun bertahap.</li>
+<li><code>\uXXXX</code> didekode ke UTF-8 tanpa pasangan surrogate.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>(internal) gabung dua tape</td>
+</tr>
+<tr>
+<td><code>static int[] slice(int[] a, int from, int len)</code></td>
+<td>(internal) potong tape</td>
+</tr>
+<tr>
+<td><code>static int[] one(int v)</code></td>
+<td>(internal) tape satu elemen</td>
+</tr>
+<tr>
+<td><code>static int[] two(int a, int b)</code></td>
+<td>(internal) tape dua elemen</td>
+</tr>
+<tr>
+<td><code>static int[] nullV()</code></td>
+<td>nilai JSON null</td>
+</tr>
+<tr>
+<td><code>static int[] boolV(int b)</code></td>
+<td>nilai JSON boolean</td>
+</tr>
+<tr>
+<td><code>static int[] num(String text)</code></td>
+<td>nilai JSON angka dari teks desimal</td>
+</tr>
+<tr>
+<td><code>static int[] str(String s)</code></td>
+<td>nilai JSON string (di-escape)</td>
+</tr>
+<tr>
+<td><code>static int[] arr0()</code></td>
+<td>array JSON kosong</td>
+</tr>
+<tr>
+<td><code>static int[] obj0()</code></td>
+<td>objek JSON kosong</td>
+</tr>
+<tr>
+<td><code>static int skip(int[] t, int p)</code></td>
+<td>peta nilai: dipakai untuk skip/akses</td>
+</tr>
+<tr>
+<td><code>static int typeOf(int[] v)</code></td>
+<td>tipe nilai: 0 null, 1 bool, 2 angka, 3 string, 4 array, 5 objek</td>
+</tr>
+<tr>
+<td><code>static boolean isNull(int[] v)</code></td>
+<td>true bila null</td>
+</tr>
+<tr>
+<td><code>static boolean isBool(int[] v)</code></td>
+<td>true bila boolean</td>
+</tr>
+<tr>
+<td><code>static boolean isNumber(int[] v)</code></td>
+<td>true bila angka</td>
+</tr>
+<tr>
+<td><code>static boolean isString(int[] v)</code></td>
+<td>true bila string</td>
+</tr>
+<tr>
+<td><code>static boolean isArray(int[] v)</code></td>
+<td>true bila array</td>
+</tr>
+<tr>
+<td><code>static boolean isObject(int[] v)</code></td>
+<td>true bila objek</td>
+</tr>
+<tr>
+<td><code>static int asBool(int[] v)</code></td>
+<td>boolean nilai (0/1)</td>
+</tr>
+<tr>
+<td><code>static String asText(int[] v)</code></td>
+<td>teks mentah untuk number/string</td>
+</tr>
+<tr>
+<td><code>static int count(int[] v)</code></td>
+<td>jumlah elemen array / pasangan objek</td>
+</tr>
+<tr>
+<td><code>static int[] at(int[] arr, int idx)</code></td>
+<td>elemen array pada indeks (null di luar rentang)</td>
+</tr>
+<tr>
+<td><code>static boolean keyEq(int[] t, int at, int len, String key)</code></td>
+<td>(internal) bandingkan kunci pada tape</td>
+</tr>
+<tr>
+<td><code>static int[] get(int[] obj, String key)</code></td>
+<td>ambil nilai</td>
+</tr>
+<tr>
+<td><code>static boolean has(int[] obj, String key)</code></td>
+<td>true bila elemen/kunci ada</td>
+</tr>
+<tr>
+<td><code>static int[] put(int[] obj, String key, int[] val)</code></td>
+<td>objek baru dengan key diganti/ditambah (immutable)</td>
+</tr>
+<tr>
+<td><code>static int[] del(int[] obj, String key)</code></td>
+<td>objek tanpa kunci key (tape baru)</td>
+</tr>
+<tr>
+<td><code>static int[] add(int[] arr, int[] val)</code></td>
+<td>array baru + satu elemen di belakang</td>
+</tr>
+<tr>
+<td><code>static int[] arr1(int[] a)</code></td>
+<td>array JSON 1 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] arr2(int[] a, int[] b)</code></td>
+<td>array JSON 2 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] arr3(int[] a, int[] b, int[] c)</code></td>
+<td>array JSON 3 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] arr4(int[] a, int[] b, int[] c, int[] d)</code></td>
+<td>array JSON 4 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] arr5(int[] a, int[] b, int[] c, int[] d, int[] e)</code></td>
+<td>array JSON 5 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] arr6(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f)</code></td>
+<td>array JSON 6 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] arr7(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f, int[] g)</code></td>
+<td>array JSON 7 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] arr8(int[] a, int[] b, int[] c, int[] d, int[] e, int[] f, int[] g, int[] h)</code></td>
+<td>array JSON 8 elemen</td>
+</tr>
+<tr>
+<td><code>static int[] obj1(String k1, int[] v1)</code></td>
+<td>objek JSON 1 pasangan</td>
+</tr>
+<tr>
+<td><code>static int[] obj2(String k1, int[] v1, String k2, int[] v2)</code></td>
+<td>objek JSON 2 pasangan</td>
+</tr>
+<tr>
+<td><code>static int[] obj3(String k1, int[] v1, String k2, int[] v2, String k3, int[] v3)</code></td>
+<td>objek JSON 3 pasangan</td>
+</tr>
+<tr>
+<td><code>static int[] obj4(String k1, int[] v1, String k2, int[] v2, String k3, int[] v3, String k4, int[] v4)</code></td>
+<td>objek JSON 4 pasangan</td>
+</tr>
+<tr>
+<td><code>static int asInt(int[] v)</code></td>
+<td>integer dari teks number (bagian pecahan dipotong); wrap int32</td>
+</tr>
+<tr>
+<td><code>static double asDouble(int[] v)</code></td>
+<td>double dari teks number (dukung pecahan &amp; eksponen)</td>
+</tr>
+<tr>
+<td><code>static boolean isWs(int c)</code></td>
+<td>(internal) karakter whitespace JSON</td>
+</tr>
+<tr>
+<td><code>static void pws(int[] t, int[] pos)</code></td>
+<td>(internal) lewati whitespace pada posisi parser</td>
+</tr>
+<tr>
+<td><code>static int hexv(int c)</code></td>
+<td>(internal) hex char → nilai</td>
+</tr>
+<tr>
+<td><code>static int[] putByte(int[] a, int b)</code></td>
+<td>(internal) tambah byte ke tape</td>
+</tr>
+<tr>
+<td><code>static int[] pstr(int[] t, int[] pos)</code></td>
+<td>parse string JSON; hasil = byte array (sudah di-unescape)</td>
+</tr>
+<tr>
+<td><code>static int[] pval(int[] t, int[] pos)</code></td>
+<td>(internal) parse satu nilai dari posisi</td>
+</tr>
+<tr>
+<td><code>static int[] parse(String text)</code></td>
+<td>parse teks JSON menjadi tape (null bila rusak)</td>
+</tr>
+<tr>
+<td><code>static int hexdig(int v)</code></td>
+<td>(internal) nilai → hex char</td>
+</tr>
+<tr>
+<td><code>static int[] quote(int[] s)</code></td>
+<td>(internal) string JSON ter-escape</td>
+</tr>
+<tr>
+<td><code>static int[] wr(int[] v)</code></td>
+<td>(internal) tulis nilai JSON ke teks</td>
+</tr>
+<tr>
+<td><code>static int[] keyAt(int[] obj, int idx)</code></td>
+<td>kunci pasangan ke-i pada objek</td>
+</tr>
+<tr>
+<td><code>static int[] valAt(int[] obj, int idx)</code></td>
+<td>nilai pasangan ke-i pada objek</td>
+</tr>
+<tr>
+<td><code>static int getInt(int[] obj, String key, int def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long getLong(int[] obj, String key, long def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static double getDouble(int[] obj, String key, double def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean getBool(int[] obj, String key, boolean def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String getString(int[] obj, String key, String def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] getArray(int[] obj, String key, int[] def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] getObject(int[] obj, String key, int[] def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] atOr(int[] arr, int idx, int[] def)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String typeName(int[] v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] path(int[] root, String expr)</code></td>
+<td>bagian path</td>
+</tr>
+<tr>
+<td><code>static boolean hasPath(int[] root, String expr)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String pad2(int depth)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String wrp(int[] v, int depth)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static String write(int[] v)</code></td>
+<td>API publik: serialisasi ke teks</td>
+</tr>
+<tr>
+<td><code>static String writePretty(int[] v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int writePrettyInto(int[] v, int[] buf)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void print(int[] v)</code></td>
+<td>tulis ke stdout (fd 1) byte demi byte — melengkapi println(int)</td>
+</tr>
+<tr>
+<td><code>static void line(int[] v)</code></td>
+<td>tulis dengan newline</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int NULLV = 0</code></td>
+<td>tipe: null</td>
+</tr>
+<tr>
+<td><code>static int BOOLV = 1</code></td>
+<td>tipe: boolean</td>
+</tr>
+<tr>
+<td><code>static int NUMV = 2</code></td>
+<td>tipe: angka</td>
+</tr>
+<tr>
+<td><code>static int STRV = 3</code></td>
+<td>tipe: string</td>
+</tr>
+<tr>
+<td><code>static int ARRV = 4</code></td>
+<td>tipe: array</td>
+</tr>
+<tr>
+<td><code>static int OBJV = 5</code></td>
+<td>tipe: objek</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="messagepack">MessagePack<a class="anchor" href="#messagepack" aria-label="tautan">#</a></h2>
+<p><code>lib/data/MessagePack.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] one(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] cat(int[] a, int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encNil()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBool(int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encInt(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encBin(int[] b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encStr(String s)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arrHead(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encArr(int[] items, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encMap(int[] pairs, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] mapHead(int n)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<footer class="foot">
+  <span>Dokumentasi Kopi v1.20 · lisensi MIT</span>
+  <a href="https://github.com/rinnejay/kopiLanguage/blob/main/docs/api-data.md">Sunting halaman ini</a>
+</footer>
+  </main>
+</div>
+</body>
+</html>

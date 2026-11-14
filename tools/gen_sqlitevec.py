@@ -19,7 +19,7 @@ import sys
 
 
 def kopi_double(d):
-    """replika persis Str.fromDouble (lib/core/Str.kop)."""
+    """replika persis Str.fromDouble (lib/text/Str.kop)."""
     if d != d:
         return "nan"
     neg = d < 0

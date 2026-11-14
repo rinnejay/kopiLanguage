@@ -16,11 +16,11 @@ class Log {
 
     /* ── level, tujuan file, rotasi, log terstruktur (v1.24) ───── */
 
-    static int DEBUG() { return 0; }
-    static int INFO()  { return 1; }
-    static int WARN()  { return 2; }
-    static int ERROR() { return 3; }
-    static int OFF()   { return 4; }
+    static int DEBUG = 0;
+    static int INFO = 1;
+    static int WARN = 2;
+    static int ERROR = 3;
+    static int OFF = 4;
 
     static String levelName(int level) {
         if (level == 0) return "DEBUG";

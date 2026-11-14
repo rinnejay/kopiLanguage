@@ -4,8 +4,15 @@
 Output:
   docs/api.md          indeks semua modul + pola penerapan
   docs/api-core.md     referensi lib/core
-  docs/api-net.md      referensi lib/net
+  docs/api-text.md     referensi lib/text
+  docs/api-data.md     referensi lib/data
+  docs/api-io.md       referensi lib/io
+  docs/api-system.md   referensi lib/system
+  docs/api-compress.md referensi lib/compress
   docs/api-crypto.md   referensi lib/crypto
+  docs/api-net.md      referensi lib/net
+  docs/api-web.md      referensi lib/web
+  docs/api-db.md       referensi lib/db
 
 Signature diekstrak langsung dari source agar tidak ada fungsi yang
 terlewat. Deskripsi memakai komentar sumber, metadata libmeta.py, lalu
@@ -22,10 +29,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from libmeta import META, COMMON, EXTRA  # noqa: E402
 
 CATS = [
-    ("core", "Core", "Tipe dasar, teks, matematika, koleksi, file, waktu"),
-    ("net", "Net", "TCP/UDP, HTTP, WebSocket, URL, auth, DNS, TLS"),
+    ("core", "Core", "Tipe dasar, koleksi, matematika, dan utilitas bahasa"),
+    ("text", "Text", "Teks native String, transformasi teks, dan regex"),
+    ("data", "Data", "JSON, CBOR, MessagePack, CSV, konfigurasi, cookie"),
+    ("io", "IO", "Berkas, path, pembaca, dan penulis berbuffer"),
+    ("system", "System", "Argumen, environment, waktu, log, dan UUID"),
+    ("compress", "Compress", "LZMA/LZMA2/XZ, checksum, filter, dan kompresi umum"),
     ("crypto", "Crypto", "Hash, PBKDF2, cipher, X25519, AEAD, DER"),
-    ("io", "IO", "Pembaca & penulis berkas berbuffer"),
+    ("net", "Net", "TCP/UDP, DNS, TLS, dan protokol jaringan dasar"),
+    ("web", "Web", "HTTP/1.1, HTTP/2, WebSocket, URL, auth, sesi"),
     ("db", "Database", "Pembaca SQLite read-only"),
 ]
 

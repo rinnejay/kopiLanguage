@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""gen_http2.py — generator tabel HPACK untuk lib/net/Http2Tabel.kop.
+"""gen_http2.py — generator tabel HPACK untuk lib/web/Http2Tabel.kop.
 
 Pemakaian: tools/gen_http2.py [keluaran.kop]
 
@@ -188,7 +188,7 @@ class Http2Tabel {
 
 
 def main():
-    outp = sys.argv[1] if len(sys.argv) > 1 else "lib/net/Http2Tabel.kop"
+    outp = sys.argv[1] if len(sys.argv) > 1 else "lib/web/Http2Tabel.kop"
     tsv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "hpack_huffman.tsv")
     code, ln = parse_tsv(tsv)
     assert len(STATIC_TABLE) == 61

@@ -49,9 +49,9 @@ class Sqlite {
 
     /* ── konstanta ──────────────────────────────────────────────── */
 
-    static int MAXPAY() { return 65536; }   /* batas payload record */
-    static int MAXCOL() { return 64; }      /* batas kolom per record */
-    static int MAXDEPTH() { return 64; }    /* tinggi b-tree */
+    static int MAXPAY = 65536;   /* batas payload record */
+    static int MAXCOL = 64;      /* batas kolom per record */
+    static int MAXDEPTH = 64;    /* tinggi b-tree */
 
     /* ── I/O file bantu ─────────────────────────────────────────── */
 

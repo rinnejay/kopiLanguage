@@ -26,9 +26,174 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-io">Referensi API — IO<a class="anchor" href="#referensi-api-io" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#reader">Reader</a></li><li class="toc-h2"><a href="#writer">Writer</a></li></ul></nav>
-<p>Pembaca &amp; penulis berkas berbuffer. Semua signature di bawah diekstrak langsung dari source <code>lib/io/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#reader">Reader</a></li><li class="toc-h2"><a href="#writer">Writer</a></li></ul></nav>
+<p>Berkas, path, pembaca, dan penulis berbuffer. Semua signature di bawah diekstrak langsung dari source <code>lib/io/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
+<h2 id="file">File<a class="anchor" href="#file" aria-label="tautan">#</a></h2>
+<p><code>lib/io/File.kop</code> · 15 fungsi</p>
+<p>I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir.</p>
+<pre><code class="language-java">import File;
+
+int fd = File.create("hasil.txt");
+File.writeAll(fd, Net.bytes("halo\n"));
+File.close(fd);
+
+int r = File.openRead("hasil.txt");
+int[] buf = new int[File.size(r)];
+File.readInto(r, buf);
+File.close(r);</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li>Selalu tutup fd; tidak ada finalizer/GC untuk resource.</li>
+<li><code>readInto</code> membaca sampai buffer penuh/EOF.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int openRead(String path)</code></td>
+<td>buka file hanya-baca; -1 bila gagal</td>
+</tr>
+<tr>
+<td><code>static int create(String path)</code></td>
+<td>buat/buka file</td>
+</tr>
+<tr>
+<td><code>static int append(String path)</code></td>
+<td>buka untuk menambah di akhir</td>
+</tr>
+<tr>
+<td><code>static int close(int fd)</code></td>
+<td>tutup deskriptor</td>
+</tr>
+<tr>
+<td><code>static int writeAll(int fd, int[] data)</code></td>
+<td>tulis seluruh data; jumlah byte tertulis</td>
+</tr>
+<tr>
+<td><code>static int readInto(int fd, int[] buf)</code></td>
+<td>baca sampai buffer penuh/EOF; jumlah byte terbaca</td>
+</tr>
+<tr>
+<td><code>static int seekSet(int fd, int off)</code></td>
+<td>lompat ke offset dari awal</td>
+</tr>
+<tr>
+<td><code>static int seekCur(int fd, int off)</code></td>
+<td>lompat relatif dari posisi</td>
+</tr>
+<tr>
+<td><code>static int seekEnd(int fd, int off)</code></td>
+<td>lompat relatif dari akhir</td>
+</tr>
+<tr>
+<td><code>static int size(int fd)</code></td>
+<td>jumlah elemen saat ini</td>
+</tr>
+<tr>
+<td><code>static int remove(String path)</code></td>
+<td>hapus elemen</td>
+</tr>
+<tr>
+<td><code>static int renameTo(String oldp, String newp)</code></td>
+<td>ganti nama file/direktori</td>
+</tr>
+<tr>
+<td><code>static int mkdir(String path)</code></td>
+<td>buat direktori</td>
+</tr>
+<tr>
+<td><code>static String readText(String path)</code></td>
+<td>v1.17.1: I/O teks langsung — kode biasa tak perlu sentuh int[]</td>
+</tr>
+<tr>
+<td><code>static boolean writeText(String path, String text)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int O_RDONLY = 0</code></td>
+<td>flag open: hanya baca</td>
+</tr>
+<tr>
+<td><code>static int O_WRONLY = 1</code></td>
+<td>flag open: hanya tulis</td>
+</tr>
+<tr>
+<td><code>static int O_CREAT = 64</code></td>
+<td>flag open: buat bila belum ada</td>
+</tr>
+<tr>
+<td><code>static int O_TRUNC = 512</code></td>
+<td>flag open: kosongkan bila sudah ada</td>
+</tr>
+<tr>
+<td><code>static int O_APPEND = 1024</code></td>
+<td>flag open: selalu tulis di akhir</td>
+</tr>
+<tr>
+<td><code>static int MODE_0644 = 420</code></td>
+<td>izin bawaan file baru (0644)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="path">Path<a class="anchor" href="#path" aria-label="tautan">#</a></h2>
+<p><code>lib/io/Path.kop</code> · 6 fungsi</p>
+<p>Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut.</p>
+<pre><code class="language-java">import Path;
+
+System.out.println(Path.ext("index.html"));  // html
+System.out.println(Path.dir("/a/b/c.txt"));  // /a/b</code></pre>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static String sep()</code></td>
+<td>string pemisah path (/)</td>
+</tr>
+<tr>
+<td><code>static String join(String a, String b)</code></td>
+<td>gabung dua path dengan pemisah</td>
+</tr>
+<tr>
+<td><code>static String base(String p)</code></td>
+<td>nama file terakhir tanpa direktori</td>
+</tr>
+<tr>
+<td><code>static String dir(String p)</code></td>
+<td>bagian direktori (tanpa nama file)</td>
+</tr>
+<tr>
+<td><code>static String ext(String p)</code></td>
+<td>ekstensi tanpa titik</td>
+</tr>
+<tr>
+<td><code>static boolean isAbsolute(String p)</code></td>
+<td>true bila path absolut</td>
+</tr>
+</tbody></table></div>
+<p><strong>Konstanta</strong></p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Nama</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int SEP = 47</code></td>
+<td>byte pemisah path</td>
+</tr>
+</tbody></table></div>
+<hr>
 <h2 id="reader">Reader<a class="anchor" href="#reader" aria-label="tautan">#</a></h2>
 <p><code>lib/io/Reader.kop</code> · 1 fungsi</p>
 <p>Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.</p>

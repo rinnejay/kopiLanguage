@@ -26,7 +26,7 @@ assembly/binary sendiri — tanpa JVM, tanpa bytecode vendor lain.
 ```sh
 make                 # kopicc + kopivm
 make test            # 155 uji lintas backend
-./kopicc --version   # kopicc 1.41.0 (Kopi) — target a64 | x64 | vm
+./kopicc --version   # kopicc 1.42.0 (Kopi) — target a64 | x64 | vm
 
 # binary asli (aarch64)
 ./kopicc examples/hello.kop -t a64 -o hello.s
@@ -73,14 +73,20 @@ class Main {
 - Diagnostik runtime: nomor baris + stack trace + saran saat error.
 - Multi-file: `import Nama;` mencari `lib/<kategori>/Nama.kop`.
 
-## Pustaka standar (42 modul, ditulis dengan Kopi)
+## Pustaka standar (84 modul, ditulis dengan Kopi)
 
 | Kelompok | Modul |
 |---|---|
-| `lib/core/` | `Str`, `Math`, `Digits`, `Stats`, `Matrix`, `Arrays`, `Json`, `Map`, `Set`, `Deque`, `File`, `Path`, `Time` |
-| `lib/net/` | `Tcp`, `Udp`, `Dns`, `Resolv`, `Rfc`, `Http`, `Url`, `Tls`, `TlsServer`, `Http2`, `Http2Tabel`, `HttpServer`, `Static`, `Mime`, `WebSocket`, `Jwt`, `Session`, `Auth` |
+| `lib/core/` | `Arrays`, `BigInt`, `Bytes`, `Deque`, `Digits`, `List`, `ListStr`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `Set`, `SetStr`, `Stats`, `Test` |
+| `lib/text/` | `Str`, `Text`, `Regex` |
+| `lib/data/` | `Cbor`, `Config`, `Cookie`, `Csv`, `Json`, `MessagePack` |
+| `lib/io/` | `File`, `Path`, `Reader`, `Writer` |
+| `lib/system/` | `Args`, `Env`, `Log`, `Time`, `Uuid` |
+| `lib/compress/` | `Checksum`, `Compress`, `Filter`, `Lzma`, `Lzma2`, `LzmaAuto`, `LzmaStream`, `Xz` |
+| `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
+| `lib/net/` | `Dns`, `Resolv`, `Rfc`, `Tcp`, `Tls`, `TlsServer`, `Udp` |
+| `lib/web/` | `Auth`, `Http`, `Http2`, `Http2Tabel`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Router`, `Session`, `Static`, `Url`, `WebSocket`, `WsClient` |
 | `lib/db/` | `Sqlite` (pembaca read-only `.db`, RFC sqlite) |
-| `lib/crypto/` | `Crypto`, `Cipher`, `Hash`, `Pbkdf2`, `Kdf`, `Big`, `X25519`, `ChaCha`, `Poly`, `Aead`, `Rand`, `Der` |
 
 Termasuk klien TLS 1.3, HTTP/1.1, WebSocket, server HTTP, event loop,
 DNS, PBKDF2/HMAC, ChaCha20-Poly1305, dan X25519 — semuanya diuji
@@ -98,7 +104,7 @@ tanpa Termux.
   dan detail ukuran/izin/waktu ubah.
 - Autocomplete `System.out.`, `Str.`, `Net.`, `String`, snippet.
 - Build `kopicc -t vm` → run `kopivm`, output streaming.
-- 42 modul bahasa ikut dibundel; arm64-v8a, Android 7+.
+- 84 modul bahasa ikut dibundel; arm64-v8a, Android 7+.
 - Detail build/install: [`android/README.md`](android/README.md).
 
 ## Dokumentasi
@@ -111,7 +117,7 @@ tanpa Termux.
 | [04 — Server](docs/04-server.md) | TCP/UDP, HTTP, WebSocket, TLS, game |
 | [05 — Arsitektur](docs/05-developer.md) | pipeline compiler, 3 backend, kontribusi |
 | [06 — Batas & roadmap](docs/06-batas-roadmap.md) | yang belum ada + jebakan |
-| [Referensi API](docs/api.md) | 42 modul, 588 fungsi + builtin `Net.*` |
+| [Referensi API](docs/api.md) | 84 modul, 10 kelompok + builtin `Net.*` |
 
 Versi HTML: **https://rinnejay.github.io/** · [`docs/`](docs/README.md)
 
@@ -130,7 +136,7 @@ test.sh     suite lintas backend
 
 ## Status
 
-`v1.41.0` — **193 pass, 0 fail**. Riwayat versi lengkap:
+`v1.42.0` — **193 pass, 0 fail**. Riwayat versi lengkap:
 [`CHANGELOG.md`](CHANGELOG.md). Batas jujur & rencana:
 [docs/06-batas-roadmap.md](docs/06-batas-roadmap.md).
 

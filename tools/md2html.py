@@ -33,9 +33,14 @@ PAGES = [
 # validasi, tetapi tidak ditampilkan di nav agar nav tetap pendek.
 NONAV = [
     ("api-core.md", "api-core.html", "Referensi API — Core", ""),
-    ("api-net.md", "api-net.html", "Referensi API — Net", ""),
-    ("api-crypto.md", "api-crypto.html", "Referensi API — Crypto", ""),
+    ("api-text.md", "api-text.html", "Referensi API — Text", ""),
+    ("api-data.md", "api-data.html", "Referensi API — Data", ""),
     ("api-io.md", "api-io.html", "Referensi API — IO", ""),
+    ("api-system.md", "api-system.html", "Referensi API — System", ""),
+    ("api-compress.md", "api-compress.html", "Referensi API — Compress", ""),
+    ("api-crypto.md", "api-crypto.html", "Referensi API — Crypto", ""),
+    ("api-net.md", "api-net.html", "Referensi API — Net", ""),
+    ("api-web.md", "api-web.html", "Referensi API — Web", ""),
     ("api-db.md", "api-db.html", "Referensi API — Database", ""),
 ]
 

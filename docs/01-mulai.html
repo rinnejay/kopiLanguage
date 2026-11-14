@@ -93,7 +93,7 @@ import Http;</code></pre>
 <ol>
 <li>folder file pengimpor — <code>Nama.kop</code>, lalu <code>nama.kop</code> (lokal menang)</li>
 <li><code>lib/</code> di samping <code>kopicc</code> (bisa dioverride <code>KOPPATH</code>)</li>
-<li>subfolder <code>lib/&lt;kategori&gt;/Nama.kop</code> (<code>core/</code>, <code>net/</code>, <code>crypto/</code>)</li>
+<li>subfolder <code>lib/&lt;kategori&gt;/Nama.kop</code> (<code>core/</code>, <code>text/</code>, <code>data/</code>, <code>io/</code>, <code>system/</code>, <code>compress/</code>, <code>crypto/</code>, <code>net/</code>, <code>web/</code>, <code>db/</code>)</li>
 </ol>
 <p>File yang sama (realpath) hanya dimuat sekali. <strong>Jebakan</strong>: file lokal bernama sama dengan modul (tanpa peduli huruf besar/kecil) akan menang, sehingga <code>import Str</code> dari folder yang berisi <code>str.kop</code> akan memuat file lokal. Ini alasan file uji tidak boleh dinamai sama dengan modul.</p>
 <h2 id="6-alur-kerja-singkat">6. Alur kerja singkat<a class="anchor" href="#6-alur-kerja-singkat" aria-label="tautan">#</a></h2>

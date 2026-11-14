@@ -24,12 +24,12 @@ import Str;
 
 class Json {
 
-    static int NULLV()  { return 0; }
-    static int BOOLV()  { return 1; }
-    static int NUMV()   { return 2; }
-    static int STRV()   { return 3; }
-    static int ARRV()   { return 4; }
-    static int OBJV()   { return 5; }
+    static int NULLV = 0;
+    static int BOOLV = 1;
+    static int NUMV = 2;
+    static int STRV = 3;
+    static int ARRV = 4;
+    static int OBJV = 5;
 
     /* ── utilitas tape ─────────────────────────────────────────── */
 
