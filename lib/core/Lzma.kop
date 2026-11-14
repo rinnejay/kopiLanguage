@@ -1,370 +1,992 @@
-// Lzma.kop — decoder LZMA1 murni Kopi (v1.39).
+// Lzma.kop — decoder + encoder LZMA1 murni Kopi (v1.40).
 //
-// Mendukung dua bentuk input:
+// Format yang didukung (lihat juga Lzma2.kop / Xz.kop):
+//   - LZMA alone (.lzma): props + dictSize + uncompressedSize + data
+//   - LZMA1 raw tanpa header
 //
-//   1) LZMA "alone" / .lzma (FORMAT_ALONE):
-//        1 byte  props   = (pb * 5 + lp) * 9 + lc
-//        4 byte  dictSize (LE)
-//        8 byte  uncompressedSize (LE, semua 0xFF = tidak diketahui)
-//        ...data terkompresi...
-//      Pakai Lzma.decompress(data).
+// Kelas LzmaDec menyimpan seluruh state model sehingga bisa dipakai
+// ulang oleh decoder LZMA2 (state persisten antar-chunk) dan API streaming.
+// Kelas LzmaEnc adalah range encoder dengan greedy hash-chain match finder.
 //
-//   2) LZMA1 raw tanpa header (FORMAT_RAW):
-//        ...data terkompresi... (5 byte pertama = range coder init)
-//      Pakai Lzma.decompressRaw(comp, props, outSize).
-//
-// Properti bebas: lc 0..8, lp 0..4 (lc+lp <= 8), pb 0..4.
-// outSize -1 berarti ukuran tidak diketahui: decoder berhenti pada
-// end-of-stream marker atau saat input habis.
-//
-// Implementasi mengikuti LZMA SDK (Igor Pavlov, public domain):
-// range coder, 12-state machine, literal + matched literal,
-// rep/match, length coder, posSlot, specPos, align.
+// Implementasi mengikuti LZMA SDK (Igor Pavlov, public domain).
 
 import Str;
 
-class Lzma {
+class LzmaDec {
 
-    /* ══ Range decoder ══════════════════════════════════════════════
-     * state: int[3] = [range, pos, code]
-     * range/code diperlakukan sebagai uint32; perbandingan memakai
-     * ult() karena int di Kopi bertanda.
-     */
+    /* ── konfigurasi ─────────────────────────────────────────────── */
+    int lc;
+    int lp;
+    int pb;
+    int posStates;
+    int lpMask;
+    int litStates;
 
-    private static boolean ult(int a, int b) {
+    /* ── tabel probabilitas ──────────────────────────────────────── */
+    int[] isMatch;
+    int[] isRep;
+    int[] isRepG0;
+    int[] isRepG1;
+    int[] isRepG2;
+    int[] isRep0Long;
+    int[] posSlot;
+    int[] specPos;
+    int[] align;
+    int[] matchLen;
+    int[] repLen;
+    int[] literal;
+
+    /* ── state LZMA ──────────────────────────────────────────────── */
+    int state;
+    int rep0;
+    int rep1;
+    int rep2;
+    int rep3;
+    int prevByte;
+
+    /* ── range decoder: rc = [range, pos, code] ──────────────────── */
+    int[] buf;
+    int[] rc;
+
+    /* ── output / kamus ──────────────────────────────────────────── */
+    int[] out;
+    int outLen;
+
+    /* posisi relatif terhadap reset kamus terakhir: dipakai untuk
+     * posState & konteks literal. outLen tetap total keluaran. */
+    int dictPos;
+
+    int eofMark;
+    int bad;
+
+    LzmaDec(int lc0, int lp0, int pb0) {
+        this.lc = lc0;
+        this.lp = lp0;
+        this.pb = pb0;
+        this.posStates = 1 << pb0;
+        this.lpMask = (1 << lp0) - 1;
+        this.litStates = 1 << (lc0 + lp0);
+
+        int lenSize = 2 + this.posStates * 16 + 256;
+        this.isMatch = LzmaDec.mk(192);
+        this.isRep = LzmaDec.mk(12);
+        this.isRepG0 = LzmaDec.mk(12);
+        this.isRepG1 = LzmaDec.mk(12);
+        this.isRepG2 = LzmaDec.mk(12);
+        this.isRep0Long = LzmaDec.mk(192);
+        this.posSlot = LzmaDec.mk(256);
+        this.specPos = LzmaDec.mk(128);
+        this.align = LzmaDec.mk(16);
+        this.matchLen = LzmaDec.mk(lenSize);
+        this.repLen = LzmaDec.mk(lenSize);
+        this.literal = LzmaDec.mk(this.litStates * 768);
+
+        this.rc = new int[3];
+        this.out = new int[1024];
+        this.outLen = 0;
+        this.dictPos = 0;
+        this.eofMark = 0;
+        this.bad = 0;
+        this.resetModel();
+    }
+
+    static int[] mk(int n) {
+        int[] p = new int[n];
+        for (int i = 0; i < n; i++) p[i] = 1024;
+        return p;
+    }
+
+    static void fill(int[] p) {
+        for (int i = 0; i < p.length; i++) p[i] = 1024;
+    }
+
+    /* reset model (probabilitas + state + rep) tanpa menyentuh kamus */
+    void resetProbs() {
+        LzmaDec.fill(this.isMatch);
+        LzmaDec.fill(this.isRep);
+        LzmaDec.fill(this.isRepG0);
+        LzmaDec.fill(this.isRepG1);
+        LzmaDec.fill(this.isRepG2);
+        LzmaDec.fill(this.isRep0Long);
+        LzmaDec.fill(this.posSlot);
+        LzmaDec.fill(this.specPos);
+        LzmaDec.fill(this.align);
+        LzmaDec.fill(this.matchLen);
+        LzmaDec.fill(this.repLen);
+        LzmaDec.fill(this.literal);
+        this.state = 0;
+        this.rep0 = 1;
+        this.rep1 = 1;
+        this.rep2 = 1;
+        this.rep3 = 1;
+        this.eofMark = 0;
+        this.bad = 0;
+    }
+
+    /* LZMA2 "state reset": model saja, byte sebelumnya dipertahankan */
+    void resetState() {
+        this.resetProbs();
+    }
+
+    void resetModel() {
+        this.resetProbs();
+        this.prevByte = 0;
+        this.dictPos = 0;
+    }
+
+    /* LZMA2 "dictionary reset": posisi & konteks mulai dari nol,
+     * tetapi keluaran total (this.out) tidak dibuang. */
+    void resetDict() {
+        this.dictPos = 0;
+        this.prevByte = 0;
+        this.resetProbs();
+    }
+
+    /* ganti properti lc/lp/pb; alokasi tabel menyesuaikan */
+    void setProps(int props) {
+        if (props < 0 || props >= 225) return;
+        int nlc = props % 9;
+        int r = props / 9;
+        int nlp = r % 5;
+        int npb = r / 5;
+        if (nlc == this.lc && nlp == this.lp && npb == this.pb) {
+            this.resetProbs();
+            return;
+        }
+        this.lc = nlc;
+        this.lp = nlp;
+        this.pb = npb;
+        this.posStates = 1 << npb;
+        this.lpMask = (1 << nlp) - 1;
+        this.litStates = 1 << (nlc + nlp);
+        int lenSize = 2 + this.posStates * 16 + 256;
+        this.isMatch = LzmaDec.mk(192);
+        this.isRep = LzmaDec.mk(12);
+        this.isRepG0 = LzmaDec.mk(12);
+        this.isRepG1 = LzmaDec.mk(12);
+        this.isRepG2 = LzmaDec.mk(12);
+        this.isRep0Long = LzmaDec.mk(192);
+        this.posSlot = LzmaDec.mk(256);
+        this.specPos = LzmaDec.mk(128);
+        this.align = LzmaDec.mk(16);
+        this.matchLen = LzmaDec.mk(lenSize);
+        this.repLen = LzmaDec.mk(lenSize);
+        this.literal = LzmaDec.mk(this.litStates * 768);
+        this.resetProbs();
+    }
+
+    /* tambahkan byte mentah (chunk tak terkompresi LZMA2) */
+    void appendBytes(int[] data, int off, int count) {
+        for (int i = 0; i < count; i++) {
+            this.ensure();
+            int v = data[off + i] & 255;
+            this.out[this.outLen] = v;
+            this.outLen = this.outLen + 1;
+            this.dictPos = this.dictPos + 1;
+            this.prevByte = v;
+        }
+    }
+
+    void ensure() {
+        if (this.outLen >= this.out.length) {
+            int[] n = new int[this.out.length * 2];
+            for (int i = 0; i < this.out.length; i++) n[i] = this.out[i];
+            this.out = n;
+        }
+    }
+
+    int[] takeResult() {
+        int[] r = new int[this.outLen];
+        for (int i = 0; i < this.outLen; i++) r[i] = this.out[i];
+        return r;
+    }
+
+    /* ══ range decoder (static, state eksplisit) ═══════════════════ */
+
+    static boolean ult(int a, int b) {
         int ah = a >>> 24;
         int bh = b >>> 24;
         if (ah != bh) return ah < bh;
         return (a & 0xFFFFFF) < (b & 0xFFFFFF);
     }
 
-    private static int rangeInit(int[] buf, int off, int[] st) {
-        if (buf.length < off + 5) return -1;
-        if ((buf[off] & 255) != 0) return -1;
-        st[0] = -1;                                    // 0xFFFFFFFF
-        st[1] = off + 5;
-        st[2] = ((buf[off + 1] & 255) << 24) | ((buf[off + 2] & 255) << 16)
-              | ((buf[off + 3] & 255) << 8) | (buf[off + 4] & 255);
+    static int rInit(int[] b, int off, int[] r) {
+        if (b.length < off + 5) return -1;
+        if ((b[off] & 255) != 0) return -1;
+        r[0] = -1;
+        r[1] = off + 5;
+        r[2] = ((b[off + 1] & 255) << 24) | ((b[off + 2] & 255) << 16)
+             | ((b[off + 3] & 255) << 8) | (b[off + 4] & 255);
         return 0;
     }
 
-    private static int rangeNormalize(int[] buf, int[] st) {
-        int pos = st[1];
-        int range = st[0];
-        int code = st[2];
+    static int rNorm(int[] b, int[] r) {
+        int pos = r[1];
+        int range = r[0];
+        int code = r[2];
         while ((range >>> 24) == 0) {
-            if (pos >= buf.length) return -1;
+            if (pos >= b.length) return -1;
             range = range << 8;
-            code = (code << 8) | (buf[pos] & 255);
+            code = (code << 8) | (b[pos] & 255);
             pos++;
         }
-        st[0] = range;
-        st[1] = pos;
-        st[2] = code;
+        r[0] = range;
+        r[1] = pos;
+        r[2] = code;
         return 0;
     }
 
-    private static int decBit(int[] buf, int[] st, int[] probs, int idx) {
-        if (rangeNormalize(buf, st) != 0) return -1;
+    static int rBit(int[] b, int[] r, int[] probs, int idx) {
+        if (LzmaDec.rNorm(b, r) != 0) return -1;
         int prob = probs[idx];
-        int range = st[0];
+        int range = r[0];
         int bound = (range >>> 11) * prob;
-        if (ult(st[2], bound)) {
-            st[0] = bound;
+        if (LzmaDec.ult(r[2], bound)) {
+            r[0] = bound;
             probs[idx] = prob + ((2048 - prob) >>> 5);
             return 0;
         }
-        st[0] = range - bound;
-        st[2] = st[2] - bound;
+        r[0] = range - bound;
+        r[2] = r[2] - bound;
         probs[idx] = prob - (prob >>> 5);
         return 1;
     }
 
-    private static int decDirect(int[] buf, int[] st, int n) {
+    static int rDirect(int[] b, int[] r, int n) {
         int v = 0;
         for (int i = 0; i < n; i++) {
-            if (rangeNormalize(buf, st) != 0) return -1;
-            st[0] = st[0] >>> 1;
+            if (LzmaDec.rNorm(b, r) != 0) return -1;
+            r[0] = r[0] >>> 1;
             v = v << 1;
-            if (!ult(st[2], st[0])) {
-                st[2] = st[2] - st[0];
+            if (!LzmaDec.ult(r[2], r[0])) {
+                r[2] = r[2] - r[0];
                 v = v | 1;
             }
         }
         return v;
     }
 
-    /* pohon biner n-bit: index prob 1..2^n-1, hasil 0..2^n-1 */
-    private static int treeDecode(int[] buf, int[] st, int[] probs, int base, int nbits) {
+    static int treeDec(int[] b, int[] r, int[] probs, int base, int nbits) {
         int m = 1;
         for (int i = 0; i < nbits; i++) {
-            int b = decBit(buf, st, probs, base + m);
-            if (b < 0) return -1;
-            m = (m << 1) | b;
+            int v = LzmaDec.rBit(b, r, probs, base + m);
+            if (v < 0) return -1;
+            m = (m << 1) | v;
         }
         return m - (1 << nbits);
     }
 
-    private static int[] mkprobs(int n) {
-        int[] p = new int[n];
-        for (int i = 0; i < n; i++) p[i] = 1024;
-        return p;
-    }
+    /* ══ length / distance ═════════════════════════════════════════ */
 
-    private static int[] grow(int[] a) {
-        int[] b = new int[a.length * 2];
-        for (int i = 0; i < a.length; i++) b[i] = a[i];
-        return b;
-    }
-
-    /* ══ Length decoder ════════════════════════════════════════════
-     * layout: [0]=choice [1]=choice2,
-     *         low  = 2 + posState*8                (tree 3 bit)
-     *         mid  = 2 + posStates*8 + posState*8  (tree 3 bit)
-     *         high = 2 + posStates*16              (tree 8 bit)
-     * hasil: 2..273 (sudah termasuk kMatchMinLen=2)
-     */
-
-    private static int lenDecode(int[] buf, int[] st, int[] lp, int posStates, int posState) {
-        int b = decBit(buf, st, lp, 0);
+    int lenDecode(int[] lp2, int posState) {
+        int b = LzmaDec.rBit(this.buf, this.rc, lp2, 0);
         if (b < 0) return -1;
         if (b == 0) {
-            int v = treeDecode(buf, st, lp, 2 + posState * 8, 3);
+            int v = LzmaDec.treeDec(this.buf, this.rc, lp2, 2 + posState * 8, 3);
             if (v < 0) return -1;
             return 2 + v;
         }
-        b = decBit(buf, st, lp, 1);
+        b = LzmaDec.rBit(this.buf, this.rc, lp2, 1);
         if (b < 0) return -1;
         if (b == 0) {
-            int v = treeDecode(buf, st, lp, 2 + posStates * 8 + posState * 8, 3);
+            int v = LzmaDec.treeDec(this.buf, this.rc, lp2,
+                                    2 + this.posStates * 8 + posState * 8, 3);
             if (v < 0) return -1;
             return 10 + v;
         }
-        int v = treeDecode(buf, st, lp, 2 + posStates * 16, 8);
+        int v = LzmaDec.treeDec(this.buf, this.rc, lp2, 2 + this.posStates * 16, 8);
         if (v < 0) return -1;
         return 18 + v;
     }
 
-    /* ══ Distance decoder ══════════════════════════════════════════
-     * return jarak 0-based, -1 = error range coder,
-     * -2 = end-of-stream marker (jarak 0xFFFFFFFF).
-     */
-
-    private static int distDecode(int[] buf, int[] st, int[] specPos, int[] align, int slot) {
+    /* return jarak 0-based, -1 galat, -2 end marker */
+    int distDecode(int slot) {
         if (slot < 4) return slot;
         int n = (slot >>> 1) - 1;
         if (slot < 14) {
-            int dist = (2 | (slot & 1)) << n;
-            dist = dist + 1;
+            /* reverse bit tree; indeks prob = (base - slot - 1) + node */
+            int base = (2 | (slot & 1)) << n;
+            int t = base - slot - 1;
             int m = 1;
-            for (int i = 0; i < n; i++) {
-                int b = decBit(buf, st, specPos, dist);
+            for (int k = 0; k < n; k++) {
+                int b = LzmaDec.rBit(this.buf, this.rc, this.specPos, t + m);
                 if (b < 0) return -1;
-                if (b == 0) {
-                    dist = dist + m;
-                    m = m + m;
-                } else {
-                    m = m + m;
-                    dist = dist + m;
-                }
+                m = (m << 1) | b;
+                if (b == 1) base = base + (1 << k);
             }
-            return dist - m;
+            return base;
         }
         int d = 2 | (slot & 1);
         int nd = n - 4;
         for (int i = 0; i < nd; i++) {
-            int b = decDirect(buf, st, 1);
+            int b = LzmaDec.rDirect(this.buf, this.rc, 1);
             if (b < 0) return -1;
             d = (d << 1) | b;
         }
         d = d << 4;
-        int a = treeDecode(buf, st, align, 0, 4);
-        if (a < 0) return -1;
-        d = d | a;
+        /* 4 bit align: reverse bit tree (LSB dulu) */
+        int m = 1;
+        for (int k = 0; k < 4; k++) {
+            int b = LzmaDec.rBit(this.buf, this.rc, this.align, m);
+            if (b < 0) return -1;
+            m = (m << 1) | b;
+            if (b == 1) d = d + (1 << k);
+        }
         if (d == -1) return -2;
         return d;
     }
 
-    /* ══ Decoder utama ═════════════════════════════════════════════ */
+    /* ══ decode satu aliran ════════════════════════════════════════
+     * count >= 0 : berhenti setelah tepat count byte (LZMA2 / ukuran diketahui)
+     * count <  0 : berhenti pada end marker atau akhir input
+     * return 0 sukses, -1 data rusak, -2 input terpotong
+     */
 
-    private static int[] decodeStream(int[] buf, int off, int lc, int lp, int pb, int outSize) {
-        int[] st = new int[3];
-        if (rangeInit(buf, off, st) != 0) return new int[0];
+    int decodeChunk(int[] b, int off, int count) {
+        this.buf = b;
+        this.bad = 0;
+        this.eofMark = 0;
+        if (LzmaDec.rInit(b, off, this.rc) != 0) return -1;
 
-        int posStates = 1 << pb;
-        int lpMask = (1 << lp) - 1;
-        int litStates = 1 << (lc + lp);
-        int lenSize = 2 + posStates * 16 + 256;
+        int target = -1;
+        if (count >= 0) target = this.outLen + count;
 
-        int[] isMatch = mkprobs(192);
-        int[] isRep = mkprobs(12);
-        int[] isRepG0 = mkprobs(12);
-        int[] isRepG1 = mkprobs(12);
-        int[] isRepG2 = mkprobs(12);
-        int[] isRep0Long = mkprobs(192);
-        int[] posSlot = mkprobs(256);
-        int[] specPos = mkprobs(128);
-        int[] align = mkprobs(16);
-        int[] matchLen = mkprobs(lenSize);
-        int[] repLen = mkprobs(lenSize);
-        int[] literal = mkprobs(litStates * 768);
+        while (target < 0 || this.outLen < target) {
+            int posState = this.dictPos & (this.posStates - 1);
+            int idx = (this.state << 4) | posState;
 
-        int cap = 1024;
-        if (outSize > 0) cap = outSize;
-        int[] out = new int[cap];
-        int dictPos = 0;
+            int b0 = LzmaDec.rBit(this.buf, this.rc, this.isMatch, idx);
+            if (b0 < 0) return -2;
 
-        int rep0 = 1;
-        int rep1 = 1;
-        int rep2 = 1;
-        int rep3 = 1;
-        int state = 0;
-        int prevByte = 0;
-        int done = 0;
-
-        while (done == 0) {
-            if (outSize >= 0 && dictPos >= outSize) break;
-
-            int posState = dictPos & (posStates - 1);
-            int idx = (state << 4) | posState;
-
-            int b = decBit(buf, st, isMatch, idx);
-            if (b < 0) break;
-
-            if (b == 0) {
-                /* literal */
-                int litState = ((dictPos & lpMask) << lc) | (prevByte >>> (8 - lc));
+            if (b0 == 0) {
+                int litState = ((this.dictPos & this.lpMask) << this.lc)
+                             | (this.prevByte >>> (8 - this.lc));
                 int base = litState * 768;
                 int sym = 1;
 
-                if (state < 7) {
+                if (this.state < 7) {
                     for (int i = 0; i < 8; i++) {
-                        int bitv = decBit(buf, st, literal, base + sym);
-                        if (bitv < 0) { done = 1; break; }
-                        sym = (sym << 1) | bitv;
+                        int v = LzmaDec.rBit(this.buf, this.rc, this.literal, base + sym);
+                        if (v < 0) return -2;
+                        sym = (sym << 1) | v;
                     }
-                    if (done != 0) break;
-                    if (state < 4) state = 0;
-                    else if (state < 10) state = state - 3;
-                    else state = state - 6;
+                    if (this.state < 4) this.state = 0;
+                    else if (this.state < 10) this.state = this.state - 3;
+                    else this.state = this.state - 6;
                 } else {
-                    int src = dictPos - rep0;
-                    if (src < 0) break;
-                    int matchByte = out[src] & 255;
+                    if (this.rep0 > this.dictPos) return -1;
+                    int src = this.outLen - this.rep0;
+                    if (src < 0) return -1;
+                    int matchByte = this.out[src] & 255;
                     int offs = 0x100;
                     for (int i = 0; i < 8; i++) {
                         matchByte = matchByte << 1;
                         int bitv = offs;
                         offs = offs & matchByte;
-                        int bb = decBit(buf, st, literal, base + offs + bitv + sym);
-                        if (bb < 0) { done = 1; break; }
-                        sym = (sym << 1) | bb;
-                        if (bb == 0) offs = offs ^ bitv;
+                        int v = LzmaDec.rBit(this.buf, this.rc, this.literal,
+                                             base + offs + bitv + sym);
+                        if (v < 0) return -2;
+                        sym = (sym << 1) | v;
+                        if (v == 0) offs = offs ^ bitv;
                     }
-                    if (done != 0) break;
-                    state = state < 10 ? state - 3 : state - 6;
+                    this.state = this.state < 10 ? this.state - 3 : this.state - 6;
                 }
 
-                if (dictPos >= out.length) out = grow(out);
-                out[dictPos] = (sym - 256) & 255;
-                prevByte = out[dictPos];
-                dictPos++;
+                this.ensure();
+                this.out[this.outLen] = (sym - 256) & 255;
+                this.prevByte = this.out[this.outLen];
+                this.outLen = this.outLen + 1;
+                this.dictPos = this.dictPos + 1;
                 continue;
             }
 
-            b = decBit(buf, st, isRep, state);
-            if (b < 0) break;
+            int b1 = LzmaDec.rBit(this.buf, this.rc, this.isRep, this.state);
+            if (b1 < 0) return -2;
 
             int len = 0;
+            int endMark = 0;
 
-            if (b == 1) {
-                /* rep match */
-                b = decBit(buf, st, isRepG0, state);
-                if (b < 0) break;
+            if (b1 == 1) {
+                int g0 = LzmaDec.rBit(this.buf, this.rc, this.isRepG0, this.state);
+                if (g0 < 0) return -2;
 
-                if (b == 0) {
-                    b = decBit(buf, st, isRep0Long, idx);
-                    if (b < 0) break;
-                    if (b == 0) {
-                        /* short rep: panjang 1 */
-                        int src = dictPos - rep0;
-                        if (src < 0) break;
-                        if (dictPos >= out.length) out = grow(out);
-                        out[dictPos] = out[src] & 255;
-                        prevByte = out[dictPos];
-                        dictPos++;
-                        state = state < 7 ? 9 : 11;
+                if (g0 == 0) {
+                    int lon = LzmaDec.rBit(this.buf, this.rc, this.isRep0Long, idx);
+                    if (lon < 0) return -2;
+                    if (lon == 0) {
+                        if (this.rep0 > this.dictPos) return -1;
+                        int src = this.outLen - this.rep0;
+                        if (src < 0) return -1;
+                        this.ensure();
+                        this.out[this.outLen] = this.out[src] & 255;
+                        this.prevByte = this.out[this.outLen];
+                        this.outLen = this.outLen + 1;
+                        this.dictPos = this.dictPos + 1;
+                        this.state = this.state < 7 ? 9 : 11;
                         continue;
                     }
-                    /* rep0 dengan panjang */
-                    len = lenDecode(buf, st, repLen, posStates, posState);
-                    if (len < 0) break;
-                    state = state < 7 ? 8 : 11;
+                    len = this.lenDecode(this.repLen, posState);
+                    if (len < 0) return -2;
+                    this.state = this.state < 7 ? 8 : 11;
                 } else {
-                    b = decBit(buf, st, isRepG1, state);
-                    if (b < 0) break;
+                    int g1 = LzmaDec.rBit(this.buf, this.rc, this.isRepG1, this.state);
+                    if (g1 < 0) return -2;
                     int dist = 0;
-                    if (b == 0) {
-                        dist = rep1;
+                    if (g1 == 0) {
+                        dist = this.rep1;
                     } else {
-                        b = decBit(buf, st, isRepG2, state);
-                        if (b < 0) break;
-                        if (b == 0) {
-                            dist = rep2;
-                            rep2 = rep1;
+                        int g2 = LzmaDec.rBit(this.buf, this.rc, this.isRepG2, this.state);
+                        if (g2 < 0) return -2;
+                        if (g2 == 0) {
+                            dist = this.rep2;
+                            this.rep2 = this.rep1;
                         } else {
-                            dist = rep3;
-                            rep3 = rep2;
-                            rep2 = rep1;
+                            dist = this.rep3;
+                            this.rep3 = this.rep2;
+                            this.rep2 = this.rep1;
                         }
                     }
-                    rep1 = rep0;
-                    rep0 = dist;
-                    len = lenDecode(buf, st, repLen, posStates, posState);
-                    if (len < 0) break;
-                    state = state < 7 ? 8 : 11;
+                    this.rep1 = this.rep0;
+                    this.rep0 = dist;
+                    len = this.lenDecode(this.repLen, posState);
+                    if (len < 0) return -2;
+                    this.state = this.state < 7 ? 8 : 11;
                 }
             } else {
-                /* match normal */
-                len = lenDecode(buf, st, matchLen, posStates, posState);
-                if (len < 0) break;
+                len = this.lenDecode(this.matchLen, posState);
+                if (len < 0) return -2;
 
                 int lenState = len - 2;
                 if (lenState > 3) lenState = 3;
-                int slot = treeDecode(buf, st, posSlot, lenState * 64, 6);
-                if (slot < 0) break;
+                int slot = LzmaDec.treeDec(this.buf, this.rc, this.posSlot,
+                                           lenState * 64, 6);
+                if (slot < 0) return -2;
 
-                int dist = distDecode(buf, st, specPos, align, slot);
-                if (dist == -1) break;
-                if (dist == -2) break;                  /* end marker */
-
-                rep3 = rep2;
-                rep2 = rep1;
-                rep1 = rep0;
-                rep0 = dist + 1;
-                state = state < 7 ? 7 : 10;
+                int dist = this.distDecode(slot);
+                if (dist == -1) return -2;
+                if (dist == -2) {
+                    endMark = 1;
+                } else {
+                    this.rep3 = this.rep2;
+                    this.rep2 = this.rep1;
+                    this.rep1 = this.rep0;
+                    this.rep0 = dist + 1;
+                    this.state = this.state < 7 ? 7 : 10;
+                }
             }
 
-            /* salin len byte dari jarak rep0 */
+            if (endMark == 1) {
+                this.eofMark = 1;
+                break;
+            }
+
+            if (this.rep0 > this.dictPos) return -1;
             for (int i = 0; i < len; i++) {
-                int src = dictPos - rep0;
-                if (src < 0) { done = 1; break; }
-                if (dictPos >= out.length) out = grow(out);
-                out[dictPos] = out[src] & 255;
-                prevByte = out[dictPos];
-                dictPos++;
+                int src = this.outLen - this.rep0;
+                if (src < 0) return -1;
+                this.ensure();
+                this.out[this.outLen] = this.out[src] & 255;
+                this.prevByte = this.out[this.outLen];
+                this.outLen = this.outLen + 1;
+                this.dictPos = this.dictPos + 1;
             }
-            if (done != 0) break;
         }
 
-        int[] res = new int[dictPos];
-        for (int i = 0; i < dictPos; i++) res[i] = out[i];
-        return res;
+        return 0;
     }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * LzmaEnc — range encoder LZMA1 (greedy, hash-chain).
+ *
+ * `low`/`range` memakai long agar operasi 32-bit tidak salah tanda.
+ * Match finder: hash 3 byte (16 bit) + rantai `prevPos`, batas 128.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+class LzmaEnc {
+
+    int[] data;
+    int n;
+    int lc;
+    int lp;
+    int pb;
+    int posStates;
+    int lpMask;
+    int litStates;
+    int dictSize;
+
+    int pos;
+    int prev;
+    int state;
+    int[] reps;
+
+    int[] isMatch;
+    int[] isRep;
+    int[] isRepG0;
+    int[] isRepG1;
+    int[] isRepG2;
+    int[] isRep0Long;
+    int[] posSlot;
+    int[] specPos;
+    int[] align;
+    int[] matchLen;
+    int[] repLen;
+    int[] literal;
+
+    long low;
+    long range;
+    int cache;
+    int cacheSize;
+    int[] out;
+    int outLen;
+
+    int hbits;
+    int[] head;
+    int[] prevPos;
+
+    int bestLen;
+    int bestDist;
+    int curRepLen;
+    int curRepIdx;
+
+    LzmaEnc(int[] src, int lc0, int lp0, int pb0, int dict0) {
+        this.data = src;
+        this.n = src.length;
+        this.lc = lc0;
+        this.lp = lp0;
+        this.pb = pb0;
+        this.posStates = 1 << pb0;
+        this.lpMask = (1 << lp0) - 1;
+        this.litStates = 1 << (lc0 + lp0);
+        this.dictSize = dict0;
+        if (this.dictSize < 4096) this.dictSize = 4096;
+
+        int lenSize = 2 + this.posStates * 16 + 256;
+        this.isMatch = LzmaEnc.mk(192);
+        this.isRep = LzmaEnc.mk(12);
+        this.isRepG0 = LzmaEnc.mk(12);
+        this.isRepG1 = LzmaEnc.mk(12);
+        this.isRepG2 = LzmaEnc.mk(12);
+        this.isRep0Long = LzmaEnc.mk(192);
+        this.posSlot = LzmaEnc.mk(256);
+        this.specPos = LzmaEnc.mk(128);
+        this.align = LzmaEnc.mk(16);
+        this.matchLen = LzmaEnc.mk(lenSize);
+        this.repLen = LzmaEnc.mk(lenSize);
+        this.literal = LzmaEnc.mk(this.litStates * 768);
+
+        this.reps = new int[4];
+        for (int i = 0; i < 4; i++) this.reps[i] = 1;
+        this.pos = 0;
+        this.prev = 0;
+        this.state = 0;
+
+        this.low = 0L;
+        this.range = 4294967295L;
+        this.cache = 0;
+        this.cacheSize = 1;
+        this.out = new int[1024];
+        this.outLen = 0;
+
+        this.hbits = 16;
+        this.head = LzmaEnc.neg(1 << this.hbits);
+        this.prevPos = LzmaEnc.neg(this.n);
+        this.bestLen = 0;
+        this.bestDist = 0;
+        this.curRepLen = 0;
+        this.curRepIdx = 0;
+    }
+
+    static int[] mk(int n) {
+        int[] p = new int[n];
+        for (int i = 0; i < n; i++) p[i] = 1024;
+        return p;
+    }
+
+    static int[] neg(int n) {
+        int[] p = new int[n];
+        for (int i = 0; i < n; i++) p[i] = -1;
+        return p;
+    }
+
+    /* ── output ──────────────────────────────────────────────────── */
+
+    void ensureOut() {
+        if (this.outLen >= this.out.length) {
+            int[] q = new int[this.out.length * 2];
+            for (int i = 0; i < this.out.length; i++) q[i] = this.out[i];
+            this.out = q;
+        }
+    }
+
+    void emit(int b) {
+        this.ensureOut();
+        this.out[this.outLen] = b & 255;
+        this.outLen = this.outLen + 1;
+    }
+
+    int[] takeOut() {
+        int[] r = new int[this.outLen];
+        for (int i = 0; i < this.outLen; i++) r[i] = this.out[i];
+        return r;
+    }
+
+    /* ── range encoder ───────────────────────────────────────────── */
+
+    void shiftLow() {
+        long hi = this.low >>> 32;
+        if (hi != 0L || (this.low & 4278190080L) != 4278190080L) {
+            int temp = this.cache;
+            while (true) {
+                this.emit((temp + (int) hi) & 255);
+                temp = 255;
+                this.cacheSize = this.cacheSize - 1;
+                if (this.cacheSize == 0) break;
+            }
+            this.cache = (int) ((this.low >>> 24) & 255L);
+        }
+        this.cacheSize = this.cacheSize + 1;
+        this.low = (this.low & 16777215L) << 8;
+    }
+
+    void encBit(int[] probs, int i, int bit) {
+        int p = probs[i];
+        long bound = (this.range >>> 11) * (long) p;
+        if (bit == 0) {
+            this.range = bound;
+            probs[i] = p + ((2048 - p) >>> 5);
+        } else {
+            this.low = this.low + bound;
+            this.range = this.range - bound;
+            probs[i] = p - (p >>> 5);
+        }
+        while (this.range < 16777216L) {
+            this.range = this.range << 8;
+            this.shiftLow();
+        }
+    }
+
+    void encDirect(int value, int nbits) {
+        for (int i = nbits - 1; i >= 0; i--) {
+            this.range = this.range >>> 1;
+            if (((value >>> i) & 1) != 0) this.low = this.low + this.range;
+            while (this.range < 16777216L) {
+                this.range = this.range << 8;
+                this.shiftLow();
+            }
+        }
+    }
+
+    void flush() {
+        for (int i = 0; i < 5; i++) this.shiftLow();
+    }
+
+    void tree(int[] probs, int base, int nbits, int value) {
+        int m = 1;
+        for (int i = nbits - 1; i >= 0; i--) {
+            int b = (value >>> i) & 1;
+            this.encBit(probs, base + m, b);
+            m = (m << 1) | b;
+        }
+    }
+
+    /* ── match finder ────────────────────────────────────────────── */
+
+    int hash3(int p) {
+        int a = this.data[p] & 255;
+        int b = 0;
+        int c = 0;
+        if (p + 1 < this.n) b = this.data[p + 1] & 255;
+        if (p + 2 < this.n) c = this.data[p + 2] & 255;
+        return ((a << 16) ^ (b << 8) ^ c) & ((1 << this.hbits) - 1);
+    }
+
+    void insert(int p) {
+        if (p + 2 >= this.n) return;
+        int h = this.hash3(p);
+        this.prevPos[p] = this.head[h];
+        this.head[h] = p;
+    }
+
+    void find() {
+        int p = this.pos;
+        int maxlen = 273;
+        if (this.n - p < maxlen) maxlen = this.n - p;
+        int bl = 0;
+        int bd = 0;
+        if (maxlen >= 2) {
+            int cand = -1;
+            if (p + 2 < this.n) cand = this.head[this.hash3(p)];
+            int chain = 0;
+            while (cand >= 0 && chain < 128) {
+                int dist = p - cand;
+                if (dist > this.dictSize) break;
+                int l = 0;
+                while (l < maxlen && this.data[cand + l] == this.data[p + l]) {
+                    l = l + 1;
+                }
+                if (l > bl) {
+                    bl = l;
+                    bd = dist;
+                    if (l == maxlen) break;
+                }
+                cand = this.prevPos[cand];
+                chain = chain + 1;
+            }
+        }
+        int rl = 0;
+        int ri = 0;
+        for (int r = 0; r < 4; r++) {
+            int d = this.reps[r];
+            if (d > p) continue;
+            int l = 0;
+            while (l < maxlen && this.data[p - d + l] == this.data[p + l]) {
+                l = l + 1;
+            }
+            if (l > rl) {
+                rl = l;
+                ri = r;
+            }
+        }
+        this.bestLen = bl;
+        this.bestDist = bd;
+        this.curRepLen = rl;
+        this.curRepIdx = ri;
+    }
+
+    /* ── token encoder ───────────────────────────────────────────── */
+
+    void encodeLen(int[] probs, int length, int posState) {
+        if (length < 10) {
+            this.encBit(probs, 0, 0);
+            this.tree(probs, 2 + posState * 8, 3, length - 2);
+        } else if (length < 18) {
+            this.encBit(probs, 0, 1);
+            this.encBit(probs, 1, 0);
+            this.tree(probs, 2 + this.posStates * 8 + posState * 8, 3, length - 10);
+        } else {
+            this.encBit(probs, 0, 1);
+            this.encBit(probs, 1, 1);
+            this.tree(probs, 2 + this.posStates * 16, 8, length - 18);
+        }
+    }
+
+    void encodeMatch(int length, int dist, int posState) {
+        this.encBit(this.isMatch, (this.state << 4) | posState, 1);
+        this.encBit(this.isRep, this.state, 0);
+        this.encodeLen(this.matchLen, length, posState);
+
+        int d = dist - 1;
+        int slot = 0;
+        if (d < 4) {
+            slot = d;
+        } else {
+            int nb = 0;
+            int t = d;
+            while (t != 0) {
+                nb = nb + 1;
+                t = t >>> 1;
+            }
+            nb = nb - 1;
+            slot = (nb << 1) | ((d >>> (nb - 1)) & 1);
+        }
+        int lenState = length - 2;
+        if (lenState > 3) lenState = 3;
+        this.tree(this.posSlot, lenState * 64, 6, slot);
+
+        if (slot >= 4) {
+            int nb2 = (slot >>> 1) - 1;
+            if (slot < 14) {
+                int base = (2 | (slot & 1)) << nb2;
+                int footer = d - base;
+                int t = base - slot - 1;
+                int m = 1;
+                for (int k = 0; k < nb2; k++) {
+                    int b = (footer >>> k) & 1;
+                    this.encBit(this.specPos, t + m, b);
+                    m = (m << 1) | b;
+                }
+            } else {
+                int nd = nb2 - 4;
+                int direct = (d >>> 4) & ((1 << nd) - 1);
+                this.encDirect(direct, nd);
+                int al = d & 15;
+                int m = 1;
+                for (int k = 0; k < 4; k++) {
+                    int b = (al >>> k) & 1;
+                    this.encBit(this.align, m, b);
+                    m = (m << 1) | b;
+                }
+            }
+        }
+
+        this.reps[3] = this.reps[2];
+        this.reps[2] = this.reps[1];
+        this.reps[1] = this.reps[0];
+        this.reps[0] = dist;
+        this.state = this.state < 7 ? 7 : 10;
+    }
+
+    void encodeRep(int length, int idx, int posState) {
+        this.encBit(this.isMatch, (this.state << 4) | posState, 1);
+        this.encBit(this.isRep, this.state, 1);
+        if (idx == 0) {
+            this.encBit(this.isRepG0, this.state, 0);
+            this.encBit(this.isRep0Long, (this.state << 4) | posState, 1);
+        } else {
+            this.encBit(this.isRepG0, this.state, 1);
+            if (idx == 1) {
+                this.encBit(this.isRepG1, this.state, 0);
+            } else {
+                this.encBit(this.isRepG1, this.state, 1);
+                if (idx == 2) {
+                    this.encBit(this.isRepG2, this.state, 0);
+                } else {
+                    this.encBit(this.isRepG2, this.state, 1);
+                }
+            }
+        }
+
+        int dist = 0;
+        if (idx == 0) {
+            dist = this.reps[0];
+        } else if (idx == 1) {
+            dist = this.reps[1];
+            this.reps[1] = this.reps[0];
+            this.reps[0] = dist;
+        } else if (idx == 2) {
+            dist = this.reps[2];
+            this.reps[2] = this.reps[1];
+            this.reps[1] = this.reps[0];
+            this.reps[0] = dist;
+        } else {
+            dist = this.reps[3];
+            this.reps[3] = this.reps[2];
+            this.reps[2] = this.reps[1];
+            this.reps[1] = this.reps[0];
+            this.reps[0] = dist;
+        }
+        this.encodeLen(this.repLen, length, posState);
+        this.state = this.state < 7 ? 8 : 11;
+    }
+
+    void encodeShortRep(int posState) {
+        this.encBit(this.isMatch, (this.state << 4) | posState, 1);
+        this.encBit(this.isRep, this.state, 1);
+        this.encBit(this.isRepG0, this.state, 0);
+        this.encBit(this.isRep0Long, (this.state << 4) | posState, 0);
+        this.state = this.state < 7 ? 9 : 11;
+    }
+
+    void encodeLiteral(int posState) {
+        this.encBit(this.isMatch, (this.state << 4) | posState, 0);
+        int p = this.pos;
+        int byteVal = this.data[p] & 255;
+        int litState = ((p & this.lpMask) << this.lc) | (this.prev >>> (8 - this.lc));
+        int base = litState * 768;
+        int sym = 1;
+        if (this.state < 7) {
+            for (int i = 7; i >= 0; i--) {
+                int b = (byteVal >>> i) & 1;
+                this.encBit(this.literal, base + sym, b);
+                sym = (sym << 1) | b;
+            }
+            if (this.state < 4) this.state = 0;
+            else if (this.state < 10) this.state = this.state - 3;
+            else this.state = this.state - 6;
+        } else {
+            int src = p - this.reps[0];
+            int matchByte = 0;
+            if (src >= 0) matchByte = this.data[src] & 255;
+            int offs = 0x100;
+            for (int i = 7; i >= 0; i--) {
+                matchByte = matchByte << 1;
+                int bitv = offs;
+                offs = offs & matchByte;
+                int b = (byteVal >>> i) & 1;
+                this.encBit(this.literal, base + offs + bitv + sym, b);
+                sym = (sym << 1) | b;
+                if (b == 0) offs = offs ^ bitv;
+            }
+            this.state = this.state < 10 ? this.state - 3 : this.state - 6;
+        }
+        this.prev = byteVal;
+    }
+
+    void endMarker(int posState) {
+        this.encBit(this.isMatch, (this.state << 4) | posState, 1);
+        this.encBit(this.isRep, this.state, 0);
+        this.encodeLen(this.matchLen, 2, posState);
+        this.tree(this.posSlot, 0, 6, 63);
+        this.encDirect((1 << 26) - 1, 26);
+        int m = 1;
+        for (int k = 0; k < 4; k++) {
+            this.encBit(this.align, m, 1);
+            m = (m << 1) | 1;
+        }
+    }
+
+    void encodeTokens() {
+        while (this.pos < this.n) {
+            int posState = this.pos & (this.posStates - 1);
+            this.find();
+            int ln = 1;
+            if (this.curRepLen >= 2 && this.curRepLen + 1 >= this.bestLen) {
+                this.encodeRep(this.curRepLen, this.curRepIdx, posState);
+                ln = this.curRepLen;
+            } else if (this.bestLen >= 2) {
+                this.encodeMatch(this.bestLen, this.bestDist, posState);
+                ln = this.bestLen;
+            } else if (this.curRepLen >= 1 && this.curRepIdx == 0) {
+                this.encodeShortRep(posState);
+                ln = 1;
+            } else {
+                this.encodeLiteral(posState);
+                ln = 1;
+            }
+            for (int k = 0; k < ln; k++) this.insert(this.pos + k);
+            this.pos = this.pos + ln;
+            this.prev = this.data[this.pos - 1] & 255;
+        }
+    }
+
+    int[] encode() {
+        this.encodeTokens();
+        this.endMarker(this.pos & (this.posStates - 1));
+        this.flush();
+        return this.takeOut();
+    }
+
+    /* LZMA2: satu chunk tanpa end marker */
+    int[] encodeNoEnd() {
+        this.encodeTokens();
+        this.flush();
+        return this.takeOut();
+    }
+
+    static int[] raw(int[] src, int props, int dictSize) {
+        int lc = props % 9;
+        int r = props / 9;
+        int lp = r % 5;
+        int pb = r / 5;
+        LzmaEnc e = new LzmaEnc(src, lc, lp, pb, dictSize);
+        return e.encode();
+    }
+
+    static int[] chunk(int[] src, int props, int dictSize) {
+        int lc = props % 9;
+        int r = props / 9;
+        int lp = r % 5;
+        int pb = r / 5;
+        LzmaEnc e = new LzmaEnc(src, lc, lp, pb, dictSize);
+        return e.encodeNoEnd();
+    }
+}
+
+class Lzma {
 
     /* ══ API publik ════════════════════════════════════════════════ */
 
-    /* LZMA alone: props + dictSize + uncompressedSize + data */
     static int[] decompress(int[] data) {
         if (data.length < 13) return new int[0];
         int props = data[0] & 255;
@@ -382,24 +1004,59 @@ class Lzma {
         if (!(lo == -1 && hi == -1)) {
             if (hi == 0 && lo >= 0) outSize = lo;
         }
-        return decodeStream(data, 13, lc, lp, pb, outSize);
+
+        LzmaDec d = new LzmaDec(lc, lp, pb);
+        int st = d.decodeChunk(data, 13, outSize);
+        if (st < 0 && d.outLen == 0) return new int[0];
+        return d.takeResult();
     }
 
-    /* LZMA1 raw tanpa header. props = (pb*5+lp)*9+lc.
-     * outSize = ukuran hasil yang diharapkan, atau -1 jika tidak diketahui. */
     static int[] decompressRaw(int[] comp, int props, int outSize) {
         if (props < 0 || props >= 225) return new int[0];
         int lc = props % 9;
         int r = props / 9;
         int lp = r % 5;
         int pb = r / 5;
-        return decodeStream(comp, 0, lc, lp, pb, outSize);
+        LzmaDec d = new LzmaDec(lc, lp, pb);
+        int st = d.decodeChunk(comp, 0, outSize);
+        if (st < 0 && d.outLen == 0) return new int[0];
+        return d.takeResult();
     }
 
-    /* utilitas: byte properti dari lc/lp/pb; -1 jika di luar jangkauan */
     static int propsOf(int lc, int lp, int pb) {
         if (lc < 0 || lc > 8 || lp < 0 || lp > 4 || pb < 0 || pb > 4) return -1;
         return (pb * 5 + lp) * 9 + lc;
+    }
+
+    /* ══ encoder ═══════════════════════════════════════════════════ */
+
+    /* LZMA1 raw (tanpa header) dengan end marker. */
+    static int[] compressRaw(int[] data, int props, int dictSize) {
+        if (props < 0 || props >= 225) return new int[0];
+        return LzmaEnc.raw(data, props, dictSize);
+    }
+
+    /* LZMA alone (.lzma): header 13 byte + raw; uncompressed size = -1. */
+    static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize) {
+        int props = Lzma.propsOf(lc, lp, pb);
+        if (props < 0) return new int[0];
+        int dict = dictSize;
+        if (dict < 4096) dict = 4096;
+        int[] raw = LzmaEnc.raw(data, props, dict);
+        int[] out = new int[13 + raw.length];
+        out[0] = props;
+        out[1] = dict & 255;
+        out[2] = (dict >>> 8) & 255;
+        out[3] = (dict >>> 16) & 255;
+        out[4] = (dict >>> 24) & 255;
+        for (int i = 5; i < 13; i++) out[i] = 255;
+        for (int i = 0; i < raw.length; i++) out[13 + i] = raw[i];
+        return out;
+    }
+
+    /* Default: lc=3, lp=0, pb=2, dict=64 KiB (sama dengan vektor raw). */
+    static int[] compress(int[] data) {
+        return Lzma.compressWith(data, 3, 0, 2, 1 << 16);
     }
 
     static String decompressText(int[] data) {

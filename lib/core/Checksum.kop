@@ -1,0 +1,114 @@
+// Checksum.kop — checksum & VLI untuk container XZ (v1.40).
+//
+//   Checksum.crc32(data)                CRC-32 IEEE (identik dengan zlib)
+//   Checksum.crc32Init()                state awal (0xFFFFFFFF, int -1)
+//   Checksum.crc32Update(st, a, off, n) state berikut (incremental)
+//   Checksum.crc32Final(st)             xorout
+//   Checksum.crc64(data)                CRC-64/XZ (ECMA-182) → long
+//   Checksum.crc64Init() / crc64Update / crc64Final
+//   Checksum.vliSize(a, off)            panjang VLI mulai offset
+//   Checksum.vliDecode(a, off)          nilai VLI (long)
+//   Checksum.vliEncode(v)               int[] byte VLI (7 bit/byte, little-endian)
+//
+// CRC-32 dipakai XZ (check type 1) dan gzip. CRC-64/XZ memakai polinom
+// refleksi 0xC96C5795D7870F42, init & xorout semua bit 1.
+
+class Checksum {
+
+    /* ══ CRC-32 (polinom 0xEDB88320, refleksi) ═════════════════════ */
+
+    static int crc32Init() {
+        return -1;
+    }
+
+    static int crc32Update(int crc, int[] a, int off, int len) {
+        for (int i = 0; i < len; i++) {
+            crc = crc ^ (a[off + i] & 255);
+            for (int k = 0; k < 8; k++) {
+                if ((crc & 1) != 0) crc = (crc >>> 1) ^ (-306674912);
+                else crc = crc >>> 1;
+            }
+        }
+        return crc;
+    }
+
+    static int crc32Final(int crc) {
+        return crc ^ (-1);
+    }
+
+    static int crc32(int[] a) {
+        return crc32Final(crc32Update(crc32Init(), a, 0, a.length));
+    }
+
+    /* ══ CRC-64/XZ (ECMA-182, polinom refleksi 0xC96C5795D7870F42) ═ */
+
+    static long crc64Init() {
+        return -1L;
+    }
+
+    static long crc64Update(long crc, int[] a, int off, int len) {
+        for (int i = 0; i < len; i++) {
+            crc = crc ^ (long) (a[off + i] & 255);
+            for (int k = 0; k < 8; k++) {
+                if ((crc & 1L) != 0L) crc = (crc >>> 1) ^ (-3932672073523589310L);
+                else crc = crc >>> 1;
+            }
+        }
+        return crc;
+    }
+
+    static long crc64Final(long crc) {
+        return crc ^ (-1L);
+    }
+
+    static long crc64(int[] a) {
+        return crc64Final(crc64Update(crc64Init(), a, 0, a.length));
+    }
+
+    /* ══ VLI (variable-length integer) — format XZ ═════════════════
+     * Setiap byte menyumbang 7 bit (little-endian); bit 0x80 menandakan
+     * masih ada byte lanjutan.
+     */
+
+    static int vliSize(int[] a, int off) {
+        int n = 0;
+        while (off + n < a.length) {
+            int b = a[off + n] & 255;
+            n = n + 1;
+            if ((b & 128) == 0) break;
+        }
+        return n;
+    }
+
+    static long vliDecode(int[] a, int off) {
+        long v = 0L;
+        int shift = 0;
+        int i = off;
+        while (i < a.length) {
+            int b = a[i] & 255;
+            v = v | ((long) (b & 127) << shift);
+            i = i + 1;
+            if ((b & 128) == 0) break;
+            shift = shift + 7;
+        }
+        return v;
+    }
+
+    static int[] vliEncode(long v) {
+        int n = 1;
+        long t = v >>> 7;
+        while (t != 0L) {
+            n = n + 1;
+            t = t >>> 7;
+        }
+        int[] out = new int[n];
+        t = v;
+        for (int i = 0; i < n; i++) {
+            int b = (int) (t & 127L);
+            t = t >>> 7;
+            if (i != n - 1) b = b | 128;
+            out[i] = b;
+        }
+        return out;
+    }
+}

@@ -1,0 +1,374 @@
+// Filter.kop — filter chain XZ (delta + BCJ) murni Kopi (v1.40).
+//
+// Setiap fungsi mengembalikan array baru; data masukan tidak diubah.
+// Port langsung dari xz-utils src/liblzma/simple/*.c (0BSD) dan
+// src/liblzma/delta/*.c. Semua bekerja pada satu blok penuh, dengan
+// startOffset untuk BCJ (posisi absolut blok; 0 untuk blok pertama).
+//
+//   Filter.deltaEncode(a, dist) / deltaDecode(a, dist)   dist 1..256
+//   Filter.x86Encode/Decode(a, start)                    BCJ x86 (E8/E9)
+//   Filter.armEncode/Decode, armthumb, powerpc
+//   Filter.ia64Encode/Decode, sparc, arm64
+//
+// Dispatcher memakai filter ID XZ:
+//   0x03 delta, 0x04 x86, 0x05 powerpc, 0x06 ia64,
+//   0x07 arm, 0x08 armthumb, 0x09 sparc, 0x0A arm64
+
+class Filter {
+
+    static int[] copy(int[] a) {
+        int[] b = new int[a.length];
+        for (int i = 0; i < a.length; i++) b[i] = a[i] & 255;
+        return b;
+    }
+
+    static boolean msByte(int b) {
+        return b == 0 || b == 255;
+    }
+
+    /* ══ delta ═════════════════════════════════════════════════════ */
+
+    static int[] deltaEncode(int[] a, int dist) {
+        if (dist < 1 || dist > 256) return copy(a);
+        int[] b = new int[a.length];
+        for (int i = 0; i < a.length; i++) {
+            int tmp = 0;
+            if (i >= dist) tmp = a[i - dist] & 255;
+            b[i] = ((a[i] & 255) - tmp) & 255;
+        }
+        return b;
+    }
+
+    static int[] deltaDecode(int[] a, int dist) {
+        if (dist < 1 || dist > 256) return copy(a);
+        int[] b = new int[a.length];
+        for (int i = 0; i < a.length; i++) {
+            int tmp = 0;
+            if (i >= dist) tmp = b[i - dist];
+            b[i] = ((a[i] & 255) + tmp) & 255;
+        }
+        return b;
+    }
+
+    /* ══ x86 BCJ (E8/E9 rel32) ═════════════════════════════════════ */
+
+    static int[] x86Encode(int[] a, int start) {
+        return x86(a, start, 1);
+    }
+
+    static int[] x86Decode(int[] a, int start) {
+        return x86(a, start, 0);
+    }
+
+    static int[] x86(int[] src, int start, int enc) {
+        int[] b = copy(src);
+        int n = b.length;
+        if (n < 5) return b;
+
+        int[] maskToBit = new int[5];
+        maskToBit[0] = 0; maskToBit[1] = 1; maskToBit[2] = 2;
+        maskToBit[3] = 2; maskToBit[4] = 3;
+
+        int prevMask = 0;
+        int prevPos = start - 5;
+        int limit = n - 5;
+        int pos = 0;
+
+        while (pos <= limit) {
+            int bb = b[pos] & 255;
+            if (bb != 0xE8 && bb != 0xE9) { pos = pos + 1; continue; }
+
+            int offset = start + pos - prevPos;
+            prevPos = start + pos;
+
+            if (offset > 5) {
+                prevMask = 0;
+            } else {
+                for (int i = 0; i < offset; i++) {
+                    prevMask = (prevMask & 0x77) << 1;
+                }
+            }
+
+            bb = b[pos + 4] & 255;
+            int pm = prevMask >>> 1;
+
+            if (msByte(bb) && pm <= 4 && pm != 3) {
+                int s = (bb << 24) | ((b[pos + 3] & 255) << 16)
+                      | ((b[pos + 2] & 255) << 8) | (b[pos + 1] & 255);
+                int dest = 0;
+                while (true) {
+                    if (enc == 1) dest = s + (start + pos + 5);
+                    else dest = s - (start + pos + 5);
+                    if (prevMask == 0) break;
+                    int i = maskToBit[pm];
+                    int sh = 24 - i * 8;
+                    bb = (dest >>> sh) & 255;
+                    if (!msByte(bb)) break;
+                    int msh = (32 - i * 8) & 31;
+                    s = dest ^ ((1 << msh) - 1);
+                }
+                b[pos + 4] = ((dest >>> 24) & 1) != 0 ? 255 : 0;
+                b[pos + 3] = (dest >>> 16) & 255;
+                b[pos + 2] = (dest >>> 8) & 255;
+                b[pos + 1] = dest & 255;
+                pos = pos + 5;
+                prevMask = 0;
+            } else {
+                pos = pos + 1;
+                prevMask = prevMask | 1;
+                if (msByte(bb)) prevMask = prevMask | 0x10;
+            }
+        }
+
+        return b;
+    }
+
+    /* ══ ARM (BL, 24-bit rel) ══════════════════════════════════════ */
+
+    static int[] armEncode(int[] a, int start) { return arm(a, start, 1); }
+    static int[] armDecode(int[] a, int start) { return arm(a, start, 0); }
+
+    static int[] arm(int[] src, int start, int enc) {
+        int[] b = copy(src);
+        int n = b.length & ~3;
+        for (int i = 0; i < n; i = i + 4) {
+            if (b[i + 3] == 0xEB) {
+                int s = ((b[i + 2] & 255) << 16)
+                      | ((b[i + 1] & 255) << 8) | (b[i] & 255);
+                s = s << 2;
+                int dest = 0;
+                if (enc == 1) dest = start + i + 8 + s;
+                else dest = s - (start + i + 8);
+                dest = dest >>> 2;
+                b[i + 2] = (dest >>> 16) & 255;
+                b[i + 1] = (dest >>> 8) & 255;
+                b[i] = dest & 255;
+            }
+        }
+        return b;
+    }
+
+    /* ══ ARM-Thumb (BL pair) ══════════════════════════════════════ */
+
+    static int[] armthumbEncode(int[] a, int start) { return armthumb(a, start, 1); }
+    static int[] armthumbDecode(int[] a, int start) { return armthumb(a, start, 0); }
+
+    static int[] armthumb(int[] src, int start, int enc) {
+        int[] b = copy(src);
+        if (b.length < 4) return b;
+        int limit = b.length - 4;
+        int i = 0;
+        while (i <= limit) {
+            if ((b[i + 1] & 0xF8) == 0xF0 && (b[i + 3] & 0xF8) == 0xF8) {
+                int s = (((b[i + 1] & 255) & 7) << 19)
+                      | ((b[i] & 255) << 11)
+                      | (((b[i + 3] & 255) & 7) << 8)
+                      | (b[i + 2] & 255);
+                s = s << 1;
+                int dest = 0;
+                if (enc == 1) dest = start + i + 4 + s;
+                else dest = s - (start + i + 4);
+                dest = dest >>> 1;
+                b[i + 1] = 0xF0 | ((dest >>> 19) & 7);
+                b[i] = (dest >>> 11) & 255;
+                b[i + 3] = 0xF8 | ((dest >>> 8) & 7);
+                b[i + 2] = dest & 255;
+                i = i + 4;
+            } else {
+                i = i + 2;
+            }
+        }
+        return b;
+    }
+
+    /* ══ PowerPC (b/BL, 24-bit) ═══════════════════════════════════ */
+
+    static int[] powerpcEncode(int[] a, int start) { return powerpc(a, start, 1); }
+    static int[] powerpcDecode(int[] a, int start) { return powerpc(a, start, 0); }
+
+    static int[] powerpc(int[] src, int start, int enc) {
+        int[] b = copy(src);
+        int n = b.length & ~3;
+        for (int i = 0; i < n; i = i + 4) {
+            if ((b[i] >>> 2) == 0x12 && (b[i + 3] & 3) == 1) {
+                int s = (((b[i] & 255) & 3) << 24)
+                      | ((b[i + 1] & 255) << 16)
+                      | ((b[i + 2] & 255) << 8)
+                      | ((b[i + 3] & 255) & ~3);
+                int dest = 0;
+                if (enc == 1) dest = start + i + s;
+                else dest = s - (start + i);
+                b[i] = 0x48 | ((dest >>> 24) & 3);
+                b[i + 1] = (dest >>> 16) & 255;
+                b[i + 2] = (dest >>> 8) & 255;
+                b[i + 3] = (b[i + 3] & 3) | (dest & 255);
+            }
+        }
+        return b;
+    }
+
+    /* ══ IA-64 (bundles, branch slot) ═════════════════════════════ */
+
+    static int[] ia64Encode(int[] a, int start) { return ia64(a, start, 1); }
+    static int[] ia64Decode(int[] a, int start) { return ia64(a, start, 0); }
+
+    static int[] ia64(int[] src, int start, int enc) {
+        int[] b = copy(src);
+        int[] tab = new int[32];
+        tab[16] = 4; tab[17] = 4; tab[18] = 6; tab[19] = 6;
+        tab[22] = 7; tab[23] = 7; tab[24] = 4; tab[25] = 4;
+        tab[28] = 4; tab[29] = 4;
+
+        int n = b.length & ~15;
+        for (int i = 0; i < n; i = i + 16) {
+            int tpl = b[i] & 0x1F;
+            int mask = tab[tpl];
+            int bitPos = 5;
+
+            for (int slot = 0; slot < 3; slot++) {
+                if (((mask >>> slot) & 1) != 0) {
+                    int bytePos = bitPos >>> 3;
+                    int bitRes = bitPos & 7;
+                    long instruction = 0L;
+
+                    for (int j = 0; j < 6; j++) {
+                        instruction = instruction
+                            | ((long) (b[i + j + bytePos] & 255) << (8 * j));
+                    }
+
+                    long norm = instruction >>> bitRes;
+
+                    if (((norm >>> 37) & 0xF) == 0x5L
+                            && ((norm >>> 9) & 0x7) == 0L) {
+                        int s = (int) ((norm >>> 13) & 0xFFFFFL);
+                        s = s | ((int) ((norm >>> 36) & 1L) << 20);
+                        s = s << 4;
+
+                        int dest = 0;
+                        if (enc == 1) dest = start + i + s;
+                        else dest = s - (start + i);
+                        dest = dest >>> 4;
+
+                        norm = norm & ~((long) 0x8FFFFFL << 13);
+                        norm = norm | ((long) (dest & 0xFFFFF) << 13);
+                        norm = norm | ((long) (dest & 0x100000) << 16);
+
+                        instruction = instruction & ((1L << bitRes) - 1L);
+                        instruction = instruction | (norm << bitRes);
+
+                        for (int j = 0; j < 6; j++) {
+                            b[i + j + bytePos] = (int) ((instruction >>> (8 * j)) & 255L);
+                        }
+                    }
+                }
+                bitPos = bitPos + 41;
+            }
+        }
+        return b;
+    }
+
+    /* ══ SPARC (call, 30-bit) ═════════════════════════════════════ */
+
+    static int[] sparcEncode(int[] a, int start) { return sparc(a, start, 1); }
+    static int[] sparcDecode(int[] a, int start) { return sparc(a, start, 0); }
+
+    static int[] sparc(int[] src, int start, int enc) {
+        int[] b = copy(src);
+        int n = b.length & ~3;
+        for (int i = 0; i < n; i = i + 4) {
+            if ((b[i] == 0x40 && (b[i + 1] & 0xC0) == 0x00)
+                    || (b[i] == 0x7F && (b[i + 1] & 0xC0) == 0xC0)) {
+                int s = ((b[i] & 255) << 24) | ((b[i + 1] & 255) << 16)
+                      | ((b[i + 2] & 255) << 8) | (b[i + 3] & 255);
+                s = s << 2;
+
+                int dest = 0;
+                if (enc == 1) dest = start + i + s;
+                else dest = s - (start + i);
+                dest = dest >>> 2;
+
+                dest = (((0 - ((dest >>> 22) & 1)) << 22) & 0x3FFFFFFF)
+                     | (dest & 0x3FFFFF) | 0x40000000;
+
+                b[i] = (dest >>> 24) & 255;
+                b[i + 1] = (dest >>> 16) & 255;
+                b[i + 2] = (dest >>> 8) & 255;
+                b[i + 3] = dest & 255;
+            }
+        }
+        return b;
+    }
+
+    /* ══ ARM64 (BL + ADRP) ════════════════════════════════════════ */
+
+    static int[] arm64Encode(int[] a, int start) { return arm64(a, start, 1); }
+    static int[] arm64Decode(int[] a, int start) { return arm64(a, start, 0); }
+
+    static int[] arm64(int[] src, int start, int enc) {
+        int[] b = copy(src);
+        int n = b.length & ~3;
+        for (int i = 0; i < n; i = i + 4) {
+            int pc = start + i;
+            int instr = (b[i] & 255) | ((b[i + 1] & 255) << 8)
+                      | ((b[i + 2] & 255) << 16) | ((b[i + 3] & 255) << 24);
+
+            if ((instr >>> 26) == 0x25) {
+                int s = instr;
+                instr = (int) 0x94000000;
+                pc = pc >>> 2;
+                if (enc == 0) pc = 0 - pc;
+                instr = instr | ((s + pc) & 0x03FFFFFF);
+                b[i] = instr & 255;
+                b[i + 1] = (instr >>> 8) & 255;
+                b[i + 2] = (instr >>> 16) & 255;
+                b[i + 3] = (instr >>> 24) & 255;
+            } else if ((instr & (int) 0x9F000000) == (int) 0x90000000) {
+                int s = ((instr >>> 29) & 3) | ((instr >>> 3) & 0x001FFFFC);
+                if (((s + 0x00020000) & 0x001C0000) != 0) continue;
+
+                instr = instr & (int) 0x9000001F;
+                pc = pc >>> 12;
+                if (enc == 0) pc = 0 - pc;
+                int dest = s + pc;
+                instr = instr | ((dest & 3) << 29);
+                instr = instr | ((dest & 0x0003FFFC) << 3);
+                instr = instr | ((0 - (dest & 0x00020000)) & 0x00E00000);
+
+                b[i] = instr & 255;
+                b[i + 1] = (instr >>> 8) & 255;
+                b[i + 2] = (instr >>> 16) & 255;
+                b[i + 3] = (instr >>> 24) & 255;
+            }
+        }
+        return b;
+    }
+
+    /* ══ dispatcher ═══════════════════════════════════════════════
+     * id  = filter ID XZ
+     * arg = jarak delta (1..256) untuk 0x03, startOffset untuk BCJ
+     */
+
+    static int[] encode(int id, int[] a, int arg) {
+        if (id == 0x03) return deltaEncode(a, arg);
+        if (id == 0x04) return x86Encode(a, arg);
+        if (id == 0x05) return powerpcEncode(a, arg);
+        if (id == 0x06) return ia64Encode(a, arg);
+        if (id == 0x07) return armEncode(a, arg);
+        if (id == 0x08) return armthumbEncode(a, arg);
+        if (id == 0x09) return sparcEncode(a, arg);
+        if (id == 0x0A) return arm64Encode(a, arg);
+        return copy(a);
+    }
+
+    static int[] decode(int id, int[] a, int arg) {
+        if (id == 0x03) return deltaDecode(a, arg);
+        if (id == 0x04) return x86Decode(a, arg);
+        if (id == 0x05) return powerpcDecode(a, arg);
+        if (id == 0x06) return ia64Decode(a, arg);
+        if (id == 0x07) return armDecode(a, arg);
+        if (id == 0x08) return armthumbDecode(a, arg);
+        if (id == 0x09) return sparcDecode(a, arg);
+        if (id == 0x0A) return arm64Decode(a, arg);
+        return copy(a);
+    }
+}

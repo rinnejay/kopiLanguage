@@ -26,7 +26,7 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-core">Referensi API — Core<a class="anchor" href="#referensi-api-core" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bigint">BigInt</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#lzma">Lzma</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#regex">Regex</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#arrays">Arrays</a></li><li class="toc-h2"><a href="#bigint">BigInt</a></li><li class="toc-h2"><a href="#bytes">Bytes</a></li><li class="toc-h2"><a href="#cbor">Cbor</a></li><li class="toc-h2"><a href="#checksum">Checksum</a></li><li class="toc-h2"><a href="#compress">Compress</a></li><li class="toc-h2"><a href="#config">Config</a></li><li class="toc-h2"><a href="#cookie">Cookie</a></li><li class="toc-h2"><a href="#csv">Csv</a></li><li class="toc-h2"><a href="#deque">Deque</a></li><li class="toc-h2"><a href="#digits">Digits</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#file">File</a></li><li class="toc-h2"><a href="#filter">Filter</a></li><li class="toc-h2"><a href="#json">Json</a></li><li class="toc-h2"><a href="#list">List</a></li><li class="toc-h2"><a href="#liststr">ListStr</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#lzmadec">LzmaDec</a></li><li class="toc-h2"><a href="#lzma2">Lzma2</a></li><li class="toc-h2"><a href="#lzmaauto">LzmaAuto</a></li><li class="toc-h2"><a href="#map">Map</a></li><li class="toc-h2"><a href="#mapss">MapSS</a></li><li class="toc-h2"><a href="#mapstr">MapStr</a></li><li class="toc-h2"><a href="#math">Math</a></li><li class="toc-h2"><a href="#matrix">Matrix</a></li><li class="toc-h2"><a href="#messagepack">MessagePack</a></li><li class="toc-h2"><a href="#path">Path</a></li><li class="toc-h2"><a href="#regex">Regex</a></li><li class="toc-h2"><a href="#router">Router</a></li><li class="toc-h2"><a href="#set">Set</a></li><li class="toc-h2"><a href="#setstr">SetStr</a></li><li class="toc-h2"><a href="#stats">Stats</a></li><li class="toc-h2"><a href="#str">Str</a></li><li class="toc-h2"><a href="#test">Test</a></li><li class="toc-h2"><a href="#text">Text</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li><li class="toc-h2"><a href="#xz">Xz</a></li></ul></nav>
 <p>Tipe dasar, teks, matematika, koleksi, file, waktu. Semua signature di bawah diekstrak langsung dari source <code>lib/core/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
@@ -562,6 +562,60 @@ String t = Bytes.text(Bytes.cat(Bytes.of("a"), Bytes.of("b")));</code></pre>
 </tr>
 <tr>
 <td><code>static int[] encMap(int[] pairs, int n)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="checksum">Checksum<a class="anchor" href="#checksum" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Checksum.kop</code> · 11 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int crc32Init()</code></td>
+<td>══ CRC-32 (polinom 0xEDB88320, refleksi) ═════════════════════</td>
+</tr>
+<tr>
+<td><code>static int crc32Update(int crc, int[] a, int off, int len)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int crc32Final(int crc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int crc32(int[] a)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long crc64Init()</code></td>
+<td>══ CRC-64/XZ (ECMA-182, polinom refleksi 0xC96C5795D7870F42) ═</td>
+</tr>
+<tr>
+<td><code>static long crc64Update(long crc, int[] a, int off, int len)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long crc64Final(long crc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long crc64(int[] a)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int vliSize(int[] a, int off)</code></td>
+<td>══ VLI (variable-length integer) — format XZ ═════════════════ Setiap byte menyumbang 7 bit (little-endian); bit 0x80 menandakan masih ada byte lanjutan.</td>
+</tr>
+<tr>
+<td><code>static long vliDecode(int[] a, int off)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] vliEncode(long v)</code></td>
 <td>—</td>
 </tr>
 </tbody></table></div>
@@ -1140,6 +1194,124 @@ File.close(r);</code></pre>
 <tr>
 <td><code>static int MODE_0644()</code></td>
 <td>izin bawaan file baru (0644)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="filter">Filter<a class="anchor" href="#filter" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Filter.kop</code> · 27 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] copy(int[] a)</code></td>
+<td>salinan (array baru)</td>
+</tr>
+<tr>
+<td><code>static boolean msByte(int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] deltaEncode(int[] a, int dist)</code></td>
+<td>══ delta ═════════════════════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] deltaDecode(int[] a, int dist)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] x86Encode(int[] a, int start)</code></td>
+<td>══ x86 BCJ (E8/E9 rel32) ═════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] x86Decode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] x86(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] armEncode(int[] a, int start)</code></td>
+<td>══ ARM (BL, 24-bit rel) ══════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] armDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arm(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] armthumbEncode(int[] a, int start)</code></td>
+<td>══ ARM-Thumb (BL pair) ══════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] armthumbDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] armthumb(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] powerpcEncode(int[] a, int start)</code></td>
+<td>══ PowerPC (b/BL, 24-bit) ═══════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] powerpcDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] powerpc(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] ia64Encode(int[] a, int start)</code></td>
+<td>══ IA-64 (bundles, branch slot) ═════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] ia64Decode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] ia64(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] sparcEncode(int[] a, int start)</code></td>
+<td>══ SPARC (call, 30-bit) ═════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] sparcDecode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] sparc(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arm64Encode(int[] a, int start)</code></td>
+<td>══ ARM64 (BL + ADRP) ════════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] arm64Decode(int[] a, int start)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] arm64(int[] src, int start, int enc)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] encode(int id, int[] a, int arg)</code></td>
+<td>══ dispatcher ═══════════════════════════════════════════════ id = filter ID XZ arg = jarak delta (1..256) untuk 0x03, startOffset untuk BCJ</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int id, int[] a, int arg)</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -1816,8 +1988,94 @@ Log.error("db", "gagal konek");</code></pre>
 </tr>
 </tbody></table></div>
 <hr>
-<h2 id="lzma">Lzma<a class="anchor" href="#lzma" aria-label="tautan">#</a></h2>
-<p><code>lib/core/Lzma.kop</code> · 4 fungsi</p>
+<h2 id="lzmadec">LzmaDec<a class="anchor" href="#lzmadec" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Lzma.kop</code> · 19 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static int[] mk(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void fill(int[] p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean ult(int a, int b)</code></td>
+<td>══ range decoder (static, state eksplisit) ═══════════════════</td>
+</tr>
+<tr>
+<td><code>static int rInit(int[] b, int off, int[] r)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int rNorm(int[] b, int[] r)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int rBit(int[] b, int[] r, int[] probs, int idx)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int rDirect(int[] b, int[] r, int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int treeDec(int[] b, int[] r, int[] probs, int base, int nbits)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] mk(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] neg(int n)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] raw(int[] src, int props, int dictSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] chunk(int[] src, int props, int dictSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>══ API publik ════════════════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>static int[] decompressRaw(int[] comp, int props, int outSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int propsOf(int lc, int lp, int pb)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressRaw(int[] data, int props, int dictSize)</code></td>
+<td>LZMA1 raw (tanpa header) dengan end marker.</td>
+</tr>
+<tr>
+<td><code>static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)</code></td>
+<td>LZMA alone (.lzma): header 13 byte + raw; uncompressed size = -1.</td>
+</tr>
+<tr>
+<td><code>static int[] compress(int[] data)</code></td>
+<td>Default: lc=3, lp=0, pb=2, dict=64 KiB (sama dengan vektor raw).</td>
+</tr>
+<tr>
+<td><code>static String decompressText(int[] data)</code></td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="lzma2">Lzma2<a class="anchor" href="#lzma2" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Lzma2.kop</code> · 8 fungsi</p>
 <p>Modul pustaka Kopi.</p>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -1826,18 +2084,56 @@ Log.error("db", "gagal konek");</code></pre>
 </tr></thead><tbody>
 <tr>
 <td><code>static int[] decompress(int[] data)</code></td>
-<td>LZMA alone: props + dictSize + uncompressedSize + data</td>
+<td>—</td>
 </tr>
 <tr>
-<td><code>static int[] decompressRaw(int[] comp, int props, int outSize)</code></td>
-<td>LZMA1 raw tanpa header. props = (pb 5+lp) 9+lc. outSize = ukuran hasil yang diharapkan, atau -1 jika tidak diketahui.</td>
+<td><code>static int[] decode(int[] data, int[] status)</code></td>
+<td>—</td>
 </tr>
 <tr>
-<td><code>static int propsOf(int lc, int lp, int pb)</code></td>
-<td>utilitas: byte properti dari lc/lp/pb; -1 jika di luar jangkauan</td>
+<td><code>static int streamSize(int[] data, int off)</code></td>
+<td>panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak</td>
 </tr>
 <tr>
-<td><code>static String decompressText(int[] data)</code></td>
+<td><code>static int[] compress(int[] data)</code></td>
+<td>══ encoder ═══════════════════════════════════════════════════ Sederhana namun valid: pecah data per 64 KiB, setiap chunk memakai reset penuh (control 0xE0) sehingga stream inde…</td>
+</tr>
+<tr>
+<td><code>static void encChunk(int[] out, int[] p, int[] part, int props, int dictSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decodeFrom(int[] data, int off, int[] status)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static Lzma2EncStream create()</code></td>
+<td>buat/buka file</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="lzmaauto">LzmaAuto<a class="anchor" href="#lzmaauto" aria-label="tautan">#</a></h2>
+<p><code>lib/core/LzmaAuto.kop</code> · 3 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static boolean isXz(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int[] data, int[] status)</code></td>
 <td>—</td>
 </tr>
 </tbody></table></div>
@@ -3691,6 +3987,76 @@ System.out.println(Uuid.valid(id));</code></pre>
 <tr>
 <td><code>static int version(String s)</code></td>
 <td>versi UUID (1..5)</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="xz">Xz<a class="anchor" href="#xz" aria-label="tautan">#</a></h2>
+<p><code>lib/core/Xz.kop</code> · 15 fungsi</p>
+<p>Modul pustaka Kopi.</p>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>static boolean isXz(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static boolean isXzAt(int[] data, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int get32le(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static long get64le(int[] a, int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] append(int[] a, int[] b)</code></td>
+<td>buka untuk menambah di akhir</td>
+</tr>
+<tr>
+<td><code>static int checkLen(int type)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int verifyCheck(int type, int[] a, int off, int[] data)</code></td>
+<td>verifikasi check; return 0 cocok, -3 tidak, -1 tipe tak didukung</td>
+</tr>
+<tr>
+<td><code>static void put(int[] out, int[] p, int v)</code></td>
+<td>══ encoder .xz (satu block, filter LZMA2) ════════════════════</td>
+</tr>
+<tr>
+<td><code>static void put32le(int[] out, int[] p, int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static void putVli(int[] out, int[] p, long v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] compressCheck(int[] data, int checkType)</code></td>
+<td>checkType: 0 None, 1 CRC32, 4 CRC64, 10 SHA-256</td>
+</tr>
+<tr>
+<td><code>static int[] decompress(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>static int[] decodeStream(int[] data, int start, int[] state)</code></td>
+<td>decode satu stream mulai start; state[0] = posisi akhir, state[1] = status.</td>
+</tr>
+<tr>
+<td><code>static int[] decode(int[] data, int[] status)</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>

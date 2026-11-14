@@ -213,6 +213,28 @@ Modul pustaka Kopi.
 
 ---
 
+## Checksum
+
+`lib/core/Checksum.kop` · 11 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int crc32Init()` | ══ CRC-32 (polinom 0xEDB88320, refleksi) ═════════════════════ |
+| `static int crc32Update(int crc, int[] a, int off, int len)` | — |
+| `static int crc32Final(int crc)` | — |
+| `static int crc32(int[] a)` | — |
+| `static long crc64Init()` | ══ CRC-64/XZ (ECMA-182, polinom refleksi 0xC96C5795D7870F42) ═ |
+| `static long crc64Update(long crc, int[] a, int off, int len)` | — |
+| `static long crc64Final(long crc)` | — |
+| `static long crc64(int[] a)` | — |
+| `static int vliSize(int[] a, int off)` | ══ VLI (variable-length integer) — format XZ ═════════════════ Setiap byte menyumbang 7 bit (little-endian); bit 0x80 menandakan masih ada byte lanjutan. |
+| `static long vliDecode(int[] a, int off)` | — |
+| `static int[] vliEncode(long v)` | — |
+
+---
+
 ## Compress
 
 `lib/core/Compress.kop` · 29 fungsi
@@ -469,6 +491,44 @@ File.close(r);
 
 ---
 
+## Filter
+
+`lib/core/Filter.kop` · 27 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] copy(int[] a)` | salinan (array baru) |
+| `static boolean msByte(int b)` | — |
+| `static int[] deltaEncode(int[] a, int dist)` | ══ delta ═════════════════════════════════════════════════════ |
+| `static int[] deltaDecode(int[] a, int dist)` | — |
+| `static int[] x86Encode(int[] a, int start)` | ══ x86 BCJ (E8/E9 rel32) ═════════════════════════════════════ |
+| `static int[] x86Decode(int[] a, int start)` | — |
+| `static int[] x86(int[] src, int start, int enc)` | — |
+| `static int[] armEncode(int[] a, int start)` | ══ ARM (BL, 24-bit rel) ══════════════════════════════════════ |
+| `static int[] armDecode(int[] a, int start)` | — |
+| `static int[] arm(int[] src, int start, int enc)` | — |
+| `static int[] armthumbEncode(int[] a, int start)` | ══ ARM-Thumb (BL pair) ══════════════════════════════════════ |
+| `static int[] armthumbDecode(int[] a, int start)` | — |
+| `static int[] armthumb(int[] src, int start, int enc)` | — |
+| `static int[] powerpcEncode(int[] a, int start)` | ══ PowerPC (b/BL, 24-bit) ═══════════════════════════════════ |
+| `static int[] powerpcDecode(int[] a, int start)` | — |
+| `static int[] powerpc(int[] src, int start, int enc)` | — |
+| `static int[] ia64Encode(int[] a, int start)` | ══ IA-64 (bundles, branch slot) ═════════════════════════════ |
+| `static int[] ia64Decode(int[] a, int start)` | — |
+| `static int[] ia64(int[] src, int start, int enc)` | — |
+| `static int[] sparcEncode(int[] a, int start)` | ══ SPARC (call, 30-bit) ═════════════════════════════════════ |
+| `static int[] sparcDecode(int[] a, int start)` | — |
+| `static int[] sparc(int[] src, int start, int enc)` | — |
+| `static int[] arm64Encode(int[] a, int start)` | ══ ARM64 (BL + ADRP) ════════════════════════════════════════ |
+| `static int[] arm64Decode(int[] a, int start)` | — |
+| `static int[] arm64(int[] src, int start, int enc)` | — |
+| `static int[] encode(int id, int[] a, int arg)` | ══ dispatcher ═══════════════════════════════════════════════ id = filter ID XZ arg = jarak delta (1..256) untuk 0x03, startOffset untuk BCJ |
+| `static int[] decode(int id, int[] a, int arg)` | — |
+
+---
+
 ## Json
 
 `lib/core/Json.kop` · 72 fungsi
@@ -698,18 +758,66 @@ Log.error("db", "gagal konek");
 
 ---
 
-## Lzma
+## LzmaDec
 
-`lib/core/Lzma.kop` · 4 fungsi
+`lib/core/Lzma.kop` · 19 fungsi
 
 Modul pustaka Kopi.
 
 | Fungsi | Keterangan |
 |---|---|
-| `static int[] decompress(int[] data)` | LZMA alone: props + dictSize + uncompressedSize + data |
-| `static int[] decompressRaw(int[] comp, int props, int outSize)` | LZMA1 raw tanpa header. props = (pb 5+lp) 9+lc. outSize = ukuran hasil yang diharapkan, atau -1 jika tidak diketahui. |
-| `static int propsOf(int lc, int lp, int pb)` | utilitas: byte properti dari lc/lp/pb; -1 jika di luar jangkauan |
+| `static int[] mk(int n)` | — |
+| `static void fill(int[] p)` | — |
+| `static boolean ult(int a, int b)` | ══ range decoder (static, state eksplisit) ═══════════════════ |
+| `static int rInit(int[] b, int off, int[] r)` | — |
+| `static int rNorm(int[] b, int[] r)` | — |
+| `static int rBit(int[] b, int[] r, int[] probs, int idx)` | — |
+| `static int rDirect(int[] b, int[] r, int n)` | — |
+| `static int treeDec(int[] b, int[] r, int[] probs, int base, int nbits)` | — |
+| `static int[] mk(int n)` | — |
+| `static int[] neg(int n)` | — |
+| `static int[] raw(int[] src, int props, int dictSize)` | — |
+| `static int[] chunk(int[] src, int props, int dictSize)` | — |
+| `static int[] decompress(int[] data)` | ══ API publik ════════════════════════════════════════════════ |
+| `static int[] decompressRaw(int[] comp, int props, int outSize)` | — |
+| `static int propsOf(int lc, int lp, int pb)` | — |
+| `static int[] compressRaw(int[] data, int props, int dictSize)` | LZMA1 raw (tanpa header) dengan end marker. |
+| `static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)` | LZMA alone (.lzma): header 13 byte + raw; uncompressed size = -1. |
+| `static int[] compress(int[] data)` | Default: lc=3, lp=0, pb=2, dict=64 KiB (sama dengan vektor raw). |
 | `static String decompressText(int[] data)` | — |
+
+---
+
+## Lzma2
+
+`lib/core/Lzma2.kop` · 8 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static int[] decompress(int[] data)` | — |
+| `static int[] decode(int[] data, int[] status)` | — |
+| `static int streamSize(int[] data, int off)` | panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak |
+| `static int[] compress(int[] data)` | ══ encoder ═══════════════════════════════════════════════════ Sederhana namun valid: pecah data per 64 KiB, setiap chunk memakai reset penuh (control 0xE0) sehingga stream inde… |
+| `static void encChunk(int[] out, int[] p, int[] part, int props, int dictSize)` | — |
+| `static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)` | — |
+| `static int[] decodeFrom(int[] data, int off, int[] status)` | — |
+| `static Lzma2EncStream create()` | buat/buka file |
+
+---
+
+## LzmaAuto
+
+`lib/core/LzmaAuto.kop` · 3 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static boolean isXz(int[] data)` | — |
+| `static int[] decompress(int[] data)` | — |
+| `static int[] decode(int[] data, int[] status)` | — |
 
 ---
 
@@ -1434,5 +1542,31 @@ System.out.println(Uuid.valid(id));
 | `static int[] parse(String s)` | teks UUID → 16 byte |
 | `static boolean valid(String s)` | true bila teks UUID valid |
 | `static int version(String s)` | versi UUID (1..5) |
+
+---
+
+## Xz
+
+`lib/core/Xz.kop` · 15 fungsi
+
+Modul pustaka Kopi.
+
+| Fungsi | Keterangan |
+|---|---|
+| `static boolean isXz(int[] data)` | — |
+| `static boolean isXzAt(int[] data, int p)` | — |
+| `static int get32le(int[] a, int p)` | — |
+| `static long get64le(int[] a, int p)` | — |
+| `static int[] append(int[] a, int[] b)` | buka untuk menambah di akhir |
+| `static int checkLen(int type)` | — |
+| `static int verifyCheck(int type, int[] a, int off, int[] data)` | verifikasi check; return 0 cocok, -3 tidak, -1 tipe tak didukung |
+| `static void put(int[] out, int[] p, int v)` | ══ encoder .xz (satu block, filter LZMA2) ════════════════════ |
+| `static void put32le(int[] out, int[] p, int v)` | — |
+| `static void putVli(int[] out, int[] p, long v)` | — |
+| `static int[] compress(int[] data)` | — |
+| `static int[] compressCheck(int[] data, int checkType)` | checkType: 0 None, 1 CRC32, 4 CRC64, 10 SHA-256 |
+| `static int[] decompress(int[] data)` | — |
+| `static int[] decodeStream(int[] data, int start, int[] state)` | decode satu stream mulai start; state[0] = posisi akhir, state[1] = status. |
+| `static int[] decode(int[] data, int[] status)` | — |
 
 ---

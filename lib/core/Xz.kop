@@ -1,0 +1,427 @@
+// Xz.kop — decoder container .xz + concatenated streams (v1.40).
+//
+// Format yang didukung:
+//   - Stream header + CRC32, stream footer + CRC32, index + CRC32.
+//   - Satu atau beberapa block; setiap block boleh punya filter chain
+//     delta/BCJ (x86/ARM/ARM64/...) + LZMA2.
+//   - Check: None (0), CRC32 (1), CRC64 (4), SHA-256 (10).
+//   - Beberapa stream .xz bersambung (stream padding nol kelipatan 4).
+//
+//   int[] out = Xz.decompress(data);            // kosong bila galat
+//   int[] out = Xz.decode(data, status);        // status[0]: 0 ok,
+//                                               // -1 data rusak,
+//                                               // -2 terpotong,
+//                                               // -3 checksum tidak cocok
+//
+// Batas: filter kompresor selain LZMA2 (0x21) belum didukung.
+
+import Checksum;
+import Filter;
+import Hash;
+import Lzma2;
+
+class Xz {
+
+    static boolean isXz(int[] data) {
+        return isXzAt(data, 0);
+    }
+
+    static boolean isXzAt(int[] data, int p) {
+        if (p + 12 > data.length) return false;
+        return (data[p] & 255) == 0xFD && (data[p + 1] & 255) == 0x37
+            && (data[p + 2] & 255) == 0x7A && (data[p + 3] & 255) == 0x58
+            && (data[p + 4] & 255) == 0x5A && (data[p + 5] & 255) == 0x00;
+    }
+
+    static int get32le(int[] a, int p) {
+        return (a[p] & 255) | ((a[p + 1] & 255) << 8)
+             | ((a[p + 2] & 255) << 16) | ((a[p + 3] & 255) << 24);
+    }
+
+    static long get64le(int[] a, int p) {
+        long v = 0L;
+        for (int i = 7; i >= 0; i--) v = (v << 8) | (long) (a[p + i] & 255);
+        return v;
+    }
+
+    static int[] append(int[] a, int[] b) {
+        int[] r = new int[a.length + b.length];
+        for (int i = 0; i < a.length; i++) r[i] = a[i];
+        for (int i = 0; i < b.length; i++) r[a.length + i] = b[i];
+        return r;
+    }
+
+    static int checkLen(int type) {
+        if (type == 0) return 0;
+        if (type == 1) return 4;
+        if (type == 4) return 8;
+        if (type == 10) return 32;
+        return -1;
+    }
+
+    /* verifikasi check; return 0 cocok, -3 tidak, -1 tipe tak didukung */
+    static int verifyCheck(int type, int[] a, int off, int[] data) {
+        if (type == 0) return 0;
+        if (type == 1) {
+            int want = get32le(a, off);
+            int got = Checksum.crc32(data);
+            return want == got ? 0 : -3;
+        }
+        if (type == 4) {
+            long want = get64le(a, off);
+            long got = Checksum.crc64(data);
+            return want == got ? 0 : -3;
+        }
+        if (type == 10) {
+            int[] dig = Hash.sha256(data);
+            for (int i = 0; i < 32; i++) {
+                if ((a[off + i] & 255) != (dig[i] & 255)) return -3;
+            }
+            return 0;
+        }
+        return -1;
+    }
+
+    /* ══ encoder .xz (satu block, filter LZMA2) ════════════════════ */
+
+    static void put(int[] out, int[] p, int v) {
+        out[p[0]] = v & 255;
+        p[0] = p[0] + 1;
+    }
+
+    static void put32le(int[] out, int[] p, int v) {
+        for (int i = 0; i < 4; i++) Xz.put(out, p, (v >>> (8 * i)) & 255);
+    }
+
+    static void putVli(int[] out, int[] p, long v) {
+        int[] e = Checksum.vliEncode(v);
+        for (int i = 0; i < e.length; i++) Xz.put(out, p, e[i]);
+    }
+
+    static int[] compress(int[] data) {
+        return Xz.compressCheck(data, 1);
+    }
+
+    /* checkType: 0 None, 1 CRC32, 4 CRC64, 10 SHA-256 */
+    static int[] compressCheck(int[] data, int checkType) {
+        int clen = Xz.checkLen(checkType);
+        if (clen < 0) return new int[0];
+        int[] payload = Lzma2.compress(data);
+
+        int cap = 12 + 12 + payload.length + 3 + 32 + 64 + 12;
+        int[] out = new int[cap];
+        int[] p = new int[1];
+        p[0] = 0;
+
+        /* stream header */
+        Xz.put(out, p, 0xFD);
+        Xz.put(out, p, 0x37);
+        Xz.put(out, p, 0x7A);
+        Xz.put(out, p, 0x58);
+        Xz.put(out, p, 0x5A);
+        Xz.put(out, p, 0x00);
+        Xz.put(out, p, 0);
+        Xz.put(out, p, checkType);
+        int[] sf = new int[2];
+        sf[0] = 0;
+        sf[1] = checkType;
+        Xz.put32le(out, p, Checksum.crc32(sf));
+
+        /* block header: flags 0, filter 0x21 LZMA2, props dict 64 KiB */
+        int[] hb = new int[8];
+        hb[0] = 2;      /* (12/4)-1 */
+        hb[1] = 0;      /* satu filter, tanpa csize/usize */
+        hb[2] = 0x21;
+        hb[3] = 1;
+        hb[4] = 8;      /* dict 2^16 */
+        hb[5] = 0;
+        hb[6] = 0;
+        hb[7] = 0;
+        for (int i = 0; i < 8; i++) Xz.put(out, p, hb[i]);
+        Xz.put32le(out, p, Checksum.crc32(hb));
+
+        int hsize = 12;
+        for (int i = 0; i < payload.length; i++) Xz.put(out, p, payload[i]);
+
+        int pad = (4 - ((hsize + payload.length + clen) & 3)) & 3;
+        for (int i = 0; i < pad; i++) Xz.put(out, p, 0);
+
+        /* check */
+        if (checkType == 1) {
+            Xz.put32le(out, p, Checksum.crc32(data));
+        } else if (checkType == 4) {
+            long c = Checksum.crc64(data);
+            for (int i = 0; i < 8; i++) {
+                Xz.put(out, p, (int) ((c >>> (8 * i)) & 255L));
+            }
+        } else if (checkType == 10) {
+            int[] dig = Hash.sha256(data);
+            for (int i = 0; i < 32; i++) Xz.put(out, p, dig[i]);
+        }
+
+        /* index */
+        int unpadded = hsize + payload.length + clen;
+        int[] ib = new int[64];
+        int[] ip = new int[1];
+        ip[0] = 0;
+        Xz.put(ib, ip, 0);
+        Xz.putVli(ib, ip, 1L);
+        Xz.putVli(ib, ip, (long) unpadded);
+        Xz.putVli(ib, ip, (long) data.length);
+        while ((ip[0] & 3) != 0) Xz.put(ib, ip, 0);
+        int ilen = ip[0];
+        int[] ib2 = new int[ilen];
+        for (int i = 0; i < ilen; i++) ib2[i] = ib[i];
+        for (int i = 0; i < ilen; i++) Xz.put(out, p, ib2[i]);
+        Xz.put32le(out, p, Checksum.crc32(ib2));
+
+        /* footer */
+        int idxTotal = ilen + 4;
+        int back = idxTotal / 4 - 1;
+        int[] fb = new int[6];
+        fb[0] = back & 255;
+        fb[1] = (back >>> 8) & 255;
+        fb[2] = (back >>> 16) & 255;
+        fb[3] = (back >>> 24) & 255;
+        fb[4] = 0;
+        fb[5] = checkType;
+        Xz.put32le(out, p, Checksum.crc32(fb));
+        for (int i = 0; i < 6; i++) Xz.put(out, p, fb[i]);
+        Xz.put(out, p, 0x59);
+        Xz.put(out, p, 0x5A);
+
+        int[] r = new int[p[0]];
+        for (int i = 0; i < p[0]; i++) r[i] = out[i];
+        return r;
+    }
+
+    static int[] decompress(int[] data) {
+        int[] status = new int[1];
+        int[] r = Xz.decode(data, status);
+        if (status[0] != 0) return new int[0];
+        return r;
+    }
+
+    /* decode satu stream mulai start; state[0] = posisi akhir,
+     * state[1] = status. */
+    static int[] decodeStream(int[] data, int start, int[] state) {
+        state[0] = start;
+        state[1] = 0;
+
+        if (start + 12 > data.length) { state[1] = -2; return new int[0]; }
+        if (!( (data[start] & 255) == 0xFD && (data[start + 1] & 255) == 0x37
+            && (data[start + 2] & 255) == 0x7A && (data[start + 3] & 255) == 0x58
+            && (data[start + 4] & 255) == 0x5A && (data[start + 5] & 255) == 0x00)) {
+            state[1] = -1;
+            return new int[0];
+        }
+
+        int f0 = data[start + 6] & 255;
+        int f1 = data[start + 7] & 255;
+        if (f0 != 0 || (f1 & 0xF0) != 0) { state[1] = -1; return new int[0]; }
+        int checkType = f1 & 0x0F;
+        int clen = checkLen(checkType);
+        if (clen < 0) { state[1] = -1; return new int[0]; }
+
+        int hcrc = get32le(data, start + 8);
+        int[] flags = new int[2];
+        flags[0] = f0; flags[1] = f1;
+        if (Checksum.crc32(flags) != hcrc) { state[1] = -1; return new int[0]; }
+
+        int pos = start + 12;
+        int[] out = new int[0];
+
+        while (true) {
+            if (pos >= data.length) { state[1] = -2; return new int[0]; }
+
+            /* Index Indicator */
+            if ((data[pos] & 255) == 0x00) break;
+
+            /* ── block header ─────────────────────────────────────── */
+            int h0 = pos;
+            int hsize = ((data[h0] & 255) + 1) * 4;
+            if (h0 + hsize > data.length) { state[1] = -2; return new int[0]; }
+            if (hsize < 8) { state[1] = -1; return new int[0]; }
+
+            int bflags = data[h0 + 1] & 255;
+            if ((bflags & 0x3C) != 0) { state[1] = -1; return new int[0]; }
+            int nf = (bflags & 3) + 1;
+            int p = h0 + 2;
+
+            int csizeField = 0;
+            int usizeField = 0;
+            int haveC = 0;
+            int haveU = 0;
+            if ((bflags & 0x40) != 0) {
+                if (p >= h0 + hsize - 4) { state[1] = -2; return new int[0]; }
+                csizeField = (int) Checksum.vliDecode(data, p);
+                p = p + Checksum.vliSize(data, p);
+                haveC = 1;
+            }
+            if ((bflags & 0x80) != 0) {
+                if (p >= h0 + hsize - 4) { state[1] = -2; return new int[0]; }
+                usizeField = (int) Checksum.vliDecode(data, p);
+                p = p + Checksum.vliSize(data, p);
+                haveU = 1;
+            }
+
+            int[] fids = new int[nf];
+            int[] fargs = new int[nf];
+            for (int fi = 0; fi < nf; fi++) {
+                if (p >= h0 + hsize - 4) { state[1] = -2; return new int[0]; }
+                int id = (int) Checksum.vliDecode(data, p);
+                p = p + Checksum.vliSize(data, p);
+                if (p >= h0 + hsize - 4) { state[1] = -2; return new int[0]; }
+                int psz = (int) Checksum.vliDecode(data, p);
+                p = p + Checksum.vliSize(data, p);
+                if (p + psz > h0 + hsize - 4) { state[1] = -2; return new int[0]; }
+
+                int arg = 0;
+                if (id == 0x03) {
+                    arg = psz >= 1 ? (data[p] & 255) + 1 : 1;
+                } else if (id >= 0x04 && id <= 0x0A) {
+                    if (psz == 4) arg = get32le(data, p);
+                } else if (id != 0x21) {
+                    state[1] = -1;
+                    return new int[0];
+                }
+                fids[fi] = id;
+                fargs[fi] = arg;
+                p = p + psz;
+            }
+
+            /* padding nol + CRC32 header */
+            int hc = h0 + hsize - 4;
+            int[] hdr = new int[hc - h0];
+            for (int i = 0; i < hdr.length; i++) hdr[i] = data[h0 + i] & 255;
+            if (Checksum.crc32(hdr) != get32le(data, hc)) {
+                state[1] = -1;
+                return new int[0];
+            }
+
+            /* ── data ─────────────────────────────────────────────── */
+            int dataOff = h0 + hsize;
+            int csize = 0;
+            if (haveC == 1) {
+                csize = csizeField;
+                if (dataOff + csize > data.length) { state[1] = -2; return new int[0]; }
+            } else {
+                csize = Lzma2.streamSize(data, dataOff);
+                if (csize < 0) { state[1] = -1; return new int[0]; }
+            }
+
+            if (fids[nf - 1] != 0x21) { state[1] = -1; return new int[0]; }
+
+            int[] st = new int[1];
+            int[] block = Lzma2.decodeFrom(data, dataOff, st);
+            if (st[0] != 0) {
+                state[1] = st[0];
+                return new int[0];
+            }
+
+            for (int fi = nf - 2; fi >= 0; fi--) {
+                block = Filter.decode(fids[fi], block, fargs[fi]);
+            }
+
+            if (haveU == 1 && block.length != usizeField) {
+                state[1] = -1;
+                return new int[0];
+            }
+
+            int checkOff = dataOff + csize;
+            int unpadded = hsize + csize + clen;
+            int pad = (4 - (unpadded & 3)) & 3;
+            checkOff = checkOff + pad;
+            if (checkOff + clen > data.length) { state[1] = -2; return new int[0]; }
+            int vc = verifyCheck(checkType, data, checkOff, block);
+            if (vc != 0) {
+                state[1] = vc == -3 ? -3 : -1;
+                return new int[0];
+            }
+
+            out = append(out, block);
+
+            pos = checkOff + clen;
+            if (pos > data.length) { state[1] = -2; return new int[0]; }
+        }
+
+        /* ── Index ─────────────────────────────────────────────────── */
+        int idxStart = pos;
+        int p = idxStart + 1;
+        if (p > data.length) { state[1] = -2; return new int[0]; }
+        int records = (int) Checksum.vliDecode(data, p);
+        p = p + Checksum.vliSize(data, p);
+        for (int i = 0; i < records; i++) {
+            if (p >= data.length) { state[1] = -2; return new int[0]; }
+            p = p + Checksum.vliSize(data, p);
+            if (p >= data.length) { state[1] = -2; return new int[0]; }
+            p = p + Checksum.vliSize(data, p);
+        }
+        while (((p - idxStart) & 3) != 0) {
+            if (p >= data.length) { state[1] = -2; return new int[0]; }
+            if ((data[p] & 255) != 0) { state[1] = -1; return new int[0]; }
+            p = p + 1;
+        }
+        if (p + 4 > data.length) { state[1] = -2; return new int[0]; }
+        int idxCrc = get32le(data, p);
+        int[] idxBytes = new int[p - idxStart];
+        for (int i = 0; i < idxBytes.length; i++) idxBytes[i] = data[idxStart + i] & 255;
+        if (Checksum.crc32(idxBytes) != idxCrc) { state[1] = -1; return new int[0]; }
+
+        int foot = p + 4;
+        if (foot + 12 > data.length) { state[1] = -2; return new int[0]; }
+        if ((data[foot + 10] & 255) != 0x59
+                || (data[foot + 11] & 255) != 0x5A) {
+            state[1] = -1;
+            return new int[0];
+        }
+
+        int[] fbytes = new int[6];
+        for (int i = 0; i < 6; i++) fbytes[i] = data[foot + 4 + i] & 255;
+        if (Checksum.crc32(fbytes) != get32le(data, foot)) {
+            state[1] = -1;
+            return new int[0];
+        }
+        int g0 = fbytes[4];
+        int g1 = fbytes[5];
+        if (g0 != f0 || g1 != f1) { state[1] = -1; return new int[0]; }
+
+        state[0] = foot + 12;
+        return out;
+    }
+
+    static int[] decode(int[] data, int[] status) {
+        status[0] = 0;
+        if (data.length == 0) { status[0] = -1; return new int[0]; }
+
+        int pos = 0;
+        int[] out = new int[0];
+        int streams = 0;
+
+        while (pos < data.length) {
+            /* stream padding: nol kelipatan 4 */
+            if ((data[pos] & 255) == 0) {
+                int z = pos;
+                while (z < data.length && (data[z] & 255) == 0) z = z + 1;
+                if (((z - pos) & 3) != 0) { status[0] = -1; return new int[0]; }
+                pos = z;
+                if (pos >= data.length) break;
+            }
+
+            if (!isXzAt(data, pos)) { status[0] = -1; return new int[0]; }
+
+            int[] state = new int[2];
+            int[] block = decodeStream(data, pos, state);
+            if (state[1] != 0) {
+                status[0] = state[1];
+                return new int[0];
+            }
+            out = append(out, block);
+            pos = state[0];
+            streams = streams + 1;
+        }
+
+        if (streams == 0) { status[0] = -1; return new int[0]; }
+        return out;
+    }
+}

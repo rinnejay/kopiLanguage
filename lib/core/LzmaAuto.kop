@@ -1,0 +1,56 @@
+// LzmaAuto.kop — auto-detect format seperti `lzma.decompress` Python (v1.40).
+//
+//   int[] out = LzmaAuto.decompress(data);       // .xz atau LZMA alone
+//   int[] out = LzmaAuto.decode(data, status);   // status[0]:
+//       0 ok, -1 rusak, -2 terpotong, -3 check .xz salah
+//
+// Deteksi: magic .xz (FD 37 7A 58 5A 00) -> Xz; selain itu -> LZMA alone.
+
+import Lzma;
+import Xz;
+
+class LzmaAuto {
+
+    static boolean isXz(int[] data) {
+        return Xz.isXz(data);
+    }
+
+    static int[] decompress(int[] data) {
+        if (Xz.isXz(data)) return Xz.decompress(data);
+        return Lzma.decompress(data);
+    }
+
+    static int[] decode(int[] data, int[] status) {
+        status[0] = 0;
+        if (Xz.isXz(data)) return Xz.decode(data, status);
+
+        if (data.length < 13) {
+            status[0] = -1;
+            return new int[0];
+        }
+        int props = data[0] & 255;
+        if (props >= 225) {
+            status[0] = -1;
+            return new int[0];
+        }
+        int lc = props % 9;
+        int r = props / 9;
+        int lp = r % 5;
+        int pb = r / 5;
+
+        int lo = (data[5] & 255) | ((data[6] & 255) << 8)
+               | ((data[7] & 255) << 16) | ((data[8] & 255) << 24);
+        int hi = (data[9] & 255) | ((data[10] & 255) << 8)
+               | ((data[11] & 255) << 16) | ((data[12] & 255) << 24);
+        int outSize = -1;
+        if (!(lo == -1 && hi == -1)) {
+            if (hi == 0 && lo >= 0) outSize = lo;
+        }
+
+        LzmaDec d = new LzmaDec(lc, lp, pb);
+        int st = d.decodeChunk(data, 13, outSize);
+        status[0] = st;
+        if (st < 0 && d.outLen == 0) return new int[0];
+        return d.takeResult();
+    }
+}

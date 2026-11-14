@@ -1,0 +1,453 @@
+// Lzma2.kop — decoder LZMA2 (chunked) murni Kopi (v1.40).
+//
+// LZMA2 adalah filter kompresi yang dipakai container .xz (filter ID
+// 0x21). Format chunk:
+//
+//   control 0x00          : akhir stream
+//   control 0x01          : chunk tak terkompresi + reset kamus
+//   control 0x02          : chunk tak terkompresi (tanpa reset)
+//   control 0x80..0xFF    : chunk LZMA
+//       bit 5-6 = reset mode (0 none, 1 state, 2 state+props, 3 semua)
+//       bit 0-4 = 5 bit atas ukuran hasil
+//       lalu u16 ukuran hasil (BE, rendah), u16 ukuran terkompresi (BE),
+//       byte props bila reset >= 2, lalu data terkompresi.
+//
+//   int[] out = Lzma2.decompress(data);          // array kosong bila galat
+//   int[] out = Lzma2.decode(data, status);      // status[0]: 0 ok,
+//                                                //  -1 data rusak, -2 terpotong
+
+import Lzma;
+
+class Lzma2 {
+
+    static int[] decompress(int[] data) {
+        int[] status = new int[1];
+        int[] r = Lzma2.decode(data, status);
+        if (status[0] != 0) return new int[0];
+        return r;
+    }
+
+    static int[] decode(int[] data, int[] status) {
+        return Lzma2.decodeFrom(data, 0, status);
+    }
+
+    /* panjang stream LZMA2 (termasuk control 0x00), -1 bila rusak */
+    static int streamSize(int[] data, int off) {
+        int p = off;
+        while (p < data.length) {
+            int control = data[p] & 255;
+            p = p + 1;
+            if (control == 0x00) return p - off;
+            if (control < 0x80) {
+                if (control > 2 || p + 2 > data.length) return -1;
+                int sz = (((data[p] & 255) << 8) | (data[p + 1] & 255)) + 1;
+                p = p + 2;
+                if (p + sz > data.length) return -1;
+                p = p + sz;
+            } else {
+                if (p + 4 > data.length) return -1;
+                int csize = (((data[p + 2] & 255) << 8)
+                           | (data[p + 3] & 255)) + 1;
+                int reset = (control >>> 5) & 3;
+                p = p + 4;
+                if (reset >= 2) p = p + 1;
+                if (p + csize > data.length) return -1;
+                p = p + csize;
+            }
+        }
+        return -1;
+    }
+
+    /* ══ encoder ═══════════════════════════════════════════════════
+     * Sederhana namun valid: pecah data per 64 KiB, setiap chunk
+     * memakai reset penuh (control 0xE0) sehingga stream independen.
+     * Bila hasil kompresi tidak lebih kecil, pakai chunk mentah 0x01.
+     * ═══════════════════════════════════════════════════════════════ */
+
+    static int[] compress(int[] data) {
+        return Lzma2.compressWith(data, 3, 0, 2, 1 << 16);
+    }
+
+    static void encChunk(int[] out, int[] p, int[] part, int props, int dictSize) {
+        int chunk = part.length;
+        int[] comp = LzmaEnc.chunk(part, props, dictSize);
+        int u1 = chunk - 1;
+        if (comp.length < chunk) {
+            int c1 = comp.length - 1;
+            out[p[0]] = 0xE0 | ((u1 >>> 16) & 31); p[0] = p[0] + 1;
+            out[p[0]] = (u1 >>> 8) & 255; p[0] = p[0] + 1;
+            out[p[0]] = u1 & 255; p[0] = p[0] + 1;
+            out[p[0]] = (c1 >>> 8) & 255; p[0] = p[0] + 1;
+            out[p[0]] = c1 & 255; p[0] = p[0] + 1;
+            out[p[0]] = props; p[0] = p[0] + 1;
+            for (int i = 0; i < comp.length; i++) {
+                out[p[0]] = comp[i] & 255;
+                p[0] = p[0] + 1;
+            }
+        } else {
+            out[p[0]] = 0x01; p[0] = p[0] + 1;
+            out[p[0]] = (u1 >>> 8) & 255; p[0] = p[0] + 1;
+            out[p[0]] = u1 & 255; p[0] = p[0] + 1;
+            for (int i = 0; i < chunk; i++) {
+                out[p[0]] = part[i] & 255;
+                p[0] = p[0] + 1;
+            }
+        }
+    }
+
+    static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize) {
+        int props = (pb * 5 + lp) * 9 + lc;
+        int cap = data.length + (data.length / 65536 + 2) * 8 + 16;
+        int[] out = new int[cap];
+        int[] p = new int[1];
+        p[0] = 0;
+        int off = 0;
+        while (off < data.length) {
+            int chunk = data.length - off;
+            if (chunk > 65536) chunk = 65536;
+            int[] part = new int[chunk];
+            for (int i = 0; i < chunk; i++) part[i] = data[off + i] & 255;
+            Lzma2.encChunk(out, p, part, props, dictSize);
+            off = off + chunk;
+        }
+        out[p[0]] = 0x00; p[0] = p[0] + 1;
+        int[] r = new int[p[0]];
+        for (int i = 0; i < p[0]; i++) r[i] = out[i];
+        return r;
+    }
+
+    static int[] decodeFrom(int[] data, int off, int[] status) {        status[0] = 0;
+        LzmaDec d = new LzmaDec(3, 0, 2);
+        int pos = off;
+        int haveProps = 0;
+
+        while (pos < data.length) {
+            int control = data[pos] & 255;
+            pos = pos + 1;
+
+            if (control == 0x00) {
+                return d.takeResult();
+            }
+
+            if (control < 0x80) {
+                /* chunk tak terkompresi */
+                if (control > 2) {
+                    status[0] = -1;
+                    return new int[0];
+                }
+                if (pos + 2 > data.length) {
+                    status[0] = -2;
+                    return new int[0];
+                }
+                int usize = (((data[pos] & 255) << 8)
+                           | (data[pos + 1] & 255)) + 1;
+                pos = pos + 2;
+                if (pos + usize > data.length) {
+                    status[0] = -2;
+                    return new int[0];
+                }
+                if (control == 1) {
+                    d.resetDict();
+                    haveProps = 0;
+                }
+                d.appendBytes(data, pos, usize);
+                pos = pos + usize;
+                continue;
+            }
+
+            /* chunk LZMA */
+            if (pos + 4 > data.length) {
+                status[0] = -2;
+                return new int[0];
+            }
+            int usize = (((control & 0x1F) << 16)
+                       | ((data[pos] & 255) << 8)
+                       | (data[pos + 1] & 255)) + 1;
+            int csize = (((data[pos + 2] & 255) << 8)
+                       | (data[pos + 3] & 255)) + 1;
+            pos = pos + 4;
+
+            int reset = (control >>> 5) & 3;
+
+            if (reset >= 2) {
+                if (pos >= data.length) {
+                    status[0] = -2;
+                    return new int[0];
+                }
+                int props = data[pos] & 255;
+                pos = pos + 1;
+                haveProps = 1;
+                d.setProps(props);
+            } else if (haveProps == 0) {
+                status[0] = -1;
+                return new int[0];
+            }
+
+            if (reset == 1) d.resetState();
+            if (reset == 3) d.resetDict();
+
+            if (pos + csize > data.length) {
+                status[0] = -2;
+                return new int[0];
+            }
+
+            int rc = d.decodeChunk(data, pos, usize);
+            if (rc != 0) {
+                status[0] = rc;
+                return new int[0];
+            }
+            pos = pos + csize;
+        }
+
+        /* stream berakhir tanpa control 0x00 */
+        status[0] = -2;
+        return new int[0];
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Streaming LZMA2 — input/output bertahap.
+ *
+ *   Lzma2DecStream ds = new Lzma2DecStream();
+ *   int[] a = ds.push(chunk1);     // byte yang sudah bisa didekode
+ *   int[] b = ds.push(chunk2);
+ *   boolean selesai = ds.isFinished();
+ *   int status = ds.status();      // 0 ok, -1 rusak, -2 terpotong
+ *
+ *   Lzma2EncStream es = new Lzma2EncStream();
+ *   int[] c1 = es.push(chunk1);    // sebagian (per 64 KiB penuh)
+ *   int[] c2 = es.finish();        // sisa + control 0x00
+ * ═══════════════════════════════════════════════════════════════════ */
+
+class Lzma2DecStream {
+
+    LzmaDec dec;
+    int[] in;
+    int inLen;
+    int[] out;
+    int outLen;
+    int haveProps;
+    int error;
+    int done;
+
+    Lzma2DecStream() {
+        this.dec = new LzmaDec(3, 0, 2);
+        this.in = new int[1024];
+        this.inLen = 0;
+        this.out = new int[1024];
+        this.outLen = 0;
+        this.haveProps = 0;
+        this.error = 0;
+        this.done = 0;
+    }
+
+    void ensureIn(int need) {
+        if (this.inLen + need <= this.in.length) return;
+        int cap = this.in.length * 2;
+        while (cap < this.inLen + need) cap = cap * 2;
+        int[] n = new int[cap];
+        for (int i = 0; i < this.inLen; i++) n[i] = this.in[i];
+        this.in = n;
+    }
+
+    void appendIn(int[] data) {
+        if (data.length == 0) return;
+        this.ensureIn(data.length);
+        for (int i = 0; i < data.length; i++) {
+            this.in[this.inLen] = data[i] & 255;
+            this.inLen = this.inLen + 1;
+        }
+    }
+
+    void ensureOut() {
+        if (this.outLen < this.out.length) return;
+        int[] n = new int[this.out.length * 2];
+        for (int i = 0; i < this.out.length; i++) n[i] = this.out[i];
+        this.out = n;
+    }
+
+    void putOut(int v) {
+        this.ensureOut();
+        this.out[this.outLen] = v & 255;
+        this.outLen = this.outLen + 1;
+    }
+
+    int[] push(int[] data) {
+        this.outLen = 0;
+        if (this.error != 0) return new int[0];
+        this.appendIn(data);
+        this.process();
+        int[] r = new int[this.outLen];
+        for (int i = 0; i < this.outLen; i++) r[i] = this.out[i];
+        return r;
+    }
+
+    void process() {
+        LzmaDec dc = this.dec;
+        int pos = 0;
+        while (pos < this.inLen && this.done == 0 && this.error == 0) {
+            int control = this.in[pos] & 255;
+            if (control == 0) {
+                pos = pos + 1;
+                this.done = 1;
+                break;
+            }
+            if (control < 0x80) {
+                if (control > 2) {
+                    this.error = -1;
+                    break;
+                }
+                if (this.inLen - pos < 3) break;
+                int usize = (((this.in[pos + 1] & 255) << 8)
+                           | (this.in[pos + 2] & 255)) + 1;
+                if (this.inLen - pos < 3 + usize) break;
+                if (control == 1) {
+                    dc.resetDict();
+                    this.haveProps = 0;
+                } else if (control != 2) {
+                    this.error = -1;
+                    break;
+                }
+                int before = dc.outLen;
+                dc.appendBytes(this.in, pos + 3, usize);
+                for (int i = before; i < dc.outLen; i++) {
+                    this.putOut(dc.out[i]);
+                }
+                pos = pos + 3 + usize;
+                continue;
+            }
+
+            if (this.inLen - pos < 5) break;
+            int usize = (((control & 0x1F) << 16)
+                       | ((this.in[pos + 1] & 255) << 8)
+                       | (this.in[pos + 2] & 255)) + 1;
+            int csize = (((this.in[pos + 3] & 255) << 8)
+                       | (this.in[pos + 4] & 255)) + 1;
+            int reset = (control >>> 5) & 3;
+            int hdr = 5;
+            if (reset >= 2) hdr = 6;
+            if (this.inLen - pos < hdr + csize) break;
+
+            if (reset >= 2) {
+                this.haveProps = 1;
+                dc.setProps(this.in[pos + 5] & 255);
+            } else if (this.haveProps == 0) {
+                this.error = -1;
+                break;
+            }
+            if (reset == 1) dc.resetState();
+            if (reset == 3) dc.resetDict();
+
+            int before = dc.outLen;
+            int rc = dc.decodeChunk(this.in, pos + hdr, usize);
+            if (rc != 0) {
+                this.error = rc;
+                break;
+            }
+            for (int i = before; i < dc.outLen; i++) {
+                this.putOut(dc.out[i]);
+            }
+            pos = pos + hdr + csize;
+        }
+
+        if (pos > 0) {
+            int rem = this.inLen - pos;
+            for (int i = 0; i < rem; i++) this.in[i] = this.in[pos + i];
+            this.inLen = rem;
+        }
+    }
+
+    boolean isFinished() { return this.done != 0; }
+    int status() { return this.error; }
+}
+
+class Lzma2EncStream {
+
+    int[] buf;
+    int len;
+    int[] out;
+    int outLen;
+    int props;
+    int dictSize;
+    int finished;
+
+    static Lzma2EncStream create() {
+        return new Lzma2EncStream(3, 0, 2, 1 << 16);
+    }
+
+    Lzma2EncStream(int lc, int lp, int pb, int dictSize) {
+        this.buf = new int[1024];
+        this.len = 0;
+        this.out = new int[1024];
+        this.outLen = 0;
+        this.props = (pb * 5 + lp) * 9 + lc;
+        this.dictSize = dictSize;
+        if (this.dictSize < 4096) this.dictSize = 4096;
+        this.finished = 0;
+    }
+
+    void ensureBuf(int need) {
+        if (this.len + need <= this.buf.length) return;
+        int cap = this.buf.length * 2;
+        while (cap < this.len + need) cap = cap * 2;
+        int[] n = new int[cap];
+        for (int i = 0; i < this.len; i++) n[i] = this.buf[i];
+        this.buf = n;
+    }
+
+    void ensureOut(int need) {
+        if (this.outLen + need <= this.out.length) return;
+        int cap = this.out.length * 2;
+        while (cap < this.outLen + need) cap = cap * 2;
+        int[] n = new int[cap];
+        for (int i = 0; i < this.outLen; i++) n[i] = this.out[i];
+        this.out = n;
+    }
+
+    int[] drain() {
+        int[] r = new int[this.outLen];
+        for (int i = 0; i < this.outLen; i++) r[i] = this.out[i];
+        this.outLen = 0;
+        return r;
+    }
+
+    int[] push(int[] data) {
+        if (this.finished != 0) return new int[0];
+        this.ensureBuf(data.length);
+        for (int i = 0; i < data.length; i++) {
+            this.buf[this.len] = data[i] & 255;
+            this.len = this.len + 1;
+        }
+        while (this.len >= 65536) {
+            int[] part = new int[65536];
+            for (int i = 0; i < 65536; i++) part[i] = this.buf[i];
+            this.len = this.len - 65536;
+            for (int i = 0; i < this.len; i++) this.buf[i] = this.buf[i + 65536];
+            this.ensureOut(65536 + 8);
+            int[] p = new int[1];
+            p[0] = this.outLen;
+            Lzma2.encChunk(this.out, p, part, this.props, this.dictSize);
+            this.outLen = p[0];
+        }
+        return this.drain();
+    }
+
+    int[] finish() {
+        if (this.finished != 0) return new int[0];
+        if (this.len > 0) {
+            int[] part = new int[this.len];
+            for (int i = 0; i < this.len; i++) part[i] = this.buf[i];
+            this.len = 0;
+            this.ensureOut(65536 + 8);
+            int[] p = new int[1];
+            p[0] = this.outLen;
+            Lzma2.encChunk(this.out, p, part, this.props, this.dictSize);
+            this.outLen = p[0];
+        }
+        this.ensureOut(1);
+        this.out[this.outLen] = 0;
+        this.outLen = this.outLen + 1;
+        this.finished = 1;
+        return this.drain();
+    }
+}

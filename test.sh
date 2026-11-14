@@ -59,6 +59,24 @@ check lzmavec "$T/kopi/lzmavec.kop"
     && cc -target x86_64-linux-gnu -c "$T/kopi/lzmavec64.s" -o /dev/null \
     && echo "PASS  lzmavec [x64]" || { echo "FAIL  lzmavec [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
+# ─── LZMA v1.40: checksum/filter/LZMA2/XZ + encoder (oracle python) ─────
+for g in checksumvec filtervec lzma2vec xzvec; do
+    N=$(python3 tools/gen_$g.py "$T/kopi/$g.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
+    python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/$g.ref"
+    check $g "$T/kopi/$g.kop"
+done
+
+N=$(python3 tools/gen_lzmaencvec.py "$T/kopi/lzmaencvec.kop" | sed -n 's/^kasus: \([0-9]*\).*/\1/p')
+python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/lzmaencvec.ref"
+check lzmaencvec "$T/kopi/lzmaencvec.kop"
+
+# sintaks x64 decoder/encoder LZMA (tidak dieksekusi di aarch64)
+for t in checksumvec filtervec lzma2vec xzvec lzmaencvec; do
+    ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" \
+        && cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null \
+        && echo "PASS  $t [x64]" || { echo "FAIL  $t [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+done
+
 # ─── BLAKE2b + scrypt (RFC 7693 / RFC 7914 lewat vektor python) ──────────
 python3 tools/gen_blakevec.py > "$T/kopi/blakevec.ref"
 check blakevec test/blakevec.kop

@@ -4,7 +4,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 
 | Kelompok | Folder | Modul |
 |---|---|---|
-| **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Json`, `List`, `ListStr`, `Log`, `Lzma`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid` |
+| **Core** | `lib/core/` | `Args`, `Arrays`, `BigInt`, `Bytes`, `Cbor`, `Checksum`, `Compress`, `Config`, `Cookie`, `Csv`, `Deque`, `Digits`, `Env`, `File`, `Filter`, `Json`, `List`, `ListStr`, `Log`, `LzmaDec`, `Lzma2`, `LzmaAuto`, `Map`, `MapSS`, `MapStr`, `Math`, `Matrix`, `MessagePack`, `Path`, `Regex`, `Router`, `Set`, `SetStr`, `Stats`, `Str`, `Test`, `Text`, `Time`, `Uuid`, `Xz` |
 | **Net** | `lib/net/` | `Auth`, `Dns`, `Http`, `Http2`, `Http2Tabel`, `HttpServer`, `Jwt`, `Mime`, `Multipart`, `Resolv`, `Rfc`, `Session`, `Static`, `Tcp`, `Tls`, `TlsServer`, `Udp`, `Url`, `WebSocket`, `WsClient` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | **IO** | `lib/io/` | `Reader`, `Writer` |
@@ -21,6 +21,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`BigInt`](api-core.md#bigint) | `lib/core/BigInt.kop` | 22 | Bilangan bulat presisi sembarang: tambah, kali, bagi, pangkat modulo, invers modulo, FPB, konversi… |
 | [`Bytes`](api-core.md#bytes) | `lib/core/Bytes.kop` | 48 | Utilitas buffer byte `int[]`: I/O biner, jaringan, kriptografi. Untuk teks gunakan `Str`. |
 | [`Cbor`](api-core.md#cbor) | `lib/core/Cbor.kop` | 11 | — |
+| [`Checksum`](api-core.md#checksum) | `lib/core/Checksum.kop` | 11 | — |
 | [`Compress`](api-core.md#compress) | `lib/core/Compress.kop` | 29 | — |
 | [`Config`](api-core.md#config) | `lib/core/Config.kop` | 9 | — |
 | [`Cookie`](api-core.md#cookie) | `lib/core/Cookie.kop` | 16 | — |
@@ -29,11 +30,14 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Digits`](api-core.md#digits) | `lib/core/Digits.kop` | 11 | Manipulasi digit bilangan: jumlah, jumlah digit, palindrom, Armstrong, digital root, dan cetak basis lain. |
 | [`Env`](api-core.md#env) | `lib/core/Env.kop` | 11 | — |
 | [`File`](api-core.md#file) | `lib/core/File.kop` | 15 | I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir. |
+| [`Filter`](api-core.md#filter) | `lib/core/Filter.kop` | 27 | — |
 | [`Json`](api-core.md#json) | `lib/core/Json.kop` | 72 | Parser/penulis JSON murni. Nilai direpresentasikan sebagai tape `int[]`; literal bahasa memakai… |
 | [`List`](api-core.md#list) | `lib/core/List.kop` | 25 | — |
 | [`ListStr`](api-core.md#liststr) | `lib/core/ListStr.kop` | 24 | — |
 | [`Log`](api-core.md#log) | `lib/core/Log.kop` | 18 | Logging ke stderr dengan timestamp UTC dan level. |
-| [`Lzma`](api-core.md#lzma) | `lib/core/Lzma.kop` | 4 | — |
+| [`LzmaDec`](api-core.md#lzmadec) | `lib/core/Lzma.kop` | 19 | — |
+| [`Lzma2`](api-core.md#lzma2) | `lib/core/Lzma2.kop` | 8 | — |
+| [`LzmaAuto`](api-core.md#lzmaauto) | `lib/core/LzmaAuto.kop` | 3 | — |
 | [`Map`](api-core.md#map) | `lib/core/Map.kop` | 13 | Hash map int→int dengan open addressing dan `grow` eksplisit. |
 | [`MapSS`](api-core.md#mapss) | `lib/core/MapSS.kop` | 19 | — |
 | [`MapStr`](api-core.md#mapstr) | `lib/core/MapStr.kop` | 14 | Peta String→int dengan open addressing dan kolam kunci tetap. Dipakai untuk header HTTP, session, dan… |
@@ -51,6 +55,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Text`](api-core.md#text) | `lib/core/Text.kop` | 19 | — |
 | [`Time`](api-core.md#time) | `lib/core/Time.kop` | 32 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
 | [`Uuid`](api-core.md#uuid) | `lib/core/Uuid.kop` | 6 | UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID. |
+| [`Xz`](api-core.md#xz) | `lib/core/Xz.kop` | 15 | — |
 
 ### Net — [buka referensi](api-net.md)
 
