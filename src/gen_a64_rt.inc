@@ -73,6 +73,44 @@ static void gen_a64_runtime(void) {
     emit("\tadd\tx0, x3, x2");
     emit("\tret");
 
+    /* v1.49: kop_throw(x0 = nilai exception) — lompat ke blok catch
+       terdekat dengan memulihkan sp/x29/x30 dari catatan handler.
+       Catatan ada di frame metode pemilik try (lihat gen_stmt ST_TRY):
+       [0]=prev [8]=sp [16]=x29 [24]=x30 [32]=landing pad [40]=nilai
+       [48..127]=x19..x28. */
+    emit(".text");
+    emit("\t.globl kop_throw");
+    emit("kop_throw:");
+    tls_addr("x9");
+    emit("\tldr\tx10, [x9, #56]");
+    emit("\tcbz\tx10, .Kuncaught");
+    emit("\tstr\tx0, [x10, #40]");         /* nilai exception */
+    emit("\tldr\tx11, [x10, #0]");         /* prev handler */
+    emit("\tstr\tx11, [x9, #56]");
+    emit("\tldr\tx12, [x10, #32]");        /* landing pad */
+    emit("\tldr\tx11, [x10, #8]");         /* sp saat try masuk */
+    emit("\tldr\tx29, [x10, #16]");
+    emit("\tldr\tx30, [x10, #24]");
+    emit("\tldp\tx19, x20, [x10, #48]");
+    emit("\tldp\tx21, x22, [x10, #64]");
+    emit("\tldp\tx23, x24, [x10, #80]");
+    emit("\tldp\tx25, x26, [x10, #96]");
+    emit("\tldp\tx27, x28, [x10, #112]");
+    emit("\tmov\tsp, x11");
+    emit("\tldr\tx0, [x10, #40]");
+    emit("\tbr\tx12");
+    emit(".Kuncaught:");
+    emit("\tadrp\tx0, :got:.Lmsg_exc");
+    emit("\tldr\tx0, [x0, :got_lo12:.Lmsg_exc]");
+    emit("\tadrp\tx1, :got:stderr");
+    emit("\tldr\tx1, [x1, :got_lo12:stderr]");
+    emit("\tldr\tx1, [x1]");
+    emit("\tbl\tfputs");
+    emit("\tmov\tw0, #1");
+    emit("\tadrp\tx9, :got:exit");
+    emit("\tldr\tx9, [x9, :got_lo12:exit]");
+    emit("\tblr\tx9");
+
     /* v1.22/v1.45: kop_arena_enter(x0 = byte) -> x1 = handle (40 byte).
        State arena aktif disimpan thread-lokal (TLS kop_tls).
        0 = OTOMATIS: mmap 4 GB MAP_NORESERVE (RAM hanya sesuai kebutuhan).
@@ -960,7 +998,7 @@ static void gen_a64_runtime(void) {
 
     emit("\t.section .tbss,\"awT\",@nobits");
     emit("\t.balign 64");
-    emit("kop_tls: .zero 48");              /* base,cap,used,mmapped,auto,id */
+    emit("kop_tls: .zero 64");              /* base,cap,used,mmapped,auto,id,?,[56]=handler */
     emit("\t.section .data");
     emit("\t.align 3");
     emit("kop_thread_next: .quad 2");       /* id thread berikut (1 = utama) */
@@ -973,6 +1011,7 @@ static void gen_a64_runtime(void) {
     emit(".Lfmt_in: .asciz \"%s\"", "%d\\n");
     emit(".Lfmt_s: .asciz \"%s\"", "%s");
     emit(".Lmsg_lam: .asciz \"%s\"", "kopi: jumlah argumen lambda tidak cocok\\n");
+    emit(".Lmsg_exc: .asciz \"%s\"", "kopi: exception tidak tertangkap (throw tanpa try/catch)\\n");
     emit(".Lmsg_arr: .asciz \"%s\"", "kopi: array tidak valid (indeks/ukuran salah) — periksa indeks 0..panjang-1\\n");
     emit(".Lmsg_bnd: .asciz \"%s\"", "kopi: byte mkstr di luar 0..255\\n");
     emit(".Lmsg_oom: .asciz \"%s\"", "kopi: arena malloc habis — batas %ld MB terlampaui (naikkan malloc<...> atau pakai malloc{} otomatis)\\n");

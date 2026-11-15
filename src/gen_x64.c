@@ -174,6 +174,45 @@ static void emit_loop_exit_resets(void) {
     for (int i = rg_sp - 1; i >= base; i--) emit_region_leave(rg_slot[i]);
 }
 
+/* ── v1.49: exception (throw/try/catch) ───────────────────────────────
+ * Catatan handler disimpan di frame metode pemilik try (48 byte per
+ * kedalaman): [0]=prev [8]=rsp [16]=landing pad [24]=rbp [32]=nilai.
+ * kop_throw memulihkan rsp/rbp lalu melompat ke blok catch. */
+static int try_sp, try_slot[64], loop_try[64];
+static long framew_cur;
+
+static int ximax(int a, int b) { return a > b ? a : b; }
+static int try_depth_max(Node *s);
+
+static int try_depth1(Node *s) {
+    if (!s) return 0;
+    switch (s->kind) {
+    case ST_TRY: return 1 + ximax(try_depth_max(s->b), try_depth_max(s->d));
+    case ST_IF:  return ximax(try_depth_max(s->b), try_depth_max(s->c));
+    case ST_WHILE:
+    case ST_DO:  return try_depth_max(s->b);
+    case ST_FOR: return ximax(ximax(try_depth_max(s->a), try_depth_max(s->d)),
+                              try_depth_max(s->c));
+    case ST_BLOCK:
+    case ST_REGION: return try_depth_max(s->d);
+    default: return 0;
+    }
+}
+
+static int try_depth_max(Node *s) {
+    int mx = 0;
+    for (; s; s = s->next) mx = ximax(mx, try_depth1(s));
+    return mx;
+}
+
+static void emit_try_pop_to(int base) {
+    for (int i = try_sp - 1; i >= base; i--) {
+        emit("\tleaq kop_exc_top(%%rip), %%r9");
+        emit("\tmovq -%d(%%rbp), %%r10", try_slot[i]);
+        emit("\tmovq %%r10, (%%r9)");
+    }
+}
+
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
@@ -225,6 +264,7 @@ static void gen_stmt(Method *m, Node *s) {
         int ltop = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = ltop; brk_sp++;
         emit(".L%d:", ltop);
         gen_expr(m, s->a);
@@ -240,6 +280,7 @@ static void gen_stmt(Method *m, Node *s) {
         int ltop = nlab++, lcont = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
         gen_stmts(m, s->b);
@@ -256,6 +297,7 @@ static void gen_stmt(Method *m, Node *s) {
         int ltop = nlab++, lend = nlab++, lcont = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
         if (s->b) {
@@ -271,8 +313,16 @@ static void gen_stmt(Method *m, Node *s) {
         brk_sp--; brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
-    case ST_BRK: emit_loop_exit_resets(); emit("\tjmp .L%d", brk_lab[brk_sp - 1]); break;
-    case ST_CONT: emit_loop_exit_resets(); emit("\tjmp .L%d", cont_lab[brk_sp - 1]); break;
+    case ST_BRK:
+        emit_loop_exit_resets();
+        emit_try_pop_to(brk_sp ? loop_try[brk_sp - 1] : 0);
+        emit("\tjmp .L%d", brk_lab[brk_sp - 1]);
+        break;
+    case ST_CONT:
+        emit_loop_exit_resets();
+        emit_try_pop_to(brk_sp ? loop_try[brk_sp - 1] : 0);
+        emit("\tjmp .L%d", cont_lab[brk_sp - 1]);
+        break;
     case ST_RETURN: {
         if (s->a) {
             gen_expr(m, s->a);
@@ -282,6 +332,7 @@ static void gen_stmt(Method *m, Node *s) {
             emit("\tmovl $0, %%eax");
         }
         for (int i = rg_sp - 1; i >= 0; i--) emit_region_leave(rg_slot[i]);
+        emit_try_pop_to(0);
         emit("\tjmp .Lret%d", cur_ret_label);
         break;
     }
@@ -372,6 +423,37 @@ static void gen_stmt(Method *m, Node *s) {
         gen_stmts(m, s->d);
         break;
 
+    case ST_THROW:                       /* v1.49 */
+        gen_expr(m, s->a);
+        widen_ty((Ty)s->dty);
+        emit("\tcall kop_throw");
+        break;
+    case ST_TRY: {                       /* v1.49 */
+        int lcatch = nlab++, lend = nlab++;
+        int rec = (int)(framew_cur - 48L * try_sp);
+        try_slot[try_sp++] = rec;
+        emit("\tleaq kop_exc_top(%%rip), %%r9");
+        emit("\tmovq (%%r9), %%r10");
+        emit("\tleaq -%d(%%rbp), %%r11", rec);
+        emit("\tmovq %%r10, (%%r11)");
+        emit("\tmovq %%rsp, 8(%%r11)");
+        emit("\tleaq .Lh%d(%%rip), %%r10", lcatch);
+        emit("\tmovq %%r10, 16(%%r11)");
+        emit("\tmovq %%rbp, 24(%%r11)");
+        emit("\tmovq %%r11, (%%r9)");
+        gen_stmts(m, s->b);
+        try_sp--;
+        emit("\tleaq kop_exc_top(%%rip), %%r9");
+        emit("\tmovq -%d(%%rbp), %%r10", rec);
+        emit("\tmovq %%r10, (%%r9)");
+        emit("\tjmp .L%d", lend);
+        emit(".Lh%d:", lcatch);
+        emit("\tmovq %%rax, -%ld(%%rbp)", ((long)s->ival + 1) * 8);
+        gen_stmts(m, s->d);
+        emit(".L%d:", lend);
+        break;
+    }
+
     case ST_REGION:              /* v1.20: malloc { ... } */
         emit_region_enter((int)s->ival, s->cp);   /* v1.21: ukuran custom */
         rg_slot[rg_sp++] = (int)s->ival;
@@ -457,7 +539,9 @@ void gen_x64(const char *outpath) {
 
     for (Method *m = prog.methods; m; m = m->next) {
         emit("%s__%s:", m->cls, m->name);
-        long framew = ((m->nlocals * 8 + 15) / 16) * 16;
+        int tdepth = try_depth_max(m->body);
+        long framew = ((m->nlocals * 8 + 15) / 16) * 16 + 48L * tdepth;
+        framew_cur = framew;
         emit("\tpushq %%rbp");
         emit("\tmovq %%rsp, %%rbp");
         if (framew > 0) emit("\tsubq $%ld, %%rsp", framew);
@@ -479,6 +563,7 @@ void gen_x64(const char *outpath) {
         }
         brk_sp = 0;
         rg_sp = 0;
+        try_sp = 0;
         cur_ret_label = nlab++;
         gen_stmts(m, m->body);
         emit("\tmovl $0, %%eax");        /* kembalian default jalur jatuh */
@@ -1162,6 +1247,7 @@ void gen_x64(const char *outpath) {
     emit("kop_arena_auto: .quad 0");
     emit("kop_argc: .quad 0");
     emit("kop_argv: .quad 0");
+    emit("kop_exc_top: .quad 0");        /* v1.49: handler try/catch teratas */
     emit("\t.comm kop_iobuf, 256, 32");    /* penyangga syscall rekursi builtin */
     emit("\tpushq %%rbp");
     emit("\tmovq %%rsp, %%rbp");
@@ -1172,6 +1258,7 @@ void gen_x64(const char *outpath) {
     emit("\tcall exit@PLT");
 
     emit("\t.section .rodata");
+    emit(".Lmsg_exc: .asciz \"%s\"", "kopi: exception tidak tertangkap (throw tanpa try/catch)");
     emit(".Lfmt_i: .asciz \"%s\"", "%d");
     emit(".Lfmt_in: .asciz \"%s\"", "%d\\n");
     emit(".Lfmt_s: .asciz \"%s\"", "%s");

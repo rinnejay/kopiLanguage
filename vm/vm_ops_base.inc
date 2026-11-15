@@ -35,6 +35,36 @@
             break;
         }
         case OP_POP: sp--; break;
+        /* v1.49: exception */
+        case OP_TRYENTER: {
+            int32_t tgt = (int32_t)m->code[f->pc] | ((int32_t)m->code[f->pc + 1] << 8) |
+                          ((int32_t)m->code[f->pc + 2] << 16) | ((int32_t)m->code[f->pc + 3] << 24);
+            f->pc += 4;
+            if (nh >= MAXHAND) dievm("try/catch bersarang terlalu dalam");
+            hstk[nh].ssp = sp;
+            hstk[nh].snf = nframes;
+            hstk[nh].smeth = f->meth;
+            hstk[nh].spc = tgt;
+            nh++;
+            break;
+        }
+        case OP_TRYLEAVE:
+            if (nh > 0) nh--;
+            break;
+        case OP_THROW: {
+            int64_t v = stackv[--sp];
+            if (nh <= 0) {
+                fprintf(stderr, "kopivm: exception tidak tertangkap\n");
+                exit(1);
+            }
+            VHandler *h = &hstk[--nh];
+            sp = h->ssp;
+            nframes = h->snf;
+            frames[nframes - 1].meth = h->smeth;
+            frames[nframes - 1].pc = h->spc;
+            stackv[sp++] = v;
+            break;
+        }
         /* semantik int 32-bit (wrap, seperti Java/backend native) */
         case OP_ADD: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a + b); break;
         case OP_SUB: b = stackv[--sp]; a = stackv[--sp]; stackv[sp++] = (int32_t)(a - b); break;

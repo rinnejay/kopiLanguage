@@ -64,6 +64,39 @@ else
     echo "FAIL  bhoist [codegen]: jumlah cek batas tidak sesuai"; FAIL=$((FAIL+1))
 fi
 
+# ─── exception: throw / try / catch (v1.49) ────────────────────────────
+printf 'negatif\nluar: dibungkus\n3\n3\n-2\n8\ndalam!\n9\n43\n36\nselesai\n' > "$T/kopi/exception.ref"
+check exception test/exception.kop
+# metode bertry tidak boleh mengalokasikan lokal ke register (agar nilai
+# lokal yang diubah di dalam try tetap terlihat di catch): tidak ada
+# simpan x19..x26 di prologue Main__main.
+if [ -f "$T/kopi/exception.s" ] &&
+   ! sed -n '/^Main__main:/,/^\tret$/p' "$T/kopi/exception.s" | grep -q 'stp\tx19, x20'; then
+    echo "PASS  exception [codegen]"; PASS=$((PASS+1))
+else
+    echo "FAIL  exception [codegen]: metode bertry masih memakai register lokal"; FAIL=$((FAIL+1))
+fi
+# throw tanpa try harus berhenti dengan status != 0 (bukan segfault)
+cat > "$T/kopi/excuncaught.kop" <<'EOF'
+class Main {
+    public static void main(String[] args) {
+        System.out.println("sebelum");
+        throw "tak tertangkap";
+    }
+}
+EOF
+if ./kopicc "$T/kopi/excuncaught.kop" -t a64 -o "$T/kopi/excu.s" &&
+   cc "$T/kopi/excu.s" -o "$T/kopi/excu.bin" &&
+   "$T/kopi/excu.bin" > "$T/kopi/excu.out" 2>/dev/null; then
+    echo "FAIL  exception [uncaught]: keluar dengan status 0"; FAIL=$((FAIL+1))
+else
+    if [ -f "$T/kopi/excu.out" ] && [ "$(cat "$T/kopi/excu.out")" = "sebelum" ]; then
+        echo "PASS  exception [uncaught]"; PASS=$((PASS+1))
+    else
+        echo "FAIL  exception [uncaught]: output sebelum throw hilang"; FAIL=$((FAIL+1))
+    fi
+fi
+
 # ─── hash: SHA-256/384/512 + HMAC-SHA256/512 (vektor FIPS 180-4 / RFC 4231) ─
 python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"

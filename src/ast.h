@@ -157,6 +157,9 @@ enum {
     ST_BLOCK,      /* blok { ... } : d=statement list (scope sendiri)      */
     ST_REGION,     /* malloc { ... } : d=isi; ival=slot penanda arena      */
     ST_THREAD,     /* thread [h] { ... } : a=lambda badan, b=tujuan handle */
+    ST_THROW,      /* throw e; : a=nilai; dty=tipe nilai (v1.49)           */
+    ST_TRY,        /* try { b } catch (T e) { d } : ival=slot e, str=nama e,
+                    * dty=tipe e (v1.49)                                  */
 };
 
 typedef struct Node {

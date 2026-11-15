@@ -107,7 +107,29 @@ static Node *stmt_single(void) {
     case KW_CONTINUE: { advance(); expect(';', "';'"); Node *n = newnode(ST_CONT, line); return n; }
     case KW_SWITCH: return parse_switch(line);   /* v1.19 */
     case KW_MALLOC: return parse_malloc(line);   /* v1.20 */
-    case KW_THREAD: {                            /* v1.45: thread [h] { ... } */
+    case KW_THROW: {                             /* v1.49: throw e; */
+        Node *n = newnode(ST_THROW, line);
+        advance();
+        n->a = expr();
+        expect(';', "';' setelah throw");
+        return n;
+    }
+    case KW_TRY: {                               /* v1.49: try/catch */
+        Node *n = newnode(ST_TRY, line);
+        advance();
+        if (!at('{'))
+            die("baris %d: setelah 'try' butuh '{'", line);
+        n->b = block();
+        expect(KW_CATCH, "'catch' setelah blok try");
+        expect('(', "'(' setelah catch");
+        n->dty = (int)type_opt();                /* tipe variabel penangkap */
+        if (at(T_ID)) { n->str = xs(peek()->text); advance(); }
+        expect(')', "')' setelah parameter catch");
+        if (!at('{'))
+            die("baris %d: setelah catch(...) butuh '{'", line);
+        n->d = block();
+        return n;
+    }    case KW_THREAD: {                            /* v1.45: thread [h] { ... } */
         advance();
         Node *tgt = 0;
         if (!at('{')) {

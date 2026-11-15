@@ -2,6 +2,29 @@
 
 static void gen_x64_runtime(void) {
     emit(".text");
+    /* v1.49: kop_throw(rax = nilai) — pulihkan rsp/rbp lalu lompat ke
+       blok catch terdekat. Catatan handler: [0]=prev [8]=rsp
+       [16]=landing pad [24]=rbp [32]=nilai (48 byte per kedalaman). */
+    emit("\t.globl kop_throw");
+    emit("kop_throw:");
+    emit("\tleaq kop_exc_top(%%rip), %%r9");
+    emit("\tmovq (%%r9), %%r10");
+    emit("\ttestq %%r10, %%r10");
+    emit("\tje .KuncaughtX");
+    emit("\tmovq %%rax, 32(%%r10)");
+    emit("\tmovq (%%r10), %%r11");
+    emit("\tmovq %%r11, (%%r9)");
+    emit("\tmovq 8(%%r10), %%r11");
+    emit("\tmovq 16(%%r10), %%r12");
+    emit("\tmovq 24(%%r10), %%rbp");
+    emit("\tmovq %%r11, %%rsp");
+    emit("\tmovq 32(%%r10), %%rax");
+    emit("\tjmp *%%r12");
+    emit(".KuncaughtX:");
+    emit("\tleaq .Lmsg_exc(%%rip), %%rdi");
+    emit("\tcall puts@PLT");
+    emit("\tmovl $1, %%edi");
+    emit("\tcall exit@PLT");
     /* stub mati: jumlah argumen lambda tidak cocok (dilompati dari jne .Klam).
        Tanpa label ini linker gagal: `.Klam` hanya didefinisikan di runtime a64. */
     emit(".Klam:");

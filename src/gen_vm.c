@@ -44,7 +44,11 @@ enum {
     OP_MULADD,                      /* [slot:2][c:4][k:4] — slot = slot*c+k (int32) */
     OP_ADDSHR,                      /* [slotX:2][slotY:2][shift:1] — slotX += slotY>>>shift */
     /* v1.43: buffer byte packed 1 byte/elemen */
-    OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B
+    OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B,
+    /* v1.49: exception */
+    OP_TRYENTER,                    /* 4 byte: alamat pc blok catch */
+    OP_TRYLEAVE,
+    OP_THROW
 };
 
 typedef struct {
@@ -61,6 +65,9 @@ static Method *cur_meth;
 static int brk_lab[64], cont_lab[64], brk_sp, last_line;
 /* v1.20: malloc{} — slot penanda arena aktif + rg_sp saat loop masuk */
 static int rg_slot[64], rg_sp, loop_rg[64];
+/* v1.49: exception — kedalaman handler aktif + kedalaman saat loop masuk */
+static int try_sp, loop_try[64];
+
 
 static const char *last_file;
 
@@ -173,6 +180,7 @@ static void gen_stmt(Node *s) {
         int slot, cmp, imm;
         int fast = s->a && cond_pat(s->a, &slot, &cmp, &imm);
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = ltop; brk_sp++;
         if (fast) {
             /* v1.22: cek awal sekali, lalu tes di kaki loop (hemat JMP) */
@@ -196,6 +204,7 @@ static void gen_stmt(Node *s) {
         int ltop = newlab(), lcont = newlab(), lend = newlab();
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         mark(ltop);
         gen_stmts(s->b);
@@ -217,6 +226,7 @@ static void gen_stmt(Node *s) {
         }
         int inc = fast && step_pat(s->c, slot, &delta);
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         if (fast) {
             /* v1.22: cek awal sekali; kaki loop = satu opcode OP_LOOP
@@ -252,8 +262,18 @@ static void gen_stmt(Node *s) {
         brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
-    case ST_BRK: emit_loop_exit_resets(); jmp(OP_JMP, brk_lab[brk_sp - 1]); break;
-    case ST_CONT: emit_loop_exit_resets(); jmp(OP_JMP, cont_lab[brk_sp - 1]); break;
+    case ST_BRK:
+        emit_loop_exit_resets();
+        for (int i = try_sp - 1; i >= (brk_sp ? loop_try[brk_sp - 1] : 0); i--)
+            em8(OP_TRYLEAVE);
+        jmp(OP_JMP, brk_lab[brk_sp - 1]);
+        break;
+    case ST_CONT:
+        emit_loop_exit_resets();
+        for (int i = try_sp - 1; i >= (brk_sp ? loop_try[brk_sp - 1] : 0); i--)
+            em8(OP_TRYLEAVE);
+        jmp(OP_JMP, cont_lab[brk_sp - 1]);
+        break;
     case ST_RETURN:
         if (s->a) {
             gen_expr(s->a);
@@ -262,6 +282,7 @@ static void gen_stmt(Node *s) {
             em8(OP_ICONST); em32(0);
         }
         for (int i = rg_sp - 1; i >= 0; i--) emit_region_leave(rg_slot[i]);
+        for (int i = try_sp - 1; i >= 0; i--) em8(OP_TRYLEAVE);
         em8(OP_RET);
         break;
     case ST_PRINT:
@@ -313,6 +334,24 @@ static void gen_stmt(Node *s) {
         else
             em8(OP_IDXW);
         break;
+    case ST_THROW:                       /* v1.49 */
+        gen_expr(s->a);
+        em8(OP_THROW);
+        break;
+    case ST_TRY: {                       /* v1.49 */
+        int lcatch = newlab(), lend = newlab();
+        jmp(OP_TRYENTER, lcatch);
+        try_sp++;
+        gen_stmts(s->b);
+        try_sp--;
+        em8(OP_TRYLEAVE);
+        jmp(OP_JMP, lend);
+        mark(lcatch);                    /* nilai exception ada di stack */
+        em8(OP_ISTORE); em16((int)s->ival);
+        gen_stmts(s->d);
+        mark(lend);
+        break;
+    }
     default:
         die("gen_vm: statement kind=%d", s->kind);
     }
@@ -328,6 +367,7 @@ static void write_method(FILE *f, Method *m) {
     cur_meth = m;
     cx.len = 0; cx.nfixes = 0; cx.nlab = 0;
     last_line = 0; last_file = 0;
+    try_sp = 0; brk_sp = 0; rg_sp = 0;
     memset(cx.labpos, 0xff, sizeof(cx.labpos));
 
     gen_stmts(m->body);

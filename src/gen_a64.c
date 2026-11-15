@@ -12,6 +12,7 @@ static int nlab;
 static int brk_lab[64], cont_lab[64], brk_sp;
 /* v1.20: malloc{} — slot penanda arena aktif + rg_sp saat loop masuk */
 static int rg_slot[64], rg_sp, loop_rg[64];
+static int loop_try[64];      /* v1.49: kedalaman handler saat loop masuk */
 
 static void emit(const char *fmt, ...) {
     va_list ap;
@@ -208,6 +209,59 @@ static void emit_loop_exit_resets(void) {
     for (int i = rg_sp - 1; i >= base; i--) emit_region_leave(rg_slot[i]);
 }
 
+/* ── v1.49: exception (throw/try/catch) ───────────────────────────────
+ * Handler disimpan di frame metode pemilik try (128 byte per kedalaman):
+ *   [0]=prev [8]=sp [16]=x29 [24]=x30 [32]=pc landing pad [40]=nilai
+ *   [48..127]=x19..x28 (callee-saved, dipulihkan agar pemanggil tidak
+ *   melihat register rusak setelah throw melompati beberapa frame).
+ * kop_throw memulihkan semuanya lalu melompat ke landing pad, jadi throw
+ * dari kedalaman berapa pun langsung masuk blok catch. Metode yang memakai
+ * try TIDAK mengalokasikan lokal ke register (loc_nreg = 0) agar nilai
+ * lokal yang sudah diubah di dalam try tetap terlihat di catch. */
+static int try_sp, try_slot[64];
+static long framew_cur;            /* ukuran frame metode aktif (byte) */
+
+static int try_depth_max(Node *s);
+
+static int imax(int a, int b) { return a > b ? a : b; }
+
+static int try_depth1(Node *s) {
+    if (!s) return 0;
+    switch (s->kind) {
+    case ST_TRY:
+        return 1 + imax(try_depth_max(s->b), try_depth_max(s->d));
+    case ST_IF:
+        return imax(try_depth_max(s->b), try_depth_max(s->c));
+    case ST_WHILE:
+    case ST_DO:
+        return try_depth_max(s->b);
+    case ST_FOR:
+        return imax(imax(try_depth_max(s->a), try_depth_max(s->d)),
+                    try_depth_max(s->c));
+    case ST_BLOCK:
+    case ST_REGION:
+        return try_depth_max(s->d);
+    default:
+        return 0;
+    }
+}
+
+static int try_depth_max(Node *s) {
+    int mx = 0;
+    for (; s; s = s->next) mx = imax(mx, try_depth1(s));
+    return mx;
+}
+
+/* buang handler aktif sampai kedalaman `base` (break/continue/return) */
+static void emit_try_pop_to(int base) {
+    for (int i = try_sp - 1; i >= base; i--) {
+        tls_addr("x9");
+        emit("\tsub\tx10, x29, #%d", try_slot[i]);
+        emit("\tldr\tx11, [x10, #0]");
+        emit("\tstr\tx11, [x9, #56]");
+    }
+}
+
 static void push_val(int is64) {
     if (is64) emit("\tstr\tx0, [sp, #-16]!");
     else emit("\tstr\tw0, [sp, #-16]!");
@@ -362,6 +416,7 @@ static void gen_stmt(Method *m, Node *s) {
         int ltop = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = ltop; brk_sp++;
         emit(".L%d:", ltop);
         if (!gen_cond_jump(m, s->a, lend, 0)) {
@@ -378,6 +433,7 @@ static void gen_stmt(Method *m, Node *s) {
         int ltop = nlab++, lcont = nlab++, lend = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
         gen_stmts(m, s->b);
@@ -395,6 +451,7 @@ static void gen_stmt(Method *m, Node *s) {
         int ltop = nlab++, lend = nlab++, lcont = nlab++;
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
+        loop_try[brk_sp] = try_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         /* v1.48: hoisting cek batas untuk loop kanonik */
         int pis = safe_idx_slot, pas = safe_arr_slot;
@@ -419,8 +476,16 @@ static void gen_stmt(Method *m, Node *s) {
         brk_sp--; brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
     }
-    case ST_BRK: emit_loop_exit_resets(); emit("\tb\t.L%d", brk_lab[brk_sp - 1]); break;
-    case ST_CONT: emit_loop_exit_resets(); emit("\tb\t.L%d", cont_lab[brk_sp - 1]); break;
+    case ST_BRK:
+        emit_loop_exit_resets();
+        emit_try_pop_to(brk_sp ? loop_try[brk_sp - 1] : 0);
+        emit("\tb\t.L%d", brk_lab[brk_sp - 1]);
+        break;
+    case ST_CONT:
+        emit_loop_exit_resets();
+        emit_try_pop_to(brk_sp ? loop_try[brk_sp - 1] : 0);
+        emit("\tb\t.L%d", cont_lab[brk_sp - 1]);
+        break;
     case ST_RETURN: {
         if (s->a) {
             gen_expr(m, s->a);
@@ -430,6 +495,7 @@ static void gen_stmt(Method *m, Node *s) {
             emit("\tmov\tw0, wzr");
         }
         for (int i = rg_sp - 1; i >= 0; i--) emit_region_leave(rg_slot[i]);
+        emit_try_pop_to(0);
         emit("\tb\t.Lret%d", cur_ret_label);
         break;
     }
@@ -543,6 +609,45 @@ static void gen_stmt(Method *m, Node *s) {
         gen_stmts(m, s->d);
         break;
 
+    case ST_THROW: {                     /* v1.49 */
+        gen_expr(m, s->a);
+        widen_ty((Ty)s->dty);
+        emit("\tbl\tkop_throw");
+        break;
+    }
+    case ST_TRY: {                       /* v1.49 */
+        int lcatch = nlab++, lend = nlab++;
+        int rec = (int)(framew_cur - 128L * try_sp);
+        try_slot[try_sp++] = rec;
+        tls_addr("x9");
+        emit("\tldr\tx11, [x9, #56]");
+        emit("\tsub\tx10, x29, #%d", rec);
+        emit("\tstr\tx11, [x10, #0]");        /* prev */
+        emit("\tmov\tx11, sp");
+        emit("\tstr\tx11, [x10, #8]");        /* sp saat masuk try */
+        emit("\tstp\tx29, x30, [x10, #16]");
+        emit("\tadr\tx11, .Lh%d", lcatch);
+        emit("\tstr\tx11, [x10, #32]");       /* landing pad */
+        emit("\tstp\tx19, x20, [x10, #48]");  /* callee-saved pemanggil */
+        emit("\tstp\tx21, x22, [x10, #64]");
+        emit("\tstp\tx23, x24, [x10, #80]");
+        emit("\tstp\tx25, x26, [x10, #96]");
+        emit("\tstp\tx27, x28, [x10, #112]");
+        emit("\tstr\tx10, [x9, #56]");        /* handler top */
+        gen_stmts(m, s->b);
+        try_sp--;
+        tls_addr("x9");                         /* keluar normal */
+        emit("\tsub\tx10, x29, #%d", rec);
+        emit("\tldr\tx11, [x10, #0]");
+        emit("\tstr\tx11, [x9, #56]");
+        emit("\tb\t.L%d", lend);
+        emit(".Lh%d:", lcatch);
+        loc_store(((int)s->ival + 1) * 8, "x0");   /* variabel penangkap */
+        gen_stmts(m, s->d);
+        emit(".L%d:", lend);
+        break;
+    }
+
     case ST_REGION:              /* v1.20: malloc { ... } */
         emit_region_enter((int)s->ival, s->cp);   /* v1.21: ukuran custom */
         rg_slot[rg_sp++] = (int)s->ival;
@@ -593,13 +698,19 @@ void gen_a64(const char *outpath) {
     for (Method *m = prog.methods; m; m = m->next) {
         emit("%s__%s:", m->cls, m->name);
         long nslots = m->nlocals;
-        long framew = ((nslots * 8 + 15) / 16) * 16;
+        int tdepth = try_depth_max(m->body);
+        long framew = ((nslots * 8 + 15) / 16) * 16 + 128L * tdepth;
         if (nslots > 510) die("metode %s.%s: terlalu banyak local untuk backend a64", m->cls, m->name);
+        framew_cur = framew;
         emit("\tstp\tx29, x30, [sp, #-16]!");
         emit("\tmov\tx29, sp");
-        if (framew > 0) emit("\tsub\tsp, sp, #%ld", framew);
-        /* v1.47: pakai x19..x26 untuk 8 slot pertama; simpan callee-saved */
-        loc_nreg = (int)(nslots < 8 ? nslots : 8);
+        if (framew > 0) {
+            if (framew <= 4095) emit("\tsub\tsp, sp, #%ld", framew);
+            else { emit_imm64("x9", (unsigned long)framew); emit("\tsub\tsp, sp, x9"); }
+        }
+        /* v1.47: pakai x19..x26 untuk 8 slot pertama; simpan callee-saved.
+         * v1.49: metode dengan try/catch memakai slot memori saja. */
+        loc_nreg = tdepth ? 0 : (int)(nslots < 8 ? nslots : 8);
         for (int i = 0; i < 8; i++) loc_reg[i] = i < loc_nreg ? 19 + i : -1;
         for (int i = 0; i < loc_nreg; i += 2) {
             if (i + 1 < loc_nreg)
@@ -623,6 +734,7 @@ void gen_a64(const char *outpath) {
         }
         brk_sp = 0;
         rg_sp = 0;
+        try_sp = 0;
         cur_ret_label = nlab++;
         gen_stmts(m, m->body);
         emit("\tmov\tw0, wzr");          /* kembalian default jalur jatuh */

@@ -253,8 +253,7 @@ static void resolve_stmt(Node *s) {
         s->next = nx;
         break;
     }
-    case ST_REGION: {
-        /* v1.20: malloc { ... } — scope sendiri + arena blok otomatis.
+    case ST_REGION: {        /* v1.20: malloc { ... } — scope sendiri + arena blok otomatis.
          * v1.21: ukuran arena (s->cp, byte) dari malloc<64mb>.
          * v1.22: tanpa <...> = OTOMATIS (runtime menyediakan arena sampai
          *        4096 MB; RAM hanya terpakai sesuai kebutuhan). */
@@ -270,6 +269,25 @@ static void resolve_stmt(Node *s) {
         resolve_stmts(s->d);
         reg_sp--;
         nscope = mks;              /* slot tidak direset → watermark tetap */
+        break;
+    }
+    case ST_THROW: {                       /* v1.49: throw e; */
+        if (!s->a) die("baris %d: throw butuh nilai", s->line);
+        Ty et = type_expr(s->a);
+        if (et == T_VOID)
+            die("baris %d: throw tidak menerima nilai void", s->line);
+        s->dty = (int)et;                  /* codegen melebarkan sesuai tipe */
+        break;
+    }
+    case ST_TRY: {                         /* v1.49: try/catch */
+        int mks = nscope;
+        resolve_stmts(s->b);
+        nscope = mks;
+        if (nextslot >= 1020) die("terlalu banyak variabel lokal");
+        s->ival = nextslot++;              /* slot variabel penangkap */
+        if (s->str) scope_push(s->str, (int)s->ival, (Ty)s->dty, 0);
+        resolve_stmts(s->d);
+        nscope = mks;                      /* slot tidak direset → watermark */
         break;
     }
     default:

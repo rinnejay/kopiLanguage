@@ -68,7 +68,11 @@ enum {
     OP_MULADD,                      /* slot = slot*c+k (int32) */
     OP_ADDSHR,                      /* slotX += slotY>>>shift */
     /* v1.43: buffer byte packed 1 byte/elemen */
-    OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B
+    OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B,
+    /* v1.49: exception */
+    OP_TRYENTER,                    /* 4 byte: alamat pc blok catch */
+    OP_TRYLEAVE,
+    OP_THROW
 };
 
 #define MAXM 4096
@@ -110,6 +114,10 @@ typedef struct {
 
 typedef struct { int meth; long pc; long retbase; int line; const char *file; } Frame;
 
+/* v1.49: catatan handler try/catch. sp/nframes/pc dipulihkan saat throw. */
+typedef struct { long ssp; int snf; int smeth; long spc; } VHandler;
+#define MAXHAND 256
+
 /* state interpreter yang dimiliki satu thread (v1.45) */
 typedef struct {
     int64_t *stackv;
@@ -123,6 +131,8 @@ typedef struct {
     ArenaCtx astk[MAXARENA];
     int asp;
     int id;                        /* id thread (1 = utama) */
+    VHandler hstk[MAXHAND];        /* v1.49: tumpukan handler try/catch */
+    int nh;
 } VState;
 
 static _Thread_local VState *vt;
@@ -139,6 +149,8 @@ static _Thread_local VState *vt;
 #define heap_auto (vt->heap_auto)
 #define astk   (vt->astk)
 #define asp    (vt->asp)
+#define hstk   (vt->hstk)
+#define nh     (vt->nh)
 
 /* registry rentang heap hidup dari semua thread; slot mati dipakai ulang */
 typedef struct { _Atomic(long *) base; _Atomic long cap; } HeapRange;
