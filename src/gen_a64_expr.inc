@@ -1,6 +1,185 @@
 /* gen_a64_expr.inc — ekspresi backend a64 (bagian dari gen_a64.c).
  * Dipisah agar gen_a64.c tidak monolitik; bukan unit kompilasi sendiri. */
 
+static int gen_bin_typed(Method *m, Node *e);
+
+/* v1.47: operand "sederhana" (variabel/literal) bisa dimuat langsung ke
+ * register tujuan, menghindari push/pop stack untuk pola panas seperti
+ * `s += i` dan `i < n`. */
+static int simple_expr(Node *e) {
+    if (!e) return 0;
+    if (e->kind == EX_VAR || e->kind == EX_INT || e->kind == EX_BOOL)
+        return 1;
+    if (e->kind == EX_LEN && e->a && e->a->kind == EX_VAR)
+        return 1;
+    if (e->kind == EX_IDX && e->a && e->a->kind == EX_VAR && e->b &&
+        (e->b->kind == EX_VAR || e->b->kind == EX_INT) &&
+        ((Ty)e->dty == T_INT || (Ty)e->dty == T_LONG))
+        return 1;
+    return 0;
+}
+
+static void gen_imm_to(const char *reg, unsigned long long v) {
+    if (reg[0] == 'w') {
+        unsigned u = (unsigned)v;
+        if (u <= 65535) { emit("\tmov\t%s, #%u", reg, u); return; }
+        emit("\tmovz\t%s, #0x%x", reg, u & 0xffffu);
+        if (u >> 16) emit("\tmovk\t%s, #0x%x, lsl #16", reg, (u >> 16) & 0xffffu);
+    } else {
+        emit_imm64(reg, (unsigned long)v);
+    }
+}
+
+static void gen_simple_to(Node *e, const char *reg) {
+    if (e->kind == EX_VAR) {
+        loc_load((e->ival + 1) * 8, reg);
+        return;
+    }
+    if (e->kind == EX_LEN) {
+        Node *base = e->a;
+        loc_load((base->ival + 1) * 8, "x28");
+        if (reg[0] == 'w') emit("\tldr\t%s, [x28]", reg);
+        else { emit("\tldr\tw0, [x28]"); emit("\tsxtw\t%s, w0", reg); }
+        return;
+    }
+    if (e->kind == EX_IDX) {
+        Node *base = e->a, *idx = e->b;
+        Ty et = (Ty)e->dty;
+        Ty bt = (Ty)base->dty;
+        loc_load((base->ival + 1) * 8, "x28");
+        if (idx->kind == EX_VAR) loc_load((idx->ival + 1) * 8, "w10");
+        else gen_imm_to("w10", (unsigned long long)idx->ival);
+        emit("\tldr\tw11, [x28]");
+        emit("\tcmp\tw10, w11");
+        emit("\tb.hs\t.Karr");
+        emit("\tsxtw\tx10, w10");
+        emit("\tadd\tx28, x28, #8");
+        if (bt == T_STR || bt == T_BYTEARR || bt == T_U8ARR) {
+            /* String/buffer byte packed: satu byte per elemen */
+            emit(bt == T_BYTEARR ? "\tldrsb\tw0, [x28, x10]"
+                                 : "\tldrb\tw0, [x28, x10]");
+            if (reg[0] == 'w') {
+                if (strcmp(reg, "w0")) emit("\tmov\t%s, w0", reg);
+            } else if (bt == T_BYTEARR) {
+                emit("\tsxtw\t%s, w0", reg);
+            } else {
+                emit("\tmov\t%s, x0", reg);
+            }
+            return;
+        }
+        if (et == T_LONG) {
+            emit("\tadd\tx28, x28, x10, lsl #3");
+            emit("\tldr\t%s, [x28]", reg);
+        } else {
+            emit("\tadd\tx28, x28, x10, lsl #3");
+            emit("\tldr\tw0, [x28]");
+            if (reg[0] == 'w') {
+                if (strcmp(reg, "w0")) emit("\tmov\t%s, w0", reg);
+            } else {
+                emit("\tsxtw\t%s, w0", reg);
+            }
+        }
+        return;
+    }
+    Ty t = (Ty)e->dty;
+    if (t == T_FLOAT) {
+        union { float f; uint32_t u; } cv;
+        cv.f = (float)e->fval;
+        gen_imm_to(reg, cv.u);
+        return;
+    }
+    if (t == T_DOUBLE) {
+        union { double d; uint64_t u; } cv;
+        cv.d = e->fval;
+        gen_imm_to(reg, cv.u);
+        return;
+    }
+    gen_imm_to(reg, (unsigned long long)e->ival);
+}
+
+/* v1.47: `x = x + e` / `x = x - e` (termasuk x++ dari desugar) dikerjakan
+ * langsung pada register lokal, tanpa memuat ulang x lewat w0/x0. */
+static int try_simple_assign(Node *s) {
+    Node *rhs = s->a;
+    if (!rhs || rhs->kind != EX_BIN || !rhs->str || rhs->str[1] != 0)
+        return 0;
+    char op = rhs->str[0];
+    if (op != '+' && op != '-') return 0;
+    if (!rhs->a || rhs->a->kind != EX_VAR || rhs->a->ival != s->ival)
+        return 0;
+    Ty t = (Ty)s->dty;
+    if ((Ty)rhs->dty != t) return 0;
+    if (t != T_INT && t != T_LONG && t != T_UINT32 && t != T_UINT64)
+        return 0;
+    if (!simple_expr(rhs->b)) return 0;
+
+    long off = (s->ival + 1) * 8;
+    /* T_UINT32 kanoniknya 32-bit zero-extended: operasi w sudah benar */
+    int isx = (t == T_LONG || t == T_UINT64);
+    int slot = (int)s->ival;
+    int mapped = slot >= 0 && slot < loc_nreg && loc_reg[slot] >= 0;
+    char acc[8];
+    if (mapped)
+        snprintf(acc, sizeof acc, "%c%d", isx ? 'x' : 'w', loc_reg[slot]);
+    else
+        snprintf(acc, sizeof acc, "%s", isx ? "x9" : "w9");
+
+    if (!mapped) loc_load(off, acc);
+
+    if (rhs->b->kind == EX_INT) {
+        long v = rhs->b->ival;
+        if (v >= 0 && v <= 4095) {
+            if (v) emit("\t%s\t%s, %s, #%ld", op == '+' ? "add" : "sub",
+                        acc, acc, v);
+        } else {
+            long d = op == '+' ? v : -v;
+            gen_imm_to(isx ? "x0" : "w0", (unsigned long long)d);
+            emit("\tadd\t%s, %s, %s", acc, acc, isx ? "x0" : "w0");
+        }
+    } else {
+        if ((Ty)rhs->b->dty == t) {
+            gen_simple_to(rhs->b, isx ? "x0" : "w0");
+        } else {
+            gen_simple_to(rhs->b, "x0");
+            widen_ty((Ty)rhs->b->dty);
+            conv_ty((Ty)rhs->b->dty, t);
+        }
+        emit("\t%s\t%s, %s, %s", op == '+' ? "add" : "sub",
+             acc, acc, isx ? "x0" : "w0");
+    }
+    if (!mapped) loc_store(off, acc);
+    return 1;
+}
+
+static int gen_cond_jump(Method *m, Node *e, int label, int on_true) {
+    if (!e || e->kind != EX_BIN || !e->str) return 0;
+    Ty bl = (Ty)e->a->dty, br = (Ty)e->b->dty;
+    if (!((bl == T_INT || bl == T_BOOL) &&
+          (br == T_INT || br == T_BOOL)))
+        return 0;
+    const char *cc;
+    if (!strcmp(e->str, "==")) cc = on_true ? "eq" : "ne";
+    else if (!strcmp(e->str, "!=")) cc = on_true ? "ne" : "eq";
+    else if (!strcmp(e->str, "<")) cc = on_true ? "lt" : "ge";
+    else if (!strcmp(e->str, ">")) cc = on_true ? "gt" : "le";
+    else if (!strcmp(e->str, "<=")) cc = on_true ? "le" : "gt";
+    else if (!strcmp(e->str, ">=")) cc = on_true ? "ge" : "lt";
+    else return 0;
+
+    if (simple_expr(e->a) && simple_expr(e->b)) {
+        gen_simple_to(e->a, "w9");
+        gen_simple_to(e->b, "w0");
+    } else {
+        gen_expr(m, e->a);
+        push_w0();
+        gen_expr(m, e->b);
+        pop_w("w9");
+    }
+    emit("\tcmp\tw9, w0");
+    emit("\tb.%s\t.L%d", cc, label);
+    return 1;
+}
+
 static int gen_bin_typed(Method *m, Node *e) {
     Ty lt = (Ty)e->a->dty, rt = (Ty)e->b->dty;
     char op = e->str[0];
@@ -24,14 +203,32 @@ static int gen_bin_typed(Method *m, Node *e) {
         return 0;
     }
 
-    gen_expr(m, e->a);
-    widen_ty(lt);
-    conv_ty(lt, P);
-    push_x();
-    gen_expr(m, e->b);
-    widen_ty(rt);
-    if (!isShift) conv_ty(rt, P);
-    pop_x("x9");
+    if (!isShift && simple_expr(e->a) && simple_expr(e->b)) {
+        if (lt == P) {
+            gen_simple_to(e->a, is64ty(P) ? "x9" : "w9");
+        } else {
+            gen_simple_to(e->a, "x0");
+            widen_ty(lt);
+            conv_ty(lt, P);
+            emit("\tmov\tx9, x0");
+        }
+        if (rt == P) {
+            gen_simple_to(e->b, is64ty(P) ? "x0" : "w0");
+        } else {
+            gen_simple_to(e->b, "x0");
+            widen_ty(rt);
+            conv_ty(rt, P);
+        }
+    } else {
+        gen_expr(m, e->a);
+        widen_ty(lt);
+        conv_ty(lt, P);
+        push_x();
+        gen_expr(m, e->b);
+        widen_ty(rt);
+        if (!isShift) conv_ty(rt, P);
+        pop_x("x9");
+    }
 
     if (ty_is_float(P)) {
         const char *pre = P == T_FLOAT ? "s" : "d";
@@ -1451,7 +1648,8 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmov\tw2, #1");
             emit("\tmov\tx8, #64");                    /* __NR_write */
             emit("\tsvc\t#0");
-            emit("\tadd\tsp, sp, #32");
+            /* buffer 1B + 2 argumen (fd, byte) = 48 byte */
+            emit("\tadd\tsp, sp, #48");
             emit("\tcmp\tx0, #1");
             emit("\tb.ne\t4f");
             emit("\tmov\tx0, xzr");
@@ -1465,7 +1663,7 @@ static int gen_expr(Method *m, Node *e) {
         return 0;                           /* hasil int di w0/x0 */
     }
     case EX_ENVLOAD:
-        emit("\tldr\tx0, [x29, #-8]");   /* slot 0 = param $env */
+        loc_load(8, "x0");               /* slot 0 = param $env */
         if (is64ty((Ty)e->dty)) {
             emit("\tldr\tx0, [x0, #%ld]", 24 + 8 * (long)e->ival);
             return 1;
@@ -1481,8 +1679,10 @@ static int gen_expr(Method *m, Node *e) {
     }
     case EX_TERN: {
         int lelse = nlab++, lend = nlab++;
-        gen_expr(m, e->a);
-        emit("\tcbz\tw0, .L%d", lelse);
+        if (!gen_cond_jump(m, e->a, lelse, 0)) {
+            gen_expr(m, e->a);
+            emit("\tcbz\tw0, .L%d", lelse);
+        }
         int w1 = gen_expr(m, e->b);
         emit("\tb\t.L%d", lend);
         emit(".L%d:", lelse);
@@ -1519,10 +1719,15 @@ static int gen_expr(Method *m, Node *e) {
             emit(".L%d:", lend);
             return 0;
         }
-        gen_expr(m, e->a);
-        push_w0();
-        gen_expr(m, e->b);
-        pop_w("w9");
+        if (simple_expr(e->a) && simple_expr(e->b)) {
+            gen_simple_to(e->a, "w9");
+            gen_simple_to(e->b, "w0");
+        } else {
+            gen_expr(m, e->a);
+            push_w0();
+            gen_expr(m, e->b);
+            pop_w("w9");
+        }
         /* operator 2-karakter dulu supaya tidak tabrak case '<' / '>' */
         if (!strcmp(e->str, "<=")) { emit("\tcmp\tw9, w0"); emit("\tcset\tw0, le"); break; }
         if (!strcmp(e->str, ">=")) { emit("\tcmp\tw9, w0"); emit("\tcset\tw0, ge"); break; }

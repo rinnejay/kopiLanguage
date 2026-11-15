@@ -23,6 +23,13 @@ static void emit(const char *fmt, ...) {
 
 static int gen_expr(Method *m, Node *e);
 static void gen_stmts(Method *m, Node *lst);
+static int simple_expr(Node *e);
+static void gen_simple_to(Node *e, const char *reg);
+static int try_simple_assign(Node *s);
+
+/* v1.47: kondisi perbandingan int/bool langsung dicabang, tanpa
+ * materialisasi boolean (`cset` + `cbz`). */
+static int gen_cond_jump(Method *m, Node *e, int label, int on_true);
 static int netlbl;      /* label EX_NET unik per kemunculan */
 static int arrlbl;      /* label zero-init array unik */
 
@@ -130,13 +137,37 @@ static void loc_addr(long off) {
     }
 }
 
+/* ── v1.47: alokasi register untuk lokal ──────────────────────────────
+ * Delapan slot pertama sebuah metode disimpan di x19..x26 selama metode
+ * berjalan. Ini bukan alokator global: tujuannya menghapus traffic
+ * ldr/str lokal di loop panas (i, s, parameter). Register ini callee-saved
+ * menurut AAPCS, jadi panggilan fungsi/runtime tidak merusaknya; metode
+ * yang memakainya menyimpan & memulihkan di prologue/epilogue. */
+static int loc_reg[8];     /* slot → nomor register (19..26), -1 = memori */
+static int loc_nreg;       /* jumlah register yang dipakai metode aktif   */
+
+static int slot_of(long off) {
+    long s = off / 8 - 1;
+    return (s >= 0 && s < loc_nreg && s < 8) ? (int)s : -1;
+}
+
 static void loc_store(long off, const char *reg) {
+    int s = slot_of(off);
+    if (s >= 0 && loc_reg[s] >= 0) {
+        emit("\tmov\t%c%d, %s", reg[0] == 'x' ? 'x' : 'w', loc_reg[s], reg);
+        return;
+    }
     if (off <= 255) { emit("\tstr\t%s, [x29, #-%ld]", reg, off); return; }
     loc_addr(off);
     emit("\tstr\t%s, [x27]", reg);
 }
 
 static void loc_load(long off, const char *reg) {
+    int s = slot_of(off);
+    if (s >= 0 && loc_reg[s] >= 0) {
+        emit("\tmov\t%s, %c%d", reg, reg[0] == 'x' ? 'x' : 'w', loc_reg[s]);
+        return;
+    }
     if (off <= 255) { emit("\tldr\t%s, [x29, #-%ld]", reg, off); return; }
     loc_addr(off);
     emit("\tldr\t%s, [x27]", reg);
@@ -215,6 +246,7 @@ static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
     case ST_ASSIGN: {
+        if (try_simple_assign(s)) break;
         gen_expr(m, s->a);
         widen_ty((Ty)s->a->dty);
         conv_ty((Ty)s->a->dty, (Ty)s->dty);
@@ -251,8 +283,10 @@ static void gen_stmt(Method *m, Node *s) {
     }
     case ST_IF: {
         int lelse = nlab++, lend = nlab++;
-        gen_expr(m, s->a);
-        emit("\tcbz\tw0, .L%d", lelse);
+        if (!gen_cond_jump(m, s->a, lelse, 0)) {
+            gen_expr(m, s->a);
+            emit("\tcbz\tw0, .L%d", lelse);
+        }
         gen_stmts(m, s->b);
         emit("\tb\t.L%d", lend);
         emit(".L%d:", lelse);
@@ -266,8 +300,10 @@ static void gen_stmt(Method *m, Node *s) {
         loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = ltop; brk_sp++;
         emit(".L%d:", ltop);
-        gen_expr(m, s->a);
-        emit("\tcbz\tw0, .L%d", lend);
+        if (!gen_cond_jump(m, s->a, lend, 0)) {
+            gen_expr(m, s->a);
+            emit("\tcbz\tw0, .L%d", lend);
+        }
         gen_stmts(m, s->b);
         emit("\tb\t.L%d", ltop);
         emit(".L%d:", lend);
@@ -282,8 +318,10 @@ static void gen_stmt(Method *m, Node *s) {
         emit(".L%d:", ltop);
         gen_stmts(m, s->b);
         emit(".L%d:", lcont);
-        gen_expr(m, s->a);
-        emit("\tcbnz\tw0, .L%d", ltop);
+        if (!gen_cond_jump(m, s->a, ltop, 1)) {
+            gen_expr(m, s->a);
+            emit("\tcbnz\tw0, .L%d", ltop);
+        }
         emit(".L%d:", lend);
         brk_sp--; brk_lab[brk_sp] = pdb; cont_lab[brk_sp] = pdc;
         break;
@@ -295,7 +333,12 @@ static void gen_stmt(Method *m, Node *s) {
         loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
         emit(".L%d:", ltop);
-        if (s->b) { gen_expr(m, s->b); emit("\tcbz\tw0, .L%d", lend); }
+        if (s->b) {
+            if (!gen_cond_jump(m, s->b, lend, 0)) {
+                gen_expr(m, s->b);
+                emit("\tcbz\tw0, .L%d", lend);
+            }
+        }
         gen_stmts(m, s->d);
         emit(".L%d:", lcont);           /* target continue: sebelum langkah */
         if (s->c) gen_stmt(m, s->c);
@@ -483,12 +526,27 @@ void gen_a64(const char *outpath) {
         emit("\tstp\tx29, x30, [sp, #-16]!");
         emit("\tmov\tx29, sp");
         if (framew > 0) emit("\tsub\tsp, sp, #%ld", framew);
+        /* v1.47: pakai x19..x26 untuk 8 slot pertama; simpan callee-saved */
+        loc_nreg = (int)(nslots < 8 ? nslots : 8);
+        for (int i = 0; i < 8; i++) loc_reg[i] = i < loc_nreg ? 19 + i : -1;
+        for (int i = 0; i < loc_nreg; i += 2) {
+            if (i + 1 < loc_nreg)
+                emit("\tstp\tx%d, x%d, [sp, #-16]!", 19 + i, 19 + i + 1);
+            else
+                emit("\tstr\tx%d, [sp, #-16]!", 19 + i);
+        }
         {   /* simpan parameter (register w0..w7) ke slot lokal;
                 param T_FN (lambda/env) disalin 64-bit (x0) */
             int i = 0;
             for (Param *p = m->params; p; p = p->next, i++) {
-                if (is64ty((Ty)p->ty)) emit("\tstr\tx%d, [x29, #-%ld]", i, (i + 1) * 8);
-                else emit("\tstr\tw%d, [x29, #-%ld]", i, (i + 1) * 8);
+                if (i < loc_nreg) {
+                    if (is64ty((Ty)p->ty)) emit("\tmov\tx%d, x%d", 19 + i, i);
+                    else emit("\tmov\tw%d, w%d", 19 + i, i);
+                } else if (is64ty((Ty)p->ty)) {
+                    emit("\tstr\tx%d, [x29, #-%ld]", i, (i + 1) * 8);
+                } else {
+                    emit("\tstr\tw%d, [x29, #-%ld]", i, (i + 1) * 8);
+                }
             }
         }
         brk_sp = 0;
@@ -497,6 +555,17 @@ void gen_a64(const char *outpath) {
         gen_stmts(m, m->body);
         emit("\tmov\tw0, wzr");          /* kembalian default jalur jatuh */
         emit(".Lret%d:", cur_ret_label);
+        {   /* pulihkan register lokal sebelum frame dibuang */
+            int i = loc_nreg - 1;
+            if (i >= 0 && (i % 2) == 0) {      /* sisa push tunggal di puncak */
+                emit("\tldr\tx%d, [sp], #16", 19 + i);
+                i--;
+            }
+            while (i >= 1) {
+                emit("\tldp\tx%d, x%d, [sp], #16", 19 + i - 1, 19 + i);
+                i -= 2;
+            }
+        }
         emit("\tmov\tsp, x29");
         emit("\tldp\tx29, x30, [sp], #16");
         emit("\tret");
