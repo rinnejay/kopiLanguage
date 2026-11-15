@@ -78,8 +78,16 @@ static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) |
         if (at('[')) { advance(); expect(']', "']' setelah '[' pada long[]"); return T_LNGARR; }
         return T_LONG;
     }
-    if (at(KW_DOUBLE)) { advance(); return T_DOUBLE; }
-    if (at(KW_FLOAT))  { advance(); return T_FLOAT; }
+    if (at(KW_DOUBLE)) {
+        advance();
+        if (at('[')) { advance(); expect(']', "']' setelah '[' pada double[]"); return T_DBLARR; }
+        return T_DOUBLE;
+    }
+    if (at(KW_FLOAT))  {
+        advance();
+        if (at('[')) { advance(); expect(']', "']' setelah '[' pada float[]"); return T_FLTARR; }
+        return T_FLOAT;
+    }
     if (at(KW_UINT8))  {
         advance();
         if (at('[')) { advance(); expect(']', "']' setelah '[' pada uint8[]"); return T_U8ARR; }

@@ -372,9 +372,12 @@ static void gen_stmt(Method *m, Node *s) {
     case ST_IDXASG: {
         /* nilai slot: 32-bit (int dsb.) atau 64-bit (long/String/objek) */
         Ty vt = (Ty)s->c->dty;
-        int v64 = ty_width(vt) == 64 || vt == T_ARI || vt == T_STR || vt == T_FN ||
-                  vt == T_LNGARR || vt == T_STRARR;   /* v1.29: array = pointer 64-bit */
+        Ty et = ty_elem((Ty)s->a->dty);   /* v1.49: elemen double[]/float[] */
+        Ty stt = ty_is_float(et) ? et : vt;
+        int v64 = ty_width(stt) == 64 || stt == T_ARI || stt == T_STR || stt == T_FN ||
+                  stt == T_LNGARR || stt == T_STRARR;   /* v1.29: array = pointer 64-bit */
         gen_expr(m, s->c);               /* nilai */
+        if (ty_is_float(et) && vt != et) { widen_ty(vt); conv_ty(vt, et); }
         push_val(v64);
         gen_expr(m, s->a);               /* x0 = array */
         push_val(1);

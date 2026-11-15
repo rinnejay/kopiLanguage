@@ -442,12 +442,15 @@ static Node *primary(void) {
     if (at(T_ID) && !strcmp(xs(t->text), "new") &&
         (peek2()->type == KW_INT || peek2()->type == KW_LONG ||
          peek2()->type == KW_STRING || peek2()->type == KW_BYTE ||
-         peek2()->type == KW_INT8 || peek2()->type == KW_UINT8)) {
+         peek2()->type == KW_INT8 || peek2()->type == KW_UINT8 ||
+         peek2()->type == KW_DOUBLE || peek2()->type == KW_FLOAT)) {
         Ty aty;
         if (peek2()->type == KW_INT)         aty = T_ARI;
         else if (peek2()->type == KW_LONG)   aty = T_LNGARR;
         else if (peek2()->type == KW_STRING) aty = T_STRARR;
         else if (peek2()->type == KW_UINT8)  aty = T_U8ARR;
+        else if (peek2()->type == KW_DOUBLE) aty = T_DBLARR;
+        else if (peek2()->type == KW_FLOAT)  aty = T_FLTARR;
         else                                 aty = T_BYTEARR;
         advance();                       /* new */
         advance();                       /* int/long/String/byte/uint8 */

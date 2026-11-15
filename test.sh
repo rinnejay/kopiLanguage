@@ -97,6 +97,10 @@ else
     fi
 fi
 
+# ─── array double[]/float[] (v1.49) ────────────────────────────────────
+printf '4\n1.25\n2\n8\n2\n2\n8.5\n4\n4.25\n' > "$T/kopi/fparr.ref"
+check fparr test/fparr.kop
+
 # ─── hash: SHA-256/384/512 + HMAC-SHA256/512 (vektor FIPS 180-4 / RFC 4231) ─
 python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"

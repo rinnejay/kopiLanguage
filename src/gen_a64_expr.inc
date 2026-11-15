@@ -111,7 +111,7 @@ static void gen_simple_to(Node *e, const char *reg) {
             return;
         }
         emit("\tadd\tx28, %s, %s, sxtw #3", breg, ireg);
-        if (et == T_LONG) {
+        if (et == T_LONG || et == T_DOUBLE) {
             emit("\tldr\t%s, [x28, #8]", reg);
         } else if (reg[0] == 'x' && !ty_is_uint(et) && !ty_is_float(et)) {
             /* int → long: satu instruksi (ldrsw menandatangani 32→64) */

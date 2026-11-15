@@ -320,6 +320,11 @@ static void gen_stmt(Node *s) {
 
     case ST_IDXASG:
         gen_expr(s->c);          /* nilai - dipakai paling atas */
+        {   /* v1.49: elemen double[]/float[] — konversi nilai ke tipe elemen */
+            Ty et = ty_elem((Ty)s->a->dty);
+            if (ty_is_float(et) && (Ty)s->c->dty != et)
+                emit_conv((Ty)s->c->dty, et);
+        }
         /* v1.22: a[i] = v dengan a dan i variabel lokal → satu opcode */
         if (s->a->kind == EX_VAR && s->b->kind == EX_VAR &&
             (Ty)s->a->dty != T_BYTEARR && (Ty)s->a->dty != T_U8ARR) {

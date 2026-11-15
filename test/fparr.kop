@@ -1,0 +1,46 @@
+/* fparr.kop — regresi array double[]/float[] (v1.49).
+ *
+ * Slot elemen 8 byte berisi bit-pattern IEEE-754; int yang disimpan ke
+ * elemen double/float harus dikonversi dulu (bukan disimpan mentah).
+ */
+
+class Main {
+    static double jumlah(double[] a) {
+        double s = 0.0;
+        for (int i = 0; i < a.length; i++) s = s + a[i];
+        return s;
+    }
+
+    static double rata(double[] a) {
+        return jumlah(a) / (double)a.length;
+    }
+
+    public static void main(String[] args) {
+        double[] d = new double[4];
+        d[0] = 1.25;
+        d[1] = 2;
+        d[2] = 0.5;
+        d[3] = 4.25;
+        System.out.println(d.length);
+        System.out.println(d[0]);
+        System.out.println(d[1]);
+        System.out.println(jumlah(d));
+        System.out.println(rata(d));
+
+        d[2] = d[2] * 4.0;
+        System.out.println(d[2]);
+
+        double[] e = d;
+        e[0] = 8.5;
+        System.out.println(d[0]);
+
+        float[] f = new float[3];
+        f[0] = 0.5f;
+        f[1] = 1.5f;
+        f[2] = 2;
+        System.out.println(f[0] + f[1] + f[2]);
+
+        int n = 3;
+        System.out.println(d[n]);
+    }
+}

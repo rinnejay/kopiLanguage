@@ -186,6 +186,9 @@ static void resolve_stmt(Node *s) {
         Ty et = type_expr(s->c);
         if (at == T_STRARR && et != T_STR)
             die("baris %d: elemen String[] harus String", s->line);
+        if ((at == T_DBLARR || at == T_FLTARR) && !ty_is_num(et))
+            die("baris %d: elemen %s harus numerik",
+                s->line, at == T_DBLARR ? "double[]" : "float[]");
         if (at == T_BYTEARR || at == T_U8ARR) {
             /* v1.44: penyimpanan ke buffer packed memotong ke 8 bit;
              * nilai integer apa pun diterima (seperti assignment Java
@@ -194,7 +197,8 @@ static void resolve_stmt(Node *s) {
                 die("baris %d: elemen %s harus integer",
                     s->line, at == T_BYTEARR ? "byte[]" : "uint8[]");
         }
-        else if (at != T_STRARR && !ty_is_int(et))
+        else if (at != T_STRARR && at != T_DBLARR && at != T_FLTARR &&
+                 !ty_is_int(et))
             die("baris %d: elemen %s harus integer (perlu cast eksplisit)",
                 s->line, at == T_LNGARR ? "long[]" : "int[]");
         /* v1.20: rujukan tidak boleh disimpan ke array milik luar malloc{} */

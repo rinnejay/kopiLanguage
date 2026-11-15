@@ -10,7 +10,9 @@ typedef enum {
     /* v1.16: array 64-bit slot dengan tipe elemen (fisik = T_ARI) */
     T_LNGARR, T_STRARR,
     /* v1.43: buffer byte packed — 1 byte per elemen, header 8 byte */
-    T_BYTEARR, T_U8ARR
+    T_BYTEARR, T_U8ARR,
+    /* v1.49: array elemen float/double (slot 8 byte, bit-pattern IEEE) */
+    T_DBLARR, T_FLTARR
 } Ty;
 
 /* ── sifat tipe numerik ─────────────────────────────────────────── */
@@ -35,7 +37,8 @@ static inline int ty_is_num(Ty t) {
 /* array 64-bit-slot: int[] klasik, long[]/String[] bertipe (v1.16) */
 static inline int ty_is_arr(Ty t) {
     return t == T_ARI || t == T_LNGARR || t == T_STRARR ||
-           t == T_BYTEARR || t == T_U8ARR;
+           t == T_BYTEARR || t == T_U8ARR ||
+           t == T_DBLARR || t == T_FLTARR;      /* v1.49 */
 }
 
 /* v1.44: buffer packed — String, byte[], uint8[] berbagi layout
@@ -55,6 +58,8 @@ static inline Ty ty_elem(Ty t) {
     case T_STRARR:  return T_STR;
     case T_BYTEARR: return T_BYTE;
     case T_U8ARR:   return T_UINT8;
+    case T_DBLARR:  return T_DOUBLE;
+    case T_FLTARR:  return T_FLOAT;
     default:        return t;
     }
 }
