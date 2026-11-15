@@ -1952,6 +1952,69 @@ check threadtest test/threadtest.kop
     && cc -target x86_64-linux-gnu -c "$T/kopi/threadtest64.s" -o /dev/null \
     && echo "PASS  threadtest [x64]" || { echo "FAIL  threadtest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
+# ─── fitur bahasa v1.46: channel CSP + mutex + executor ─────────────────
+printf '15\n10\n20\n30\n3\n3\n4000\n110\nselesai\n' > "$T/kopi/chantest.ref"
+check chantest test/chantest.kop
+./kopicc test/chantest.kop -t x64 -o "$T/kopi/chantest64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/chantest64.s" -o /dev/null \
+    && echo "PASS  chantest [x64]" || { echo "FAIL  chantest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
+# ─── v1.46: superinstruksi VM (x = x*C+K, acc += x>>>K) ─────────────────
+printf '%s\n' '-928224423' '33236353' '505' > "$T/kopi/vmfast.ref"
+check vmfast test/vmfast.kop
+./kopicc test/vmfast.kop -t x64 -o "$T/kopi/vmfast64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/vmfast64.s" -o /dev/null \
+    && { echo "PASS  vmfast [x64]"; PASS=$((PASS+1)); } \
+    || { echo "FAIL  vmfast [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
+# ─── v1.46: JIT loop angka aarch64 + OP_LOOP_R ─────────────────────────
+cat > "$T/kopi/jittest.ref" <<'EOF'
+-1591462976
+51849
+0
+6368366
+6368547
+6368366
+6368366
+6368366
+6368366
+1478569377
+3870493
+-2034464594
+EOF
+check jittest test/jittest.kop
+KOPI_NOJIT=1 ./kopivm "$T/kopi/jittest.kbc" > "$T/kopi/jittest.nojit.out" \
+    && diff -q "$T/kopi/jittest.ref" "$T/kopi/jittest.nojit.out" >/dev/null 2>&1 \
+    && { echo "PASS  jittest [nojit]"; PASS=$((PASS+1)); } \
+    || { echo "FAIL  jittest [nojit]: JIT vs interpreter"; FAIL=$((FAIL+1)); }
+
+# ─── v1.46: JIT loop array packed (acc += buf[i], acc ^= buf[i]) ───────
+cat > "$T/kopi/jitarr.ref" <<'EOF'
+12749904
+96
+-49840
+6375080
+127499040
+EOF
+check jitarr test/jitarr.kop
+KOPI_NOJIT=1 ./kopivm "$T/kopi/jitarr.kbc" > "$T/kopi/jitarr.nojit.out" \
+    && diff -q "$T/kopi/jitarr.ref" "$T/kopi/jitarr.nojit.out" >/dev/null 2>&1 \
+    && { echo "PASS  jitarr [nojit]"; PASS=$((PASS+1)); } \
+    || { echo "FAIL  jitarr [nojit]: JIT vs interpreter"; FAIL=$((FAIL+1)); }
+
+# bail batas array: JIT harus menyerahkan error yang sama ke interpreter
+./kopicc test/jitarroob.kop -t vm -o "$T/kopi/jitarroob.kbc" \
+    && ./kopivm "$T/kopi/jitarroob.kbc" > "$T/kopi/jitarroob.out" 2> "$T/kopi/jitarroob.jit.err"
+JITRC=$?
+KOPI_NOJIT=1 ./kopivm "$T/kopi/jitarroob.kbc" > "$T/kopi/jitarroob.out" 2> "$T/kopi/jitarroob.nojit.err"
+NOJITRC=$?
+if [ $JITRC -ne 0 ] && [ $NOJITRC -ne 0 ] &&
+   diff -q "$T/kopi/jitarroob.jit.err" "$T/kopi/jitarroob.nojit.err" >/dev/null 2>&1; then
+    echo "PASS  jitarroob [bail]"; PASS=$((PASS+1))
+else
+    echo "FAIL  jitarroob [bail]: error JIT != interpreter"; FAIL=$((FAIL+1))
+fi
+
 # ─── situs dokumentasi HTML (GitHub Pages) ───
 # gen_libref dulu: signature lib/*.kop harus sinkron dengan docs/api-*.md
 if python3 tools/gen_libref.py > "$T/kopi/libref.out" 2>&1 &&

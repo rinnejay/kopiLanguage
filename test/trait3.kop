@@ -1,0 +1,10 @@
+trait Printable {
+    void print();
+    int hitung(int x);
+}
+
+class Main : Printable {
+    public static void main(String[] args) {
+        System.out.println("Test trait multi method");
+    }
+}

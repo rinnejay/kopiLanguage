@@ -94,7 +94,7 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b
 
 ## Reader
 
-`lib/io/Reader.kop` · 1 fungsi
+`lib/io/Reader.kop` · 10 fungsi
 
 Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.
 
@@ -113,12 +113,21 @@ r.close();
 | Fungsi | Keterangan |
 |---|---|
 | `static Reader open(String path)` | buka file untuk dibaca (null bila gagal) |
+| `boolean valid()` | true bila file berhasil dibuka |
+| `boolean fill()` | isi buffer; false kalau sudah EOF |
+| `int readByte()` | baca satu byte; -1 di EOF |
+| `boolean eof()` | true kalau tidak ada byte lagi |
+| `String readLine()` | baca satu baris (tanpa newline); "" di EOF |
+| `String readAll()` | baca seluruh sisa isi sebagai teks |
+| `int[] readBytes(int n)` | baca n byte; boleh lebih pendek di EOF |
+| `int available()` | jumlah byte yang belum dibaca (perkiraan) |
+| `void close()` | tutup file |
 
 ---
 
 ## Writer
 
-`lib/io/Writer.kop` · 2 fungsi
+`lib/io/Writer.kop` · 9 fungsi
 
 Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.
 
@@ -138,5 +147,12 @@ w.close();
 |---|---|
 | `static Writer open(String path)` | buat/truncate file untuk ditulis |
 | `static Writer append(String path)` | buka file untuk ditambahkan di akhir |
+| `boolean valid()` | true bila file berhasil dibuka |
+| `void put(int c)` | tulis byte ke buffer; flush bila penuh |
+| `void write(String s)` | tulis teks |
+| `void writeLine(String s)` | tulis teks + newline |
+| `void writeBytes(int[] data)` | tulis byte biner |
+| `void flush()` | tulis buffer ke disk |
+| `void close()` | flush lalu tutup file |
 
 ---

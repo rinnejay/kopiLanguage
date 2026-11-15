@@ -1,0 +1,62 @@
+// Chan.kop — channel CSP untuk komunikasi antar-thread (v1.46).
+//
+// Channel menyimpan payload 64-bit (long) atau closure (fn). Untuk antrean
+// tugas executor, gunakan sendFn/recvFn; worker memanggil job() setelah
+// recvFn. recv/recvFn memblokir sampai ada nilai atau channel ditutup.
+// Setelah ditutup dan kosong, recv mengembalikan 0 dan recvFn
+// mengembalikan closure kosong; cek isClosed() untuk keluar dari loop.
+//
+//   import Chan;
+//   Chan q = new Chan(16);
+//   q.sendFn(() => { System.out.println("tugas"); });
+//   fn job = q.recvFn();
+//   if (!q.isClosed()) job();
+//   q.close();
+
+class Chan {
+    long h;
+
+    Chan(int cap) {
+        this.h = Net.channew(cap);
+    }
+
+    /* kirim/terima nilai long (int otomatis naik ke long) */
+    void send(long v) {
+        Net.chansend(this.h, v);
+    }
+
+    long recv() {
+        return Net.chanrecv(this.h);
+    }
+
+    /* varian aman: ok[0] = 1 bila nilai diterima, 0 bila channel
+     * sudah ditutup dan kosong (tidak kehilangan nilai terakhir). */
+    long recvOk(int[] ok) {
+        return Net.chanrecvok(this.h, ok);
+    }
+
+    /* kirim/terima closure — dipakai executor untuk antrean tugas */
+    void sendFn(fn f) {
+        Net.chansendfn(this.h, f);
+    }
+
+    fn recvFn() {
+        return Net.chanrecvfn(this.h);
+    }
+
+    fn recvFnOk(int[] ok) {
+        return Net.chanrecvfnok(this.h, ok);
+    }
+
+    void close() {
+        Net.chanclose(this.h);
+    }
+
+    int len() {
+        return Net.chanlen(this.h);
+    }
+
+    boolean isClosed() {
+        return Net.chanclosed(this.h) != 0;
+    }
+}

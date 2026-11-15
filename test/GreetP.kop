@@ -1,0 +1,5 @@
+trait GreetP {
+    void hello() {
+        System.out.println("hello dari trait import");
+    }
+}

@@ -1,6 +1,6 @@
 # Referensi API — System
 
-Argumen, environment, waktu, log, dan UUID. Semua signature di bawah diekstrak langsung dari source `lib/system/`; deskripsi berasal dari komentar sumber atau metadata.
+Argumen, environment, waktu, log, UUID, channel, dan mutex. Semua signature di bawah diekstrak langsung dari source `lib/system/`; deskripsi berasal dari komentar sumber atau metadata.
 
 > Impor dengan `import {Nama};` — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.
 
@@ -22,6 +22,43 @@ Modul pustaka Kopi.
 | `static String[] positionals()` | — |
 | `static String command()` | perintah = positional pertama, "" bila tidak ada |
 | `static String[] flags()` | — |
+
+---
+
+## Chan
+
+`lib/system/Chan.kop` · 9 fungsi
+
+Channel CSP antar-thread: payload `long` atau closure `fn`, dengan buffer melingkar dan penunggu condvar.
+
+```java
+import Chan;
+
+Chan q = new Chan(16);
+q.sendFn(() => { System.out.println("tugas"); });
+fn job = q.recvFn();
+if (!q.isClosed()) job();
+q.close();
+```
+
+**Catatan**
+
+- `send`/`recv` untuk `long`; `sendFn`/`recvFn` untuk closure (antrean executor).
+- `recv` mengembalikan 0 setelah channel ditutup dan kosong; pakai `recvOk`/`recvFnOk` agar nilai terakhir tidak hilang.
+- `recvOk`/`recvFnOk` mengisi `ok[0] = 1` bila nilai diterima, `0` bila channel tutup/kosong.
+- `close` membangunkan semua penunggu; `send` setelah tutup diabaikan.
+
+| Fungsi | Keterangan |
+|---|---|
+| `void send(long v)` | kirim nilai `long` (memblokir bila penuh) |
+| `long recv()` | terima nilai `long` (memblokir; 0 bila tutup/kosong) |
+| `long recvOk(int[] ok)` | terima `long`; `ok[0]` = 1 bila dapat nilai |
+| `void sendFn(fn f)` | kirim closure (antrean tugas) |
+| `fn recvFn()` | terima closure (closure kosong bila tutup/kosong) |
+| `fn recvFnOk(int[] ok)` | terima closure; `ok[0]` = 1 bila dapat closure |
+| `void close()` | tutup channel dan bangunkan semua penunggu |
+| `int len()` | jumlah nilai yang sedang di buffer |
+| `boolean isClosed()` | true bila channel sudah ditutup |
 
 ---
 
@@ -94,6 +131,34 @@ Log.error("db", "gagal konek");
 | `static int WARN = 2` | — |
 | `static int ERROR = 3` | — |
 | `static int OFF = 4` | — |
+
+---
+
+## Mutex
+
+`lib/system/Mutex.kop` · 3 fungsi
+
+Kunci mutual-exclusion antar-thread untuk melindungi data bersama.
+
+```java
+import Mutex;
+
+Mutex m = new Mutex();
+m.lock();
+// ... akses data bersama ...
+m.unlock();
+```
+
+**Catatan**
+
+- `tryLock` tidak memblokir: true bila kunci berhasil diambil.
+- Selalu `unlock` pada jalur yang sama; tidak ada RAII/finalizer.
+
+| Fungsi | Keterangan |
+|---|---|
+| `void lock()` | ambil kunci (memblokir sampai tersedia) |
+| `void unlock()` | lepas kunci |
+| `boolean tryLock()` | coba ambil kunci tanpa menunggu; true bila berhasil |
 
 ---
 

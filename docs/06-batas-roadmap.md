@@ -40,18 +40,20 @@ Batas teknis lain:
 |---|---|
 | aarch64 native | **dijalankan** di Termux/ARM, diuji suite |
 | VM KOP1 | **dijalankan**, diuji suite |
+| JIT VM (aarch64) | **✅ v1.46** — loop angka panas (`OP_LOOP`/`OP_LOOP_R` dengan badan `OP_MULADD`/`OP_ADDSHR`) dan loop checksum array packed (`OP_ILOAD` + `OP_IDXR_UB`/`OP_IDXR_B` + `OP_OP_STORE`, mis. `acc += buf[i]`) diterjemahkan ke kode mesin dan seluruh sisa iterasi dijalankan native; indeks di luar batas membuat JIT bail ke interpreter. `KOPI_NOJIT=1` mematikan JIT. Belum ada JIT untuk panggilan, `OP_ISTORE` di tengah badan, cabang, atau array 64-bit (`int[]`/`long[]`) |
 | x86-64 native | **hanya verifikasi sintaks** (`cc -target x86_64-linux-gnu -c`); belum dieksekusi di CI |
-| Thread OS | **✅ v1.45** — sintaks `thread <long> { ... }` + `wait h` (pthread; a64 & VM; handle `long`/`long[]`). Belum ada mutex/channel/thread pool. `fork`/`async` belum ada |
+| Thread OS | **✅ v1.45** — sintaks `thread <long> { ... }` + `wait h` (pthread; a64 & VM; handle `long`/`long[]`). **✅ v1.46** — `Chan` (CSP, payload `long`/`fn`) + `Mutex` (`lock`/`unlock`/`tryLock`). Belum ada thread pool bawaan, `select`, atau `fork`/`async` |
 | Signal handler / graceful shutdown | tidak ada |
 | Diagnostik runtime | nomor baris + stack trace + `saran:` perbaikan |
 | Arena | per-thread (a64 TLS, VM heap/thread, x64 global); `malloc{}` otomatis (mmap hingga 4096 MB) atau `malloc<N>` 1 kb–4096 MB; tanpa GC |
 | Cross-compile | a64 hanya di ARM; x64 hanya di x86-64 |
 
-Konsekuensi: thread OS tersedia untuk tugas CPU-bound (v1.45), tetapi
-contoh server tetap **single-thread**; belum ada mutex/channel sehingga
-berbagi state antar-thread harus lewat pola join / satu penulis per sel.
-Service yang butuh isolasi penuh tetap paling aman dijalankan sebagai
-beberapa proses di belakang reverse proxy.
+Konsekuensi: thread OS tersedia untuk tugas CPU-bound (v1.45) dan
+sinkronisasi antar-thread lewat `Mutex`/`Chan` (v1.46), tetapi contoh
+server tetap **single-thread**; thread pool/executor masih harus
+dirakit sendiri dengan `long[]` + `Chan.sendFn`. Service yang butuh
+isolasi penuh tetap paling aman dijalankan sebagai beberapa proses di
+belakang reverse proxy.
 
 ## 3. Jaringan
 
@@ -104,8 +106,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **174/174** (v1.38) — a64 + VM + sintaks x64 + dokumen HTML
-  (174 PASS termasuk cek x64).
+- Suite: **213/213** (v1.46) — a64 + VM + sintaks x64 + dokumen HTML
+  (213 PASS, 0 fail; x64 diverifikasi sintaks saja, belum dijalankan).
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal

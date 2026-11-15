@@ -1,0 +1,17 @@
+// v1.47: trait dari file .h lewat import "path" + Trait::method().
+import "HeaderTrait.h";
+
+class A : HeaderTrait {
+    void hello() {
+        System.out.println("A sebelum");
+        HeaderTrait::hello();
+        System.out.println("A sesudah");
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        A a = new A();
+        a.hello();
+    }
+}

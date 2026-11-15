@@ -38,6 +38,10 @@ enum {
     OP_IDXR_L,                      /* [slotArr:2][slotIdx:2] */
     OP_IDXW_L,                      /* [slotArr:2][slotIdx:2] — pop nilai */
     OP_LOOP,                        /* [type][cmp][slot:2][delta:4][imm:4][target:4] */
+    OP_LOOP_R,                      /* [type][cmp][slot:2][delta:4][boundSlot:2][target:4] */
+    /* v1.46: superinstruksi pola loop angka (backend VM saja) */
+    OP_MULADD,                      /* [slot:2][c:4][k:4] — slot = slot*c+k (int32) */
+    OP_ADDSHR,                      /* [slotX:2][slotY:2][shift:1] — slotX += slotY>>>shift */
     /* v1.43: buffer byte packed 1 byte/elemen */
     OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B
 };
@@ -115,11 +119,33 @@ static void gen_stmt(Node *s) {
     switch (s->kind) {
     case ST_VAR:
     case ST_ASSIGN:
+        /* v1.46: pola loop angka — x = x*C+K dan x += y>>>K jadi satu opcode */
+        if (s->kind == ST_ASSIGN && s->a && (Ty)s->dty == T_INT &&
+            (Ty)s->a->dty == T_INT && s->a->kind == EX_BIN) {
+            Node *b = s->a;
+            long c, k;
+            if (!strcmp(b->str, "+") && b->a->kind == EX_BIN &&
+                !strcmp(b->a->str, "*") && b->a->a->kind == EX_VAR &&
+                (Ty)b->a->dty == T_INT && (int)b->a->a->ival == (int)s->ival &&
+                const_int(b->a->b, &c) && const_int(b->b, &k)) {
+                em8(OP_MULADD); em16((int)s->ival); em32(c); em32(k);
+                break;
+            }
+            if (!strcmp(b->str, "+") && b->a->kind == EX_VAR &&
+                (Ty)b->a->dty == T_INT && (int)b->a->ival == (int)s->ival &&
+                b->b->kind == EX_BIN && !strcmp(b->b->str, ">>>") &&
+                b->b->a->kind == EX_VAR && (Ty)b->b->a->dty == T_INT &&
+                const_int(b->b->b, &k) && k >= 0 && k <= 31) {
+                em8(OP_ADDSHR); em16((int)s->ival);
+                em16((int)b->b->a->ival); em8((int)k);
+                break;
+            }
+        }
         /* v1.22: x = x <op> y → OP_OP_STORE (baca/tulis lokal tanpa stack) */
         if (s->kind == ST_ASSIGN && s->a && s->a->kind == EX_BIN &&
             (Ty)s->dty == T_INT && (Ty)s->a->dty == T_INT &&
             s->a->a->kind == EX_VAR && (int)s->a->a->ival == (int)s->ival &&
-            (Ty)s->a->b->dty == T_INT && bin_code(s->a->str) >= 0) {
+            opstore_rhs_ok((Ty)s->a->b->dty) && bin_code(s->a->str) >= 0) {
             gen_expr(s->a->b);
             em8(OP_OP_STORE); em8(0); em8(bin_code(s->a->str));
             em16((int)s->ival);
@@ -183,8 +209,11 @@ static void gen_stmt(Node *s) {
         if (s->a) gen_stmt(s->a);       /* init (ST_VAR / ST_ASSIGN) */
         int ltop = newlab(), lend = newlab(), lcont = newlab();
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
-        int slot, cmp, imm, delta;
+        int slot, cmp, imm, delta, bound = 0, varb = 0;
         int fast = s->b && cond_pat(s->b, &slot, &cmp, &imm);
+        if (!fast && s->b && cond_pat2(s->b, &slot, &cmp, &bound)) {
+            fast = 1; varb = 1;         /* v1.46: batas variabel → OP_LOOP_R */
+        }
         int inc = fast && step_pat(s->c, slot, &delta);
         loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
@@ -196,9 +225,15 @@ static void gen_stmt(Node *s) {
             gen_stmts(s->d);
             mark(lcont);                /* target continue: sebelum langkah */
             if (inc) {
-                em8(OP_LOOP); em8(0); em8(cmp); em16(slot);
-                em32(delta); em32(imm);
-                fix_at(ltop);
+                if (varb) {
+                    em8(OP_LOOP_R); em8(0); em8(cmp); em16(slot);
+                    em32(delta); em16(bound);
+                    fix_at(ltop);
+                } else {
+                    em8(OP_LOOP); em8(0); em8(cmp); em16(slot);
+                    em32(delta); em32(imm);
+                    fix_at(ltop);
+                }
             } else {
                 if (s->c) gen_stmt(s->c);
                 emit_cond_jmp(s->b, ltop, 1);

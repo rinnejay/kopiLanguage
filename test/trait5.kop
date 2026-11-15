@@ -1,0 +1,16 @@
+trait Printable {
+    void print();
+}
+
+class Impl : Printable {
+    void print() {
+        System.out.println("Impl.print() dipanggil");
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        Impl obj = new Impl();
+        obj.print();
+    }
+}

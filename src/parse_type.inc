@@ -14,7 +14,8 @@ static Ty type_expr_raw(Node *e) {
             e->str = 0;
         }
         if (e->ival == 5 || e->ival == 6) return (Ty)e->dty;
-        if (e->ival == 22 || e->ival == 23 || e->ival == 24) {
+        if (e->ival == 22 || e->ival == 23 || e->ival == 24 ||
+            (e->ival >= 53 && e->ival <= 66)) {
             for (Node *aa = e->a; aa; aa = aa->next) type_expr(aa);
             return (Ty)e->dty;
         }
@@ -270,6 +271,21 @@ static Ty type_expr_raw(Node *e) {
             else if (!strcmp(fn, "threadid"))    { bi = 50; want = 1; }
             else if (!strcmp(fn, "threadself"))  { bi = 51; want = 0; }
             else if (!strcmp(fn, "threadyield")) { bi = 52; want = 0; }
+            /* v1.46: channel + mutex untuk executor multithread */
+            else if (!strcmp(fn, "channew"))     { bi = 53; want = 1; }
+            else if (!strcmp(fn, "chansend"))    { bi = 54; want = 2; }
+            else if (!strcmp(fn, "chanrecv"))    { bi = 55; want = 1; }
+            else if (!strcmp(fn, "chanclose"))   { bi = 56; want = 1; }
+            else if (!strcmp(fn, "chanlen"))     { bi = 57; want = 1; }
+            else if (!strcmp(fn, "chanrecvfn"))  { bi = 58; want = 1; }
+            else if (!strcmp(fn, "chansendfn"))  { bi = 59; want = 2; }
+            else if (!strcmp(fn, "mutexnew"))    { bi = 60; want = 0; }
+            else if (!strcmp(fn, "mutexlock"))   { bi = 61; want = 1; }
+            else if (!strcmp(fn, "mutexunlock")) { bi = 62; want = 1; }
+            else if (!strcmp(fn, "chanclosed"))  { bi = 63; want = 1; }
+            else if (!strcmp(fn, "mutextrylock")){ bi = 64; want = 1; }
+            else if (!strcmp(fn, "chanrecvok"))  { bi = 65; want = 2; }
+            else if (!strcmp(fn, "chanrecvfnok")){ bi = 66; want = 2; }
             else die("baris %d: fungsi Net.%s tidak ada", e->line, fn);
 
             int narg = (int)e->ival;
@@ -397,6 +413,26 @@ static Ty type_expr_raw(Node *e) {
                 } else if (bi >= 48 && bi <= 50) {
                     if (t != T_LONG && t != T_UINT64)
                         die("baris %d: argumen Net.%s harus handle long", e->line, fn);
+                } else if (bi == 53) {
+                    if (t != T_INT)
+                        die("baris %d: Net.channew kapasitas harus int", e->line);
+                } else if (bi == 54 || bi == 59) {
+                    if (i == 0 && t != T_LONG && t != T_UINT64)
+                        die("baris %d: Net.%s handle channel harus long", e->line, fn);
+                    if (i == 1) {
+                        if (bi == 59 && t != T_FN)
+                            die("baris %d: Net.chansendfn nilai harus lambda/fn", e->line);
+                        if (bi == 54 && t != T_LONG && t != T_UINT64)
+                            die("baris %d: Net.chansend nilai harus long (pakai suffix L)", e->line);
+                    }
+                } else if (bi == 65 || bi == 66) {
+                    if (i == 0 && t != T_LONG && t != T_UINT64)
+                        die("baris %d: Net.%s handle channel harus long", e->line, fn);
+                    if (i == 1 && t != T_ARI)
+                        die("baris %d: Net.%s penanda harus int[] (new int[1])", e->line, fn);
+                } else if (bi >= 55 && bi <= 64 && bi != 59 && bi != 60) {
+                    if (t != T_LONG && t != T_UINT64)
+                        die("baris %d: argumen Net.%s harus handle long", e->line, fn);
                 } else if (t != T_INT)
                     die("baris %d: argumen %d Net.%s harus int", e->line, i, fn);
             }
@@ -409,7 +445,10 @@ static Ty type_expr_raw(Node *e) {
             }
             e->kind = EX_NET;
             e->ival = bi;
-            if (bi == 19 || bi == 47) { e->dty = (int)T_LONG; return T_LONG; }
+            if (bi == 19 || bi == 47 || bi == 53 || bi == 55 || bi == 60 || bi == 65) {
+                e->dty = (int)T_LONG; return T_LONG;
+            }
+            if (bi == 58 || bi == 66) { e->dty = (int)T_FN; return T_FN; }
             if (bi == 22 || bi == 31 || bi == 32 || bi == 40) { e->dty = (int)T_STR; return T_STR; }
             if (bi == 23 || bi == 24) { e->dty = (int)T_BOOL; return T_BOOL; }
             if (bi == 41) { e->dty = (int)T_ARI; return T_ARI; }
@@ -603,6 +642,36 @@ static Ty type_expr_raw(Node *e) {
         e->dty = (long)m->ret;    /* tipe kembalian untuk backend native */
         return m->ret;
     }
+    case EX_PCALL: {
+        /* v1.47: Trait::method(args) → panggil implementasi asli trait.
+         * apply_traits menyimpan salinan metode trait dengan nama mangled
+         * `__tr_<Trait>_<method>` di class yang memakai trait tersebut. */
+        const char *tr = e->cls, *mname = e->str;
+        char *mangled = xmalloc(strlen(tr) + strlen(mname) + 8);
+        sprintf(mangled, "__tr_%s_%s", tr, mname);
+        Method *pm = find_method(cur_method ? cur_method->cls : "", mangled);
+        if (!pm)
+            die("baris %d: trait '%s::%s' tidak tersedia di class '%s' — "
+                "class harus memakai trait dan metode harus punya implementasi default",
+                e->line, tr, mname, cur_method ? cur_method->cls : "?");
+        /* metode instance trait: sisipkan `this` sebagai argumen 0.
+         * metode static trait: panggil langsung tanpa `this`. */
+        if (pm->params && !strcmp(pm->params->name, "this")) {
+            if (!cur_method || !cur_method->is_inst)
+                die("baris %d: '%s::%s' hanya bisa dipakai di dalam metode instance",
+                    e->line, tr, mname);
+            Node *recv = newnode(EX_VAR, e->line);
+            recv->str = xs("this");
+            recv->next = e->a;
+            e->a = recv;
+            e->ival = (long)((int)e->ival + 1);
+        }
+        char *full = xmalloc(strlen(pm->cls) + strlen(pm->name) + 2);
+        sprintf(full, "%s.%s", pm->cls, pm->name);
+        e->str = full;
+        e->kind = EX_CALL;
+        return type_expr_raw(e);
+    }
     case EX_ARROW:
         resolve_lambda(e);
         return T_FN;   /* nilai lambda bertipe fn; ret internal di Method */
@@ -652,6 +721,19 @@ static Ty type_expr_raw(Node *e) {
         /* v1.41: `Class.KONSTANTA` → panggilan Class.KONSTANTA().
          * Hanya bila `Class` bukan variabel lokal (variabel menang). */
         if (e->a && e->a->kind == EX_VAR && !lookup_name(e->a->str)) {
+            /* v1.46: Enum.KONSTANTA → literal int (tanpa objek runtime) */
+            if (find_enum(e->a->str)) {
+                long ev;
+                if (!enum_lookup(e->a->str, e->str, &ev))
+                    die("baris %d: enum %s tidak punya konstanta '%s'",
+                        e->line, e->a->str, e->str);
+                e->kind = EX_INT;
+                e->ival = ev;
+                e->str = 0;
+                e->a = 0;
+                e->dty = (int)T_INT;
+                return T_INT;
+            }
             Class *cc = find_class(e->a->str);
             if (cc && find_constfield(cc->name, e->str)) {
                 char *full = xmalloc(strlen(cc->name) + strlen(e->str) + 2);

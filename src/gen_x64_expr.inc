@@ -395,9 +395,9 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tjge .LPVX%df", ln);
             emit("\tmovl %%r8d, %%eax");
             emit("\tsubl %%r9d, %%eax");
-            emit("\tcmpl $240, %%eax");
+            emit("\tcmpl $1048576, %%eax");         /* maks 1 MiB per syscall */
             emit("\tjle .LPVX%dc", ln);
-            emit("\tmovl $240, %%eax");
+            emit("\tmovl $1048576, %%eax");
             emit(".LPVX%dc:", ln);
             emit("\tmovl %%eax, %%edx");
             emit("\tleaq 8(%%r10,%%r9), %%rsi");
@@ -438,9 +438,9 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tjge .LPSX%df2", ln);
             emit("\tmovl %%r8d, %%eax");
             emit("\tsubl %%r9d, %%eax");
-            emit("\tcmpl $240, %%eax");
+            emit("\tcmpl $1048576, %%eax");         /* maks 1 MiB per syscall */
             emit("\tjle .LPSX%dc", ln);
-            emit("\tmovl $240, %%eax");
+            emit("\tmovl $1048576, %%eax");
             emit(".LPSX%dc:", ln);
             emit("\tmovl %%eax, %%edx");
             emit("\tleaq 8(%%r10,%%r9), %%rsi");
@@ -1335,6 +1335,81 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmovl $24, %%eax");             /* __NR_sched_yield */
             emit("\tsyscall");
             emit("\txorl %%eax, %%eax");
+            return 0;
+        }
+        if (e->ival >= 53 && e->ival <= 66) {
+            /* v1.46: channel + mutex (pthread) */
+            if (e->ival == 53) {                   /* channew(cap) */
+                gen_expr(m, e->a);
+                spush();
+                emit("\tmovq (%%rsp), %%rdi");
+                emit("\taddq $8, %%rsp"); par ^= 1;
+                int need = par;
+                if (need) emit("\tsubq $8, %%rsp");
+                emit("\tcall kop_chan_new");
+                if (need) emit("\taddq $8, %%rsp");
+                return 1;
+            }
+            if (e->ival == 60) {                   /* mutexnew() */
+                int need = par;
+                if (need) emit("\tsubq $8, %%rsp");
+                emit("\tcall kop_mutex_new");
+                if (need) emit("\taddq $8, %%rsp");
+                return 1;
+            }
+            if (e->ival == 55 || e->ival == 58) {  /* chanrecv / chanrecvfn */
+                gen_expr(m, e->a);
+                spush();
+                emit("\tmovq (%%rsp), %%rdi");
+                emit("\taddq $8, %%rsp"); par ^= 1;
+                int need = par;
+                if (need) emit("\tsubq $8, %%rsp");
+                emit("\tcall kop_chan_recv");
+                if (need) emit("\taddq $8, %%rsp");
+                return 1;
+            }
+            if (e->ival == 54 || e->ival == 59) {  /* chansend / chansendfn */
+                gen_expr(m, e->a);
+                spush();
+                gen_expr(m, e->a->next);
+                spush();
+                emit("\tmovq 8(%%rsp), %%rdi");    /* handle */
+                emit("\tmovq (%%rsp), %%rsi");     /* payload */
+                emit("\taddq $16, %%rsp"); par ^= 0;
+                int need = par;
+                if (need) emit("\tsubq $8, %%rsp");
+                emit("\tcall kop_chan_send");
+                if (need) emit("\taddq $8, %%rsp");
+                return 0;
+            }
+            if (e->ival == 65 || e->ival == 66) {  /* chanrecvok / chanrecvfnok */
+                gen_expr(m, e->a);
+                spush();
+                gen_expr(m, e->a->next);
+                spush();
+                emit("\tmovq 8(%%rsp), %%rdi");    /* handle */
+                emit("\tmovq (%%rsp), %%rsi");     /* int[] ok */
+                emit("\taddq $16, %%rsp"); par ^= 0;
+                int need = par;
+                if (need) emit("\tsubq $8, %%rsp");
+                emit("\tcall kop_chan_recv_ok");
+                if (need) emit("\taddq $8, %%rsp");
+                return 1;
+            }
+            /* satu argumen handle: close/len/closed/lock/unlock/trylock */
+            gen_expr(m, e->a);
+            spush();
+            emit("\tmovq (%%rsp), %%rdi");
+            emit("\taddq $8, %%rsp"); par ^= 1;
+            int need = par;
+            if (need) emit("\tsubq $8, %%rsp");
+            if (e->ival == 56)      emit("\tcall kop_chan_close");
+            else if (e->ival == 57) emit("\tcall kop_chan_len");
+            else if (e->ival == 63) emit("\tcall kop_chan_closed");
+            else if (e->ival == 61) emit("\tcall kop_mutex_lock");
+            else if (e->ival == 62) emit("\tcall kop_mutex_unlock");
+            else                    emit("\tcall kop_mutex_trylock");
+            if (need) emit("\taddq $8, %%rsp");
             return 0;
         }
         int n = 0;

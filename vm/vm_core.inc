@@ -63,6 +63,10 @@ enum {
     OP_IDXR_L,
     OP_IDXW_L,
     OP_LOOP,
+    OP_LOOP_R,                      /* loop dengan batas berupa slot lokal */
+    /* v1.46: superinstruksi pola loop angka */
+    OP_MULADD,                      /* slot = slot*c+k (int32) */
+    OP_ADDSHR,                      /* slotX += slotY>>>shift */
     /* v1.43: buffer byte packed 1 byte/elemen */
     OP_NEWARR_B, OP_IDXR_B, OP_IDXR_UB, OP_IDXW_B
 };

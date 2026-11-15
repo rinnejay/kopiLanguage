@@ -1,0 +1,75 @@
+// filebench.kop — baca file besar + checksum byte, ukur kecepatan VM vs native.
+//
+// Loop checksum `s = s + buf[i]` dan `x = x ^ s` dikenali compiler VM
+// sebagai OP_ILOAD + OP_IDXR_UB + OP_OP_STORE. Setelah beberapa iterasi,
+// kopivm menerjemahkan SELURUH loop ke kode mesin aarch64, sehingga
+// biaya checksum tidak lagi didominasi interpreter (pada mesin uji ini
+// VM JIT bahkan lebih cepat daripada backend a64 yang masih menumpahkan
+// tiap operand ke stack).
+//
+// Pakai:
+//   ./kopicc examples/filebench.kop -t vm -o filebench.kbc
+//   ./kopivm filebench.kbc [file] [ukuran-chunk]
+//   KOPI_NOJIT=1 ./kopivm filebench.kbc        // interpreter murni
+//
+// Bandingkan dengan native:
+//   ./kopicc examples/filebench.kop -t a64 -o filebench.s
+//   cc filebench.s -o filebench && ./filebench [file] [chunk]
+
+import File;
+import Str;
+
+class Main {
+    /* checksum satu chunk: satu baca byte, dua akumulator */
+    static int checksum(uint8[] buf, int n) {
+        int s = 0;
+        int x = 0;
+        for (int i = 0; i < n; i++) {
+            s = s + buf[i];
+            x = x ^ s;
+        }
+        return s ^ x;
+    }
+
+    static void main() {
+        /* default: file besar di home; arg 0 = path lain */
+        String path = "/data/data/com.termux/files/home/ida-pro-port-backup-20261031.tar.gz";
+        int chunk = 1048576;                 /* 1 MiB */
+        if (Net.argc() > 0) path = Net.argv(0);
+        if (Net.argc() > 1) chunk = Str.toInt(Net.argv(1));
+        if (chunk < 1) chunk = 1;
+
+        int fd = File.openRead(path);
+        if (fd < 0) {
+            System.out.println("tidak bisa membuka: " + path);
+            return;
+        }
+        int size = File.size(fd);
+        uint8[] buf = new uint8[chunk];
+
+        int total = 0;
+        int sum = 0;
+        long t0 = Net.mono();
+        int got = File.readIntoB(fd, buf);
+        while (got > 0) {
+            sum = sum ^ checksum(buf, got);
+            total = total + got;
+            got = File.readIntoB(fd, buf);
+        }
+        long t1 = Net.mono();
+        File.close(fd);
+
+        long ms = t1 - t0;
+        if (ms < 1) ms = 1;
+        long mbs10 = (long)total * 10000 / 1048576 / ms;   /* MB/s x10 */
+
+        System.out.println("file    : " + path);
+        System.out.println("ukuran  : " + Str.fromInt(size) + " byte");
+        System.out.println("chunk   : " + Str.fromInt(chunk) + " byte");
+        System.out.println("terbaca : " + Str.fromInt(total) + " byte");
+        System.out.println("checksum: " + Str.fromInt(sum));
+        System.out.println("waktu   : " + Str.fromLong(ms) + " ms");
+        System.out.println("laju    : " + Str.fromLong(mbs10 / 10) + "." +
+                           Str.fromLong(mbs10 % 10) + " MB/s");
+    }
+}

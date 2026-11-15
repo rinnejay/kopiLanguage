@@ -1,0 +1,26 @@
+// v1.47: Trait::method() untuk metode static trait.
+trait Tools {
+    static int nilai() {
+        return 7;
+    }
+    static int dua() {
+        return 14;
+    }
+}
+
+class C : Tools {
+    static int ambil() {
+        return Tools::nilai() + 1;
+    }
+    static int ambilDua() {
+        return Tools::dua();
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        System.out.println(C.ambil());
+        System.out.println(C.nilai());
+        System.out.println(C.ambilDua());
+    }
+}

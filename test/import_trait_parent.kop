@@ -1,0 +1,17 @@
+// v1.47: Trait::method() untuk trait yang di-import dari file lain.
+import GreetP;
+
+class A : GreetP {
+    void hello() {
+        System.out.println("A sebelum");
+        GreetP::hello();
+        System.out.println("A sesudah");
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        A a = new A();
+        a.hello();
+    }
+}

@@ -1,0 +1,15 @@
+import Greet;
+
+class Orang : Greet {
+    void bye() {
+        System.out.println("Bye dari Orang");
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        Orang o = new Orang();
+        o.hello();
+        o.bye();
+    }
+}

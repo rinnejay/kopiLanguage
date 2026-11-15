@@ -1,0 +1,56 @@
+// threadloop.kop — uji beban CPU: loop berat 1 thread vs banyak thread.
+//
+// Setiap "chunk" menjalankan LCG (linear congruential generator) yang
+// hasilnya deterministik, jadi checksum versi 1 thread dan versi
+// multithread harus sama. Waktu dicetak dengan Net.mono() (milidetik).
+
+class Main {
+    /* satu chunk loop berat; seed berbeda per chunk */
+    static int kerja(int n, int seed) {
+        int x = seed;
+        int acc = 0;
+        for (int i = 0; i < n; i++) {
+            x = x * 1103515245 + 12345;   // wrap int32, sama di VM & a64
+            acc = acc + (x >>> 16);
+        }
+        return acc;
+    }
+
+    static void main() {
+        malloc {
+            int totalIter = 20000000;     // 20 juta; turunkan bila terlalu lama
+            int workers = 4;
+            int perChunk = totalIter / workers;
+
+            /* 1) baseline: semua chunk dikerjakan berurutan */
+            long t0 = Net.mono();
+            int seq = 0;
+            for (int w = 0; w < workers; w++) {
+                seq += kerja(perChunk, 7 + w);
+            }
+            long t1 = Net.mono();
+            System.out.println(seq);
+            System.out.println(t1 - t0);
+
+            /* 2) versi paralel: chunk yang sama dibagi ke `workers` thread */
+            int[] hasil = new int[workers];
+            long[] hs = new long[workers];
+            long t2 = Net.mono();
+            for (int w = 0; w < workers; w++) {
+                int seed = 7 + w;         // ditangkap by-value
+                thread hs[w] {
+                    hasil[w] = kerja(perChunk, seed);
+                    return hasil[w];
+                }
+            }
+            int par = 0;
+            for (int w = 0; w < workers; w++) par += wait hs[w];
+            long t3 = Net.mono();
+            System.out.println(par);
+            System.out.println(t3 - t2);
+
+            System.out.println(seq == par ? "checksum sama" : "checksum beda");
+        }
+        System.out.println("selesai");
+    }
+}

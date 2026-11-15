@@ -1,0 +1,28 @@
+// Uji: trait sebagai tipe parameter, method default, field di trait
+trait Printable {
+    void print();
+}
+
+class AImpl : Printable {
+    void print() {
+        System.out.println("A");
+    }
+}
+
+class BImpl : Printable {
+    void print() {
+        System.out.println("B");
+    }
+}
+
+class Main {
+    static void panggilPrint(Printable obj) {
+        obj.print();
+    }
+    public static void main(String[] args) {
+        AImpl a = new AImpl();
+        BImpl b = new BImpl();
+        panggilPrint(a);
+        panggilPrint(b);
+    }
+}

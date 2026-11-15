@@ -26,8 +26,8 @@
 <div class="wrap layout">
   <main class="content">
 <h1 id="referensi-api-system">Referensi API — System<a class="anchor" href="#referensi-api-system" aria-label="tautan">#</a></h1>
-<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
-<p>Argumen, environment, waktu, log, dan UUID. Semua signature di bawah diekstrak langsung dari source <code>lib/system/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
+<nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#args">Args</a></li><li class="toc-h2"><a href="#chan">Chan</a></li><li class="toc-h2"><a href="#env">Env</a></li><li class="toc-h2"><a href="#log">Log</a></li><li class="toc-h2"><a href="#mutex">Mutex</a></li><li class="toc-h2"><a href="#time">Time</a></li><li class="toc-h2"><a href="#uuid">Uuid</a></li></ul></nav>
+<p>Argumen, environment, waktu, log, UUID, channel, dan mutex. Semua signature di bawah diekstrak langsung dari source <code>lib/system/</code>; deskripsi berasal dari komentar sumber atau metadata.</p>
 <blockquote>Impor dengan <code>import {Nama};</code> — nama class sama dengan nama file. Contoh pada tiap modul adalah pola pakai, bukan program utuh.</blockquote>
 <h2 id="args">Args<a class="anchor" href="#args" aria-label="tautan">#</a></h2>
 <p><code>lib/system/Args.kop</code> · 10 fungsi</p>
@@ -76,6 +76,66 @@
 <tr>
 <td><code>static String[] flags()</code></td>
 <td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="chan">Chan<a class="anchor" href="#chan" aria-label="tautan">#</a></h2>
+<p><code>lib/system/Chan.kop</code> · 9 fungsi</p>
+<p>Channel CSP antar-thread: payload <code>long</code> atau closure <code>fn</code>, dengan buffer melingkar dan penunggu condvar.</p>
+<pre><code class="language-java">import Chan;
+
+Chan q = new Chan(16);
+q.sendFn(() =&gt; { System.out.println("tugas"); });
+fn job = q.recvFn();
+if (!q.isClosed()) job();
+q.close();</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>send</code>/<code>recv</code> untuk <code>long</code>; <code>sendFn</code>/<code>recvFn</code> untuk closure (antrean executor).</li>
+<li><code>recv</code> mengembalikan 0 setelah channel ditutup dan kosong; pakai <code>recvOk</code>/<code>recvFnOk</code> agar nilai terakhir tidak hilang.</li>
+<li><code>recvOk</code>/<code>recvFnOk</code> mengisi <code>ok[0] = 1</code> bila nilai diterima, <code>0</code> bila channel tutup/kosong.</li>
+<li><code>close</code> membangunkan semua penunggu; <code>send</code> setelah tutup diabaikan.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>void send(long v)</code></td>
+<td>kirim nilai <code>long</code> (memblokir bila penuh)</td>
+</tr>
+<tr>
+<td><code>long recv()</code></td>
+<td>terima nilai <code>long</code> (memblokir; 0 bila tutup/kosong)</td>
+</tr>
+<tr>
+<td><code>long recvOk(int[] ok)</code></td>
+<td>terima <code>long</code>; <code>ok[0]</code> = 1 bila dapat nilai</td>
+</tr>
+<tr>
+<td><code>void sendFn(fn f)</code></td>
+<td>kirim closure (antrean tugas)</td>
+</tr>
+<tr>
+<td><code>fn recvFn()</code></td>
+<td>terima closure (closure kosong bila tutup/kosong)</td>
+</tr>
+<tr>
+<td><code>fn recvFnOk(int[] ok)</code></td>
+<td>terima closure; <code>ok[0]</code> = 1 bila dapat closure</td>
+</tr>
+<tr>
+<td><code>void close()</code></td>
+<td>tutup channel dan bangunkan semua penunggu</td>
+</tr>
+<tr>
+<td><code>int len()</code></td>
+<td>jumlah nilai yang sedang di buffer</td>
+</tr>
+<tr>
+<td><code>boolean isClosed()</code></td>
+<td>true bila channel sudah ditutup</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -247,6 +307,39 @@ Log.error("db", "gagal konek");</code></pre>
 <tr>
 <td><code>static int OFF = 4</code></td>
 <td>—</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="mutex">Mutex<a class="anchor" href="#mutex" aria-label="tautan">#</a></h2>
+<p><code>lib/system/Mutex.kop</code> · 3 fungsi</p>
+<p>Kunci mutual-exclusion antar-thread untuk melindungi data bersama.</p>
+<pre><code class="language-java">import Mutex;
+
+Mutex m = new Mutex();
+m.lock();
+// ... akses data bersama ...
+m.unlock();</code></pre>
+<p><strong>Catatan</strong></p>
+<ul>
+<li><code>tryLock</code> tidak memblokir: true bila kunci berhasil diambil.</li>
+<li>Selalu <code>unlock</code> pada jalur yang sama; tidak ada RAII/finalizer.</li>
+</ul>
+<div class="table-wrap"><table>
+<thead><tr>
+<th>Fungsi</th>
+<th>Keterangan</th>
+</tr></thead><tbody>
+<tr>
+<td><code>void lock()</code></td>
+<td>ambil kunci (memblokir sampai tersedia)</td>
+</tr>
+<tr>
+<td><code>void unlock()</code></td>
+<td>lepas kunci</td>
+</tr>
+<tr>
+<td><code>boolean tryLock()</code></td>
+<td>coba ambil kunci tanpa menunggu; true bila berhasil</td>
 </tr>
 </tbody></table></div>
 <hr>

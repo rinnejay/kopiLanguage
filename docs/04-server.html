@@ -165,7 +165,7 @@ HttpServer.keepAlive(req);     // HTTP/1.1 default keep-alive</code></pre>
 thread w { hasil = kerjaBerat(data); }
 // ... layani koneksi lain / pollfd ...
 wait w;                       // join; tulisan thread terlihat setelahnya</code></pre>
-<p>Badan thread adalah lambda 0-argumen: variabel ditangkap by-value, array/objek dipakai lewat referensi. Setiap thread punya arena sendiri (a64/VM), jadi alokasi di dalam thread aman; join dulu sebelum blok <code>malloc{}</code> induk berakhir. Belum ada mutex/channel — pakai satu penulis per sel data bersama.</p>
+<p>Badan thread adalah lambda 0-argumen: variabel ditangkap by-value, array/objek dipakai lewat referensi. Setiap thread punya arena sendiri (a64/VM), jadi alokasi di dalam thread aman; join dulu sebelum blok <code>malloc{}</code> induk berakhir. Data bersama dilindungi <strong><code>Mutex</code></strong>; untuk mengirim tugas/hasil antar-thread gunakan <strong><code>Chan</code></strong> (termasuk <code>sendFn</code>/<code>recvFn</code> untuk closure), sehingga worker tidak perlu berbagi sel yang sama.</p>
 <p>Kerangka:</p>
 <pre><code class="language-java">int lfd = Net.socket(2, 1);
 Net.setsockopt(lfd, 1, 2, 1);

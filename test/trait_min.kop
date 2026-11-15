@@ -1,0 +1,15 @@
+trait Greet {
+    void hello() {
+        System.out.println("Default hello");
+    }
+}
+
+class A : Greet {
+}
+
+class Main {
+    public static void main(String[] args) {
+        A a = new A();
+        a.hello();
+    }
+}

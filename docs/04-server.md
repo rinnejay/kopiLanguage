@@ -120,8 +120,10 @@ wait w;                       // join; tulisan thread terlihat setelahnya
 Badan thread adalah lambda 0-argumen: variabel ditangkap by-value,
 array/objek dipakai lewat referensi. Setiap thread punya arena sendiri
 (a64/VM), jadi alokasi di dalam thread aman; join dulu sebelum blok
-`malloc{}` induk berakhir. Belum ada mutex/channel — pakai satu penulis
-per sel data bersama.
+`malloc{}` induk berakhir. Data bersama dilindungi **`Mutex`**; untuk
+mengirim tugas/hasil antar-thread gunakan **`Chan`** (termasuk
+`sendFn`/`recvFn` untuk closure), sehingga worker tidak perlu berbagi
+sel yang sama.
 
 Kerangka:
 

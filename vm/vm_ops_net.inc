@@ -402,6 +402,39 @@
             } else if (bi == 52) {                /* threadyield() */
                 sched_yield();
                 stackv[sp++] = 0;
+            } else if (bi == 53) {                /* channew(cap) → handle */
+                int64_t cap = stackv[--sp];
+                stackv[sp++] = vm_chan_new(cap);
+            } else if (bi == 54 || bi == 59) {    /* chansend(h,v) / chansendfn(h,f) */
+                int64_t v = stackv[--sp], h = stackv[--sp];
+                stackv[sp++] = vm_chan_send((long)h, (long)v);
+            } else if (bi == 55 || bi == 58) {    /* chanrecv(h) / chanrecvfn(h) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_chan_recv((long)h);
+            } else if (bi == 56) {                /* chanclose(h) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_chan_close((long)h);
+            } else if (bi == 57) {                /* chanlen(h) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_chan_len((long)h);
+            } else if (bi == 60) {                /* mutexnew() → handle */
+                stackv[sp++] = vm_mutex_new();
+            } else if (bi == 61) {                /* mutexlock(h) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_mutex_lock((long)h);
+            } else if (bi == 62) {                /* mutexunlock(h) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_mutex_unlock((long)h);
+            } else if (bi == 63) {                /* chanclosed(h) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_chan_closed((long)h);
+            } else if (bi == 64) {                /* mutextrylock(h) */
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_mutex_trylock((long)h);
+            } else if (bi == 65 || bi == 66) {    /* chanrecvok(h, ok[]) */
+                long *ok = (long *)stackv[--sp];
+                int64_t h = stackv[--sp];
+                stackv[sp++] = vm_chan_recv_ok((long)h, ok);
             } else {
                 dievm("Net builtin tidak dikenal");
             }

@@ -1,0 +1,81 @@
+// jitloop.kop — contoh loop angka berat yang di-JIT oleh VM.
+//
+// Pola `x = x*C + K` dan `acc = acc + (x >>> K)` di badan loop dikenali
+// compiler VM sebagai OP_MULADD / OP_ADDSHR. Setelah beberapa iterasi,
+// kopivm menerjemahkan badan loop ke instruksi mesin aarch64 dan
+// menjalankan SELURUH sisa iterasi secara native (interpreter hanya
+// fallback untuk pola lain).
+//
+// Bandingkan sendiri:
+//   ./kopicc examples/jitloop.kop -t vm -o jitloop.kbc
+//   ./kopivm jitloop.kbc
+//   KOPI_NOJIT=1 ./kopivm jitloop.kbc        // interpreter murni
+//
+// Hasil di a64 harus sama:
+//   ./kopicc examples/jitloop.kop -t a64 -o jitloop.s
+//   cc jitloop.s -o jitloop && ./jitloop
+
+class Main {
+    /* LCG + checksum: badan loop = OP_MULADD + OP_ADDSHR */
+    static int lcg(int n, int seed) {
+        int x = seed;
+        int acc = 0;
+        for (int i = 0; i < n; i++) {
+            x = x * 1103515245 + 12345;
+            acc = acc + (x >>> 16);
+        }
+        return acc;
+    }
+
+    /* variasi: hitung mundur (delta negatif), batas tetap slot lokal */
+    static int mundur(int n, int seed) {
+        int x = seed;
+        int acc = 0;
+        for (int i = n; i > 0; i--) {
+            x = x * 1664525 + 1013904223;
+            acc = acc + (x >>> 24);
+        }
+        return acc;
+    }
+
+    /* beberapa loop berurutan: tiap loop mendapat JIT-nya sendiri.
+     * Loop luar (`k`) berisi loop dalam, jadi hanya loop dalam yang
+     * di-JIT — loop luar tetap jalan di interpreter. */
+    static int banyak(int kali, int n) {
+        int total = 0;
+        for (int k = 0; k < kali; k++) {
+            int x = k + 1;
+            int acc = 0;
+            for (int i = 0; i < n; i++) {
+                x = x * 22695477 + 1;
+                acc = acc + (x >>> 13);
+            }
+            total = total + acc;
+        }
+        return total;
+    }
+
+    static void main() {
+        int N = 20000000;            // 20 juta iterasi per loop
+
+        long t0 = Net.mono();
+        int a = lcg(N, 1);
+        long t1 = Net.mono();
+        System.out.println(a);
+        System.out.println(t1 - t0); // milidetik
+
+        long t2 = Net.mono();
+        int b = mundur(N, 7);
+        long t3 = Net.mono();
+        System.out.println(b);
+        System.out.println(t3 - t2);
+
+        long t4 = Net.mono();
+        int c = banyak(4, N / 4);    // 4 loop x 5 juta
+        long t5 = Net.mono();
+        System.out.println(c);
+        System.out.println(t5 - t4);
+
+        System.out.println("selesai");
+    }
+}

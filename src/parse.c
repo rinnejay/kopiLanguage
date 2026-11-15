@@ -51,6 +51,11 @@ static int lambda_ahead(void);
 static Method *find_method(const char *cls, const char *name);
 static Method *find_constfield(const char *cls, const char *name);
 static Class *find_class(const char *name);
+static TraitDef *find_trait(const char *name);
+static void parse_enum(void);
+static void parse_trait(void);
+static int enum_lookup(const char *en, const char *mem, long *out);
+static void apply_traits(Class *c, TraitDef *td);
 static Method *cur_method;
 
 /* ---------- tipe ---------- */
@@ -153,13 +158,22 @@ static Node *parse_switch(int line) {
         if (at(KW_CASE)) {
             int cl = peek()->line;
             advance();
-            int neg = 0;
-            if (at('-')) { advance(); neg = 1; }
-            if (!at(T_NUM))
-                die("baris %d: case harus literal bilangan bulat", cl);
-            long v = peek()->num;
-            advance();
-            if (neg) v = -v;
+            long v;
+            if (at(T_ID) && tokat(1, '.') && tokat(2, T_ID)) {
+                /* v1.46: case Warna.MERAH — konstanta enum */
+                const char *en = ts[ti].text, *mem = ts[ti + 2].text;
+                if (!enum_lookup(en, mem, &v))
+                    die("baris %d: '%s.%s' bukan konstanta enum", cl, en, mem);
+                advance(); advance(); advance();
+            } else {
+                int neg = 0;
+                if (at('-')) { advance(); neg = 1; }
+                if (!at(T_NUM))
+                    die("baris %d: case harus literal bilangan bulat atau konstanta enum", cl);
+                v = peek()->num;
+                advance();
+                if (neg) v = -v;
+            }
             expect(':', "':' setelah nilai case");
             for (int i = 0; i < nc; i++)
                 if (cases[i].val == v)
@@ -370,20 +384,33 @@ static int is_incuptok(int t) {
 }
 
 static Node *call_node(int line) {
-    /* sudah di posisi nama; bisa "Cls.name(...)" atau "name(...)" */
+    /* sudah di posisi nama; bisa "Cls.name(...)", "name(...)", atau
+     * "Trait::name(...)" (v1.47). */
     const char *first = xs(peek()->text);
     advance();
     const char *cls = prog.curcls, *name = first;
+    int is_pcall = 0;
     if (at('.')) {
         advance();
         name = xs(peek()->text);
         expect(T_ID, "nama metode setelah '.'");
         cls = first;
+    } else if (at(T_DCOLON)) {
+        advance();
+        name = xs(peek()->text);
+        expect(T_ID, "nama metode setelah '::'");
+        cls = first;             /* nama trait */
+        is_pcall = 1;
     }
-    Node *n = newnode(EX_CALL, line);
-    char *full = xmalloc(strlen(cls) + strlen(name) + 2);
-    sprintf(full, "%s.%s", cls, name);
-    n->str = full;
+    Node *n = newnode(is_pcall ? EX_PCALL : EX_CALL, line);
+    if (is_pcall) {
+        n->cls = cls;            /* trait asal */
+        n->str = name;           /* metode trait */
+    } else {
+        char *full = xmalloc(strlen(cls) + strlen(name) + 2);
+        sprintf(full, "%s.%s", cls, name);
+        n->str = full;
+    }
     expect('(', "'(' setelah nama metode");
     /* argumen */
     Node **argv = xmalloc(sizeof(Node *) * 256);

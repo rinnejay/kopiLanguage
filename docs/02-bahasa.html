@@ -661,7 +661,17 @@ Net.memReset(mark);       // buang semua alokasi SETELAH mark</code></pre>
 <li><code>wait h</code> menunggu thread selesai (join) dan mengembalikan <strong><code>int</code></strong> nilai <code>return</code> badan thread (0 bila tidak ada <code>return</code>).</li>
 <li><code>wait h;</code> boleh berdiri sebagai pernyataan bila hasilnya tidak dipakai.</li>
 </ul>
-<p>Sinkronisasi: join adalah titik sinkronisasi; setelah <code>wait</code>, tulisan thread terlihat oleh thread yang menunggu. Belum ada mutex/semaphore/ channel, jadi untuk data bersama pakai pola "satu penulis per sel" lalu join sebelum membaca. Setiap thread punya arena alokasi sendiri (a64 lewat TLS, VM lewat heap per-thread); objek yang dibuat di arena induk tetap sah selama induk belum keluar dari blok <code>malloc{}</code> — join dulu sebelum blok berakhir.</p>
+<p>Sinkronisasi: join adalah titik sinkronisasi; setelah <code>wait</code>, tulisan thread terlihat oleh thread yang menunggu. Untuk data bersama gunakan <strong><code>Mutex</code></strong> (<code>lock</code>/<code>unlock</code>/<code>tryLock</code>), dan untuk komunikasi antar-thread gunakan <strong><code>Chan</code></strong> (CSP): <code>send</code>/<code>recv</code> untuk nilai <code>long</code>, <code>sendFn</code>/<code>recvFn</code> untuk closure (antrean tugas executor), serta <code>recvOk</code>/<code>recvFnOk</code> yang mengisi <code>ok[0] = 1</code> bila nilai diterima dan <code>0</code> bila channel sudah ditutup/kosong — jadi nilai terakhir tidak hilang. <code>recv</code> biasa mengembalikan <code>0</code> setelah channel ditutup dan kosong. Channel memblokir pengirim saat penuh dan penerima saat kosong; <code>close</code> membangunkan semua penunggu.</p>
+<pre><code class="language-java">import Chan;
+import Mutex;
+
+Chan q = new Chan(16);
+Mutex m = new Mutex();
+
+q.send(42);
+long v = q.recv();
+q.close();</code></pre>
+<p>Setiap thread punya arena alokasi sendiri (a64 lewat TLS, VM lewat heap per-thread); objek yang dibuat di arena induk tetap sah selama induk belum keluar dari blok <code>malloc{}</code> — join dulu sebelum blok berakhir.</p>
 <p>Batas: tidak ada thread pool, cancel, prioritas, atau <code>wait</code> ganda; panggil <code>wait</code> satu kali per handle. <code>thread</code> tidak bisa dipakai di dalam badan thread lain tanpa handle sendiri (nested spawn biasa saja, tetap perlu <code>long</code> penampung).</p>
 <h2 id="17-contoh-tur-lengkap">17. Contoh tur lengkap<a class="anchor" href="#17-contoh-tur-lengkap" aria-label="tautan">#</a></h2>
 <p>Lihat <code>docs/contoh/tour.kop</code> (dijalankan oleh <code>docs/check.sh</code>). Isinya menggabungkan: tipe, ternary, loop, array fungsional, String method, template, lambda, JSON, dan memMark/memReset.</p>

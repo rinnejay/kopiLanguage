@@ -1,5 +1,7 @@
-__pycache__/
-*.pyc
+# Artefak build di root repo (hasil menjalankan contoh secara manual)
+/*.bin
+/*.kbc
+/*.s
 
 # Android IDE — artefak build (bukan sumber)
 android/sdk/

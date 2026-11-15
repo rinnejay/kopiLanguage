@@ -196,7 +196,7 @@ int[] data = Tls.readApp(ctx);
 
 ## TlsServer
 
-`lib/net/TlsServer.kop` · 28 fungsi
+`lib/net/TlsServer.kop` · 29 fungsi
 
 Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished, data aplikasi dua arah.
 
@@ -246,6 +246,7 @@ TlsServer.writeApp(ctx, Net.bytes("pong"));
 | `static int[] keyOf(int[] secret, int alg)` | kunci AEAD sesuai alg (RFC 8446 §7.3): aes128=16, aes256=32, chacha=32 |
 | `static int[] sealR(int alg, int[] key, int[] iv, int seq, int ctype, int[] payload)` | record keluar penuh: header ‖ ciphertext ‖ tag |
 | `static int[] openR(int alg, int[] key, int[] iv, int seq, int[] rec, int[] okOut)` | record masuk → plaintext (tanpa byte tipe dalam). okOut[0]: -1 galat, selain itu tipe dalam (20 finished, 4 NST, 21 alert, 23 app). |
+| `int parseCH(int[] isi)` | isi handshake message CH. mengisi this.cliPub/alg/verOk. balikan 1 bila cukup lengkap (pub x25519 + TLS 1.3 + suite dikenal). |
 | `static int[] accept(int fd, int[] certDer, int[] priv32, int[] randSes)` | handshake server TLS 1.3; context untuk writeApp/readApp (ctx[1]=1 sukses) |
 | `static int writeApp(int[] ctx, int[] data)` | kirim data aplikasi terenkripsi |
 | `static int[] readApp(int[] ctx)` | baca data aplikasi (deenkripsi); kosong = tutup/galat |

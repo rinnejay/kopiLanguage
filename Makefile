@@ -8,7 +8,7 @@ FRAG = src/parse_stmt.inc src/parse_class.inc src/parse_expr.inc \
        src/gen_a64_expr.inc src/gen_a64_rt.inc \
        src/gen_x64_expr.inc src/gen_x64_rt.inc
 VMFRAG = vm/vm_core.inc vm/vm_ops_base.inc vm/vm_ops_net.inc \
-         vm/vm_ops_num.inc vm/vm_ops_fast.inc
+         vm/vm_ops_num.inc vm/vm_ops_fast.inc vm/jit_a64.inc
 
 all: kopicc kopivm
 

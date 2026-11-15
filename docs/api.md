@@ -1,6 +1,6 @@
 # Referensi pustaka
 
-Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method static; impor memakai nama class.
+Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method static dan/atau instance; impor memakai nama class.
 
 | Kelompok | Folder | Modul |
 |---|---|---|
@@ -8,7 +8,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | **Text** | `lib/text/` | `Regex`, `Str`, `Text` |
 | **Data** | `lib/data/` | `Cbor`, `Config`, `Cookie`, `Csv`, `Json`, `MessagePack` |
 | **IO** | `lib/io/` | `File`, `Path`, `Reader`, `Writer` |
-| **System** | `lib/system/` | `Args`, `Env`, `Log`, `Time`, `Uuid` |
+| **System** | `lib/system/` | `Args`, `Chan`, `Env`, `Log`, `Mutex`, `Time`, `Uuid` |
 | **Compress** | `lib/compress/` | `Checksum`, `Compress`, `Filter`, `LzmaDec`, `Lzma2`, `LzmaAuto`, `LzmaStream`, `Xz` |
 | **Crypto** | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | **Net** | `lib/net/` | `Dns`, `Resolv`, `Rfc`, `Tcp`, `Tls`, `TlsServer`, `Udp` |
@@ -63,16 +63,18 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 |---|---|---|---|
 | [`File`](api-io.md#file) | `lib/io/File.kop` | 18 | I/O file berbasis deskriptor: buka, baca/tulis, seek, ukuran, hapus, rename, mkdir. |
 | [`Path`](api-io.md#path) | `lib/io/Path.kop` | 6 | Utilitas path POSIX: gabung, ambil direktori/nama/ekstensi, uji absolut. |
-| [`Reader`](api-io.md#reader) | `lib/io/Reader.kop` | 1 | Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori. |
-| [`Writer`](api-io.md#writer) | `lib/io/Writer.kop` | 2 | Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh. |
+| [`Reader`](api-io.md#reader) | `lib/io/Reader.kop` | 10 | Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori. |
+| [`Writer`](api-io.md#writer) | `lib/io/Writer.kop` | 9 | Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh. |
 
 ### System — [buka referensi](api-system.md)
 
 | Modul | File | Fungsi | Ringkasan |
 |---|---|---|---|
 | [`Args`](api-system.md#args) | `lib/system/Args.kop` | 10 | — |
+| [`Chan`](api-system.md#chan) | `lib/system/Chan.kop` | 9 | Channel CSP antar-thread: payload `long` atau closure `fn`, dengan buffer melingkar dan penunggu condvar. |
 | [`Env`](api-system.md#env) | `lib/system/Env.kop` | 11 | — |
 | [`Log`](api-system.md#log) | `lib/system/Log.kop` | 18 | Logging ke stderr dengan timestamp UTC dan level. |
+| [`Mutex`](api-system.md#mutex) | `lib/system/Mutex.kop` | 3 | Kunci mutual-exclusion antar-thread untuk melindungi data bersama. |
 | [`Time`](api-system.md#time) | `lib/system/Time.kop` | 32 | Waktu UTC: epoch detik, monotonic milidetik, sleep, format tanggal, dan nama hari. |
 | [`Uuid`](api-system.md#uuid) | `lib/system/Uuid.kop` | 6 | UUID versi 4 (RFC 4122) acak + format/parse/validasi UUID. |
 
@@ -83,10 +85,10 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Checksum`](api-compress.md#checksum) | `lib/compress/Checksum.kop` | 11 | — |
 | [`Compress`](api-compress.md#compress) | `lib/compress/Compress.kop` | 29 | — |
 | [`Filter`](api-compress.md#filter) | `lib/compress/Filter.kop` | 27 | — |
-| [`LzmaDec`](api-compress.md#lzmadec) | `lib/compress/Lzma.kop` | 22 | — |
-| [`Lzma2`](api-compress.md#lzma2) | `lib/compress/Lzma2.kop` | 15 | — |
+| [`LzmaDec`](api-compress.md#lzmadec) | `lib/compress/Lzma.kop` | 53 | — |
+| [`Lzma2`](api-compress.md#lzma2) | `lib/compress/Lzma2.kop` | 29 | — |
 | [`LzmaAuto`](api-compress.md#lzmaauto) | `lib/compress/LzmaAuto.kop` | 3 | — |
-| [`LzmaStream`](api-compress.md#lzmastream) | `lib/compress/LzmaStream.kop` | 15 | — |
+| [`LzmaStream`](api-compress.md#lzmastream) | `lib/compress/LzmaStream.kop` | 27 | — |
 | [`Xz`](api-compress.md#xz) | `lib/compress/Xz.kop` | 21 | — |
 
 ### Crypto — [buka referensi](api-crypto.md)
@@ -123,7 +125,7 @@ Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi dengan method st
 | [`Rfc`](api-net.md#rfc) | `lib/net/Rfc.kop` | 5 | Klien protokol TCP klasik (daytime, echo, quote, whois, finger, discard) untuk latihan. |
 | [`Tcp`](api-net.md#tcp) | `lib/net/Tcp.kop` | 18 | Transport TCP di atas builtin `Net`: buka koneksi, kirim/terima buffer, shutdown, helper alamat. |
 | [`Tls`](api-net.md#tls) | `lib/net/Tls.kop` | 27 | Klien TLS 1.3: X25519, ChaCha20-Poly1305, HKDF, pin SPKI TOFU, verifikasi Finished, data aplikasi dua arah. |
-| [`TlsServer`](api-net.md#tlsserver) | `lib/net/TlsServer.kop` | 28 | Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,… |
+| [`TlsServer`](api-net.md#tlsserver) | `lib/net/TlsServer.kop` | 29 | Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,… |
 | [`Udp`](api-net.md#udp) | `lib/net/Udp.kop` | 9 | Datagram UDP: bind, kirim/terima satu datagram, shutdown. |
 
 ### Web — [buka referensi](api-web.md)

@@ -146,6 +146,9 @@ enum {
     EX_TSTR,       /* template `...{expr}...` : a=daftar bagian (byte/ekspresi) */
     EX_NEWOBJ,     /* new Kelas() : str=nama class → didesugar EX_NEWARR  */
     EX_FLD,        /* obj.field : a=objek, str=nama field → EX_IDX        */
+    EX_PCALL,      /* Trait::method(args) : cls=trait, str=metode, a=args
+                    * → didesugar saat resolusi menjadi EX_CALL ke metode
+                    * mangled `__tr_<Trait>_<method>` (v1.47)              */
     /* statements */
     ST_VAR, ST_ASSIGN, ST_IF, ST_WHILE, ST_FOR, ST_DO,
     ST_BRK, ST_CONT, ST_RETURN, ST_PRINT, ST_EXPR,
@@ -216,8 +219,38 @@ typedef struct Class {
     struct Class *next;
 } Class;
 
+typedef struct TraitMethod {
+    const char *name;
+    Ty ret;
+    Param *params;
+    int nparams;
+    Node *body;              /* default implementation (bisa null = abstract) */
+    const char *retcls;
+    struct TraitMethod *next;
+} TraitMethod;
+
+typedef struct TraitDef {
+    const char *name;
+    TraitMethod *methods;
+    struct TraitDef *next;
+} TraitDef;
+
+typedef struct EnumConst {
+    const char *name;
+    long val;
+    struct EnumConst *next;
+} EnumConst;
+
+typedef struct EnumDef {
+    const char *name;
+    EnumConst *consts;
+    struct EnumDef *next;
+} EnumDef;
+
 typedef struct {
     Class *classes;
+    EnumDef *enums;
+    TraitDef *traits;
     Method *methods;
     int nmethods;
     int mainidx;       /* index of entry method, -1 if none */

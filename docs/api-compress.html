@@ -328,7 +328,7 @@
 </tbody></table></div>
 <hr>
 <h2 id="lzmadec">LzmaDec<a class="anchor" href="#lzmadec" aria-label="tautan">#</a></h2>
-<p><code>lib/compress/Lzma.kop</code> · 22 fungsi</p>
+<p><code>lib/compress/Lzma.kop</code> · 53 fungsi</p>
 <p>Modul pustaka Kopi.</p>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -341,6 +341,38 @@
 </tr>
 <tr>
 <td><code>static void fill(int[] p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void resetProbs()</code></td>
+<td>reset model (probabilitas + state + rep) tanpa menyentuh kamus</td>
+</tr>
+<tr>
+<td><code>void resetState()</code></td>
+<td>LZMA2 "state reset": model saja, byte sebelumnya dipertahankan</td>
+</tr>
+<tr>
+<td><code>void resetModel()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void resetDict()</code></td>
+<td>LZMA2 "dictionary reset": posisi &amp; konteks mulai dari nol, tetapi keluaran total (this.out) tidak dibuang.</td>
+</tr>
+<tr>
+<td><code>void setProps(int props)</code></td>
+<td>ganti properti lc/lp/pb; alokasi tabel menyesuaikan</td>
+</tr>
+<tr>
+<td><code>void appendBytes(int[] data, int off, int count)</code></td>
+<td>tambahkan byte mentah (chunk tak terkompresi LZMA2)</td>
+</tr>
+<tr>
+<td><code>void ensure()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] takeResult()</code></td>
 <td>—</td>
 </tr>
 <tr>
@@ -368,12 +400,104 @@
 <td>—</td>
 </tr>
 <tr>
+<td><code>int lenDecode(int[] lp2, int posState)</code></td>
+<td>══ length / distance ═════════════════════════════════════════</td>
+</tr>
+<tr>
+<td><code>int distDecode(int slot)</code></td>
+<td>return jarak 0-based, -1 galat, -2 end marker</td>
+</tr>
+<tr>
+<td><code>int decodeChunk(int[] b, int off, int count)</code></td>
+<td>══ decode satu aliran ════════════════════════════════════════ count &gt;= 0 : berhenti setelah tepat count byte (LZMA2 / ukuran diketahui) count &lt; 0 : berhenti pada end marker ata…</td>
+</tr>
+<tr>
 <td><code>static int[] mk(int n)</code></td>
 <td>—</td>
 </tr>
 <tr>
 <td><code>static int[] neg(int n)</code></td>
 <td>—</td>
+</tr>
+<tr>
+<td><code>void ensureOut()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void emit(int b)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] takeOut()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void shiftLow()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void encBit(int[] probs, int i, int bit)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void encDirect(int value, int nbits)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void flush()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void tree(int[] probs, int base, int nbits, int value)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int hash3(int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void insert(int p)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void find()</code></td>
+<td>indeks elemen, -1 bila tidak ada</td>
+</tr>
+<tr>
+<td><code>void encodeLen(int[] probs, int length, int posState)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void encodeMatch(int length, int dist, int posState)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void encodeRep(int length, int idx, int posState)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void encodeShortRep(int posState)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void encodeLiteral(int posState)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void endMarker(int posState)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void encodeTokens()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] encode()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] encodeNoEnd()</code></td>
+<td>LZMA2: satu chunk tanpa end marker</td>
 </tr>
 <tr>
 <td><code>static int[] raw(int[] src, int props, int dictSize)</code></td>
@@ -426,7 +550,7 @@
 </tbody></table></div>
 <hr>
 <h2 id="lzma2">Lzma2<a class="anchor" href="#lzma2" aria-label="tautan">#</a></h2>
-<p><code>lib/compress/Lzma2.kop</code> · 15 fungsi</p>
+<p><code>lib/compress/Lzma2.kop</code> · 29 fungsi</p>
 <p>Modul pustaka Kopi.</p>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -490,8 +614,64 @@
 <td>—</td>
 </tr>
 <tr>
+<td><code>void ensureIn(int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void appendIn(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void ensureOut()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void putOut(int v)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] push(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void process()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>boolean isFinished()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int status()</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static Lzma2EncStream create()</code></td>
 <td>buat/buka file</td>
+</tr>
+<tr>
+<td><code>void ensureBuf(int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void ensureOut(int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] drain()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void shift(int k)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] push(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] finish()</code></td>
+<td>—</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -518,7 +698,7 @@
 </tbody></table></div>
 <hr>
 <h2 id="lzmastream">LzmaStream<a class="anchor" href="#lzmastream" aria-label="tautan">#</a></h2>
-<p><code>lib/compress/LzmaStream.kop</code> · 15 fungsi</p>
+<p><code>lib/compress/LzmaStream.kop</code> · 27 fungsi</p>
 <p>Modul pustaka Kopi.</p>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -550,6 +730,22 @@
 <td>XZ dengan filter chain pra-LZMA2 (id/arg seperti Xz.compressChain).</td>
 </tr>
 <tr>
+<td><code>void ensure(int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] take()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] compress(int[] data)</code></td>
+<td>Menampung data; keluaran sebenarnya muncul di flush().</td>
+</tr>
+<tr>
+<td><code>int[] flush()</code></td>
+<td>—</td>
+</tr>
+<tr>
 <td><code>static LzmaDecompressor create()</code></td>
 <td>buat/buka file</td>
 </tr>
@@ -563,6 +759,38 @@
 </tr>
 <tr>
 <td><code>static LzmaDecompressor raw()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void ensure(int need)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>void appendUnused(int[] data)</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>boolean isEof()</code></td>
+<td>true bila stream sudah selesai dan check (bila ada) cocok.</td>
+</tr>
+<tr>
+<td><code>boolean needsInput()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>boolean isError()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int status()</code></td>
+<td>0 sukses, -1 rusak, -2 terpotong, -3 check salah (XZ).</td>
+</tr>
+<tr>
+<td><code>int[] unusedData()</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>int[] decompress(int[] data)</code></td>
 <td>—</td>
 </tr>
 <tr>

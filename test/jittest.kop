@@ -1,0 +1,82 @@
+// jittest.kop — regresi JIT loop angka (aarch64) dan superinstruksi VM.
+// Setiap loop memakai pola x = x*C+K dan/atau acc += x>>>K sehingga
+// interpreter bisa menerjemahkannya ke kode mesin. Hasil harus sama
+// dengan backend a64 (dan dengan KOPI_NOJIT=1).
+
+class Main {
+    static int lcg(int n, int seed) {
+        int x = seed;
+        int acc = 0;
+        for (int i = 0; i < n; i++) {
+            x = x * 1103515245 + 12345;
+            acc = acc + (x >>> 16);
+        }
+        return acc;
+    }
+
+    /* batas variabel + semua operator pembanding */
+    static int cmpLoop(int n, int mode) {
+        int x = 7;
+        int c = 0;
+        if (mode == 0) { for (int i = 0; i < n; i++) { x = x * 1664525 + 1013904223; c = c + (x >>> 24); } }
+        if (mode == 1) { for (int i = 0; i <= n; i++) { x = x * 1664525 + 1013904223; c = c + (x >>> 24); } }
+        if (mode == 2) { for (int i = n; i > 0; i--) { x = x * 1664525 + 1013904223; c = c + (x >>> 24); } }
+        if (mode == 3) { for (int i = n; i >= 1; i--) { x = x * 1664525 + 1013904223; c = c + (x >>> 24); } }
+        if (mode == 4) { for (int i = 0; i != n; i++) { x = x * 1664525 + 1013904223; c = c + (x >>> 24); } }
+        if (mode == 5) { for (int i = n; i != 0; i--) { x = x * 1664525 + 1013904223; c = c + (x >>> 24); } }
+        return c;
+    }
+
+    /* batas konstanta besar (> 4095) dan negatif */
+    static int bigConst() {
+        int x = 1;
+        int c = 0;
+        for (int i = 0; i < 200000; i++) {
+            x = x * 22695477 + 1;
+            c = c + (x >>> 13);
+        }
+        int y = 3;
+        int d = 0;
+        for (int i = 50000; i > -100000; i = i - 10000) {
+            y = y * 69069 + 1234567;
+            d = d + (y >>> 5);
+        }
+        return c + d;
+    }
+
+    /* badan mengubah batas: JIT harus menolak (tetap benar) */
+    static int boundChanged() {
+        int x = 5;
+        int c = 0;
+        int n = 300;
+        for (int i = 0; i < n; i++) {
+            x = x * 1103515245 + 12345;
+            c = c + (x >>> 16);
+            if (i == 100) n = 120;      /* batas berubah di tengah */
+        }
+        return c;
+    }
+
+    /* loop bersarang: loop dalam di-JIT, loop luar tetap interpreter */
+    static int nested() {
+        int x = 9;
+        int c = 0;
+        for (int i = 0; i < 50; i++) {
+            for (int j = 0; j < 4000; j++) {
+                x = x * 1103515245 + 12345;
+                c = c + (x >>> 16);
+            }
+        }
+        return c;
+    }
+
+    static void main() {
+        System.out.println(lcg(1000000, 1));
+        System.out.println(lcg(1, 42));
+        System.out.println(lcg(0, 42));
+        for (int m = 0; m < 6; m++) System.out.println(cmpLoop(50000, m));
+        System.out.println(bigConst());
+        System.out.println(boundChanged());
+        System.out.println(nested());
+    }
+}

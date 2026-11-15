@@ -1,0 +1,19 @@
+trait Printable {
+    void print();
+}
+
+class Impl : Printable {
+    void print() {
+        System.out.println("Impl.print() via trait");
+    }
+}
+
+class Main {
+    static void cetak(Printable p) {
+        p.print();
+    }
+    public static void main(String[] args) {
+        Impl obj = new Impl();
+        cetak(obj);
+    }
+}

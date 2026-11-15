@@ -22,7 +22,7 @@ Dokumentasi ini dibagi menjadi jalur belajar dan jalur kontributor.
 | [01 — Mulai](01-mulai.md) | build, `kopicc`, `kopivm`, hello world, target, alur compile/link |
 | [02 — Bahasa](02-bahasa.md) | tutorial lengkap sintaks & semantik |
 | [03 — Pustaka](03-pustaka.md) | `Str`, `Math`, `Arrays`, `Json`, `Map`, `File`, jaringan, kripto, auth |
-| [Referensi pustaka](api.md) | **indeks 84 modul `lib/` + cara menerapkan** → [Core](api-core.md) · [Text](api-text.md) · [Data](api-data.md) · [IO](api-io.md) · [System](api-system.md) · [Compress](api-compress.md) · [Crypto](api-crypto.md) · [Net](api-net.md) · [Web](api-web.md) · [Database](api-db.md) |
+| [Referensi pustaka](api.md) | **indeks 86 modul `lib/` + cara menerapkan** → [Core](api-core.md) · [Text](api-text.md) · [Data](api-data.md) · [IO](api-io.md) · [System](api-system.md) · [Compress](api-compress.md) · [Crypto](api-crypto.md) · [Net](api-net.md) · [Web](api-web.md) · [Database](api-db.md) |
 | [04 — Server](04-server.md) | TCP/UDP, HTTP klien/server, event loop, WebSocket, TLS klien, game realtime |
 | [06 — Batas & roadmap](06-batas-roadmap.md) | yang sudah ada, yang belum, dan jebakan yang harus diketahui |
 

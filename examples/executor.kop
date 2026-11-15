@@ -1,0 +1,55 @@
+// executor.kop — worker pool sederhana dengan channel closure + mutex.
+//
+// Pola:
+//   - `Chan q` menyimpan closure (`sendFn`) sebagai antrean tugas.
+//   - Setiap worker memanggil `recvFnOk(ok)`; `ok[0] == 0` berarti
+//     channel sudah ditutup dan kosong, jadi worker berhenti.
+//   - Hasil bersama dijumlahkan di bawah `Mutex`.
+//   - Setelah `q.close()`, semua worker di-`wait` (join).
+
+import Chan;
+import Mutex;
+
+class Main {
+    static int kerja(int x) { return x * x; }
+
+    static void main() {
+        malloc {
+            Chan q = new Chan(32);
+            Mutex outLock = new Mutex();
+            int[] total = new int[1];
+            int[] selesai = new int[1];
+
+            long[] ws = new long[4];
+            for (int w = 0; w < 4; w++) {
+                thread ws[w] {
+                    int[] ok = new int[1];           // ok per-thread
+                    while (true) {
+                        fn job = q.recvFnOk(ok);
+                        if (ok[0] == 0) break;       // tutup + kosong
+                        job();
+                    }
+                    return 0;
+                }
+            }
+
+            /* antrekan 10 tugas; `i` ditangkap by-value saat sendFn */
+            for (int i = 1; i <= 10; i++) {
+                q.sendFn(() => {
+                    int r = kerja(i);
+                    outLock.lock();
+                    total[0] = total[0] + r;
+                    selesai[0] = selesai[0] + 1;
+                    outLock.unlock();
+                });
+            }
+
+            q.close();                               // bangunkan semua worker
+            for (int w = 0; w < 4; w++) wait ws[w];
+
+            System.out.println(total[0]);            // 385 = 1^2 + ... + 10^2
+            System.out.println(selesai[0]);          // 10
+        }
+        System.out.println("selesai");
+    }
+}

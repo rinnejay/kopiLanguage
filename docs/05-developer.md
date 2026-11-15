@@ -154,9 +154,42 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
   saat thread selesai (join = sinkronisasi). Thread = `pthread`, handle
   `long` = pointer `VMThread`; `bi` 47–52 melayani
   spawn/join/alive/id/self/yield.
+- v1.46: `bi` 53–66 melayani channel/mutex (`channew/chansend/chanrecv/
+  chanclose/chanlen/chanrecvfn/chansendfn/mutexnew/mutexlock/mutexunlock/
+  chanclosed/mutextrylock/chanrecvok/chanrecvfnok`). Runtime VM menyimpan
+  `VMChan` (ring buffer + mutex/condvar) dan `VMMutex`; pustaka pembungkus
+  ada di `lib/system/Chan.kop` dan `lib/system/Mutex.kop`.
 - v1.22: loop panas memakai superinstruksi (`OP_LOOP`, `OP_CMP_JMP*`,
   `OP_OP_STORE`, `OP_IDXR_L`, `OP_IDXW_L`, `OP_BIN_L`) + lipat konstanta;
   emitter ada di `gen_vm_fuse.inc`.
+- v1.46: `OP_MULADD` (`x = x*C+K`) dan `OP_ADDSHR` (`x += y>>>K`)
+  memadatkan pola loop LCG/checksum menjadi satu dispatch per operasi.
+  `OP_LOOP_R` menangani loop dengan **batas berupa slot lokal**
+  (`for (i=0;i<n;i++)`), sehingga loop seperti itu juga jadi satu opcode.
+- v1.46: **JIT aarch64 minimal** (`vm/jit_a64.inc`). Saat kaki loop
+  `OP_LOOP`/`OP_LOOP_R` sudah dieksekusi beberapa kali, badan loop
+  diterjemahkan ke instruksi mesin bila hanya berisi `OP_MULADD`/
+  `OP_ADDSHR`, `OP_ILOAD`, `OP_IDXR_UB`/`OP_IDXR_B`, `OP_OP_STORE`
+  (+ `OP_LINE`/`OP_SRCFILE` yang diabaikan). Slot int dimuat ke
+  `w20..w27`; slot pointer (basis array) dimuat 64-bit ke `x20..x27`.
+  Aritmetika int32 memakai `madd`/`add-lsr`/`add`/`eor`, dan
+  `acc += buf[i]` membaca byte dengan `ldrb`/`ldrsb`. Seluruh sisa
+  iterasi dijalankan native sampai kondisi loop false; hasilnya
+  disimpan kembali (int di-sign-extend) lalu interpreter melanjutkan
+  sesudah kaki loop. Bila indeks array keluar batas (atau basis NULL),
+  JIT **bail** dengan `x0=1`: slot disimpan, `f->pc` diarahkan ke awal
+  badan, dan interpreter mengulang badan itu sehingga pesan error
+  aslinya tetap muncul. Cache per-thread (`_Thread_local`, kunci
+  `(meth,pc)`), `mmap` RW → `mprotect` RX, `__builtin___clear_cache`.
+  Pola lain (badan berisi `if`/panggilan/`OP_ISTORE`, lebih dari 8
+  slot, batas yang diubah badan) otomatis jatuh ke interpreter.
+  `KOPI_NOJIT=1` mematikan JIT untuk pembanding. Untuk loop LCG 20
+  juta iterasi, JIT VM kini **lebih cepat daripada backend a64 saat
+  ini** (yang masih menumpahkan tiap operand ke stack): ~0,07 s vs
+  ~0,6–0,75 s. Contoh: `examples/jitloop.kop` (loop angka) dan
+  `examples/filebench.kop` (baca file 519 MB + checksum byte: VM JIT
+  ~1,7 s vs interpreter ~81 s vs a64 ~11–12 s). Jalankan dengan dan
+  tanpa `KOPI_NOJIT=1` untuk melihat selisihnya.
 - Label = indeks instruksi (`newlab/mark`), bukan string.
 
 ### Struktur berkas (v1.22)
@@ -171,7 +204,7 @@ diekspor dan tidak ada biaya dispatch tambahan:
 | `src/gen_a64.c` | `gen_a64_expr.inc`, `gen_a64_rt.inc` |
 | `src/gen_x64.c` | `gen_x64_expr.inc`, `gen_x64_rt.inc` |
 | `src/gen_vm.c` | `gen_vm_fuse.inc`, `gen_vm_expr.inc` |
-| `vm/kopivm.c` | `vm_core.inc`, `vm_ops_base.inc`, `vm_ops_net.inc`, `vm_ops_num.inc`, `vm_ops_fast.inc` |
+| `vm/kopivm.c` | `vm_core.inc`, `vm_ops_base.inc`, `vm_ops_net.inc`, `vm_ops_num.inc`, `vm_ops_fast.inc`, `jit_a64.inc` |
 
 `make` sudah memantau fragmen: mengubah `.inc` otomatis membangun ulang.
 

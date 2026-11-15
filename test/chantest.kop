@@ -1,0 +1,106 @@
+// chantest.kop — v1.46: channel + mutex untuk executor multithread.
+//
+// Cakupan:
+//   1) channel nilai long antar-thread (producer/consumer)
+//   2) channel closure (fn) + eksekusi job lintas thread
+//   3) mutex menjaga penghitung bersama
+//   4) executor: antrean tugas + beberapa worker
+// Semua cetakan dilakukan thread utama agar urutannya deterministik.
+
+import Chan;
+import Mutex;
+
+class Main {
+    static int kerja(int x) { return x * 2; }
+
+    static void main() {
+        malloc {
+            /* 1) producer mengirim 1..5, consumer menjumlahkan */
+            Chan c = new Chan(4);
+            long p = 0;
+            thread p {
+                for (int i = 1; i <= 5; i++) c.send(i);
+                c.close();
+                return 0;
+            }
+            int[] ok = new int[1];
+            long sum = 0;
+            while (true) {
+                long v = c.recvOk(ok);
+                if (ok[0] == 0) break;
+                sum += v;
+            }
+            wait p;
+            System.out.println(sum);                 // 15
+
+            /* 2) channel closure: 3 tugas, lalu ditutup */
+            Chan jobs = new Chan(8);
+            long prod = 0;
+            thread prod {
+                jobs.sendFn(() => { System.out.println(10); });
+                jobs.sendFn(() => { System.out.println(20); });
+                jobs.sendFn(() => { System.out.println(30); });
+                jobs.close();
+                return 0;
+            }
+            int njob = 0;
+            int total = 0;
+            while (true) {
+                fn job = jobs.recvFnOk(ok);
+                if (ok[0] == 0) break;
+                njob++;
+                total += 1;
+                job();
+            }
+            wait prod;
+            System.out.println(njob);                // 3
+            System.out.println(total);               // 3
+
+            /* 3) mutex: 4 thread menaikkan penghitung bersama 1000x */
+            Mutex m = new Mutex();
+            int[] counter = new int[1];
+            long[] hs = new long[4];
+            for (int t = 0; t < 4; t++) {
+                thread hs[t] {
+                    for (int i = 0; i < 1000; i++) {
+                        m.lock();
+                        counter[0] = counter[0] + 1;
+                        m.unlock();
+                    }
+                    return 0;
+                }
+            }
+            for (int t = 0; t < 4; t++) wait hs[t];
+            System.out.println(counter[0]);          // 4000
+
+            /* 4) executor: antrean tugas + 3 worker */
+            Chan q = new Chan(64);
+            Mutex outLock = new Mutex();
+            int[] hasil = new int[1];
+            long[] ws = new long[3];
+            for (int w = 0; w < 3; w++) {
+                thread ws[w] {
+                    int[] wok = new int[1];
+                    while (true) {
+                        fn task = q.recvFnOk(wok);
+                        if (wok[0] == 0) break;
+                        task();
+                    }
+                    return 0;
+                }
+            }
+            for (int i = 1; i <= 10; i++) {
+                q.sendFn(() => {
+                    outLock.lock();
+                    hasil[0] = hasil[0] + kerja(i);
+                    outLock.unlock();
+                });
+            }
+            q.close();
+            for (int w = 0; w < 3; w++) wait ws[w];
+            System.out.println(hasil[0]);            // 110 (2*(1+...+10))
+
+            System.out.println("selesai");
+        }
+    }
+}

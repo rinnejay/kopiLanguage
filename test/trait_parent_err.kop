@@ -1,0 +1,18 @@
+// v1.47: Trait::method() untuk metode abstrak (tanpa body) harus error.
+trait Greet {
+    void hello();
+}
+
+class A : Greet {
+    void hello() {
+        System.out.println("A hello");
+        Greet::hello();
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        A a = new A();
+        a.hello();
+    }
+}

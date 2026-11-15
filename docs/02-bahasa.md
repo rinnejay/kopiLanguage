@@ -815,12 +815,31 @@ Bentuk pernyataan: `thread <target> { ... }` atau `thread { ... }`.
 - `wait h;` boleh berdiri sebagai pernyataan bila hasilnya tidak dipakai.
 
 Sinkronisasi: join adalah titik sinkronisasi; setelah `wait`, tulisan
-thread terlihat oleh thread yang menunggu. Belum ada mutex/semaphore/
-channel, jadi untuk data bersama pakai pola "satu penulis per sel" lalu
-join sebelum membaca. Setiap thread punya arena alokasi sendiri (a64
-lewat TLS, VM lewat heap per-thread); objek yang dibuat di arena induk
-tetap sah selama induk belum keluar dari blok `malloc{}` — join dulu
-sebelum blok berakhir.
+thread terlihat oleh thread yang menunggu. Untuk data bersama gunakan
+**`Mutex`** (`lock`/`unlock`/`tryLock`), dan untuk komunikasi antar-thread
+gunakan **`Chan`** (CSP): `send`/`recv` untuk nilai `long`,
+`sendFn`/`recvFn` untuk closure (antrean tugas executor), serta
+`recvOk`/`recvFnOk` yang mengisi `ok[0] = 1` bila nilai diterima dan `0`
+bila channel sudah ditutup/kosong — jadi nilai terakhir tidak hilang.
+`recv` biasa mengembalikan `0` setelah channel ditutup dan kosong.
+Channel memblokir pengirim saat penuh dan penerima saat kosong; `close`
+membangunkan semua penunggu.
+
+```java
+import Chan;
+import Mutex;
+
+Chan q = new Chan(16);
+Mutex m = new Mutex();
+
+q.send(42);
+long v = q.recv();
+q.close();
+```
+
+Setiap thread punya arena alokasi sendiri (a64 lewat TLS, VM lewat heap
+per-thread); objek yang dibuat di arena induk tetap sah selama induk
+belum keluar dari blok `malloc{}` — join dulu sebelum blok berakhir.
 
 Batas: tidak ada thread pool, cancel, prioritas, atau `wait` ganda;
 panggil `wait` satu kali per handle. `thread` tidak bisa dipakai di

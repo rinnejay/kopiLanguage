@@ -207,7 +207,7 @@ System.out.println(Path.dir("/a/b/c.txt"));  // /a/b</code></pre>
 </tbody></table></div>
 <hr>
 <h2 id="reader">Reader<a class="anchor" href="#reader" aria-label="tautan">#</a></h2>
-<p><code>lib/io/Reader.kop</code> · 1 fungsi</p>
+<p><code>lib/io/Reader.kop</code> · 10 fungsi</p>
 <p>Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.</p>
 <pre><code class="language-java">import Reader;
 
@@ -227,10 +227,46 @@ r.close();</code></pre>
 <td><code>static Reader open(String path)</code></td>
 <td>buka file untuk dibaca (null bila gagal)</td>
 </tr>
+<tr>
+<td><code>boolean valid()</code></td>
+<td>true bila file berhasil dibuka</td>
+</tr>
+<tr>
+<td><code>boolean fill()</code></td>
+<td>isi buffer; false kalau sudah EOF</td>
+</tr>
+<tr>
+<td><code>int readByte()</code></td>
+<td>baca satu byte; -1 di EOF</td>
+</tr>
+<tr>
+<td><code>boolean eof()</code></td>
+<td>true kalau tidak ada byte lagi</td>
+</tr>
+<tr>
+<td><code>String readLine()</code></td>
+<td>baca satu baris (tanpa newline); "" di EOF</td>
+</tr>
+<tr>
+<td><code>String readAll()</code></td>
+<td>baca seluruh sisa isi sebagai teks</td>
+</tr>
+<tr>
+<td><code>int[] readBytes(int n)</code></td>
+<td>baca n byte; boleh lebih pendek di EOF</td>
+</tr>
+<tr>
+<td><code>int available()</code></td>
+<td>jumlah byte yang belum dibaca (perkiraan)</td>
+</tr>
+<tr>
+<td><code>void close()</code></td>
+<td>tutup file</td>
+</tr>
 </tbody></table></div>
 <hr>
 <h2 id="writer">Writer<a class="anchor" href="#writer" aria-label="tautan">#</a></h2>
-<p><code>lib/io/Writer.kop</code> · 2 fungsi</p>
+<p><code>lib/io/Writer.kop</code> · 9 fungsi</p>
 <p>Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.</p>
 <pre><code class="language-java">import Writer;
 
@@ -253,6 +289,34 @@ w.close();</code></pre>
 <tr>
 <td><code>static Writer append(String path)</code></td>
 <td>buka file untuk ditambahkan di akhir</td>
+</tr>
+<tr>
+<td><code>boolean valid()</code></td>
+<td>true bila file berhasil dibuka</td>
+</tr>
+<tr>
+<td><code>void put(int c)</code></td>
+<td>tulis byte ke buffer; flush bila penuh</td>
+</tr>
+<tr>
+<td><code>void write(String s)</code></td>
+<td>tulis teks</td>
+</tr>
+<tr>
+<td><code>void writeLine(String s)</code></td>
+<td>tulis teks + newline</td>
+</tr>
+<tr>
+<td><code>void writeBytes(int[] data)</code></td>
+<td>tulis byte biner</td>
+</tr>
+<tr>
+<td><code>void flush()</code></td>
+<td>tulis buffer ke disk</td>
+</tr>
+<tr>
+<td><code>void close()</code></td>
+<td>flush lalu tutup file</td>
 </tr>
 </tbody></table></div>
 <hr>

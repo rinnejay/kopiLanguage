@@ -78,6 +78,17 @@ static int cond_pat(Node *e, int *slot, int *cmp, int *imm) {
     *slot = (int)v->ival; *cmp = c; *imm = (int)iv;
     return 1;
 }
+/* cocokkan kondisi `var-int <cmp> var-int` (batas berupa slot lokal).
+ * Dipakai OP_LOOP_R: loop dengan batas variabel, mis. `for (i=0;i<n;i++)`. */
+static int cond_pat2(Node *e, int *slot, int *cmp, int *bound) {
+    if (!e || e->kind != EX_BIN) return 0;
+    int c = cmp_code(e->str);
+    if (c < 0) return 0;
+    if ((Ty)e->a->dty != T_INT || (Ty)e->b->dty != T_INT) return 0;
+    if (e->a->kind != EX_VAR || e->b->kind != EX_VAR) return 0;
+    *slot = (int)e->a->ival; *cmp = c; *bound = (int)e->b->ival;
+    return 1;
+}
 /* cabang kondisi: satu opcode bila polanya cocok, kalau tidak cara lama */
 static void emit_cond_jmp(Node *cond, int lab, int jtrue) {
     int slot, cmp, imm;
@@ -91,6 +102,13 @@ static void emit_cond_jmp(Node *cond, int lab, int jtrue) {
     em8(cmp); em16(slot); em32(imm);
     fix_at(lab);
 }
+/* nilai kanan OP_OP_STORE: integer <=32-bit yang promosinya ke int tetap
+ * int (uint8/byte/short/uint16, mis. buf[i]). uint32/long tidak, karena
+ * aritmetikanya butuh 64-bit. */
+static int opstore_rhs_ok(Ty t) {
+    return ty_is_int(t) && ty_width(t) <= 32 && ty_promote(T_INT, t) == T_INT;
+}
+
 /* cocokkan langkah `i = i +/- k` (k konstan); delta = ±k */
 static int step_pat(Node *st, int slot, int *delta) {
     if (!st || st->kind != ST_ASSIGN) return 0;

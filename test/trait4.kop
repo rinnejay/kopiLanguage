@@ -1,0 +1,9 @@
+trait A { void a(); }
+trait B { void b(); }
+trait C { void c(); }
+
+class Main : A, B, C {
+    public static void main(String[] args) {
+        System.out.println("Multi trait");
+    }
+}

@@ -230,6 +230,20 @@ META = {
         "example": 'import Uuid;\n\nString id = Uuid.v4();\nSystem.out.println(Uuid.valid(id));',
         "notes": ["Format 8-4-4-4-12; versi 4 & varian RFC 4122."],
     },
+    "Chan": {
+        "purpose": "Channel CSP antar-thread: payload `long` atau closure `fn`, dengan buffer melingkar dan penunggu condvar.",
+        "example": 'import Chan;\n\nChan q = new Chan(16);\nq.sendFn(() => { System.out.println("tugas"); });\nfn job = q.recvFn();\nif (!q.isClosed()) job();\nq.close();',
+        "notes": ["`send`/`recv` untuk `long`; `sendFn`/`recvFn` untuk closure (antrean executor).",
+                  "`recv` mengembalikan 0 setelah channel ditutup dan kosong; pakai `recvOk`/`recvFnOk` agar nilai terakhir tidak hilang.",
+                  "`recvOk`/`recvFnOk` mengisi `ok[0] = 1` bila nilai diterima, `0` bila channel tutup/kosong.",
+                  "`close` membangunkan semua penunggu; `send` setelah tutup diabaikan."],
+    },
+    "Mutex": {
+        "purpose": "Kunci mutual-exclusion antar-thread untuk melindungi data bersama.",
+        "example": 'import Mutex;\n\nMutex m = new Mutex();\nm.lock();\n// ... akses data bersama ...\nm.unlock();',
+        "notes": ["`tryLock` tidak memblokir: true bila kunci berhasil diambil.",
+                  "Selalu `unlock` pada jalur yang sama; tidak ada RAII/finalizer."],
+    },
     "Csv": {
         "purpose": "Baca & tulis CSV (RFC 4180): field berkutip, pemisah koma, baris CRLF/LF.",
         "example": 'import Csv;\n\nString[] row = Csv.parseRow("a,\"b,c\"");\nSystem.out.println(Csv.formatRow(row));',
@@ -895,6 +909,22 @@ EXTRA = {
         "parse": "teks UUID → 16 byte",
         "valid": "true bila teks UUID valid",
         "version": "versi UUID (1..5)",
+    }},
+    "Chan": {"descs": {
+        "send": "kirim nilai `long` (memblokir bila penuh)",
+        "recv": "terima nilai `long` (memblokir; 0 bila tutup/kosong)",
+        "recvOk": "terima `long`; `ok[0]` = 1 bila dapat nilai",
+        "sendFn": "kirim closure (antrean tugas)",
+        "recvFn": "terima closure (closure kosong bila tutup/kosong)",
+        "recvFnOk": "terima closure; `ok[0]` = 1 bila dapat closure",
+        "close": "tutup channel dan bangunkan semua penunggu",
+        "len": "jumlah nilai yang sedang di buffer",
+        "isClosed": "true bila channel sudah ditutup",
+    }},
+    "Mutex": {"descs": {
+        "lock": "ambil kunci (memblokir sampai tersedia)",
+        "unlock": "lepas kunci",
+        "tryLock": "coba ambil kunci tanpa menunggu; true bila berhasil",
     }},
     "Csv": {"descs": {
         "parseRow": "pecah satu baris CSV menjadi field",

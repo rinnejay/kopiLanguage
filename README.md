@@ -19,14 +19,16 @@ assembly/binary sendiri — tanpa JVM, tanpa bytecode vendor lain.
 - **aarch64 native** — jalan langsung di Termux/Android.
 - **x86-64 native** — target desktop/WSL; verifikasi saat ini sebatas
   assembly dapat dirakit (`cc -c`), belum dijalankan di mesin x86-64.
-- **VM KOP1** — bytecode portabel, dipakai Kopi IDE Android.
+- **VM KOP1** — bytecode portabel, dipakai Kopi IDE Android. Loop angka
+  dan loop checksum array packed yang panas di-JIT ke kode mesin aarch64
+  (`KOPI_NOJIT=1` mematikan).
 
 ## Mulai cepat
 
 ```sh
 make                 # kopicc + kopivm
-make test            # 201 uji lintas backend
-./kopicc --version   # kopicc 1.45.0 (Kopi) — target a64 | x64 | vm
+make test            # 213 uji lintas backend
+./kopicc --version   # kopicc 1.46.0 (Kopi) — target a64 | x64 | vm
 
 # binary asli (aarch64)
 ./kopicc examples/hello.kop -t a64 -o hello.s
@@ -72,6 +74,10 @@ class Main {
   badan thread (lambda 0-argumen) dan menyimpan handle `long`;
   `long[]` menampung banyak thread; `wait h` join dan mengembalikan
   nilai `return` badan thread. Tanpa target = detached.
+- **Channel + mutex** (v1.46): `Chan` (CSP: `send`/`recv`/`recvOk`,
+  `sendFn`/`recvFn`/`recvFnOk`, `close`/`len`/`isClosed`) dan `Mutex`
+  (`lock`/`unlock`/`tryLock`) untuk data bersama dan antrean tugas
+  executor antar-thread.
 - **`malloc { ... }` otomatis** — arena sampai 4096 MB (RAM sesuai
   kebutuhan), tanpa menebak ukuran; `malloc<64mb>` untuk batas keras
   (`b/kb/mb/gb`), dibebaskan di semua jalur keluar blok.
@@ -81,7 +87,7 @@ class Main {
 - Diagnostik runtime: nomor baris + stack trace + saran saat error.
 - Multi-file: `import Nama;` mencari `lib/<kategori>/Nama.kop`.
 
-## Pustaka standar (84 modul, ditulis dengan Kopi)
+## Pustaka standar (86 modul, ditulis dengan Kopi)
 
 | Kelompok | Modul |
 |---|---|
@@ -89,7 +95,7 @@ class Main {
 | `lib/text/` | `Str`, `Text`, `Regex` |
 | `lib/data/` | `Cbor`, `Config`, `Cookie`, `Csv`, `Json`, `MessagePack` |
 | `lib/io/` | `File`, `Path`, `Reader`, `Writer` |
-| `lib/system/` | `Args`, `Env`, `Log`, `Time`, `Uuid` |
+| `lib/system/` | `Args`, `Chan`, `Env`, `Log`, `Mutex`, `Time`, `Uuid` |
 | `lib/compress/` | `Checksum`, `Compress`, `Filter`, `Lzma`, `Lzma2`, `LzmaAuto`, `LzmaStream`, `Xz` |
 | `lib/crypto/` | `Aead`, `Aes`, `Big`, `Blake2b`, `ChaCha`, `Cipher`, `Crypto`, `Der`, `Ecdsa`, `Gcm`, `Hash`, `Kdf`, `Pbkdf2`, `Pem`, `Poly`, `Rand`, `Rsa`, `Scrypt`, `X25519`, `X509` |
 | `lib/net/` | `Dns`, `Resolv`, `Rfc`, `Tcp`, `Tls`, `TlsServer`, `Udp` |
@@ -112,7 +118,7 @@ tanpa Termux.
   dan detail ukuran/izin/waktu ubah.
 - Autocomplete `System.out.`, `Str.`, `Net.`, `String`, snippet.
 - Build `kopicc -t vm` → run `kopivm`, output streaming.
-- 84 modul bahasa ikut dibundel; arm64-v8a, Android 7+.
+- 86 modul bahasa ikut dibundel; arm64-v8a, Android 7+.
 - Detail build/install: [`android/README.md`](android/README.md).
 
 ## Dokumentasi
@@ -125,7 +131,7 @@ tanpa Termux.
 | [04 — Server](docs/04-server.md) | TCP/UDP, HTTP, WebSocket, TLS, game |
 | [05 — Arsitektur](docs/05-developer.md) | pipeline compiler, 3 backend, kontribusi |
 | [06 — Batas & roadmap](docs/06-batas-roadmap.md) | yang belum ada + jebakan |
-| [Referensi API](docs/api.md) | 84 modul, 10 kelompok + builtin `Net.*` |
+| [Referensi API](docs/api.md) | 86 modul, 10 kelompok + builtin `Net.*` |
 
 Versi HTML: **https://rinnejay.github.io/** · [`docs/`](docs/README.md)
 
@@ -135,7 +141,7 @@ Versi HTML: **https://rinnejay.github.io/** · [`docs/`](docs/README.md)
 src/        lexer, parser, units, ast, gen_a64/x64/vm, main
 vm/         kopivm.c — mesin virtual KOP1
 lib/        pustaka standar (.kop), per kategori
-examples/   contoh: hello, demo, server, ws, game, proyekbesar
+examples/   contoh: hello, demo, thread, executor, jitloop, filebench, server, ws, game, proyekbesar
 docs/       tutorial + referensi API (+ HTML GitHub Pages)
 android/    sumber Kopi IDE (WebView + bridge Java)
 tools/      generator vektor uji, docs, deploy Pages
@@ -144,7 +150,7 @@ test.sh     suite lintas backend
 
 ## Status
 
-`v1.45.0` — **201 pass, 0 fail**. Riwayat versi lengkap:
+`v1.46.0` — **213 pass, 0 fail**. Riwayat versi lengkap:
 [`CHANGELOG.md`](CHANGELOG.md). Batas jujur & rencana:
 [docs/06-batas-roadmap.md](docs/06-batas-roadmap.md).
 

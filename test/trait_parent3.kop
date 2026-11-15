@@ -1,0 +1,37 @@
+// v1.47: Trait::method() dengan argumen, return value, dan variabel lokal.
+trait Calc {
+    int add(int a, int b) {
+        int s = a + b;
+        return s;
+    }
+    void hello() {
+        System.out.println("hello default");
+    }
+}
+
+class C : Calc {
+    int add(int a, int b) {
+        int r = Calc::add(a, b);
+        return r * 2;
+    }
+    void callDefault() {
+        Calc::hello();   // implementasi trait langsung
+        this.hello();    // salinan default trait
+    }
+}
+
+class D : Calc {
+    int add(int a, int b) {
+        return Calc::add(a, b) + 100;
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        C c = new C();
+        D d = new D();
+        System.out.println(c.add(2, 3));
+        System.out.println(d.add(2, 3));
+        c.callDefault();
+    }
+}

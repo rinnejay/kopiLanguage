@@ -1,0 +1,10 @@
+impl trait_impl; //impl trait_impl.h
+
+class MainImpl : trait_impl {
+   
+   static void main(String[] args) {
+     MainImpl test = new MainImpl() ;
+     test.printDummy();
+   }
+
+}

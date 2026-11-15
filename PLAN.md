@@ -45,7 +45,7 @@ Lokasi: `~/kopi/PLAN.md`
 
 ### B. Concurrency & I/O
 - **Green threads + OS threads** – `spawn()` dapat memilih implementation.
-- **Channels (CSP)** – `chan T`, select, untuk komunikasi tanpa race.
+- **Channels (CSP)** – ✅ v1.46: `Chan` (`send`/`recv`, `sendFn`/`recvFn`) untuk komunikasi tanpa race; `select` belum ada.
 - **Zero-copy async I/O** – `Net.recv` langsung ke arena.
 - **Non-blocking epoll** – `pollfd`, `settimeout`, `setnonblock`.
 
@@ -87,14 +87,14 @@ Lokasi: `~/kopi/PLAN.md`
 
 | Bulan | Fokus | Item Utama |
 |--------|-------|------------|
-| 1–2 | **Konkurensi & I/O** | Green threads, OS threads, channels, epoll, zero-copy |
+| 1–2 | **Konkurensi & I/O** | Green threads, OS threads ✅, channels ✅, epoll, zero-copy |
 | 2–3 | **Error Handling** | `Result<T,E>`, `try` expr, `catch`, pattern matching (`match`) |
 | 3–4 | **Type System & Metaprogramming** | Generik, Traits, Macro VM, Dependent types, Reflection |
 | 4 | **Plugin Runtime** | `Plugin.load()`, hot-patch method, class dynamic |
 
 #### Milestone 1 — Deterministic Runtime
 - Arena + Region → bukan GC
-- Concurrency → `spawn()` & channels
+- Concurrency → OS threads (`thread`/`wait`) & channels (`Chan`) ✅; `spawn()` green thread belum
 - Error → `Result<T,E>` & `try`
 
 ### Fase 2 — Ekosistem Server (4–11 bulan)
@@ -144,29 +144,38 @@ Lokasi: `~/kopi/PLAN.md`
 
 ---
 
-## 4. Daftar Checklist (Versi 2.0)
+## 4. Daftar Checklist (Versi 2.1 — disinkronkan dengan v1.46)
+
+Legenda: `[x]` ada & diuji · `[~]` sebagian · `[ ]` belum ada.
+Checklist ini adalah **visi**, bukan janji. Status teknis rinci ada di
+`docs/06-batas-roadmap.md`.
 
 ### A. Konfirmasi Bahasa (20 item)
-- [ ] Deterministic arena memory (no GC)
-- [ ] Green threads + OS threads + channels
+- [x] Deterministic arena memory (no GC) — arena + `malloc{}` + `memMark/memReset`; belum ada GC dan itu memang keputusan desain
+- [x] OS threads + channels (v1.45–v1.46) · [ ] green threads
 - [ ] Capability-based Net security
 - [ ] Macro VM (compile-time bytecode generation)
 - [ ] Runtime hot-patch plugin system
-- [ ] Full HTTP router + middleware
-- [ ] Minimal 3 driver DB (PostgreSQL, SQLite, Redis)
-- [ ] Zero-copy JSON/MsgPack/CBOR serialization
-- [ ] Built-in TLS/HTTPS
-- [ ] Auth & JWT (OAuth2/OIDC)
+- [~] HTTP router + middleware — `Router` ada; middleware/CORS belum
+- [~] Minimal 3 driver DB — `Sqlite` read-only ada; PostgreSQL/Redis belum
+- [~] JSON/MsgPack/CBOR — ketiganya ada, tetapi **bukan** zero-copy (masih menyalin)
+- [x] Built-in TLS/HTTPS — `TlsServer` (v1.36), klien TOFU pin, HTTP/2 klien (v1.37)
+- [~] Auth & JWT — Basic/Bearer, HS256/384/512, RS256; OAuth2/OIDC belum
 - [ ] Package manager (`kopi add`) + registry
-- [ ] Property testing + mocking + coverage
+- [~] Test framework — `lib/core/Test.kop` dasar; property testing/mocking/coverage belum
 - [ ] Linter & Formatter
 - [ ] Language server (LSP) + completion + refactoring
-- [ ] Structured logging + metrics + tracing
+- [~] Structured logging — `Log` (stderr + timestamp); metrics/tracing belum
 - [ ] Health check + graceful shutdown
-- [ ] Dockerfile & CI template
+- [ ] Dockerfile & CI template — **belum ada CI sama sekali**, x64 belum pernah dieksekusi
 - [ ] Canary release + rollback
 - [ ] Binary hardening & race detection
 - [ ] Multi-language interop (`C`/`Rust`)
+
+**Skor kelengkapan jujur per v1.46:** ±72% sebagai bahasa, ±85% sebagai
+bahasa inti, ±45% sebagai platform yang bisa diserahkan ke orang lain.
+Angka tertinggi ditahan oleh tooling, error handling, dan bukti runtime x64
+— bukan oleh jumlah fitur bahasa.
 
 ---
 
@@ -193,6 +202,46 @@ Lokasi: `~/kopi/PLAN.md`
 - **Macro VM** → unik: Anda dapat menghasilkan *bytecode* selama compile-time, tidak hanya template code.
 - **Runtime hot-patch** → server *pindah* class dinamis tanpa restart.
 - **Multi-pass compilation** → memungkinkan *optimasi* per tahap (`lexer` → `parser` → `IR` → `bytecode`/`asm`).
+
+## 7. Rencana eksekusi terdekat (pasca v1.46)
+
+Tujuan yang dipilih: **Kopi dipakai sendiri untuk tool & server nyata.**
+Karena itu prioritas ditentukan oleh "apa yang menghambat pemakaian
+harian", bukan oleh kelengkapan daftar fitur. Aturan main: satu gelombang
+= satu tema, wajib lulus `sh test.sh` 0 fail + docs + commit sebelum
+gelombang berikutnya. Setiap fitur bahasa berbiaya **3 backend**, jadi
+utamakan yang bisa didesugar di parser.
+
+### Gelombang 0 — Amankan ✅
+- [x] Commit + tag `v1.46.0` (JIT, Chan/Mutex, fusion, benchmark file besar)
+- [x] Sinkronkan `docs/06` (suite 174 → 213) dan checklist di file ini
+
+### Gelombang 1 — Kredibilitas & keamanan kode
+- [ ] CI x86-64 nyata (GitHub Actions: build + suite) → x64 berhenti jadi klaim
+- [ ] `throw` + `try/catch` minimal (+ `finally` bila murah) di a64/VM
+- [ ] `assert`
+- [ ] `kopi fmt` (parser → printer, tanpa menyentuh backend)
+
+### Gelombang 2 — Siap dipakai harian
+- [ ] Manifest proyek (`kopi.toml`: nama, versi, dependensi path/vendor)
+- [ ] Graceful shutdown (signal handler + drain koneksi)
+- [ ] Thread pool bawaan + `select` di atas `Chan`
+- [ ] LSP minimal: diagnostics, hover, goto-def
+
+### Gelombang 3 — Kedalaman bahasa
+- [ ] Selesaikan enum + trait yang sedang dikerjakan
+- [ ] Generics terbatas (monomorphization) untuk `List<T>`/`Map<K,V>`
+- [ ] `match` sebagai penerus `switch`
+- [ ] vtable/inheritance hanya bila benar-benar dibutuhkan
+
+### Gelombang 4 — Diferensiasi (pilih satu)
+- [ ] Server deterministik: log JSON, metrics, health/ready, `sendfile`
+- [ ] atau: perluasan JIT (panggilan & cabang) + benchmark lawan Go/C
+
+### Ditunda (jangan dikerjakan sekarang)
+Macro VM, dependent types, runtime hot-patching, WASM, OAuth2/OIDC,
+tiga driver DB, registry package, multi-language interop. Pada
+kelengkapan ±72%, menambah luas adalah langkah mundur.
 
 ---
 

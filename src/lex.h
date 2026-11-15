@@ -17,6 +17,7 @@ enum {
     KW_SWITCH, KW_CASE, KW_DEFAULT,          /* v1.19 */
     KW_MALLOC,                               /* v1.20 */
     KW_THREAD, KW_WAIT,                      /* v1.45: thread OS + join */
+    KW_ENUM, KW_TRAIT, KW_IMPL,              /* v1.46: enum + trait/impl */
 
     T_PP, T_MM, T_ADDEQ, T_SUBEQ, T_MULEQ, T_DIVEQ, T_MODEQ,
     T_ARROW,       /* => */
@@ -24,6 +25,7 @@ enum {
     T_ANDEQ, T_OREQ, T_XOREQ,           /* &= |= ^= */
     T_SHLEQ, T_SHREQ, T_USHREQ,         /* <<= >>= >>>= */
     T_AND, T_OR, T_EQ, T_NE, T_LE, T_GE,
+    T_DCOLON,                            /* :: — v1.47 Trait::method() */
 };
 
 typedef struct {

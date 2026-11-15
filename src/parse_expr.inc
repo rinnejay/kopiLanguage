@@ -484,9 +484,11 @@ static Node *primary(void) {
         return n;
     }
     if (at(T_ID)) {
-        /* panggilan metode / Class.metode(...): nama berlambang (. lalu id lalu '(') */
+        /* panggilan metode / Class.metode(...) / Trait::metode(...):
+         * nama berlambang (. atau :: lalu id lalu '(') */
         if (peek2()->type == '(' ||
-            (peek2()->type == '.' && ts[ti + 2].type == T_ID && ts[ti + 3].type == '('))
+            (peek2()->type == '.' && ts[ti + 2].type == T_ID && ts[ti + 3].type == '(') ||
+            (peek2()->type == T_DCOLON && ts[ti + 2].type == T_ID && ts[ti + 3].type == '('))
             return call_node(line);
         Node *n = newnode(EX_VAR, line);
         n->str = xs(t->text);

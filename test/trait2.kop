@@ -1,0 +1,9 @@
+trait Printable {
+    void print();
+}
+
+class Main : Printable {
+    public static void main(String[] args) {
+        System.out.println("Halo trait dengan method");
+    }
+}

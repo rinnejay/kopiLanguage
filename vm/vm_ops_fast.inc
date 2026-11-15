@@ -22,6 +22,7 @@
             break;
         }
         case OP_LOOP: {
+            if (jit_try(f, m)) break;   /* v1.46: seluruh loop dijalankan JIT */
             const uint8_t *c = m->code + f->pc;
             int type = c[0];
             int cm = c[1];
@@ -40,6 +41,53 @@
                 if (t > m->clen) dievm("target lompatan luar batas");
                 f->pc = (long)t;
             }
+            break;
+        }
+        case OP_LOOP_R: {
+            if (jit_try(f, m)) break;   /* v1.46: seluruh loop dijalankan JIT */
+            /* v1.46: loop dengan batas slot lokal: i±k lalu tes i <cmp> bound */
+            const uint8_t *c = m->code + f->pc;
+            int cm = c[1];
+            uint16_t sl = (uint16_t)(c[2] | (c[3] << 8));
+            int32_t delta = (int32_t)rd32c(c + 4);
+            uint16_t sb = (uint16_t)(c[8] | (c[9] << 8));
+            uint32_t t = rd32c(c + 10);
+            f->pc += 14;
+            if ((int)sl >= MAXLOC || (int)sb >= MAXLOC)
+                dievm("slot lokal luar batas");
+            int32_t v = (int32_t)((uint32_t)localsv[nframes - 1][sl] + (uint32_t)delta);
+            localsv[nframes - 1][sl] = v;
+            int32_t bd = (int32_t)localsv[nframes - 1][sb];
+            if (cmp_i32(v, bd, cm)) {
+                if (t > m->clen) dievm("target lompatan luar batas");
+                f->pc = (long)t;
+            }
+            break;
+        }
+        case OP_MULADD: {
+            const uint8_t *c = m->code + f->pc;
+            uint16_t sl = (uint16_t)(c[0] | (c[1] << 8));
+            int32_t mul = (int32_t)rd32c(c + 2);
+            int32_t add = (int32_t)rd32c(c + 6);
+            f->pc += 10;
+            if ((int)sl >= MAXLOC) dievm("slot lokal luar batas");
+            int32_t x = (int32_t)localsv[nframes - 1][sl];
+            x = (int32_t)((int64_t)x * mul + add);
+            localsv[nframes - 1][sl] = x;
+            break;
+        }
+        case OP_ADDSHR: {
+            const uint8_t *c = m->code + f->pc;
+            uint16_t sx = (uint16_t)(c[0] | (c[1] << 8));
+            uint16_t sy = (uint16_t)(c[2] | (c[3] << 8));
+            int sh = c[4];
+            f->pc += 5;
+            if ((int)sx >= MAXLOC || (int)sy >= MAXLOC)
+                dievm("slot lokal luar batas");
+            int32_t x = (int32_t)localsv[nframes - 1][sx];
+            uint32_t y = (uint32_t)localsv[nframes - 1][sy];
+            x = (int32_t)((uint32_t)x + (y >> sh));
+            localsv[nframes - 1][sx] = x;
             break;
         }
         case OP_IINC: {

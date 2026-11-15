@@ -1,0 +1,21 @@
+// v1.47: TraitName::method() — panggil implementasi asli trait (C++ Base::method())
+trait Greet {
+    void hello() {
+        System.out.println("trait hello");
+    }
+}
+
+class A : Greet {
+    void hello() {
+        System.out.println("A before");
+        Greet::hello();
+        System.out.println("A after");
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        A a = new A();
+        a.hello();
+    }
+}

@@ -9,6 +9,9 @@ static void resolve_stmt(Node *s) {
         if (vcls && !find_class(vcls))
             die("baris %d: tipe class '%s' tidak ada (definisikan class sebelum dipakai)",
                 s->line, vcls);
+        int declslot = nextslot;             /* v1.46: simpan slot sebelum
+                                              * inisialisasi — inisialisasi bisa
+                                              * membuat slot capture lambda baru */
         scope_push(s->str, nextslot++, (Ty)s->dty, vcls);
         Ty et = type_expr(s->a);
         /* v1.18: konversi representasi String ↔ buffer otomatis */
@@ -18,7 +21,7 @@ static void resolve_stmt(Node *s) {
         if (!ty_can_implicit((Ty)s->dty, et) && !fits_literal((Ty)s->dty, s->a))
             die("baris %d: inisialisasi '%s' tidak cocok dengan tipe deklarasinya (butuh cast)",
                 s->line, s->str);
-        s->ival = nextslot - 1;
+        s->ival = declslot;
         break;
     }
     case ST_ASSIGN: {
@@ -376,6 +379,10 @@ void parse_all(Tok *toks) {
     ts = toks;
     ti = 0;
     prog.mainidx = -1;
-    while (!at(T_EOF)) parse_class();
+    while (!at(T_EOF)) {
+        if (at(KW_ENUM)) parse_enum();          /* v1.46 */
+        else if (at(KW_TRAIT)) parse_trait();   /* v1.46 */
+        else parse_class();                     /* class + impl */
+    }
     resolve();
 }

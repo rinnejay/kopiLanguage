@@ -1,0 +1,18 @@
+// v1.47: Trait::method() untuk metode instance dari metode static harus ditolak.
+trait Greet {
+    void hello() {
+        System.out.println("hello");
+    }
+}
+
+class A : Greet {
+    static void tes() {
+        Greet::hello();   // tidak ada `this` di metode static
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        A.tes();
+    }
+}

@@ -1,0 +1,14 @@
+trait T { void m(); }
+class X : T { void m() { System.out.println("X"); } }
+class Y : T { void m() { System.out.println("Y"); } }
+
+class Main {
+    T field;           // field trait
+    T getX() { return new X(); }  // return trait
+    public static void main(String[] args) {
+        Main m = new Main();
+        m.field = new Y();
+        m.field.m();
+        m.getX().m();
+    }
+}

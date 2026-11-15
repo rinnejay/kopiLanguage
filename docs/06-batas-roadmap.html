@@ -140,12 +140,16 @@
 <td><strong>dijalankan</strong>, diuji suite</td>
 </tr>
 <tr>
+<td>JIT VM (aarch64)</td>
+<td><strong>✅ v1.46</strong> — loop angka panas (<code>OP_LOOP</code>/<code>OP_LOOP_R</code> dengan badan <code>OP_MULADD</code>/<code>OP_ADDSHR</code>) dan loop checksum array packed (<code>OP_ILOAD</code> + <code>OP_IDXR_UB</code>/<code>OP_IDXR_B</code> + <code>OP_OP_STORE</code>, mis. <code>acc += buf[i]</code>) diterjemahkan ke kode mesin dan seluruh sisa iterasi dijalankan native; indeks di luar batas membuat JIT bail ke interpreter. <code>KOPI_NOJIT=1</code> mematikan JIT. Belum ada JIT untuk panggilan, <code>OP_ISTORE</code> di tengah badan, cabang, atau array 64-bit (<code>int[]</code>/<code>long[]</code>)</td>
+</tr>
+<tr>
 <td>x86-64 native</td>
 <td><strong>hanya verifikasi sintaks</strong> (<code>cc -target x86_64-linux-gnu -c</code>); belum dieksekusi di CI</td>
 </tr>
 <tr>
 <td>Thread OS</td>
-<td><strong>✅ v1.45</strong> — sintaks <code>thread &lt;long&gt; { ... }</code> + <code>wait h</code> (pthread; a64 &amp; VM; handle <code>long</code>/<code>long[]</code>). Belum ada mutex/channel/thread pool. <code>fork</code>/<code>async</code> belum ada</td>
+<td><strong>✅ v1.45</strong> — sintaks <code>thread &lt;long&gt; { ... }</code> + <code>wait h</code> (pthread; a64 &amp; VM; handle <code>long</code>/<code>long[]</code>). <strong>✅ v1.46</strong> — <code>Chan</code> (CSP, payload <code>long</code>/<code>fn</code>) + <code>Mutex</code> (<code>lock</code>/<code>unlock</code>/<code>tryLock</code>). Belum ada thread pool bawaan, <code>select</code>, atau <code>fork</code>/<code>async</code></td>
 </tr>
 <tr>
 <td>Signal handler / graceful shutdown</td>
@@ -164,7 +168,7 @@
 <td>a64 hanya di ARM; x64 hanya di x86-64</td>
 </tr>
 </tbody></table></div>
-<p>Konsekuensi: thread OS tersedia untuk tugas CPU-bound (v1.45), tetapi contoh server tetap <strong>single-thread</strong>; belum ada mutex/channel sehingga berbagi state antar-thread harus lewat pola join / satu penulis per sel. Service yang butuh isolasi penuh tetap paling aman dijalankan sebagai beberapa proses di belakang reverse proxy.</p>
+<p>Konsekuensi: thread OS tersedia untuk tugas CPU-bound (v1.45) dan sinkronisasi antar-thread lewat <code>Mutex</code>/<code>Chan</code> (v1.46), tetapi contoh server tetap <strong>single-thread</strong>; thread pool/executor masih harus dirakit sendiri dengan <code>long[]</code> + <code>Chan.sendFn</code>. Service yang butuh isolasi penuh tetap paling aman dijalankan sebagai beberapa proses di belakang reverse proxy.</p>
 <h2 id="3-jaringan">3. Jaringan<a class="anchor" href="#3-jaringan" aria-label="tautan">#</a></h2>
 <div class="table-wrap"><table>
 <thead><tr>
@@ -273,7 +277,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>174/174</strong> (v1.38) — a64 + VM + sintaks x64 + dokumen HTML (174 PASS termasuk cek x64).</li>
+<li>Suite: <strong>213/213</strong> (v1.46) — a64 + VM + sintaks x64 + dokumen HTML (213 PASS, 0 fail; x64 diverifikasi sintaks saja, belum dijalankan).</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>

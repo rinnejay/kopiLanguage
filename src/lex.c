@@ -36,6 +36,7 @@ static struct { const char *kw; int type; } kws[] = {
     {"switch", KW_SWITCH}, {"case", KW_CASE}, {"default", KW_DEFAULT},   /* v1.19 */
     {"malloc", KW_MALLOC},                                              /* v1.20 */
     {"thread", KW_THREAD}, {"wait", KW_WAIT},                           /* v1.45 */
+    {"enum", KW_ENUM}, {"trait", KW_TRAIT}, {"impl", KW_IMPL},          /* v1.46 */
     {0, 0},
 };
 
@@ -269,6 +270,8 @@ static Tok *lex_scan(char *src, const char *fname, int startline, int *ntoks) {
         if (p[0] == '>' && p[1] == '>' && p[2] == '>') { PUSH(T_USHR, 0, 0);  p += 3; continue; }
         if (p[0] == '>' && p[1] == '>' && p[2] == '=') { PUSH(T_SHREQ, 0, 0);  p += 3; continue; }
         if (p[0] == '>' && p[1] == '>') { PUSH(T_SHR, 0, 0);     p += 2; continue; }
+        /* v1.47: `::` untuk memanggil implementasi asli trait (Trait::method) */
+        if (p[0] == ':' && p[1] == ':') { PUSH(T_DCOLON, 0, 0);  p += 2; continue; }
         if (strchr("+-*/%(){};:,.=!<>[]&|^~?", *p) && *p) {
             PUSH((unsigned char)*p, 0, 0);
             p++;

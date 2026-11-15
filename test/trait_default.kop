@@ -1,0 +1,34 @@
+trait Greet {
+    void hello() {
+        System.out.println("Default hello");
+    }
+    void bye();
+}
+
+class A : Greet {
+    // hello() diambil dari trait default
+    void bye() {
+        System.out.println("A bye");
+    }
+}
+
+class B : Greet {
+    // override hello
+    void hello() {
+        System.out.println("B override hello");
+    }
+    void bye() {
+        System.out.println("B bye");
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        A a = new A();
+        B b = new B();
+        a.hello();
+        a.bye();
+        b.hello();
+        b.bye();
+    }
+}

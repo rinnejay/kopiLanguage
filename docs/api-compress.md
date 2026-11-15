@@ -106,7 +106,7 @@ Modul pustaka Kopi.
 
 ## LzmaDec
 
-`lib/compress/Lzma.kop` · 22 fungsi
+`lib/compress/Lzma.kop` · 53 fungsi
 
 Modul pustaka Kopi.
 
@@ -114,14 +114,45 @@ Modul pustaka Kopi.
 |---|---|
 | `static int[] mk(int n)` | — |
 | `static void fill(int[] p)` | — |
+| `void resetProbs()` | reset model (probabilitas + state + rep) tanpa menyentuh kamus |
+| `void resetState()` | LZMA2 "state reset": model saja, byte sebelumnya dipertahankan |
+| `void resetModel()` | — |
+| `void resetDict()` | LZMA2 "dictionary reset": posisi & konteks mulai dari nol, tetapi keluaran total (this.out) tidak dibuang. |
+| `void setProps(int props)` | ganti properti lc/lp/pb; alokasi tabel menyesuaikan |
+| `void appendBytes(int[] data, int off, int count)` | tambahkan byte mentah (chunk tak terkompresi LZMA2) |
+| `void ensure()` | — |
+| `int[] takeResult()` | — |
 | `static boolean ult(int a, int b)` | ══ range decoder (static, state eksplisit) ═══════════════════ |
 | `static int rInit(int[] b, int off, int[] r)` | — |
 | `static int rNorm(int[] b, int[] r)` | — |
 | `static int rBit(int[] b, int[] r, int[] probs, int idx)` | — |
 | `static int rDirect(int[] b, int[] r, int n)` | — |
 | `static int treeDec(int[] b, int[] r, int[] probs, int base, int nbits)` | — |
+| `int lenDecode(int[] lp2, int posState)` | ══ length / distance ═════════════════════════════════════════ |
+| `int distDecode(int slot)` | return jarak 0-based, -1 galat, -2 end marker |
+| `int decodeChunk(int[] b, int off, int count)` | ══ decode satu aliran ════════════════════════════════════════ count >= 0 : berhenti setelah tepat count byte (LZMA2 / ukuran diketahui) count < 0 : berhenti pada end marker ata… |
 | `static int[] mk(int n)` | — |
 | `static int[] neg(int n)` | — |
+| `void ensureOut()` | — |
+| `void emit(int b)` | — |
+| `int[] takeOut()` | — |
+| `void shiftLow()` | — |
+| `void encBit(int[] probs, int i, int bit)` | — |
+| `void encDirect(int value, int nbits)` | — |
+| `void flush()` | — |
+| `void tree(int[] probs, int base, int nbits, int value)` | — |
+| `int hash3(int p)` | — |
+| `void insert(int p)` | — |
+| `void find()` | indeks elemen, -1 bila tidak ada |
+| `void encodeLen(int[] probs, int length, int posState)` | — |
+| `void encodeMatch(int length, int dist, int posState)` | — |
+| `void encodeRep(int length, int idx, int posState)` | — |
+| `void encodeShortRep(int posState)` | — |
+| `void encodeLiteral(int posState)` | — |
+| `void endMarker(int posState)` | — |
+| `void encodeTokens()` | — |
+| `int[] encode()` | — |
+| `int[] encodeNoEnd()` | LZMA2: satu chunk tanpa end marker |
 | `static int[] raw(int[] src, int props, int dictSize)` | — |
 | `static int[] chunk(int[] src, int props, int dictSize)` | — |
 | `static int[] decompress(int[] data)` | ══ API publik ════════════════════════════════════════════════ |
@@ -139,7 +170,7 @@ Modul pustaka Kopi.
 
 ## Lzma2
 
-`lib/compress/Lzma2.kop` · 15 fungsi
+`lib/compress/Lzma2.kop` · 29 fungsi
 
 Modul pustaka Kopi.
 
@@ -159,7 +190,21 @@ Modul pustaka Kopi.
 | `static int[] compressPreset(int[] data, int preset)` | — |
 | `static int[] compressWith(int[] data, int lc, int lp, int pb, int dictSize)` | — |
 | `static int[] decodeFrom(int[] data, int off, int[] status)` | — |
+| `void ensureIn(int need)` | — |
+| `void appendIn(int[] data)` | — |
+| `void ensureOut()` | — |
+| `void putOut(int v)` | — |
+| `int[] push(int[] data)` | — |
+| `void process()` | — |
+| `boolean isFinished()` | — |
+| `int status()` | — |
 | `static Lzma2EncStream create()` | buat/buka file |
+| `void ensureBuf(int need)` | — |
+| `void ensureOut(int need)` | — |
+| `int[] drain()` | — |
+| `void shift(int k)` | — |
+| `int[] push(int[] data)` | — |
+| `int[] finish()` | — |
 
 ---
 
@@ -179,7 +224,7 @@ Modul pustaka Kopi.
 
 ## LzmaStream
 
-`lib/compress/LzmaStream.kop` · 15 fungsi
+`lib/compress/LzmaStream.kop` · 27 fungsi
 
 Modul pustaka Kopi.
 
@@ -191,10 +236,22 @@ Modul pustaka Kopi.
 | `static LzmaCompressor alone(int preset0)` | — |
 | `static LzmaCompressor raw(int dict0)` | Raw LZMA2 dengan ukuran kamus eksplisit. |
 | `static LzmaCompressor chain(int[] fids, int[] fargs, int dict0, int check0)` | XZ dengan filter chain pra-LZMA2 (id/arg seperti Xz.compressChain). |
+| `void ensure(int need)` | — |
+| `int[] take()` | — |
+| `int[] compress(int[] data)` | Menampung data; keluaran sebenarnya muncul di flush(). |
+| `int[] flush()` | — |
 | `static LzmaDecompressor create()` | buat/buka file |
 | `static LzmaDecompressor xz()` | — |
 | `static LzmaDecompressor alone()` | — |
 | `static LzmaDecompressor raw()` | — |
+| `void ensure(int need)` | — |
+| `void appendUnused(int[] data)` | — |
+| `boolean isEof()` | true bila stream sudah selesai dan check (bila ada) cocok. |
+| `boolean needsInput()` | — |
+| `boolean isError()` | — |
+| `int status()` | 0 sukses, -1 rusak, -2 terpotong, -3 check salah (XZ). |
+| `int[] unusedData()` | — |
+| `int[] decompress(int[] data)` | — |
 | `static boolean exists(String path)` | — |
 | `static int[] read(String path)` | Membaca seluruh berkas; array kosong bila gagal atau berkas kosong. |
 | `static boolean write(String path, int[] data)` | — |

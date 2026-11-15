@@ -1,0 +1,63 @@
+// thread.kop — thread OS: `thread <handle> { ... }` + `wait`.
+//
+// Cakupan:
+//   1) satu thread + nilai balik badan thread
+//   2) banyak thread lewat long[] (handle 64-bit)
+//   3) data bersama dilindungi Mutex
+//   4) thread detached + sinkronisasi lewat thread lain
+// Semua cetakan di thread utama agar urutan output deterministik.
+
+import Mutex;
+
+class Main {
+    static int sq(int x) { return x * x; }
+
+    static void main() {
+        malloc {
+            /* 1) satu thread; `wait` mengembalikan nilai `return` */
+            long t = 0;
+            thread t { return 7; }
+            System.out.println(wait t);              // 7
+
+            /* 2) banyak thread: satu handle per elemen long[] */
+            int[] out = new int[8];
+            long[] hs = new long[8];
+            for (int i = 0; i < 8; i++) {
+                thread hs[i] {
+                    out[i] = sq(i + 1);
+                    return out[i];
+                }
+            }
+            int sum = 0;
+            for (int i = 0; i < 8; i++) sum += wait hs[i];
+            System.out.println(sum);                 // 204 = 1^2 + ... + 8^2
+
+            /* 3) data bersama: 4 thread x 1000 kenaikan, dijaga Mutex */
+            Mutex m = new Mutex();
+            int[] counter = new int[1];
+            long[] cs = new long[4];
+            for (int i = 0; i < 4; i++) {
+                thread cs[i] {
+                    for (int k = 0; k < 1000; k++) {
+                        m.lock();
+                        counter[0] = counter[0] + 1;
+                        m.unlock();
+                    }
+                    return 0;
+                }
+            }
+            for (int i = 0; i < 4; i++) wait cs[i];
+            System.out.println(counter[0]);          // 4000
+
+            /* 4) detached (tanpa target): tidak bisa di-wait,
+             *    jadi pakai thread lain sebagai penanda selesai */
+            int[] flag = new int[1];
+            long j = 0;
+            thread { Net.sleep(20); flag[0] = 1; }
+            thread j { Net.sleep(80); }
+            wait j;
+            System.out.println(flag[0]);             // 1
+        }
+        System.out.println("selesai");
+    }
+}

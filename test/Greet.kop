@@ -1,0 +1,6 @@
+trait Greet {
+    void hello() {
+        System.out.println("Halo dari trait");
+    }
+    void bye();
+}

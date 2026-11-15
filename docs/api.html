@@ -27,7 +27,7 @@
   <main class="content">
 <h1 id="referensi-pustaka">Referensi pustaka<a class="anchor" href="#referensi-pustaka" aria-label="tautan">#</a></h1>
 <nav class="toc"><h2>Isi halaman</h2><ul><li class="toc-h2"><a href="#daftar-modul">Daftar modul</a></li><li class="toc-h3"><a href="#core-buka-referensi-api-core-md">Core — buka referensi</a></li><li class="toc-h3"><a href="#text-buka-referensi-api-text-md">Text — buka referensi</a></li><li class="toc-h3"><a href="#data-buka-referensi-api-data-md">Data — buka referensi</a></li><li class="toc-h3"><a href="#io-buka-referensi-api-io-md">IO — buka referensi</a></li><li class="toc-h3"><a href="#system-buka-referensi-api-system-md">System — buka referensi</a></li><li class="toc-h3"><a href="#compress-buka-referensi-api-compress-md">Compress — buka referensi</a></li><li class="toc-h3"><a href="#crypto-buka-referensi-api-crypto-md">Crypto — buka referensi</a></li><li class="toc-h3"><a href="#net-buka-referensi-api-net-md">Net — buka referensi</a></li><li class="toc-h3"><a href="#web-buka-referensi-api-web-md">Web — buka referensi</a></li><li class="toc-h3"><a href="#database-buka-referensi-api-db-md">Database — buka referensi</a></li><li class="toc-h2"><a href="#cara-menerapkan">Cara menerapkan</a></li><li class="toc-h2"><a href="#builtin-net">Builtin Net.</a></li></ul></nav>
-<p>Ringkasan semua modul di <code>lib/</code>. Setiap modul adalah class Kopi dengan method static; impor memakai nama class.</p>
+<p>Ringkasan semua modul di <code>lib/</code>. Setiap modul adalah class Kopi dengan method static dan/atau instance; impor memakai nama class.</p>
 <div class="table-wrap"><table>
 <thead><tr>
 <th>Kelompok</th>
@@ -57,7 +57,7 @@
 <tr>
 <td><strong>System</strong></td>
 <td><code>lib/system/</code></td>
-<td><code>Args</code>, <code>Env</code>, <code>Log</code>, <code>Time</code>, <code>Uuid</code></td>
+<td><code>Args</code>, <code>Chan</code>, <code>Env</code>, <code>Log</code>, <code>Mutex</code>, <code>Time</code>, <code>Uuid</code></td>
 </tr>
 <tr>
 <td><strong>Compress</strong></td>
@@ -286,13 +286,13 @@
 <tr>
 <td><a href="api-io.html#reader"><code>Reader</code></a></td>
 <td><code>lib/io/Reader.kop</code></td>
-<td>1</td>
+<td>10</td>
 <td>Pembaca berkas berbuffer: baris demi baris, byte, atau seluruh isi tanpa memuat file ke memori.</td>
 </tr>
 <tr>
 <td><a href="api-io.html#writer"><code>Writer</code></a></td>
 <td><code>lib/io/Writer.kop</code></td>
-<td>2</td>
+<td>9</td>
 <td>Penulis berkas berbuffer: teks, baris, atau byte; flush otomatis saat buffer penuh.</td>
 </tr>
 </tbody></table></div>
@@ -311,6 +311,12 @@
 <td>—</td>
 </tr>
 <tr>
+<td><a href="api-system.html#chan"><code>Chan</code></a></td>
+<td><code>lib/system/Chan.kop</code></td>
+<td>9</td>
+<td>Channel CSP antar-thread: payload <code>long</code> atau closure <code>fn</code>, dengan buffer melingkar dan penunggu condvar.</td>
+</tr>
+<tr>
 <td><a href="api-system.html#env"><code>Env</code></a></td>
 <td><code>lib/system/Env.kop</code></td>
 <td>11</td>
@@ -321,6 +327,12 @@
 <td><code>lib/system/Log.kop</code></td>
 <td>18</td>
 <td>Logging ke stderr dengan timestamp UTC dan level.</td>
+</tr>
+<tr>
+<td><a href="api-system.html#mutex"><code>Mutex</code></a></td>
+<td><code>lib/system/Mutex.kop</code></td>
+<td>3</td>
+<td>Kunci mutual-exclusion antar-thread untuk melindungi data bersama.</td>
 </tr>
 <tr>
 <td><a href="api-system.html#time"><code>Time</code></a></td>
@@ -364,13 +376,13 @@
 <tr>
 <td><a href="api-compress.html#lzmadec"><code>LzmaDec</code></a></td>
 <td><code>lib/compress/Lzma.kop</code></td>
-<td>22</td>
+<td>53</td>
 <td>—</td>
 </tr>
 <tr>
 <td><a href="api-compress.html#lzma2"><code>Lzma2</code></a></td>
 <td><code>lib/compress/Lzma2.kop</code></td>
-<td>15</td>
+<td>29</td>
 <td>—</td>
 </tr>
 <tr>
@@ -382,7 +394,7 @@
 <tr>
 <td><a href="api-compress.html#lzmastream"><code>LzmaStream</code></a></td>
 <td><code>lib/compress/LzmaStream.kop</code></td>
-<td>15</td>
+<td>27</td>
 <td>—</td>
 </tr>
 <tr>
@@ -562,7 +574,7 @@
 <tr>
 <td><a href="api-net.html#tlsserver"><code>TlsServer</code></a></td>
 <td><code>lib/net/TlsServer.kop</code></td>
-<td>28</td>
+<td>29</td>
 <td>Server TLS 1.3: X25519 + ECDSA P-256 self-signed, ChaCha20-Poly1305/AES-GCM, verifikasi client Finished,…</td>
 </tr>
 <tr>

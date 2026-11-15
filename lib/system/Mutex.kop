@@ -1,0 +1,29 @@
+// Mutex.kop — kunci mutual-exclusion antar-thread (v1.46).
+//
+//   import Mutex;
+//   Mutex m = new Mutex();
+//   m.lock();
+//   // ... akses data bersama ...
+//   m.unlock();
+//
+// tryLock() mengembalikan true bila kunci berhasil diambil tanpa menunggu.
+
+class Mutex {
+    long h;
+
+    Mutex() {
+        this.h = Net.mutexnew();
+    }
+
+    void lock() {
+        Net.mutexlock(this.h);
+    }
+
+    void unlock() {
+        Net.mutexunlock(this.h);
+    }
+
+    boolean tryLock() {
+        return Net.mutextrylock(this.h) != 0;
+    }
+}

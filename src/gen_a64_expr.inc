@@ -248,17 +248,20 @@ static int gen_expr(Method *m, Node *e) {
             n++;
         }
         gen_expr(m, e->b);               /* x0 = pointer closure */
-        emit("\tmov\tx19, x0");
+        /* v1.46: pakai register caller-saved (x9/x10), bukan x19/x20 —
+         * x19/x20 adalah callee-saved dan bisa dipakai pemanggil
+         * (mis. kop_thread_trampoline menyimpan tcb di x20). */
+        emit("\tmov\tx9, x0");
         for (int k = 0; k < n; k++)
             emit("\tldr\tw%d, [sp, #%d]", k + 1, (n - 1 - k) * 16);
         if (n > 0) emit("\tadd\tsp, sp, #%d", n * 16);
         /* cek arity runtime: nuser (env[2]) != n → mati rapi */
-        emit("\tldr\tw9, [x19, #16]");
-        emit("\tcmp\tw9, #%d", n);
+        emit("\tldr\tw10, [x9, #16]");
+        emit("\tcmp\tw10, #%d", n);
         emit("\tb.ne\t.Klam");
-        emit("\tmov\tx0, x19");          /* arg0 = env */
-        emit("\tldr\tx20, [x19]");       /* kode */
-        emit("\tblr\tx20");
+        emit("\tmov\tx0, x9");           /* arg0 = env */
+        emit("\tldr\tx10, [x9]");        /* kode */
+        emit("\tblr\tx10");
         return 0;                        /* hasil kembalian: int di w0 */
     }
     case EX_NEWARR: {
@@ -388,6 +391,60 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tmov\tw0, wzr");
             return 0;
         }
+        if (e->ival >= 53 && e->ival <= 66) {
+            /* v1.46: channel + mutex (pthread) */
+            if (e->ival == 53) {              /* channew(cap) → long */
+                gen_expr(m, e->a);
+                push_val(0);
+                emit("\tldr\tw0, [sp], #16");
+                emit("\tbl\tkop_chan_new");
+                return 1;
+            }
+            if (e->ival == 60) {              /* mutexnew() → long */
+                emit("\tbl\tkop_mutex_new");
+                return 1;
+            }
+            if (e->ival == 55 || e->ival == 58) {  /* chanrecv / chanrecvfn */
+                gen_expr(m, e->a);
+                push_val(1);
+                emit("\tldr\tx0, [sp], #16");
+                emit("\tbl\tkop_chan_recv");
+                return 1;
+            }
+            if (e->ival == 54 || e->ival == 59) {  /* chansend / chansendfn */
+                gen_expr(m, e->a);
+                push_val(1);
+                gen_expr(m, e->a->next);
+                push_val(1);
+                emit("\tldr\tx0, [sp, #16]");     /* handle */
+                emit("\tldr\tx1, [sp, #0]");      /* payload */
+                emit("\tadd\tsp, sp, #32");
+                emit("\tbl\tkop_chan_send");
+                return 0;
+            }
+            if (e->ival == 65 || e->ival == 66) {  /* chanrecvok / chanrecvfnok */
+                gen_expr(m, e->a);
+                push_val(1);
+                gen_expr(m, e->a->next);
+                push_val(1);
+                emit("\tldr\tx0, [sp, #16]");     /* handle */
+                emit("\tldr\tx1, [sp, #0]");      /* int[] ok */
+                emit("\tadd\tsp, sp, #32");
+                emit("\tbl\tkop_chan_recv_ok");
+                return 1;
+            }
+            /* satu argumen handle: close/len/closed/lock/unlock/trylock */
+            gen_expr(m, e->a);
+            push_val(1);
+            emit("\tldr\tx0, [sp], #16");
+            if (e->ival == 56)      emit("\tbl\tkop_chan_close");
+            else if (e->ival == 57) emit("\tbl\tkop_chan_len");
+            else if (e->ival == 63) emit("\tbl\tkop_chan_closed");
+            else if (e->ival == 61) emit("\tbl\tkop_mutex_lock");
+            else if (e->ival == 62) emit("\tbl\tkop_mutex_unlock");
+            else                    emit("\tbl\tkop_mutex_trylock");
+            return 0;
+        }
         if (e->ival == 7 || e->ival == 8 || e->ival == 42 || e->ival == 43) {
             /* recvb/sendb: buf adalah pointer 64-bit (slot atau packed) */
             for (Node *aa = e->a; aa; aa = aa->next) {
@@ -405,9 +462,10 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tcmp\tw9, w11");
             emit("\tb.hs\t.LPV%df", ln);
             emit("\tsub\tw12, w11, w9");
-            emit("\tcmp\tw12, #240");
+            emit("\tmov\tw13, #0x100000");             /* maks 1 MiB per syscall */
+            emit("\tcmp\tw12, w13");
             emit("\tb.ls\t.LPV%dc", ln);
-            emit("\tmov\tw12, #240");
+            emit("\tmov\tw12, w13");
             emit(".LPV%dc:", ln);
             emit("\tadd\tx1, x10, #8");
             emit("\tadd\tx1, x1, x9");
@@ -444,9 +502,10 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tcmp\tw9, w11");
             emit("\tb.hs\t.LPS%df", ln);
             emit("\tsub\tw12, w11, w9");
-            emit("\tcmp\tw12, #240");
+            emit("\tmov\tw13, #0x100000");             /* maks 1 MiB per syscall */
+            emit("\tcmp\tw12, w13");
             emit("\tb.ls\t.LPS%dc", ln);
-            emit("\tmov\tw12, #240");
+            emit("\tmov\tw12, w13");
             emit(".LPS%dc:", ln);
             emit("\tadd\tx1, x10, #8");
             emit("\tadd\tx1, x1, x9");

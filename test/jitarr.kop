@@ -1,0 +1,53 @@
+// jitarr.kop — regresi JIT loop array packed 1 byte/elemen (aarch64).
+//
+// Badan loop `s = s + buf[i]` / `x = x ^ buf[i]` kini difusikan menjadi
+// OP_ILOAD + OP_IDXR_UB + OP_OP_STORE, dan kopivm menerjemahkan seluruh
+// loop ke kode mesin. Batas loop berupa slot lokal (bukan konstanta)
+// sehingga footer memakai OP_LOOP_R.
+//
+// Hasil harus sama dengan KOPI_NOJIT=1 dan backend a64.
+
+class Main {
+    static int sumU8(uint8[] buf, int n) {
+        int s = 0;
+        for (int i = 0; i < n; i++) s = s + buf[i];
+        return s;
+    }
+
+    static int xorU8(uint8[] buf, int n) {
+        int x = 0;
+        for (int i = 0; i < n; i++) x = x ^ buf[i];
+        return x;
+    }
+
+    static int sumI8(byte[] buf, int n) {
+        int s = 0;
+        for (int i = 0; i < n; i++) s = s + buf[i];
+        return s;
+    }
+
+    /* indeks awal bukan 0; tetap OP_LOOP_R */
+    static int sumRange(uint8[] buf, int from, int n) {
+        int s = 0;
+        for (int i = from; i < n; i++) s = s + buf[i];
+        return s;
+    }
+
+    static void main() {
+        int N = 100000;
+        uint8[] u = new uint8[N];
+        for (int i = 0; i < N; i++) u[i] = (uint8)((i * 37 + 11) & 255);
+        byte[] b = new byte[N];
+        for (int i = 0; i < N; i++) b[i] = (byte)((i * 13 + 7) & 255);
+
+        System.out.println(sumU8(u, N));
+        System.out.println(xorU8(u, N));
+        System.out.println(sumI8(b, N));
+        System.out.println(sumRange(u, N / 2, N));
+
+        /* cache JIT dipakai lintas panggilan (meth,pc sama) */
+        int t = 0;
+        for (int k = 0; k < 10; k++) t = t + sumU8(u, N);
+        System.out.println(t);
+    }
+}

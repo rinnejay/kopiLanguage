@@ -21,10 +21,266 @@ static Class *find_class(const char *name) {
     return 0;
 }
 
+static TraitDef *find_trait(const char *name) {
+    for (TraitDef *t = prog.traits; t; t = t->next)
+        if (!strcmp(t->name, name)) return t;
+    return 0;
+}
+
+/* v1.46: trait = kumpulan metode dengan implementasi default (mirip Rust trait
+ * / C++ mixin). Dipakai via `class Nama : Trait1, Trait2 { ... }`. */
+static void parse_trait(void) {
+    Tok *tt = peek();
+    advance();                               /* 'trait' */
+    Tok *id = peek();
+    expect(T_ID, "nama trait");
+    if (find_class(xs(id->text)))
+        die("baris %d: trait '%s' bentrok dengan nama class", id->line, id->text);
+    if (find_trait(xs(id->text)))
+        die("baris %d: trait '%s' dideklarasikan dua kali", id->line, id->text);
+    TraitDef *td = xmalloc(sizeof *td);
+    td->name = xs(id->text);
+    td->next = prog.traits;
+    prog.traits = td;
+    const char *saved_cls = prog.curcls;
+    prog.curcls = td->name;   /* bare call dalam body trait → diagnostik jelas */
+
+    expect('{', "'{' setelah nama trait");
+    while (!at('}')) {
+        int was_static = mods_static();  /* trait method bisa static? tidak perlu, tapi biarkan */
+        Ty ret = type_opt();
+        if (ret == T_FN)
+            die("baris %d: metode trait dengan return lambda belum didukung", peek()->line);
+        Tok *mn = peek();
+        expect(T_ID, "nama metode trait");
+        expect('(', "'(' setelah nama metode trait");
+        Param **pp = 0;
+        int nparams = 0;
+        int is_static = was_static;
+        // We need a dummy method to parse params like regular method
+        Method dummy = {0};
+        dummy.params = 0;
+        Param **dpp = &dummy.params;
+        if (!is_static) {
+            /* trait method instance: param pertama implisit `this` */
+            Param *th = xmalloc(sizeof(Param));
+            th->name = xs("this");
+            th->ty = (int)T_ARI;
+            th->cls = 0;  /* class akan di-set saat apply_traits */
+            th->next = 0;
+            *dpp = th;
+            dpp = &th->next;
+            nparams++;
+        }
+        if (!at(')')) {
+            do {
+                Ty pt;
+                const char *pcls = 0;
+                if (at(T_ID) && tokat(1, T_ID) && find_class(xs(peek()->text))) {
+                    pcls = xs(peek()->text);
+                    advance();
+                    pt = T_ARI;
+                } else {
+                    pt = type_param();
+                }
+                if (pt == T_VOID) die("baris %d: tipe parameter void", peek()->line);
+                Tok *pn = peek();
+                expect(T_ID, "nama parameter");
+                Param *p = xmalloc(sizeof(Param));
+                p->name = xs(pn->text);
+                p->ty = (int)pt;
+                p->cls = pcls;
+                p->next = 0;
+                *dpp = p;
+                dpp = &p->next;
+                nparams++;
+            } while (at(',') && (advance(), 1));
+        }
+        expect(')', "')' setelah parameter trait");
+
+        Node *body = 0;
+        if (at('{')) {
+            body = block();  /* default implementation */
+        } else {
+            expect(';', "';' atau '{' setelah signature trait");
+        }
+        // Create TraitMethod
+        TraitMethod *tm = xmalloc(sizeof *tm);
+        tm->name = xs(mn->text);
+        tm->ret = ret;
+        tm->params = dummy.params;
+        tm->nparams = nparams;
+        tm->body = body;
+        tm->retcls = 0;
+        tm->next = td->methods;
+        td->methods = tm;
+    }
+    expect('}', "'}' tutup trait");
+    if (at(';')) advance();
+    prog.curcls = saved_cls;
+    (void)tt;
+}
+
+/* v1.46: enum = kumpulan konstanta int bernama (`Warna.MERAH`).
+ * Tidak ada objek runtime — nilai langsung menjadi literal int saat
+ * resolusi, sehingga bisa dipakai di switch/case, array, aritmetika. */
+static EnumDef *find_enum(const char *name) {
+    for (EnumDef *e = prog.enums; e; e = e->next)
+        if (!strcmp(e->name, name)) return e;
+    return 0;
+}
+
+static int enum_lookup(const char *en, const char *mem, long *out) {
+    EnumDef *ed = find_enum(en);
+    if (!ed) return 0;
+    for (EnumConst *c = ed->consts; c; c = c->next)
+        if (!strcmp(c->name, mem)) {
+            if (out) *out = c->val;
+            return 1;
+        }
+    return 0;
+}
+
+static void parse_enum(void) {
+    Tok *et = peek();
+    advance();                               /* 'enum' */
+    Tok *id = peek();
+    expect(T_ID, "nama enum");
+    if (find_class(xs(id->text)))
+        die("baris %d: enum '%s' bentrok dengan nama class", id->line, id->text);
+    if (find_enum(xs(id->text)))
+        die("baris %d: enum '%s' dideklarasikan dua kali", id->line, id->text);
+    EnumDef *ed = xmalloc(sizeof *ed);
+    ed->name = xs(id->text);
+    ed->next = prog.enums;
+    prog.enums = ed;
+
+    expect('{', "'{' setelah nama enum");
+    long next = 0;
+    while (!at('}')) {
+        Tok *cn = peek();
+        expect(T_ID, "nama konstanta enum");
+        long v = next;
+        if (at('=')) {
+            advance();
+            int neg = 0;
+            if (at('-')) { advance(); neg = 1; }
+            if (!at(T_NUM))
+                die("baris %d: nilai enum '%s' harus literal bilangan bulat",
+                    cn->line, cn->text);
+            v = peek()->num;
+            advance();
+            if (neg) v = -v;
+        }
+        for (EnumConst *k = ed->consts; k; k = k->next)
+            if (!strcmp(k->name, cn->text))
+                die("baris %d: konstanta enum '%s' duplikat di %s",
+                    cn->line, cn->text, ed->name);
+        EnumConst *ec = xmalloc(sizeof *ec);
+        ec->name = xs(cn->text);
+        ec->val = v;
+        ec->next = ed->consts;
+        ed->consts = ec;
+        next = v + 1;
+        if (at(',')) { advance(); continue; }
+        break;
+    }
+    expect('}', "'}' tutup enum");
+    if (at(';')) advance();                  /* titik koma opsional */
+    (void)et;
+}
+
 static Field *class_field(Class *c, const char *name) {
     for (Field *f = c->fields; f; f = f->next)
         if (!strcmp(f->name, name)) return f;
     return 0;
+}
+
+/* v1.47: salin AST metode trait agar tiap class punya salinan sendiri —
+ * slot lokal & hasil resolusi tidak saling menimpa antar class/trait. */
+static Node *clone_node(Node *n) {
+    if (!n) return 0;
+    Node *c = newnode(n->kind, n->line);
+    c->str = n->str;
+    c->ival = n->ival;
+    c->fval = n->fval;
+    c->cp = n->cp;
+    c->dty = n->dty;
+    c->typed = 0;
+    c->file = n->file;
+    c->cls = n->cls;
+    c->meth = 0;
+    c->a = clone_node(n->a);
+    c->b = clone_node(n->b);
+    c->c = clone_node(n->c);
+    c->d = clone_node(n->d);
+    c->next = clone_node(n->next);
+    return c;
+}
+
+/* v1.47: salin parameter trait; param `this` implisit diberi class pemakai. */
+static Param *clone_params(Param *p, const char *thiscls) {
+    Param *head = 0, **tail = &head;
+    for (; p; p = p->next) {
+        Param *q = xmalloc(sizeof *q);
+        q->name = p->name;
+        q->ty = p->ty;
+        q->cls = p->cls;
+        q->next = 0;
+        *tail = q;
+        tail = &q->next;
+    }
+    if (head && head->ty == (int)T_ARI && !head->cls &&
+        !strcmp(head->name, "this"))
+        head->cls = thiscls;
+    return head;
+}
+
+/* v1.46: apply_traits — salin metode trait ke class (default implementation).
+ * Jika class sudah punya metode dengan nama sama → skip (override).
+ * v1.47: metode trait yang punya body juga disalin dengan nama mangled
+ * `__tr_<Trait>_<method>` agar bisa dipanggil via `Trait::method()`. */
+static void apply_traits(Class *c, TraitDef *td) {
+    for (TraitMethod *tm = td->methods; tm; tm = tm->next) {
+        int overridden = find_method(c->name, tm->name) != 0;
+        /* implementasi asli trait untuk Trait::method() */
+        if (tm->body) {
+            char *mname = xmalloc(strlen(td->name) + strlen(tm->name) + 8);
+            sprintf(mname, "__tr_%s_%s", td->name, tm->name);
+            if (!find_method(c->name, mname)) {
+                Method *pm = xmalloc(sizeof *pm);
+                pm->cls = c->name;
+                pm->name = mname;
+                pm->ret = tm->ret;
+                pm->params = clone_params(tm->params, c->name);
+                pm->nparams = tm->nparams;
+                pm->body = clone_node(tm->body);
+                pm->retcls = tm->retcls;
+                pm->is_inst = pm->params && !strcmp(pm->params->name, "this");
+                pm->hidden = 0;
+                pm->is_constfield = 0;
+                pm->next = prog.methods;
+                prog.methods = pm;
+                prog.nmethods++;
+            }
+        }
+        if (overridden)
+            continue;  /* override: metode class menang */
+        Method *m = xmalloc(sizeof *m);
+        m->cls = c->name;
+        m->name = xs(tm->name);
+        m->ret = tm->ret;
+        m->params = clone_params(tm->params, c->name);
+        m->nparams = tm->nparams;
+        m->body = clone_node(tm->body);
+        m->retcls = tm->retcls;
+        m->is_inst = m->params && !strcmp(m->params->name, "this");
+        m->hidden = 0;
+        m->is_constfield = 0;
+        m->next = prog.methods;
+        prog.methods = m;
+        prog.nmethods++;
+    }
 }
 
 /* tipe field: 32-bit (slot tunggal) atau referensi 64-bit (long/String/class) */
@@ -37,16 +293,46 @@ static int field_ty_ok(Ty t) {
 
 static void parse_class(void) {
     skip_mods();
-    expect(KW_CLASS, "'class'");
+    int is_impl = 0;
+    if (at(KW_IMPL)) { advance(); is_impl = 1; }
+    else expect(KW_CLASS, "'class'");
     Tok *id = peek();
-    expect(T_ID, "nama class");
-    if (find_class(xs(id->text)))
-        die("baris %d: class '%s' dideklarasikan dua kali", id->line, id->text);
-    Class *c = xmalloc(sizeof(Class));
-    c->name = xs(id->text);
-    c->next = prog.classes;
-    prog.classes = c;
+    expect(T_ID, is_impl ? "nama class setelah impl" : "nama class");
+    Class *c;
+    if (is_impl) {
+        c = find_class(xs(id->text));
+        if (!c)
+            die("baris %d: impl '%s': class belum dideklarasikan — "
+                "taruh impl setelah class-nya (gaya definisi luar C++)",
+                id->line, id->text);
+    } else {
+        if (find_class(xs(id->text)))
+            die("baris %d: class '%s' dideklarasikan dua kali", id->line, id->text);
+        if (find_enum(xs(id->text)))
+            die("baris %d: class '%s' bentrok dengan nama enum", id->line, id->text);
+        c = xmalloc(sizeof(Class));
+        c->name = xs(id->text);
+        c->next = prog.classes;
+        prog.classes = c;
+    }
     prog.curcls = c->name;
+
+    /* v1.46: class Main : Trait1, Trait2 { ... } */
+    TraitDef *trait_list[16];
+    int nt = 0;
+    if (at(':')) {
+        advance();
+        do {
+            Tok *tn = peek();
+            expect(T_ID, "nama trait");
+            TraitDef *td = find_trait(xs(tn->text));
+            if (!td)
+                die("baris %d: trait '%s' tidak ada (definisikan trait sebelum dipakai)",
+                    tn->line, tn->text);
+            if (nt >= 16) die("baris %d: terlalu banyak trait (maks 16)", tn->line);
+            trait_list[nt++] = td;
+        } while (at(',') && (advance(), 1));
+    }
 
     expect('{', "'{' setelah nama class");
     while (!at('}')) {
@@ -54,6 +340,9 @@ static void parse_class(void) {
         Tok *rt = peek();
         /* constructor: NamaKelas(...) — desugar ke metode instance __ctor */
         if (at(T_ID) && !strcmp(xs(rt->text), c->name) && tokat(1, '(')) {
+            if (is_impl)
+                die("baris %d: impl tidak boleh berisi constructor — "
+                    "definisikan constructor di dalam class", rt->line);
             advance();                       /* nama class */
             if (was_static)
                 die("baris %d: constructor tidak boleh static", rt->line);
@@ -111,6 +400,9 @@ static void parse_class(void) {
             Tok *fn = peek();
             expect(T_ID, "nama field");
             advance();                       /* ';' */
+            if (is_impl)
+                die("baris %d: impl hanya berisi metode; field '%s' harus "
+                    "dideklarasikan di dalam class", fn->line, fn->text);
             if (was_static)
                 die("baris %d: static field bertipe class belum didukung — "
                     "pakai static method yang mengembalikan objek", fn->line);
@@ -138,13 +430,15 @@ static void parse_class(void) {
             ret = T_ARI;
         } else {
             ret = type_opt();
-            if (ret == T_FN)
-                die("baris %d: metode dengan return lambda belum didukung — simpan lambda di variabel", rt->line);
+            /* v1.46: metode boleh mengembalikan fn (dipakai Chan.recvFn). */
         }
         Tok *mn = peek();
         expect(T_ID, "nama metode");
         /* setelah nama: '(' → metode; ';' atau '=' → deklarasi field */
         if (at(';') || at('=')) {
+            if (is_impl && !was_static)
+                die("baris %d: impl hanya berisi metode; field '%s' harus "
+                    "dideklarasikan di dalam class", mn->line, mn->text);
             if (was_static) {
                 /* v1.41: `static T X = v;` didesugar menjadi metode static
                  * tanpa parameter X(). Semua akses `Class.X` / `X` di
@@ -256,7 +550,7 @@ static void parse_class(void) {
      *     Kelas t = new Kelas();   (alokasi mentah, zero-init)
      *     t.__ctor(args...);
      *     return t; } — 'new Kelas(args)' → Kelas.__new(args) */
-    Method *ctor = find_method(c->name, "__ctor");
+    Method *ctor = is_impl ? 0 : find_method(c->name, "__ctor");
     if (ctor) {
         if (find_method(c->name, "__new"))
             die("class %s: nama '__new' dipakai compiler — ganti nama method", c->name);
@@ -319,6 +613,25 @@ static void parse_class(void) {
         prog.methods = nm;
         prog.nmethods++;
     }
+    /* v1.46: apply_traits — terapkan default metode trait ke class.
+     * Override: jika class sudah punya metode dengan nama yang sama,
+     * metode class menang. */
+    if (is_impl) {
+        /* impl: tambahkan metode instance baru ke class yang sudah ada */
+        for (Method **pp = &prog.methods; *pp; pp = &(*pp)->next) {
+            if ((*pp)->cls && !strcmp((*pp)->cls, c->name) && !(*pp)->hidden &&
+                !(*pp)->is_constfield) {
+                /* ini metode dari impl; biarkan saja, sudah terdaftar */
+            }
+        }
+    }
+
+    /* v1.46: terapkan trait — metode trait yang belum ada di class
+     * ditambahkan sebagai metode class biasa (override = tulis ulang di
+     * badan class). */
+    for (int i = 0; i < nt; i++)
+        apply_traits(c, trait_list[i]);
+
     expect('}', "'}' tutup class");
     prog.curcls = 0;
 }

@@ -33,7 +33,7 @@ CATS = [
     ("text", "Text", "Teks native String, transformasi teks, dan regex"),
     ("data", "Data", "JSON, CBOR, MessagePack, CSV, konfigurasi, cookie"),
     ("io", "IO", "Berkas, path, pembaca, dan penulis berbuffer"),
-    ("system", "System", "Argumen, environment, waktu, log, dan UUID"),
+    ("system", "System", "Argumen, environment, waktu, log, UUID, channel, dan mutex"),
     ("compress", "Compress", "LZMA/LZMA2/XZ, checksum, filter, dan kompresi umum"),
     ("crypto", "Crypto", "Hash, PBKDF2, cipher, X25519, AEAD, DER"),
     ("net", "Net", "TCP/UDP, DNS, TLS, dan protokol jaringan dasar"),
@@ -114,6 +114,26 @@ def parse_file(path):
             pending = []
             item = {"sig": sig, "name": fname, "doc": doc}
             (consts if is_const else funcs).append(item)
+            i = j + 1
+            continue
+        # metode instance (tanpa `static`), mis. `long recv() {` / `fn recvFn() {`
+        mi = re.match(
+            r"^    (public\s+)?([A-Za-z_][A-Za-z0-9_]*(?:\[\])?)\s+"
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", raw)
+        if mi and not ln.startswith("//"):
+            sig = ln
+            j = i
+            while "{" not in sig and ";" not in sig and j + 1 < len(lines):
+                j += 1
+                sig += " " + lines[j].strip()
+            sig = sig.split("{")[0].split(";")[0].strip()
+            sig = re.sub(r"^public\s+", "", sig)
+            sig = re.sub(r"\s+", " ", sig)
+            doc = clean_comment(pending)
+            if is_banner(doc):
+                doc = ""
+            pending = []
+            funcs.append({"sig": sig, "name": mi.group(3), "doc": doc})
             i = j + 1
             continue
         if ln and not ln.startswith("*") and not ln.startswith("}"):
@@ -216,7 +236,7 @@ def shorten(text, limit=110):
 def build_index(files_by_cat):
     out = ["# Referensi pustaka", ""]
     out.append("Ringkasan semua modul di `lib/`. Setiap modul adalah class Kopi "
-               "dengan method static; impor memakai nama class.")
+               "dengan method static dan/atau instance; impor memakai nama class.")
     out.append("")
     out.append("| Kelompok | Folder | Modul |")
     out.append("|---|---|---|")

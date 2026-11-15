@@ -1,0 +1,35 @@
+// v1.47: Trait::method() dari class yang tidak meng-override metode itu,
+// plus dua class berbagi default method (uji salinan AST per class).
+trait Greet {
+    void hello() {
+        System.out.println("trait hello");
+    }
+    void bye() {
+        System.out.println("trait bye");
+    }
+}
+
+class A : Greet {
+    void hello() {
+        System.out.println("A hello");
+        Greet::hello();
+    }
+}
+
+class B : Greet {
+    void bye() {
+        System.out.println("B bye");
+        Greet::bye();
+    }
+}
+
+class Main {
+    public static void main(String[] args) {
+        A a = new A();
+        B b = new B();
+        a.hello();
+        b.bye();
+        b.hello();
+        a.bye();
+    }
+}

@@ -1,0 +1,19 @@
+// v1.47: bare call dalam body trait harus memberi error jelas, bukan crash.
+trait T {
+    void a() {
+        b();
+    }
+    void b() {
+        System.out.println("b");
+    }
+}
+
+class C : T {
+}
+
+class Main {
+    public static void main(String[] args) {
+        C c = new C();
+        c.a();
+    }
+}

@@ -1,0 +1,18 @@
+// vmfast.kop — regresi superinstruksi VM: x = x*C+K dan acc += x>>>K.
+// Pola ini dipakai loop LCG/checksum; hasil VM harus sama dengan a64.
+
+class Main {
+    static void main() {
+        int x = 1;
+        int acc = 0;
+        int top = 0;
+        for (int i = 0; i < 1000; i++) {
+            x = x * 1103515245 + 12345;      // OP_MULADD di VM
+            acc = acc + (x >>> 16);          // OP_ADDSHR di VM
+            top = top + (x >>> 31);          // shift 31
+        }
+        System.out.println(x);               // -928224423
+        System.out.println(acc);             // 33236353
+        System.out.println(top);             // 505
+    }
+}
