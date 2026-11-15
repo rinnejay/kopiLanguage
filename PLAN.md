@@ -217,7 +217,10 @@ utamakan yang bisa didesugar di parser.
 - [x] Sinkronkan `docs/06` (suite 174 → 213) dan checklist di file ini
 
 ### Gelombang 1 — Kredibilitas & keamanan kode
-- [ ] CI x86-64 nyata (GitHub Actions: build + suite) → x64 berhenti jadi klaim
+- [x] CI x86-64 nyata (GitHub Actions: build + suite + docs sinkron)
+- [ ] x64 runtime: baseline v1.46.2 = **31 lulus / 41 gagal** (11 segfault,
+      22 exit≠0, 1 timeout) dari 72 program di `test-x64.sh`. Job CI-nya
+      `continue-on-error` sampai angka ini 0.
 - [ ] `throw` + `try/catch` minimal (+ `finally` bila murah) di a64/VM
 - [ ] `assert`
 - [ ] `kopi fmt` (parser → printer, tanpa menyentuh backend)
