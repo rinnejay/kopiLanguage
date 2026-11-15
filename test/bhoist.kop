@@ -1,0 +1,43 @@
+/* bhoist — hoisting cek batas (v1.48).
+ *
+ * Loop kanonik `for (int i = 0; i < a.length; i++)` yang badannya tidak
+ * menulis `i`/`a` dilewati cek batas per elemen. Loop yang menulis salah
+ * satunya HARUS tetap memakai cek, kalau tidak hasilnya bisa berubah. */
+
+class Main {
+    static int jumlah(int[] a) {              /* kanonik: cek batas dilewati */
+        int s = 0;
+        for (int i = 0; i < a.length; i++) s += a[i];
+        return s;
+    }
+
+    public static void main(String[] args) {
+        int[] a = new int[5];
+        for (int i = 0; i < a.length; i++) a[i] = i * 2;
+        System.out.println(jumlah(a));        // 20 = 0+2+4+6+8
+
+        int t = 0;
+        for (int i = 0; i < a.length; i++) {  /* badan menulis i → cek tetap */
+            t += a[i];
+            if (i == 2) i = 4;
+        }
+        System.out.println(t);                // 6 = 0+2+4
+
+        int[] b = new int[3];
+        b[0] = 1; b[1] = 2; b[2] = 3;
+        int u = 0;
+        for (int i = 0; i < b.length; i++) {  /* badan menulis b → cek tetap */
+            u += b[i];
+            if (i == 0) b = new int[1];       /* panjang berubah jadi 1 */
+        }
+        System.out.println(u);                // 1 (i=1 langsung keluar)
+
+        // indeks dari variabel lain: tidak di-hoist, tetap aman
+        int v = 0;
+        for (int i = 0; i < a.length; i++) {
+            int j = i;
+            v += a[j];
+        }
+        System.out.println(v);                // 20
+    }
+}

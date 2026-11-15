@@ -242,6 +242,68 @@ static void pack_path_bytes(int ln, char tag, long base) {
     emit("\tstrb\twzr, [x17, x11]");        /* NUL-terminate */
 }
 
+/* ── v1.48: deteksi loop kanonik untuk hoisting bounds-check ───────────
+ * Menulis slot lokal di dalam subtree statement? Dipakai untuk memastikan
+ * badan loop tidak mengubah indeks maupun array yang diindeks. */
+static int safe_arr_slot;
+static int safe_idx_slot;
+static int idx_in_bounds(Node *base, Node *idx);
+static int stmt_writes_slot(Node *s, int slot);
+
+static int stmt1_writes_slot(Node *s, int slot) {
+    if (!s) return 0;
+    switch (s->kind) {
+    case ST_VAR:
+    case ST_ASSIGN:
+        return (int)s->ival == slot;
+    case ST_IF:
+        return stmt_writes_slot(s->b, slot) || stmt_writes_slot(s->c, slot);
+    case ST_WHILE:
+    case ST_DO:
+        return stmt_writes_slot(s->b, slot);
+    case ST_FOR:
+        return stmt1_writes_slot(s->a, slot) || stmt1_writes_slot(s->c, slot) ||
+               stmt_writes_slot(s->d, slot);
+    case ST_BLOCK:
+    case ST_REGION:
+        return stmt_writes_slot(s->d, slot);
+    default:
+        return 0;
+    }
+}
+
+static int stmt_writes_slot(Node *s, int slot) {
+    for (; s; s = s->next)
+        if (stmt1_writes_slot(s, slot)) return 1;
+    return 0;
+}
+
+/* `for (int i = 0; i < a.length; i++)` dengan badan yang tidak menulis
+ * i/a → kembalikan 1 dan isi slot i/a. */
+static int for_canonical(Node *s, int *idx_slot, int *arr_slot) {
+    if (!s->a || s->a->kind != ST_VAR || !s->a->a) return 0;
+    if (s->a->a->kind != EX_INT || s->a->a->ival != 0) return 0;
+    int islot = (int)s->a->ival;
+    Node *c = s->b;
+    if (!c || c->kind != EX_BIN || !c->str || strcmp(c->str, "<")) return 0;
+    if (!c->a || c->a->kind != EX_VAR || c->a->ival != islot) return 0;
+    if (!c->b || c->b->kind != EX_LEN || !c->b->a ||
+        c->b->a->kind != EX_VAR) return 0;
+    int aslot = (int)c->b->a->ival;
+    Node *st = s->c;                    /* langkah: i = i + 1 */
+    if (!st || st->kind != ST_ASSIGN || (int)st->ival != islot) return 0;
+    Node *r = st->a;
+    if (!r || r->kind != EX_BIN || !r->str || r->str[0] != '+' ||
+        r->str[1]) return 0;
+    if (!r->a || r->a->kind != EX_VAR || r->a->ival != islot) return 0;
+    if (!r->b || r->b->kind != EX_INT || r->b->ival != 1) return 0;
+    if (stmt_writes_slot(s->d, islot) || stmt_writes_slot(s->d, aslot))
+        return 0;
+    *idx_slot = islot;
+    *arr_slot = aslot;
+    return 1;
+}
+
 static void gen_stmt(Method *m, Node *s) {
     switch (s->kind) {
     case ST_VAR:
@@ -269,9 +331,11 @@ static void gen_stmt(Method *m, Node *s) {
         } else {
             emit("\tldr\tw2, [sp], #16");  /* nilai */
         }
-        emit("\tldr\tw3, [x1]");
-        emit("\tcmp\tw0, w3");
-        emit("\tb.hs\t.Karr");
+        if (!idx_in_bounds(s->a, s->b)) {
+            emit("\tldr\tw3, [x1]");
+            emit("\tcmp\tw0, w3");
+            emit("\tb.hs\t.Karr");
+        }
         emit("\tsxtw\tx9, w0");
         if (!v64) emit("\tsxtw\tx2, w2");
         emit("\tadd\tx1, x1, #8");
@@ -332,6 +396,13 @@ static void gen_stmt(Method *m, Node *s) {
         int pdb = brk_lab[brk_sp], pdc = cont_lab[brk_sp];
         loop_rg[brk_sp] = rg_sp;
         brk_lab[brk_sp] = lend; cont_lab[brk_sp] = lcont; brk_sp++;
+        /* v1.48: hoisting cek batas untuk loop kanonik */
+        int pis = safe_idx_slot, pas = safe_arr_slot;
+        int islot, aslot;
+        if (s->d && for_canonical(s, &islot, &aslot)) {
+            safe_idx_slot = islot;
+            safe_arr_slot = aslot;
+        }
         emit(".L%d:", ltop);
         if (s->b) {
             if (!gen_cond_jump(m, s->b, lend, 0)) {
@@ -340,6 +411,7 @@ static void gen_stmt(Method *m, Node *s) {
             }
         }
         gen_stmts(m, s->d);
+        safe_idx_slot = pis; safe_arr_slot = pas;
         emit(".L%d:", lcont);           /* target continue: sebelum langkah */
         if (s->c) gen_stmt(m, s->c);
         emit("\tb\t.L%d", ltop);

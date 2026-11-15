@@ -3,6 +3,20 @@
 
 static int gen_bin_typed(Method *m, Node *e);
 
+/* ── v1.48: hoisting bounds-check ─────────────────────────────────────
+ * Untuk loop kanonik `for (int i = 0; i < a.length; i++)` yang badannya
+ * tidak menulis `i` maupun `a`, indeks i selalu berada di [0, a.length)
+ * saat badan dieksekusi. Backend mencatat pasangan (array, indeks) itu
+ * selama badan di-generate, sehingga cek batas per elemen bisa dilewati. */
+static int safe_arr_slot = -1;
+static int safe_idx_slot = -1;
+
+static int idx_in_bounds(Node *base, Node *idx) {
+    return safe_idx_slot >= 0 && idx && idx->kind == EX_VAR &&
+           idx->ival == safe_idx_slot && base && base->kind == EX_VAR &&
+           base->ival == safe_arr_slot;
+}
+
 /* v1.47: operand "sederhana" (variabel/literal) bisa dimuat langsung ke
  * register tujuan, menghindari push/pop stack untuk pola panas seperti
  * `s += i` dan `i < n`. */
@@ -37,27 +51,56 @@ static void gen_simple_to(Node *e, const char *reg) {
     }
     if (e->kind == EX_LEN) {
         Node *base = e->a;
-        loc_load((base->ival + 1) * 8, "x28");
-        if (reg[0] == 'w') emit("\tldr\t%s, [x28]", reg);
-        else { emit("\tldr\tw0, [x28]"); emit("\tsxtw\t%s, w0", reg); }
+        char breg[8];
+        int bm = base->ival >= 0 && base->ival < loc_nreg &&
+                 loc_reg[base->ival] >= 0;
+        if (bm) snprintf(breg, sizeof breg, "x%d", loc_reg[base->ival]);
+        else { loc_load((base->ival + 1) * 8, "x28"); snprintf(breg, sizeof breg, "x28"); }
+        if (reg[0] == 'w') emit("\tldr\t%s, [%s]", reg, breg);
+        else { emit("\tldr\tw0, [%s]", breg); emit("\tsxtw\t%s, w0", reg); }
         return;
     }
     if (e->kind == EX_IDX) {
         Node *base = e->a, *idx = e->b;
         Ty et = (Ty)e->dty;
         Ty bt = (Ty)base->dty;
-        loc_load((base->ival + 1) * 8, "x28");
-        if (idx->kind == EX_VAR) loc_load((idx->ival + 1) * 8, "w10");
-        else gen_imm_to("w10", (unsigned long long)idx->ival);
-        emit("\tldr\tw11, [x28]");
-        emit("\tcmp\tw10, w11");
-        emit("\tb.hs\t.Karr");
-        emit("\tsxtw\tx10, w10");
-        emit("\tadd\tx28, x28, #8");
+        int safe = idx_in_bounds(base, idx);
+        /* alamat dasar: pakai register lokal langsung bila ada (hemat mov) */
+        char breg[8];
+        int bm = base->ival >= 0 && base->ival < loc_nreg &&
+                 loc_reg[base->ival] >= 0;
+        if (bm) snprintf(breg, sizeof breg, "x%d", loc_reg[base->ival]);
+        else { loc_load((base->ival + 1) * 8, "x28"); snprintf(breg, sizeof breg, "x28"); }
+        /* indeks: register lokal langsung, atau w10 */
+        char ireg[8];
+        int im = idx->kind == EX_VAR && idx->ival >= 0 &&
+                 idx->ival < loc_nreg && loc_reg[idx->ival] >= 0;
+        if (im) snprintf(ireg, sizeof ireg, "w%d", loc_reg[idx->ival]);
+        else if (idx->kind == EX_VAR) {
+            loc_load((idx->ival + 1) * 8, "w10");
+            snprintf(ireg, sizeof ireg, "w10");
+        } else {
+            gen_imm_to("w10", (unsigned long long)idx->ival);
+            snprintf(ireg, sizeof ireg, "w10");
+        }
+        if (!safe) {
+            emit("\tldr\tw11, [%s]", breg);
+            emit("\tcmp\t%s, w11", ireg);
+            emit("\tb.hs\t.Karr");
+        }
         if (bt == T_STR || bt == T_BYTEARR || bt == T_U8ARR) {
             /* String/buffer byte packed: satu byte per elemen */
-            emit(bt == T_BYTEARR ? "\tldrsb\tw0, [x28, x10]"
-                                 : "\tldrb\tw0, [x28, x10]");
+            emit("\tadd\tx28, %s, %s, sxtw", breg, ireg);
+            if (bt == T_BYTEARR && reg[0] == 'x') {
+                emit("\tldrsb\t%s, [x28, #8]", reg);
+                return;
+            }
+            if (bt != T_BYTEARR && reg[0] == 'x') {
+                emit("\tldrb\t%s, [x28, #8]", reg);
+                return;
+            }
+            emit(bt == T_BYTEARR ? "\tldrsb\tw0, [x28, #8]"
+                                 : "\tldrb\tw0, [x28, #8]");
             if (reg[0] == 'w') {
                 if (strcmp(reg, "w0")) emit("\tmov\t%s, w0", reg);
             } else if (bt == T_BYTEARR) {
@@ -67,12 +110,14 @@ static void gen_simple_to(Node *e, const char *reg) {
             }
             return;
         }
+        emit("\tadd\tx28, %s, %s, sxtw #3", breg, ireg);
         if (et == T_LONG) {
-            emit("\tadd\tx28, x28, x10, lsl #3");
-            emit("\tldr\t%s, [x28]", reg);
+            emit("\tldr\t%s, [x28, #8]", reg);
+        } else if (reg[0] == 'x' && !ty_is_uint(et) && !ty_is_float(et)) {
+            /* int → long: satu instruksi (ldrsw menandatangani 32→64) */
+            emit("\tldrsw\t%s, [x28, #8]", reg);
         } else {
-            emit("\tadd\tx28, x28, x10, lsl #3");
-            emit("\tldr\tw0, [x28]");
+            emit("\tldr\tw0, [x28, #8]");
             if (reg[0] == 'w') {
                 if (strcmp(reg, "w0")) emit("\tmov\t%s, w0", reg);
             } else {
@@ -95,6 +140,24 @@ static void gen_simple_to(Node *e, const char *reg) {
         return;
     }
     gen_imm_to(reg, (unsigned long long)e->ival);
+}
+
+/* muat operand sederhana ke x0/w0 lalu lebarkan/konversi ke `want`.
+ * Dipakai jalur cepat agar tidak muncul `sxtw x0, w0` dua kali. */
+static void gen_simple_conv(Node *e, Ty want) {
+    Ty t = (Ty)e->dty;
+    if (t == want) {
+        gen_simple_to(e, is64ty(want) ? "x0" : "w0");
+        return;
+    }
+    if (is64ty(want) && e->kind == EX_IDX && ty_width(t) == 32 &&
+        !ty_is_uint(t) && !ty_is_float(t)) {
+        gen_simple_to(e, "x0");         /* ldrsw: sudah kanonik 64-bit */
+        return;
+    }
+    gen_simple_to(e, "w0");
+    widen_ty(t);
+    conv_ty(t, want);
 }
 
 /* v1.47: `x = x + e` / `x = x - e` (termasuk x++ dari desugar) dikerjakan
@@ -137,13 +200,7 @@ static int try_simple_assign(Node *s) {
             emit("\tadd\t%s, %s, %s", acc, acc, isx ? "x0" : "w0");
         }
     } else {
-        if ((Ty)rhs->b->dty == t) {
-            gen_simple_to(rhs->b, isx ? "x0" : "w0");
-        } else {
-            gen_simple_to(rhs->b, "x0");
-            widen_ty((Ty)rhs->b->dty);
-            conv_ty((Ty)rhs->b->dty, t);
-        }
+        gen_simple_conv(rhs->b, t);
         emit("\t%s\t%s, %s, %s", op == '+' ? "add" : "sub",
              acc, acc, isx ? "x0" : "w0");
     }
@@ -167,15 +224,27 @@ static int gen_cond_jump(Method *m, Node *e, int label, int on_true) {
     else return 0;
 
     if (simple_expr(e->a) && simple_expr(e->b)) {
-        gen_simple_to(e->a, "w9");
-        gen_simple_to(e->b, "w0");
+        /* kiri variabel di register: bandingkan langsung (tanpa mov) */
+        int lr = -1;
+        if (e->a->kind == EX_VAR && e->a->ival >= 0 &&
+            e->a->ival < loc_nreg && loc_reg[e->a->ival] >= 0 &&
+            ty_width((Ty)e->a->dty) <= 32)
+            lr = loc_reg[e->a->ival];
+        if (lr >= 0) {
+            gen_simple_to(e->b, "w0");
+            emit("\tcmp\tw%d, w0", lr);
+        } else {
+            gen_simple_to(e->a, "w9");
+            gen_simple_to(e->b, "w0");
+            emit("\tcmp\tw9, w0");
+        }
     } else {
         gen_expr(m, e->a);
         push_w0();
         gen_expr(m, e->b);
         pop_w("w9");
+        emit("\tcmp\tw9, w0");
     }
-    emit("\tcmp\tw9, w0");
     emit("\tb.%s\t.L%d", cc, label);
     return 1;
 }
@@ -207,18 +276,12 @@ static int gen_bin_typed(Method *m, Node *e) {
         if (lt == P) {
             gen_simple_to(e->a, is64ty(P) ? "x9" : "w9");
         } else {
-            gen_simple_to(e->a, "x0");
+            gen_simple_to(e->a, "w0");
             widen_ty(lt);
             conv_ty(lt, P);
             emit("\tmov\tx9, x0");
         }
-        if (rt == P) {
-            gen_simple_to(e->b, is64ty(P) ? "x0" : "w0");
-        } else {
-            gen_simple_to(e->b, "x0");
-            widen_ty(rt);
-            conv_ty(rt, P);
-        }
+        gen_simple_conv(e->b, P);
     } else {
         gen_expr(m, e->a);
         widen_ty(lt);

@@ -52,6 +52,18 @@ else
     echo "FAIL  fold [codegen]: masih ada instruksi mul"; FAIL=$((FAIL+1))
 fi
 
+# ─── hoisting cek batas (v1.48) ────────────────────────────────────────
+printf '20\n6\n1\n20\n' > "$T/kopi/bhoist.ref"
+check bhoist test/bhoist.kop
+# loop kanonik tidak boleh menyisakan cek batas per elemen; loop yang
+# menulis indeks/array di badan harus tetap punya (total 6 di file ini)
+if [ -f "$T/kopi/bhoist.s" ] &&
+   [ "$(grep -c 'b\.hs.*\.Karr' "$T/kopi/bhoist.s")" -eq 6 ]; then
+    echo "PASS  bhoist [codegen]"; PASS=$((PASS+1))
+else
+    echo "FAIL  bhoist [codegen]: jumlah cek batas tidak sesuai"; FAIL=$((FAIL+1))
+fi
+
 # ─── hash: SHA-256/384/512 + HMAC-SHA256/512 (vektor FIPS 180-4 / RFC 4231) ─
 python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"
