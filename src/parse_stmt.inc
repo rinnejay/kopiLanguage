@@ -199,6 +199,32 @@ static Node *stmt_single(void) {
         return n;
     }
 
+    /* v1.51: deklarasi objek generik: Box<int> b = new Box<int>(); */
+    if (t->type == T_ID && tokat(1, '<') && !lambda_ahead()) {
+        Class *gc = find_class(xs(t->text));
+        if (gc && gc->tparam) {
+            Node *n = newnode(ST_VAR, line);
+            const char *base = xs(t->text);
+            advance();                 /* nama class generik */
+            n->dty = (int)T_ARI;
+            n->cls = parse_generic_ref(base, line);
+            n->str = xs(peek()->text);
+            expect(T_ID, "nama variabel");
+            expect('=', "'=' — variabel lokal wajib diinisialisasi");
+            n->a = expr();
+            expect(';', "';'");
+            return n;
+        }
+    }
+
+    /* v1.51: class generik tanpa argumen tipe → pesan jelas */
+    if (t->type == T_ID && tokat(1, T_ID)) {
+        Class *gc0 = find_class(xs(t->text));
+        if (gc0 && gc0->tparam)
+            die("baris %d: class generik '%s' butuh argumen tipe (mis. %s<int>)",
+                line, gc0->name, gc0->name);
+    }
+
     /* deklarasi objek class: P p = new P(); / P p = metode(); */
     if (t->type == T_ID && tokat(1, T_ID) && tokat(2, '=') && !lambda_ahead()) {
         Node *n = newnode(ST_VAR, line);

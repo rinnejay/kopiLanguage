@@ -236,6 +236,155 @@ static Param *clone_params(Param *p, const char *thiscls) {
     return head;
 }
 
+/* ── v1.51: generics — monomorfisasi class generik ───────────────────
+ * `class Box<T> { T isi; }` tidak pernah di-resolve atau di-codegen.
+ * Saat program menulis `Box<int>`, parser memanggil instantiate_generic():
+ * class konkret `Box$int` dibuat dengan menyalin field & metode template
+ * lalu mengganti setiap T dengan tipe argumen. Karena hasilnya class
+ * biasa, ketiga backend tidak perlu tahu apa-apa soal generics. */
+
+static const char *gen_suffix(Ty t, const char *tcls) {
+    switch (t) {
+    case T_INT: return "int";
+    case T_LONG: return "long";
+    case T_BOOL: return "bool";
+    case T_DOUBLE: return "double";
+    case T_FLOAT: return "float";
+    case T_BYTE: return "byte";
+    case T_SHORT: return "short";
+    case T_UINT8: return "u8";
+    case T_UINT16: return "u16";
+    case T_UINT32: return "u32";
+    case T_UINT64: return "u64";
+    case T_STR: return "str";
+    case T_ARI: return tcls ? tcls : "obj";
+    default: return "x";
+    }
+}
+
+static void gen_subst_node(Node *n, const char *tmpl, const char *mangled,
+                           Ty aty, const char *acls);
+
+static void gen_subst_list(Node *n, const char *tmpl, const char *mangled,
+                           Ty aty, const char *acls) {
+    for (; n; n = n->next) gen_subst_node(n, tmpl, mangled, aty, acls);
+}
+
+static void gen_subst_node(Node *n, const char *tmpl, const char *mangled,
+                           Ty aty, const char *acls) {
+    if (!n) return;
+    if ((Ty)n->dty == T_TVAR) n->dty = (int)aty;
+    if (n->cls && !strcmp(n->cls, tmpl)) n->cls = mangled;
+    if (n->str && (n->kind == EX_CALL || n->kind == EX_NEWOBJ ||
+                   n->kind == EX_PCALL)) {
+        size_t tl = strlen(tmpl);
+        if (!strncmp(n->str, tmpl, tl) && n->str[tl] == '.') {
+            char *q = xmalloc(tl + strlen(mangled) + strlen(n->str + tl) + 1);
+            sprintf(q, "%s%s", mangled, n->str + tl);
+            n->str = q;
+        } else if (!strcmp(n->str, tmpl)) {
+            n->str = mangled;
+        }
+    }
+    gen_subst_node(n->a, tmpl, mangled, aty, acls);
+    gen_subst_node(n->b, tmpl, mangled, aty, acls);
+    gen_subst_node(n->c, tmpl, mangled, aty, acls);
+    gen_subst_node(n->d, tmpl, mangled, aty, acls);
+}
+
+static const char *instantiate_generic(const char *base, Ty aty,
+                                       const char *acls, int line) {
+    Class *g = find_class(base);
+    if (!g || !g->tparam)
+        die("baris %d: '%s' bukan class generik", line, base);
+    const char *suf = gen_suffix(aty, acls);
+    char *name = xmalloc(strlen(base) + strlen(suf) + 2);
+    sprintf(name, "%s$%s", base, suf);
+    Class *ex = find_class(name);
+    if (ex) return ex->name;
+
+    Class *c = xmalloc(sizeof *c);
+    c->name = name;
+    c->next = prog.classes;
+    prog.classes = c;
+
+    Field **ft = &c->fields;
+    for (Field *f = g->fields; f; f = f->next) {
+        Field *q = xmalloc(sizeof *q);
+        q->name = f->name;
+        q->idx = f->idx;
+        if ((Ty)f->ty == T_TVAR) { q->ty = (int)aty; q->cls = acls; }
+        else {
+            q->ty = f->ty;
+            q->cls = (f->cls && !strcmp(f->cls, base)) ? c->name : f->cls;
+        }
+        *ft = q;
+        ft = &q->next;
+    }
+    c->nfields = g->nfields;
+
+    for (Method *m = g->gmethods; m; m = m->next) {
+        Method *q = xmalloc(sizeof *q);
+        *q = *m;
+        q->cls = c->name;
+        q->next = 0;
+        if ((Ty)q->ret == T_TVAR) { q->ret = aty; q->retcls = acls; }
+        else if (q->retcls && !strcmp(q->retcls, base)) q->retcls = c->name;
+        Param *head = 0, **pt = &head;
+        for (Param *p = m->params; p; p = p->next) {
+            Param *r = xmalloc(sizeof *r);
+            r->name = p->name;
+            if ((Ty)p->ty == T_TVAR) { r->ty = (int)aty; r->cls = acls; }
+            else {
+                r->ty = p->ty;
+                r->cls = (p->cls && !strcmp(p->cls, base)) ? c->name : p->cls;
+            }
+            *pt = r;
+            pt = &r->next;
+        }
+        q->params = head;
+        q->body = clone_node(m->body);
+        gen_subst_list(q->body, base, c->name, aty, acls);
+        q->hidden = 0;
+        q->next = prog.methods;
+        prog.methods = q;
+        prog.nmethods++;
+    }
+    return c->name;
+}
+
+static const char *parse_generic_ref(const char *base, int line) {
+    expect('<', "'<' pada argumen tipe generik");
+    Ty aty;
+    const char *acls = 0;
+    int selfref = 0;
+    if (at(T_ID) && find_class(xs(peek()->text))) {
+        acls = xs(peek()->text);
+        Class *ac = find_class(acls);
+        if (ac->tparam)
+            die("baris %d: argumen tipe generik bersarang belum didukung", line);
+        advance();
+        aty = T_ARI;
+    } else if (at(T_ID) && g_tvar && !strcmp(xs(peek()->text), g_tvar)) {
+        /* `Box<T>` di dalam `class Box<T>`: rujukan ke instansiasi yang
+         * sedang dibuat. Kembalikan nama template; gen_subst_node akan
+         * menggantinya dengan nama konkret saat instansiasi. */
+        if (!prog.curcls || strcmp(base, prog.curcls))
+            die("baris %d: argumen tipe generik dari class generik lain "
+                "belum didukung", line);
+        advance();
+        aty = T_TVAR;
+        selfref = 1;
+    } else {
+        aty = type_opt();
+    }
+    if (ty_is_arr(aty))
+        die("baris %d: array sebagai argumen tipe generik belum didukung", line);
+    expect('>', "'>' penutup argumen tipe");
+    if (selfref) return base;
+    return instantiate_generic(base, aty, acls, line);
+}
+
 /* v1.46: apply_traits — salin metode trait ke class (default implementation).
  * Jika class sudah punya metode dengan nama sama → skip (override).
  * v1.47: metode trait yang punya body juga disalin dengan nama mangled
@@ -285,10 +434,20 @@ static void apply_traits(Class *c, TraitDef *td) {
 
 /* tipe field: 32-bit (slot tunggal) atau referensi 64-bit (long/String/class) */
 static int field_ty_ok(Ty t) {
+    if (t == T_TVAR) return 1;            /* v1.51: field template generik */
     return t == T_INT || t == T_BOOL || t == T_BYTE ||
            t == T_SHORT || t == T_UINT8 || t == T_UINT16 ||
            t == T_LONG || t == T_STR ||   /* slot fisik 64-bit, v1.14 */
            ty_is_arr(t);                  /* v1.29: field array (pointer 64-bit) */
+}
+
+/* v1.51: pada posisi `Nama<T>`, tentukan apakah deklarasi ini metode
+ * (`Nama<T> f(`) atau field (`Nama<T> f;`). Argumen tipe tidak bersarang,
+ * jadi cukup cari '>' pertama lalu lihat ID dan token sesudahnya. */
+static int generic_decl_is_method(void) {
+    int k = ti + 1;
+    while (ts[k].type && ts[k].type != '>' && ts[k].type != T_EOF) k++;
+    return ts[k].type == '>' && ts[k + 1].type == T_ID && ts[k + 2].type == '(';
 }
 
 /* v1.50: struct = class tanpa metode/constructor/trait; hanya kumpulan
@@ -322,6 +481,13 @@ static void parse_class(int is_struct) {
         c->next = prog.classes;
         prog.classes = c;
     }
+    if (!is_struct && at('<')) {          /* v1.51: class Box<T> */
+        advance();
+        Tok *tp = peek();
+        expect(T_ID, "nama parameter tipe generik");
+        c->tparam = xs(tp->text);
+        expect('>', "'>' penutup parameter tipe");
+    }
     prog.curcls = c->name;
 
     /* v1.46: class Main : Trait1, Trait2 { ... } */
@@ -331,6 +497,8 @@ static void parse_class(int is_struct) {
         if (is_struct)
             die("baris %d: struct tidak mendukung trait — pakai class",
                 peek()->line);
+        if (c->tparam)
+            die("baris %d: class generik belum mendukung trait", peek()->line);
         advance();
         do {
             Tok *tn = peek();
@@ -344,6 +512,7 @@ static void parse_class(int is_struct) {
         } while (at(',') && (advance(), 1));
     }
 
+    g_tvar = c->tparam;                   /* v1.51: T dikenali di badan class */
     expect('{', is_struct ? "'{' setelah nama struct" : "'{' setelah nama class");
     while (!at('}')) {
         int was_static = 0;
@@ -389,7 +558,13 @@ static void parse_class(int is_struct) {
                 do {
                     Ty pt;
                     const char *pcls = 0;
-                    if (at(T_ID) && tokat(1, T_ID) && find_class(xs(peek()->text))) {
+                    if (at(T_ID) && tokat(1, '<') && find_class(xs(peek()->text)) &&
+                        find_class(xs(peek()->text))->tparam) {
+                        const char *base = xs(peek()->text);
+                        advance();
+                        pcls = parse_generic_ref(base, peek()->line);
+                        pt = T_ARI;
+                    } else if (at(T_ID) && tokat(1, T_ID) && find_class(xs(peek()->text))) {
                         pcls = xs(peek()->text);
                         advance();
                         pt = T_ARI;
@@ -415,9 +590,39 @@ static void parse_class(int is_struct) {
             prog.nmethods++;
             continue;
         }
+        /* v1.51: field bertipe class generik: `Box<int> isi;` */
+        if (at(T_ID) && tokat(1, '<') && find_class(xs(rt->text)) &&
+            find_class(xs(rt->text))->tparam && !generic_decl_is_method()) {
+            const char *base = xs(rt->text);
+            advance();
+            const char *fcls = parse_generic_ref(base, rt->line);
+            Tok *fn = peek();
+            expect(T_ID, "nama field");
+            advance();                       /* ';' */
+            if (is_impl)
+                die("baris %d: impl hanya berisi metode; field '%s' harus "
+                    "dideklarasikan di dalam class", fn->line, fn->text);
+            if (was_static)
+                die("baris %d: static field bertipe class belum didukung", fn->line);
+            if (class_field(c, xs(fn->text)) ||
+                find_constfield(c->name, xs(fn->text)))
+                die("baris %d: field '%s' dideklarasikan dua kali", fn->line, fn->text);
+            Field *f = xmalloc(sizeof(Field));
+            f->name = xs(fn->text);
+            f->idx = c->nfields++;
+            f->ty = (int)T_ARI;
+            f->cls = fcls;
+            f->next = c->fields;
+            c->fields = f;
+            continue;
+        }
         /* field bertipe class: `Titik pojok;` — slot referensi 64-bit */
         if (at(T_ID) && tokat(1, T_ID) && tokat(2, ';') && find_class(xs(rt->text))) {
             const char *fcls = xs(rt->text);
+            if (find_class(fcls)->tparam)
+                die("baris %d: field '%s' memakai class generik '%s' tanpa "
+                    "argumen tipe (mis. %s<int>)",
+                    rt->line, ts[ti + 1].text, fcls, fcls);
             advance();                       /* nama class */
             Tok *fn = peek();
             expect(T_ID, "nama field");
@@ -446,8 +651,17 @@ static void parse_class(int is_struct) {
                 "pakai static method yang mengembalikan objek", rt->line);
         Ty ret;
         const char *retcls = 0;
-        if (at(T_ID) && tokat(1, T_ID) && tokat(2, '(') && find_class(xs(rt->text))) {
+        if (at(T_ID) && tokat(1, '<') && find_class(xs(rt->text)) &&
+            find_class(xs(rt->text))->tparam) {
+            const char *base = xs(rt->text);
+            advance();
+            retcls = parse_generic_ref(base, rt->line);
+            ret = T_ARI;
+        } else if (at(T_ID) && tokat(1, T_ID) && tokat(2, '(') && find_class(xs(rt->text))) {
             retcls = xs(rt->text);       /* tipe kembalian class: P make() */
+            if (find_class(retcls)->tparam)
+                die("baris %d: tipe kembalian memakai class generik '%s' tanpa "
+                    "argumen tipe (mis. %s<int>)", rt->line, retcls, retcls);
             advance();
             ret = T_ARI;
         } else {
@@ -545,7 +759,13 @@ static void parse_class(int is_struct) {
             do {
                 Ty pt;
                 const char *pcls = 0;
-                if (at(T_ID) && tokat(1, T_ID) && find_class(xs(peek()->text))) {
+                if (at(T_ID) && tokat(1, '<') && find_class(xs(peek()->text)) &&
+                    find_class(xs(peek()->text))->tparam) {
+                    const char *base = xs(peek()->text);
+                    advance();
+                    pcls = parse_generic_ref(base, peek()->line);
+                    pt = T_ARI;
+                } else if (at(T_ID) && tokat(1, T_ID) && find_class(xs(peek()->text))) {
                     pcls = xs(peek()->text);      /* parameter bertipe class */
                     advance();
                     pt = T_ARI;
@@ -658,6 +878,24 @@ static void parse_class(int is_struct) {
     for (int i = 0; i < nt; i++)
         apply_traits(c, trait_list[i]);
 
+    /* v1.51: pisahkan metode template generik dari prog.methods supaya
+     * tidak di-resolve / di-codegen (T masih abstrak). Salinannya dibuat
+     * per instansiasi oleh instantiate_generic(). */
+    if (c->tparam) {
+        Method **pp = &prog.methods;
+        while (*pp) {
+            Method *m = *pp;
+            if (m->cls && !strcmp(m->cls, c->name)) {
+                *pp = m->next;
+                m->next = c->gmethods;
+                c->gmethods = m;
+                prog.nmethods--;
+            } else {
+                pp = &m->next;
+            }
+        }
+    }
+    g_tvar = 0;
     expect('}', is_struct ? "'}' tutup struct" : "'}' tutup class");
     prog.curcls = 0;
 }

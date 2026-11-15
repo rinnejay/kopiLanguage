@@ -471,6 +471,9 @@ static Field *field_of(Node *obj, const char *fname, int line) {
         die("baris %d: akses field '%s' butuh variabel objek sederhana "
             "(simpan dulu: P p = ...; lalu p.%s)", line, fname, fname);
     Class *c = find_class(bc);
+    if (c && c->tparam)
+        die("baris %d: class generik '%s' butuh argumen tipe (mis. %s<int>)",
+            line, c->name, c->name);
     Field *f = c ? class_field(c, fname) : 0;
     if (!f)
         die("baris %d: class %s tidak punya field '%s'", line, bc, fname);

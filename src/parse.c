@@ -58,6 +58,9 @@ static void parse_class(int is_struct);
 static int enum_lookup(const char *en, const char *mem, long *out);
 static void apply_traits(Class *c, TraitDef *td);
 static Method *cur_method;
+/* v1.51: generics — nama parameter tipe class yang sedang diparse (0 = tidak) */
+static const char *g_tvar;
+static const char *parse_generic_ref(const char *base, int line);
 
 /* ---------- tipe ---------- */
 
@@ -69,6 +72,11 @@ static int is_type_tok(int t) {
 }
 
 static Ty type_opt(void) {  /* int | int[] | boolean | void | fn | String ([]) | numerik baru */
+    /* v1.51: parameter tipe generik di dalam badan class generik */
+    if (at(T_ID) && g_tvar && !strcmp(xs(peek()->text), g_tvar)) {
+        advance();
+        return T_TVAR;
+    }
     if (at(KW_INT)) {
         advance();
         if (at('[')) { advance(); expect(']', "']' setelah '[' pada int[]"); return T_ARI; }

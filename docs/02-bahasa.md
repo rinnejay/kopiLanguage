@@ -21,8 +21,9 @@ class Main {
 - Sudah ada `class` (instance/static), `struct` (record field, v1.50),
   `enum` (konstanta int, v1.46), `trait` + `impl` (metode default, v1.46),
   `throw`/`try`/`catch` (v1.49), dan lambda/closure.
-- Belum ada `package`, inheritance, interface, overloading, atau generics;
-  lihat [06 — Batas](06-batas-roadmap.md).
+- Sudah ada generics sederhana `class Box<T>` (v1.51, monomorfisasi).
+- Belum ada `package`, inheritance, interface, overloading, atau generic
+  bersarang; lihat [06 — Batas](06-batas-roadmap.md).
 
 ## 2. Komentar
 
@@ -650,6 +651,34 @@ try {
   dilompati dengan benar.
 - `throw` tanpa handler: pesan ke stderr + keluar dengan status 1.
 - Belum ada `finally`, tipe exception berjenjang, atau `throws`.
+
+## 12d. Generics: `class Box<T>` (v1.51)
+
+```java
+class Box<T> {
+    T isi;
+    Box(T v) { this.isi = v; }
+    T get() { return this.isi; }
+    void set(T v) { this.isi = v; }
+}
+
+Box<int> a = new Box<int>(21);
+Box<String> s = new Box<String>("kopi");
+System.out.println(a.get() + 1);   // 22
+System.out.println(s.get());       // kopi
+```
+
+- Generics diimplementasikan dengan **monomorfisasi saat parse**: template
+  `Box<T>` tidak di-resolve/di-codegen; setiap pemakaian `Box<int>` membuat
+  class konkret `Box$int` (klon field + metode, `T` diganti tipe argumen).
+  Ketiga backend hanya melihat class biasa.
+- Argumen tipe: tipe primitif/numerik, `boolean`, `String`, atau class.
+- Bisa dipakai di deklarasi lokal, field, parameter, tipe kembalian,
+  `new Box<int>(...)`, dan rujukan ke diri sendiri `Box<T>` di dalam
+  template.
+- Batas v1: satu parameter tipe; argumen bersarang (`Box<Box<int>>`),
+  array (`Box<int[]>`), dan trait pada class generik belum didukung —
+  semuanya ditolak dengan pesan jelas, bukan crash.
 
 ## 13. JSON literal
 

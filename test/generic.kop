@@ -1,0 +1,70 @@
+/* generic.kop — regresi generics v1.51 (monomorfisasi saat parse).
+ *
+ * `class Box<T>` tidak pernah di-resolve/di-codegen; setiap pemakaian
+ * `Box<int>`, `Box<String>`, ... membuat class konkret `Box$int` hasil
+ * klon template + substitusi T. Jadi ketiga backend tidak perlu tahu
+ * soal generics.
+ *
+ * Batas: satu parameter tipe, tanpa argumen bersarang/array/trait.
+ */
+
+class Box<T> {
+    T isi;
+
+    Box(T v) { this.isi = v; }
+
+    T get() { return this.isi; }
+    void set(T v) { this.isi = v; }
+
+    /* `Box<T>` di dalam template = instansiasi yang sama */
+    boolean sama(Box<T> o) { return this.isi == o.get(); }
+}
+
+class Pair {
+    Box<int> a;
+    Box<String> b;
+}
+
+class Main {
+    static int dua(Box<int> x) { return x.get() * 2; }
+
+    static Box<int> buat(int v) {
+        Box<int> b = new Box<int>(v);
+        return b;
+    }
+
+    public static void main(String[] args) {
+        Box<int> b = new Box<int>(21);
+        System.out.println(b.get());
+        System.out.println(dua(b));
+        b.set(5);
+        System.out.println(b.get());
+
+        Box<int> b2 = new Box<int>(21);
+        System.out.println(b2.sama(b2) ? 1 : 0);
+        System.out.println(b2.sama(b) ? 1 : 0);
+
+        Box<String> s = new Box<String>("kopi");
+        System.out.println(s.get());
+        s.set("uap");
+        System.out.println(s.get());
+
+        Box<long> l = new Box<long>(1234567890123L);
+        System.out.println(l.get());
+
+        Box<double> d = new Box<double>(2.5);
+        System.out.println(d.get() * 2.0);
+
+        Box<boolean> t = new Box<boolean>(true);
+        System.out.println(t.get() ? 1 : 0);
+
+        Box<int> c = buat(7);
+        System.out.println(c.get());
+
+        Pair p = new Pair();
+        p.a = b;
+        p.b = s;
+        System.out.println(p.a.get());
+        System.out.println(p.b.get());
+    }
+}

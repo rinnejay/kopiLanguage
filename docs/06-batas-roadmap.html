@@ -87,8 +87,8 @@
 <td>pakai konstanta; untuk state yang berubah pakai objek singleton</td>
 </tr>
 <tr>
-<td>~~enum~~ <strong>✅ v1.46</strong>; ~~trait/impl~~ <strong>✅ v1.46</strong>; ~~struct~~ <strong>✅ v1.50</strong></td>
-<td>sisa: <strong>generics</strong>, anotasi, overloading</td>
+<td>~~enum~~ <strong>✅ v1.46</strong>; ~~trait/impl~~ <strong>✅ v1.46</strong>; ~~struct~~ <strong>✅ v1.50</strong>; ~~generics~~ <strong>✅ v1.51</strong> (monomorfisasi, satu parameter)</td>
+<td>sisa: anotasi, overloading, generic bersarang/array</td>
 <td>API harus unik per nama; sufiks nama (<code>getInt/getStr</code>)</td>
 </tr>
 <tr>
@@ -277,7 +277,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>265/265</strong> (v1.50.0) — a64 + VM + sintaks x64 + fuzzer + dokumen HTML (265 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM; <code>test-x64.sh</code> + CI menjalankannya secara nyata di runner x86-64.</li>
+<li>Suite: <strong>270/270</strong> (v1.51.0) — a64 + VM + sintaks x64 + fuzzer + dokumen HTML (270 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM; <code>test-x64.sh</code> + CI menjalankannya secara nyata di runner x86-64.</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>

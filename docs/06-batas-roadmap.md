@@ -19,7 +19,7 @@ diuji, ditulis "belum".
 | Unicode/UTF-8 penuh | `length` = byte; `upper/lower` ASCII | `utf8Count`; batasi input ke ASCII |
 | ~~`switch`~~ **✅ v1.19**; ~~`throw`/`try`/`catch`~~ **✅ v1.49** (nilai String atau integer, rethrow, try bersarang; tanpa `finally`) | sisa: `finally`, `assert`, `goto`, tipe exception berjenjang | `if/else`, kode error negatif, tangkap lalu ulangi |
 | ~~static field & inisialisasi kelas~~ **✅ v1.41** (`static T X = v;` sebagai konstanta read-only; `Class.X` / `X`) | sisa: static field yang bisa diubah, static array/tipe class, inisialisasi berurutan saat startup | pakai konstanta; untuk state yang berubah pakai objek singleton |
-| ~~enum~~ **✅ v1.46**; ~~trait/impl~~ **✅ v1.46**; ~~struct~~ **✅ v1.50** | sisa: **generics**, anotasi, overloading | API harus unik per nama; sufiks nama (`getInt/getStr`) |
+| ~~enum~~ **✅ v1.46**; ~~trait/impl~~ **✅ v1.46**; ~~struct~~ **✅ v1.50**; ~~generics~~ **✅ v1.51** (monomorfisasi, satu parameter) | sisa: anotasi, overloading, generic bersarang/array | API harus unik per nama; sufiks nama (`getInt/getStr`) |
 | `finally`/RAII | resource harus ditutup manual | `Net.close`, `File.close` |
 | ~~Field instance bertipe `double`/`float`~~ **✅ v1.50** (class & struct; nilai int dikonversi saat penugasan) | — | — |
 | Constructor overload & `this(...)` | satu constructor per class | overload = nama berbeda (`buatKecil`, `buatBesar`) |
@@ -106,8 +106,8 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **265/265** (v1.50.0) — a64 + VM + sintaks x64 + fuzzer + dokumen HTML
-  (265 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM;
+- Suite: **270/270** (v1.51.0) — a64 + VM + sintaks x64 + fuzzer + dokumen HTML
+  (270 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM;
   `test-x64.sh` + CI menjalankannya secara nyata di runner x86-64.
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.

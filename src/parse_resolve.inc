@@ -392,6 +392,10 @@ static void resolve(void) {
             if (p->cls && !find_class(p->cls))
                 die("baris ???: tipe class '%s' tidak ada (param metode %s.%s)",
                     p->cls, m->cls, m->name);
+            if (p->cls && find_class(p->cls)->tparam)
+                die("baris ???: parameter metode %s.%s memakai class generik '%s' "
+                    "tanpa argumen tipe (mis. %s<int>)",
+                    m->cls, m->name, p->cls, p->cls);
             scope_push(p->name, nextslot++, (Ty)p->ty, p->cls);
         }
         m->nlocals = nextslot;

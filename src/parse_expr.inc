@@ -461,11 +461,43 @@ static Node *primary(void) {
         expect(']', "']' pada new <tipe>[n]");
         return n;
     }
+    /* v1.51: new Box<int>() / new Box<int>(args) → EX_NEWOBJ class konkret */
+    if (at(T_ID) && !strcmp(xs(t->text), "new") &&
+        peek2()->type == T_ID && ts[ti + 2].type == '<') {
+        advance();                       /* new */
+        const char *cn = xs(peek()->text);
+        advance();
+        const char *mangled = parse_generic_ref(cn, line);
+        expect('(', "'(' setelah nama class generik");
+        Node *args = 0, *tail = 0;
+        int narg = 0;
+        if (!at(')')) {
+            do {
+                Node *a = expr();
+                if (tail) tail->next = a; else args = a;
+                tail = a;
+                narg++;
+            } while (at(',') && (advance(), 1));
+        }
+        if (tail) tail->next = 0;
+        expect(')', "')' setelah argumen constructor");
+        Node *n = newnode(EX_NEWOBJ, line);
+        n->str = mangled;
+        n->a = args;
+        n->ival = narg;
+        return n;
+    }
     /* new Kelas() / new Kelas(args) → EX_NEWOBJ (didesugar saat resolusi) */
     if (at(T_ID) && !strcmp(xs(t->text), "new") &&
         peek2()->type == T_ID && ts[ti + 2].type == '(') {
         advance();                       /* new */
         const char *cn = xs(peek()->text);
+        {
+            Class *gc0 = find_class(cn);
+            if (gc0 && gc0->tparam)
+                die("baris %d: class generik '%s' butuh argumen tipe "
+                    "(mis. new %s<int>())", line, gc0->name, gc0->name);
+        }
         advance();
         expect('(', "'(' setelah nama class");
         Node *args = 0, *tail = 0;

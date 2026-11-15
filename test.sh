@@ -127,6 +127,53 @@ else
     echo "PASS  struct [metode]"; PASS=$((PASS+1))
 fi
 
+# ─── generics: monomorfisasi class generik (v1.51) ────────────────────
+printf '21\n42\n5\n1\n0\nkopi\nuap\n1234567890123\n5\n1\n7\n5\nuap\n' > "$T/kopi/generic.ref"
+check generic test/generic.kop
+# monomorfisasi: yang di-codegen hanya instansiasi konkret (Box$int, ...),
+# template `Box` sendiri tidak boleh muncul sebagai simbol metode.
+if [ -f "$T/kopi/generic.s" ] &&
+   grep -q 'Box\$int__get' "$T/kopi/generic.s" &&
+   ! grep -qE '^Box_(get|set|sama|__ctor|__new)' "$T/kopi/generic.s"; then
+    echo "PASS  generic [codegen]"; PASS=$((PASS+1))
+else
+    echo "FAIL  generic [codegen]: template generik ikut di-codegen"; FAIL=$((FAIL+1))
+fi
+# pemakaian tanpa argumen tipe harus ditolak dengan pesan jelas.
+cat > "$T/kopi/genericbad.kop" <<'EOF'
+class Box<T> {
+    T isi;
+    T get() { return this.isi; }
+}
+class Main {
+    public static void main(String[] args) {
+        Box b = new Box();
+        System.out.println(b.get());
+    }
+}
+EOF
+if ./kopicc "$T/kopi/genericbad.kop" -t vm -o "$T/kopi/genericbad.kbc" 2>/dev/null; then
+    echo "FAIL  generic [tanpa tipe]: Box tanpa argumen tipe diterima"; FAIL=$((FAIL+1))
+else
+    echo "PASS  generic [tanpa tipe]"; PASS=$((PASS+1))
+fi
+# argumen tipe bersarang belum didukung — harus error, bukan crash.
+cat > "$T/kopi/genericnest.kop" <<'EOF'
+class Box<T> {
+    T isi;
+}
+class Main {
+    public static void main(String[] args) {
+        Box<Box<int>> b = new Box<Box<int>>();
+    }
+}
+EOF
+if ./kopicc "$T/kopi/genericnest.kop" -t vm -o "$T/kopi/genericnest.kbc" 2>/dev/null; then
+    echo "FAIL  generic [bersarang]: argumen tipe bersarang diterima"; FAIL=$((FAIL+1))
+else
+    echo "PASS  generic [bersarang]"; PASS=$((PASS+1))
+fi
+
 # ─── hash: SHA-256/384/512 + HMAC-SHA256/512 (vektor FIPS 180-4 / RFC 4231) ─
 python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"

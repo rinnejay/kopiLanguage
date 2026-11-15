@@ -12,7 +12,10 @@ typedef enum {
     /* v1.43: buffer byte packed — 1 byte per elemen, header 8 byte */
     T_BYTEARR, T_U8ARR,
     /* v1.49: array elemen float/double (slot 8 byte, bit-pattern IEEE) */
-    T_DBLARR, T_FLTARR
+    T_DBLARR, T_FLTARR,
+    /* v1.51: parameter tipe generik (hanya di template class; tidak pernah
+     * sampai ke codegen karena class generik dimonomorfisasi saat dipakai) */
+    T_TVAR
 } Ty;
 
 /* ── sifat tipe numerik ─────────────────────────────────────────── */
@@ -224,6 +227,8 @@ typedef struct Class {
     const char *name;
     Field *fields;
     int nfields;
+    const char *tparam;     /* v1.51: nama parameter tipe generik, 0 = biasa */
+    struct Method *gmethods;/* metode template generik (dipisah dari prog.methods) */
     struct Class *next;
 } Class;
 
