@@ -167,6 +167,14 @@ static void resolve_stmt(Node *s) {
             s->a->ival < reg_slot[reg_sp - 1])
             die("baris %d: nilai rujukan tidak boleh disimpan ke field '%s' objek di luar malloc{} (arena blok dibebaskan di akhirnya)",
                 s->line, s->str);
+        /* v1.50: field double/float — nilai int harus dikonversi dulu,
+         * jangan simpan bit mentah ke slot IEEE-754. */
+        if (ty_is_float(ft) && et != ft) {
+            Node *cv = newnode(EX_CAST, s->line);
+            cv->dty = (int)ft;
+            cv->a = s->c;
+            s->c = cv;
+        }
         Node *idx = newnode(EX_INT, s->line);
         idx->ival = f->idx;
         idx->dty = (int)T_INT;

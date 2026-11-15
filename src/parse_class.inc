@@ -494,8 +494,7 @@ static void parse_class(int is_struct) {
                 prog.nmethods++;
                 continue;
             }
-            if (!field_ty_ok(ret) && !retcls &&
-                !(is_struct && ty_is_float(ret)))
+            if (!field_ty_ok(ret) && !retcls && !ty_is_float(ret))
                 die("baris %d: field '%s' bertipe ini belum didukung — "
                     "didukung: int/boolean/byte/short/uint8/uint16/long/String, "
                     "array, dan tipe class%s",

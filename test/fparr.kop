@@ -4,6 +4,14 @@
  * elemen double/float harus dikonversi dulu (bukan disimpan mentah).
  */
 
+class Titik {
+    double x;
+    double y;
+    float f;
+    Titik(double ax, double ay) { this.x = ax; this.y = ay; this.f = 0.5f; }
+    double panjang2() { return this.x * this.x + this.y * this.y; }
+}
+
 class Main {
     static double jumlah(double[] a) {
         double s = 0.0;
@@ -42,5 +50,13 @@ class Main {
 
         int n = 3;
         System.out.println(d[n]);
+
+        // field instance double/float (v1.50): nilai int dikonversi dulu
+        Titik t = new Titik(3.0, 4.0);
+        System.out.println(t.x);
+        System.out.println(t.panjang2());
+        t.y = 5;
+        System.out.println(t.y);
+        System.out.println(t.f);
     }
 }

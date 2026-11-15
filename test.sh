@@ -98,7 +98,7 @@ else
 fi
 
 # ─── array double[]/float[] (v1.49) ────────────────────────────────────
-printf '4\n1.25\n2\n8\n2\n2\n8.5\n4\n4.25\n' > "$T/kopi/fparr.ref"
+printf '4\n1.25\n2\n8\n2\n2\n8.5\n4\n4.25\n3\n25\n5\n0.5\n' > "$T/kopi/fparr.ref"
 check fparr test/fparr.kop
 
 # ─── struct: record field tanpa metode (v1.50) ─────────────────────────
@@ -2106,6 +2106,17 @@ if [ $JITRC -ne 0 ] && [ $NOJITRC -ne 0 ] &&
     echo "PASS  jitarroob [bail]"; PASS=$((PASS+1))
 else
     echo "FAIL  jitarroob [bail]: error JIT != interpreter"; FAIL=$((FAIL+1))
+fi
+
+# ─── fuzzer diferensial a64 vs VM (seed tetap, harus deterministik) ────
+# Generator sengaja membatasi diri pada konstruksi yang didukung kedua
+# backend (int/boolean/array/loop/if/metode static). Seed tetap supaya
+# kegagalan bisa direproduksi: python3 tools/fuzz_diff.py -k <seed>
+if python3 tools/fuzz_diff.py -n 10 -s 1 > "$T/kopi/fuzz.out" 2>&1; then
+    echo "PASS  fuzz [a64-vs-vm]"; PASS=$((PASS+1))
+else
+    echo "FAIL  fuzz [a64-vs-vm]: backend tidak sepakat"; FAIL=$((FAIL+1))
+    tail -20 "$T/kopi/fuzz.out"
 fi
 
 # ─── situs dokumentasi HTML (GitHub Pages) ───
