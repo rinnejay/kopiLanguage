@@ -1,0 +1,33 @@
+/* fold — constant folding: hasil harus sama di VM & a64, termasuk
+ * overflow wrap, pembagian negatif, shift aritmetika/logis, dan float. */
+class Main {
+    public static void main(String[] args) {
+        System.out.println(2 * 3 + 4);                 // 10
+        System.out.println(100 / 7);                   // 14
+        System.out.println(-100 / 7);                  // -14
+        System.out.println(-100 % 7);                  // -2
+        System.out.println(1 << 10);                   // 1024
+        System.out.println(-8 >> 1);                   // -4
+        System.out.println(-8 >>> 28);                 // 15
+        System.out.println(2147483647 + 1);            // -2147483648 (wrap)
+        System.out.println(9223372036854775807L + 1);  // LONG_MIN
+        System.out.println(3 < 4);                     // true
+        System.out.println((2 + 3) * (4 - 1));         // 15
+        System.out.println(10 == 10);                  // true
+        System.out.println(1.5 + 2.5);                 // 4
+        System.out.println(5 / 2.0);                   // 2.5
+        System.out.println(-5 * -3);                   // 15
+        System.out.println(~5);                        // -6
+        System.out.println(1 > 2);                     // false
+        System.out.println(true && false);             // false
+        long a = -8;
+        System.out.println(a >> 1);                    // -4
+        System.out.println(-8L >> 1);                  // -4
+        System.out.println(-8L >>> 60);                // 15
+        System.out.println(1L << 63);                  // LONG_MIN
+        System.out.println((1L << 63) - 1);            // LONG_MAX
+        byte b = 2 * 3;                                // narrowing literal
+        System.out.println(b);                         // 6
+        System.out.println(0 / 1);                     // 0
+    }
+}

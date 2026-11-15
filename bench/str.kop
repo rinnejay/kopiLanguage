@@ -1,0 +1,8 @@
+/* bench: pembangunan string — menguji concat + alokasi arena */
+class Main {
+    public static void main(String[] args) {
+        String s = "";
+        for (int i = 0; i < 4000; i++) s = s + "x";
+        System.out.println(s.length);
+    }
+}

@@ -41,6 +41,17 @@ check demo examples/demo.kop
 printf '34\n119\n85\n-103\n48\n6\n-4\n15\n15\n3\n1024\n11\n10\n186\n48\n60\n195\n780\n48\n15\n1\n1\n42\n7\n5\n' > "$T/kopi/bitops.ref"
 check bitops test/bitops.kop
 
+# ─── constant folding: hasil 3 backend + tidak ada 'mul' tersisa ─────────
+printf '10\n14\n-14\n-2\n1024\n-4\n15\n-2147483648\n-9223372036854775808\n1\n15\n1\n4\n2.5\n15\n-6\n0\n0\n-4\n-4\n15\n-9223372036854775808\n9223372036854775807\n6\n0\n' > "$T/kopi/fold.ref"
+check fold test/fold.kop
+# seluruh perkalian di fold.kop konstan → backend a64 tidak boleh
+# memancarkan instruksi mul sama sekali (bukti folding benar-benar jalan)
+if [ -f "$T/kopi/fold.s" ] && ! grep -q 'mul' "$T/kopi/fold.s"; then
+    echo "PASS  fold [codegen]"; PASS=$((PASS+1))
+else
+    echo "FAIL  fold [codegen]: masih ada instruksi mul"; FAIL=$((FAIL+1))
+fi
+
 # ─── hash: SHA-256/384/512 + HMAC-SHA256/512 (vektor FIPS 180-4 / RFC 4231) ─
 python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"

@@ -237,9 +237,214 @@ static Ty resolve_lambda(Node *ar) {
 static Ty type_expr_raw(Node *e);
 static int fits_literal(Ty dst, Node *e);
 
+/* ── constant folding (v1.47) ─────────────────────────────────────────
+ * Dijalankan sekali saat resolusi tipe, setelah type_expr_raw memastikan
+ * operatornya sah. Ekspresi yang seluruh operandnya literal diganti nilai
+ * literal, sehingga berlaku untuk ketiga backend (a64/x64/VM) tanpa
+ * menyentuh codegen. Semantik wrap mengikuti lebar tipe hasil; pembagian
+ * dengan nol sengaja TIDAK dilipat agar perilaku runtime tidak berubah. */
+
+static long fold_wrap(unsigned long long v, Ty t) {
+    int w = ty_width(t);
+    if (w >= 64) return (long)v;
+    unsigned long long m = (1ULL << w) - 1;
+    v &= m;
+    if (!ty_is_uint(t) && ((v >> (w - 1)) & 1ULL)) v |= ~m;
+    return (long)v;
+}
+
+static int fold_lit(Node *n, long *out) {
+    if (!n) return 0;
+    if ((n->kind == EX_INT || n->kind == EX_BOOL) &&
+        !ty_is_float((Ty)n->dty)) {
+        *out = n->ival;
+        return 1;
+    }
+    if (n->kind == EX_UN && n->str && n->str[0] == '-' && n->a &&
+        (n->a->kind == EX_INT || n->a->kind == EX_BOOL) &&
+        !ty_is_float((Ty)n->a->dty)) {
+        *out = -n->a->ival;
+        return 1;
+    }
+    return 0;
+}
+
+static void fold_to_int(Node *e, Ty t, long v) {
+    e->kind = EX_INT;
+    e->str = 0;
+    e->dty = (int)t;
+    e->ival = v;
+    e->fval = (double)v;
+    e->typed = 1;
+}
+
+static void fold_to_bool(Node *e, int v) {
+    e->kind = EX_BOOL;
+    e->str = 0;
+    e->dty = (int)T_BOOL;
+    e->ival = v;
+    e->typed = 1;
+}
+
+static Ty fold_un(Node *e, Ty t) {
+    if (!e->a) return t;
+    Node *a = e->a;
+    if ((a->kind == EX_INT || a->kind == EX_BOOL) &&
+        ty_is_float((Ty)a->dty)) {
+        if (e->str[0] == '-') {
+            e->kind = EX_INT;
+            e->str = 0;
+            e->dty = (int)t;
+            e->ival = 0;
+            e->fval = -a->fval;
+            if (t == T_FLOAT) e->fval = (double)(float)e->fval;
+            e->typed = 1;
+        }
+        return t;
+    }
+    long v;
+    if (!fold_lit(a, &v)) return t;
+    if (e->str[0] == '!') {
+        fold_to_bool(e, v == 0);
+        return T_BOOL;
+    }
+    if (e->str[0] == '~') {
+        fold_to_int(e, t, fold_wrap(~(unsigned long long)v, t));
+        return t;
+    }
+    fold_to_int(e, t, fold_wrap((unsigned long long)(-v), t));
+    return t;
+}
+
+static Ty fold_bin(Node *e, Ty t) {
+    if (e->kind != EX_BIN || !e->a || !e->b || !e->str) return t;
+    Node *A = e->a, *B = e->b;
+    char op = e->str[0];
+    int two = e->str[1] != 0;
+    Ty lt = (Ty)A->dty, rt = (Ty)B->dty;
+
+    /* float: hanya aritmetika; perbandingan dibiarkan ke runtime agar
+     * aturan NaN/-0.0 persis sama dengan mesin target. */
+    if ((A->kind == EX_INT && ty_is_float(lt)) &&
+        (B->kind == EX_INT && ty_is_float(rt)) &&
+        (op == '+' || op == '-' || op == '*' || op == '/') && !two) {
+        Ty P = ty_promote(lt, rt);
+        double r;
+        if (P == T_FLOAT) {
+            float x = (float)A->fval, y = (float)B->fval, z;
+            if (op == '+') z = x + y;
+            else if (op == '-') z = x - y;
+            else if (op == '*') z = x * y;
+            else z = x / y;
+            r = (double)z;
+        } else {
+            double x = A->fval, y = B->fval;
+            if (op == '+') r = x + y;
+            else if (op == '-') r = x - y;
+            else if (op == '*') r = x * y;
+            else r = x / y;
+        }
+        e->kind = EX_INT;
+        e->str = 0;
+        e->dty = (int)P;
+        e->ival = 0;
+        e->fval = r;
+        e->typed = 1;
+        return P;
+    }
+
+    long av, bv;
+    if (!fold_lit(A, &av) || !fold_lit(B, &bv)) return t;
+    if (!ty_is_int(lt) || !ty_is_int(rt)) return t;
+
+    int isShift = !strcmp(e->str, "<<") || !strcmp(e->str, ">>") ||
+                  !strcmp(e->str, ">>>");
+    int isCmp = (op == '=' || op == '!') && two;
+    if (!isCmp && !isShift)
+        isCmp = op == '<' || op == '>' || !strcmp(e->str, "<=") ||
+                !strcmp(e->str, ">=");
+    int isLogic = (op == '&' || op == '|') && two;
+
+    Ty P = isShift ? lt : ty_promote(lt, rt);
+    if (ty_is_float(P) || !ty_is_int(P)) return t;
+    int w = ty_width(P);
+    if (w <= 0 || w > 64) return t;
+
+    unsigned long long mask = w >= 64 ? ~0ULL : ((1ULL << w) - 1);
+    unsigned long long ua = (unsigned long long)av & mask;
+    unsigned long long ub = (unsigned long long)bv & mask;
+    long sa = (long)(ua << (64 - w)) >> (64 - w);
+    long sb = (long)(ub << (64 - w)) >> (64 - w);
+
+    if (isLogic) {
+        fold_to_bool(e, (op == '&') ? (sa && sb) : (sa || sb));
+        return T_BOOL;
+    }
+    if (isCmp) {
+        int r;
+        if (op == '=') r = ua == ub;
+        else if (op == '!') r = ua != ub;
+        else if (ty_is_uint(P)) {
+            if (!strcmp(e->str, "<=")) r = ua <= ub;
+            else if (!strcmp(e->str, ">=")) r = ua >= ub;
+            else if (op == '<') r = ua < ub;
+            else r = ua > ub;
+        } else {
+            if (!strcmp(e->str, "<=")) r = sa <= sb;
+            else if (!strcmp(e->str, ">=")) r = sa >= sb;
+            else if (op == '<') r = sa < sb;
+            else r = sa > sb;
+        }
+        fold_to_bool(e, r);
+        return T_BOOL;
+    }
+
+    unsigned long long ur;
+    if (isShift) {
+        /* hanya 32/64-bit: shift byte/short punya aturan lebar yang
+         * berbeda antar jalur codegen, jadi dibiarkan */
+        if (w != 32 && w != 64) return t;
+        unsigned cnt = (unsigned)(ub & (unsigned long long)(w - 1));
+        if (op == '<') {                     /* "<<" */
+            ur = ua << cnt;
+        } else if (!strcmp(e->str, ">>>")) {
+            ur = ua >> cnt;
+        } else {                             /* ">>" aritmetika */
+            if (cnt == 0) ur = ua;
+            else if (sa < 0)
+                ur = (ua >> cnt) | (((1ULL << cnt) - 1) << (w - cnt));
+            else ur = ua >> cnt;
+        }
+    } else if (op == '+' || op == '-' || op == '*') {
+        if (op == '+') ur = ua + ub;
+        else if (op == '-') ur = ua - ub;
+        else ur = ua * ub;
+    } else if (op == '&' || op == '|' || op == '^') {
+        if (op == '&') ur = ua & ub;
+        else if (op == '|') ur = ua | ub;
+        else ur = ua ^ ub;
+    } else if (op == '/' || op == '%') {
+        if (ub == 0) return t;               /* jangan ubah perilaku runtime */
+        if (ty_is_uint(P)) {
+            ur = (op == '/') ? (ua / ub) : (ua % ub);
+        } else if (sb == -1 && sa == (w == 64 ? (long)(1ULL << 63)
+                                              : (long)(-2147483647L - 1))) {
+            ur = (op == '/') ? (unsigned long long)sa : 0;  /* INT_MIN / -1 */
+        } else {
+            ur = (unsigned long long)((op == '/') ? (sa / sb) : (sa % sb));
+        }
+    } else {
+        return t;
+    }
+    fold_to_int(e, P, fold_wrap(ur, P));
+    return P;
+}
+
 static Ty type_expr(Node *e) {
     if (e->typed) return (Ty)e->dty;
     Ty t = type_expr_raw(e);
+    if (e->kind == EX_UN) t = fold_un(e, t);
+    else if (e->kind == EX_BIN) t = fold_bin(e, t);
     e->dty = (int)t;          /* semua ekspresi menyimpan tipe hasilnya */
     e->typed = 1;
     return t;
