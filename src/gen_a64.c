@@ -1,6 +1,7 @@
 /* Backend ARM64 (aarch64): memancarkan assembly GAS yang bisa
    dirakit dengan clang/gcc (PIE, memanggil printf via GOT). */
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

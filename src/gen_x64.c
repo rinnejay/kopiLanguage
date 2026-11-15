@@ -1,5 +1,6 @@
 /* Backend x86-64 (AT&T syntax): assembly untuk gas, dirakit di PC dengan gcc. */
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

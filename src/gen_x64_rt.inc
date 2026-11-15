@@ -2,6 +2,13 @@
 
 static void gen_x64_runtime(void) {
     emit(".text");
+    /* stub mati: jumlah argumen lambda tidak cocok (dilompati dari jne .Klam).
+       Tanpa label ini linker gagal: `.Klam` hanya didefinisikan di runtime a64. */
+    emit(".Klam:");
+    emit("\tleaq .Lmsg_lam(%%rip), %%rdi");
+    emit("\tcall puts@PLT");
+    emit("\tmovl $1, %%edi");
+    emit("\tcall exit@PLT");
     emit("\t.globl kop_str_from_cstr");
     emit("kop_str_from_cstr:");
     emit("\tpushq %%rbp");

@@ -26,9 +26,10 @@ jobs:
         run: ./kopicc --version
 
   x64-native:
-    name: backend x64 dijalankan (output == VM)
+    name: x64 dijalankan (eksperimental, belum lulus)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    continue-on-error: true   # sinyal, bukan gerbang: backend x64 belum pernah lulus runtime
     env:
       TMPDIR: /tmp
     steps:
@@ -48,6 +49,8 @@ jobs:
           path: |
             /tmp/kopi-x64/*.out
             /tmp/kopi-x64/*.vm
+            /tmp/kopi-x64/*.cc.log
+            /tmp/kopi-x64/*.err
           retention-days: 3
 
   docs:

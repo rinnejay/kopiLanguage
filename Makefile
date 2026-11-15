@@ -1,5 +1,7 @@
 CC ?= cc
-CFLAGS ?= -O2 -std=c11
+# _GNU_SOURCE: strdup/readlink/PATH_MAX terlihat di glibc dengan -std=c11
+# (di bionic Android selalu terlihat, jadi ini baru ketahuan lewat CI Linux).
+CFLAGS ?= -O2 -std=c11 -D_GNU_SOURCE
 SRC = src/lex.c src/parse.c src/units.c src/gen_vm.c src/gen_a64.c src/gen_x64.c src/main.c
 HDR = src/ast.h src/lex.h
 FRAG = src/parse_stmt.inc src/parse_class.inc src/parse_expr.inc \

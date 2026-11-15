@@ -41,7 +41,7 @@ Batas teknis lain:
 | aarch64 native | **dijalankan** di Termux/ARM, diuji suite |
 | VM KOP1 | **dijalankan**, diuji suite |
 | JIT VM (aarch64) | **✅ v1.46** — loop angka panas (`OP_LOOP`/`OP_LOOP_R` dengan badan `OP_MULADD`/`OP_ADDSHR`) dan loop checksum array packed (`OP_ILOAD` + `OP_IDXR_UB`/`OP_IDXR_B` + `OP_OP_STORE`, mis. `acc += buf[i]`) diterjemahkan ke kode mesin dan seluruh sisa iterasi dijalankan native; indeks di luar batas membuat JIT bail ke interpreter. `KOPI_NOJIT=1` mematikan JIT. Belum ada JIT untuk panggilan, `OP_ISTORE` di tengah badan, cabang, atau array 64-bit (`int[]`/`long[]`) |
-| x86-64 native | **hanya verifikasi sintaks** (`cc -target x86_64-linux-gnu -c`); belum dieksekusi di CI |
+| x86-64 native | **belum lulus runtime.** Sintaks assembly lolos; `test-x64.sh` di CI sudah bisa mengompilasi, merakit, dan me-link (v1.46.2: label stub `.Klam` yang hilang + `-lm`), tetapi **semua program masih crash saat eksekusi**. Job CI-nya bersifat sinyal (`continue-on-error`), bukan gerbang |
 | Thread OS | **✅ v1.45** — sintaks `thread <long> { ... }` + `wait h` (pthread; a64 & VM; handle `long`/`long[]`). **✅ v1.46** — `Chan` (CSP, payload `long`/`fn`) + `Mutex` (`lock`/`unlock`/`tryLock`). Belum ada thread pool bawaan, `select`, atau `fork`/`async` |
 | Signal handler / graceful shutdown | tidak ada |
 | Diagnostik runtime | nomor baris + stack trace + `saran:` perbaikan |
@@ -98,7 +98,7 @@ Batas angka:
 | Package manager/versioning | `import` menggabungkan source; tidak ada dependensi versi |
 | Debugger, stack trace, breakpoint | debug via `println`, VM, dan inspeksi `.s` |
 | LSP, formatter, linter, syntax highlight resmi | editor belum terintegrasi |
-| CI lintas arsitektur | suite berjalan di Termux/aarch64; x64 runtime belum |
+| CI lintas arsitektur | ✅ GitHub Actions: build x86-64 + cek docs sinkron + suite x64 eksperimental. Runtime x64 belum lulus; a64 tetap diuji di Termux |
 | Spesifikasi formal | docs + kode adalah acuan |
 | Benchmark otomatis | ada `bench.py` untuk proyek besar, bukan regresi perf |
 | Fuzzing parser | belum |

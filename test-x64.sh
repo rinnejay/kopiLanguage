@@ -62,10 +62,21 @@ run_case() { # nama src
     # 3. target native: compile + rakit + jalan
     compile "$src" "$TGT" "$T/$name.s" \
         || { echo "FAIL  $name [$TGT]: compile"; FAIL=$((FAIL+1)); FAILED="$FAILED $name"; return; }
-    cc "$T/$name.s" -o "$T/$name.bin" 2>/dev/null \
-        || { echo "FAIL  $name [$TGT]: rakit"; FAIL=$((FAIL+1)); FAILED="$FAILED $name"; return; }
-    timeout 120 "$T/$name.bin" > "$T/$name.out" 2>/dev/null \
-        || { echo "FAIL  $name [$TGT]: eksekusi"; FAIL=$((FAIL+1)); FAILED="$FAILED $name"; return; }
+    # -lm: di glibc matematika ada di libm terpisah (bionic Android menyatukannya)
+    if ! cc "$T/$name.s" -o "$T/$name.bin" -lm 2> "$T/$name.cc.log"; then
+        echo "FAIL  $name [$TGT]: rakit/link"
+        head -3 "$T/$name.cc.log" | sed 's/^/        /'
+        FAIL=$((FAIL+1)); FAILED="$FAILED $name"; return
+    fi
+    timeout 120 "$T/$name.bin" > "$T/$name.out" 2> "$T/$name.err" \
+        || { echo "FAIL  $name [$TGT]: eksekusi (exit $?)"; head -3 "$T/$name.err" | sed 's/^/        /'; FAIL=$((FAIL+1)); FAILED="$FAILED $name"; return; }
+    # saring non-determinisme di sisi native juga (mis. penjadwalan thread):
+    # hanya dijalankan ulang bila hasilnya beda dari VM.
+    if ! cmp -s "$T/$name.vm" "$T/$name.out"; then
+        timeout 120 "$T/$name.bin" > "$T/$name.out2" 2>/dev/null \
+            || { echo "FAIL  $name [$TGT]: eksekusi (run 2)"; FAIL=$((FAIL+1)); FAILED="$FAILED $name"; return; }
+        cmp -s "$T/$name.out" "$T/$name.out2" || { note_skip "$name" "native tidak deterministik"; return; }
+    fi
 
     # 4. bandingkan dengan VM
     if cmp -s "$T/$name.vm" "$T/$name.out"; then

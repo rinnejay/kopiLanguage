@@ -145,7 +145,7 @@
 </tr>
 <tr>
 <td>x86-64 native</td>
-<td><strong>hanya verifikasi sintaks</strong> (<code>cc -target x86_64-linux-gnu -c</code>); belum dieksekusi di CI</td>
+<td><strong>belum lulus runtime.</strong> Sintaks assembly lolos; <code>test-x64.sh</code> di CI sudah bisa mengompilasi, merakit, dan me-link (v1.46.2: label stub <code>.Klam</code> yang hilang + <code>-lm</code>), tetapi <strong>semua program masih crash saat eksekusi</strong>. Job CI-nya bersifat sinyal (<code>continue-on-error</code>), bukan gerbang</td>
 </tr>
 <tr>
 <td>Thread OS</td>
@@ -256,7 +256,7 @@
 </tr>
 <tr>
 <td>CI lintas arsitektur</td>
-<td>suite berjalan di Termux/aarch64; x64 runtime belum</td>
+<td>✅ GitHub Actions: build x86-64 + cek docs sinkron + suite x64 eksperimental. Runtime x64 belum lulus; a64 tetap diuji di Termux</td>
 </tr>
 <tr>
 <td>Spesifikasi formal</td>
