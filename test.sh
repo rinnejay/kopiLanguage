@@ -57,7 +57,7 @@ python3 -c "import sys; sys.stdout.write('1\\n' * $N)" > "$T/kopi/lzmavec.ref"
 check lzmavec "$T/kopi/lzmavec.kop"
 ./kopicc "$T/kopi/lzmavec.kop" -t x64 -o "$T/kopi/lzmavec64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/lzmavec64.s" -o /dev/null \
-    && echo "PASS  lzmavec [x64]" || { echo "FAIL  lzmavec [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  lzmavec [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  lzmavec [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
 # ─── LZMA v1.40: checksum/filter/LZMA2/XZ + encoder (oracle python) ─────
 for g in checksumvec filtervec lzma2vec xzvec; do
@@ -79,7 +79,7 @@ rm -f lzmastream_tmp1.bin lzmastream_tmp2.xz lzmastream_tmp3.bin
 for t in checksumvec filtervec lzma2vec xzvec lzmaencvec; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" \
         && cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null \
-        && echo "PASS  $t [x64]" || { echo "FAIL  $t [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+        && { echo "PASS  $t [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  $t [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 done
 
 # ─── BLAKE2b + scrypt (RFC 7693 / RFC 7914 lewat vektor python) ──────────
@@ -311,7 +311,7 @@ cp examples/proyekbesar/expected.out "$T/kopi/proyekbesar.ref"
 check proyekbesar examples/proyekbesar/ProyekBesar.kop
 ./kopicc examples/proyekbesar/ProyekBesar.kop -t x64 -o "$T/kopi/proyekbesar64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/proyekbesar64.s" -o /dev/null \
-    && echo "PASS  proyekbesar [x64]" || { echo "FAIL  proyekbesar [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  proyekbesar [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  proyekbesar [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── OS/file I/O + Str/Map/Set/Deque/Path/Time (v1.7) ───────────────────
 rm -rf ostest_tmp1.txt ostest_tmp2.txt ostest_dir
@@ -450,7 +450,7 @@ check textmap "$T/kopi/textmap.kop"
 for t in ostest textmap; do
     ./kopicc "$T/kopi/$t.kop" -t x64 -o "$T/kopi/${t}64.s" \
         && cc -target x86_64-linux-gnu -c "$T/kopi/${t}64.s" -o /dev/null \
-        && echo "PASS  $t [x64]" || { echo "FAIL  $t [x64]"; FAIL=$((FAIL+1)); }
+        && { echo "PASS  $t [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  $t [x64]"; FAIL=$((FAIL+1)); }
 done
 
 # ─── template string backtick `...{expr}...` (v1.7.1) ───────────────────
@@ -516,7 +516,7 @@ printf '%s\n' \
 check tstrtest "$T/kopi/tstrtest.kop"
 ./kopicc "$T/kopi/tstrtest.kop" -t x64 -o "$T/kopi/tstrtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/tstrtest64.s" -o /dev/null \
-    && echo "PASS  tstrtest [x64]" || { echo "FAIL  tstrtest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  tstrtest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  tstrtest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── String native: literal, concat, ==, length, indexing, interop ──────
 rm -f strnative_tmp.txt strnative_net.txt
@@ -583,7 +583,7 @@ check strnative "$T/kopi/strnative.kop"
 rm -f strnative_tmp.txt strnative_net.txt
 ./kopicc "$T/kopi/strnative.kop" -t x64 -o "$T/kopi/strnative64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/strnative64.s" -o /dev/null \
-    && echo "PASS  strnative [x64]" || { echo "FAIL  strnative [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  strnative [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  strnative [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── AEAD: RFC 7539 §2.8.2 / RFC 8439 §2.8.2 (oracle python fail-hard) ───
 python3 tools/gen_aead.py "$T/kopi/aeadvec.kop" >/dev/null
@@ -1387,7 +1387,7 @@ if ./kopicc examples/server/ServerDemo.kop -t a64 -o "$T/kopi/srvdemo.s" \
     done
     ./kopicc examples/server/ServerDemo.kop -t x64 -o "$T/kopi/srvdemo64.s" \
         && cc -target x86_64-linux-gnu -c "$T/kopi/srvdemo64.s" -o /dev/null \
-        && echo "PASS  server [x64]" || { echo "FAIL  server [x64]"; FAIL=$((FAIL+1)); }
+        && { echo "PASS  server [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  server [x64]"; FAIL=$((FAIL+1)); }
 else
     echo "FAIL  server: build"; FAIL=$((FAIL+1))
 fi
@@ -1480,21 +1480,28 @@ printf '888\n1777\n890\n1\nkopi\n1099511627776\n7\n1776\n1776\n1\n1\n3553\n127\n
 check staticfield test/staticfield.kop
 ./kopicc test/staticfield.kop -t x64 -o "$T/kopi/staticfield64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/staticfield64.s" -o /dev/null \
-    && echo "PASS  staticfield [x64]" || { echo "FAIL  staticfield [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  staticfield [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  staticfield [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
 # ─── v1.43: buffer byte packed `byte[]` / `uint8[]` + Bytes.* ─────────
 printf '5\n65\n-56\n-1\n0\n8\n0\n9\n3\n200\n255\n456\n5\n65\n200\n255\n0\n5\n-56\n-1\n-56\n-56\n7\n4\n3\n' > "$T/kopi/bytetest.ref"
 check bytetest test/bytetest.kop
 ./kopicc test/bytetest.kop -t x64 -o "$T/kopi/bytetest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/bytetest64.s" -o /dev/null \
-    && echo "PASS  bytetest [x64]" || { echo "FAIL  bytetest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  bytetest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  bytetest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
 # ─── v1.44: buffer "multiple" int[]/byte[]/uint8[] + I/O packed ───────
 printf '200\n255\n44\n200\n44\n4\n255\n499\n499\n-56\n2\n65\n2\nAB\n3\n30\n32\n186\n891568578\n1\n0\n5\n65\n255\n3\n255\n5\n10\n5\n255\n1\n5\n5\n3\n97\n99\n1\n' > "$T/kopi/bufmulti.ref"
 check bufmulti test/bufmulti.kop
 ./kopicc test/bufmulti.kop -t x64 -o "$T/kopi/bufmulti64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/bufmulti64.s" -o /dev/null \
-    && echo "PASS  bufmulti [x64]" || { echo "FAIL  bufmulti [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  bufmulti [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  bufmulti [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+
+# ─── v1.46.1: jalur galat recvb/sendb harus -1 (a64 sempat 0) ─────────
+printf '%s\n' -1 -1 -1 -1 0 > "$T/kopi/ioerr.ref"
+check ioerr test/ioerr.kop
+./kopicc test/ioerr.kop -t x64 -o "$T/kopi/ioerr64.s" \
+    && cc -target x86_64-linux-gnu -c "$T/kopi/ioerr64.s" -o /dev/null \
+    && { echo "PASS  ioerr [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  ioerr [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
 # ─── v1.42: seluruh modul lib dapat diimpor dari folder kategorinya ───
 {
@@ -1514,77 +1521,77 @@ printf 'all-lib-ok\n' > "$T/kopi/alllib.ref"
 check alllib "$T/kopi/alllib.kop"
 ./kopicc "$T/kopi/alllib.kop" -t x64 -o "$T/kopi/alllib64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/alllib64.s" -o /dev/null \
-    && echo "PASS  alllib [x64]" || { echo "FAIL  alllib [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  alllib [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  alllib [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.12: class instance (new, field, method this) ───
 cp test/objtest.ref "$T/kopi/objtest.ref"
 check objtest test/objtest.kop
 ./kopicc test/objtest.kop -t x64 -o "$T/kopi/objtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/objtest64.s" -o /dev/null \
-    && echo "PASS  objtest [x64]" || { echo "FAIL  objtest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  objtest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  objtest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.14: field instance 64-bit (long/String/class) ───
 cp test/reftest.ref "$T/kopi/reftest.ref"
 check reftest test/reftest.kop
 ./kopicc test/reftest.kop -t x64 -o "$T/kopi/reftest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/reftest64.s" -o /dev/null \
-    && echo "PASS  reftest [x64]" || { echo "FAIL  reftest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  reftest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  reftest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.15: constructor — new Kelas(args) ───
 cp test/ctortest.ref "$T/kopi/ctortest.ref"
 check ctortest test/ctortest.kop
 ./kopicc test/ctortest.kop -t x64 -o "$T/kopi/ctortest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/ctortest64.s" -o /dev/null \
-    && echo "PASS  ctortest [x64]" || { echo "FAIL  ctortest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  ctortest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  ctortest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.16: array bertipe long[] dan String[] ───
 cp test/arrtest.ref "$T/kopi/arrtest.ref"
 check arrtest test/arrtest.kop
 ./kopicc test/arrtest.kop -t x64 -o "$T/kopi/arrtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/arrtest64.s" -o /dev/null \
-    && echo "PASS  arrtest [x64]" || { echo "FAIL  arrtest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  arrtest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  arrtest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.17: String opaque — Net.mkstr/Net.strbytes ───
 cp test/mkstrtest.ref "$T/kopi/mkstrtest.ref"
 check mkstrtest test/mkstrtest.kop
 ./kopicc test/mkstrtest.kop -t x64 -o "$T/kopi/mkstrtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/mkstrtest64.s" -o /dev/null \
-    && echo "PASS  mkstrtest [x64]" || { echo "FAIL  mkstrtest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  mkstrtest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  mkstrtest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── v1.23: Str native String + Bytes buffer (API lengkap) ───
 cp test/strbytes.ref "$T/kopi/strbytes.ref"
 check strbytes test/strbytes.kop
 ./kopicc test/strbytes.kop -t x64 -o "$T/kopi/strbytes64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/strbytes64.s" -o /dev/null \
-    && echo "PASS  strbytes [x64]" || { echo "FAIL  strbytes [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  strbytes [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  strbytes [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.18: String packed 1 byte/karakter ───
 cp test/packedreuse.ref "$T/kopi/packedreuse.ref"
 check packedreuse test/packedreuse.kop
 ./kopicc test/packedreuse.kop -t x64 -o "$T/kopi/packedreuse64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/packedreuse64.s" -o /dev/null \
-    && echo "PASS  packedreuse [x64]" || { echo "FAIL  packedreuse [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  packedreuse [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  packedreuse [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.19: switch (desugar if/else, tanpa fall-through) ───
 cp test/switchtest.ref "$T/kopi/switchtest.ref"
 check switchtest test/switchtest.kop
 ./kopicc test/switchtest.kop -t x64 -o "$T/kopi/switchtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/switchtest64.s" -o /dev/null \
-    && echo "PASS  switchtest [x64]" || { echo "FAIL  switchtest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  switchtest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  switchtest [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.20: malloc { ... } region arena otomatis ───
 cp test/regiontest.ref "$T/kopi/regiontest.ref"
 check regiontest test/regiontest.kop
 ./kopicc test/regiontest.kop -t x64 -o "$T/kopi/regiontest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/regiontest64.s" -o /dev/null \
-    && echo "PASS  regiontest [x64]" || { echo "FAIL  regiontest [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  regiontest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  regiontest [x64]"; FAIL=$((FAIL+1)); }
 # diagnostik escape: rujukan tidak boleh keluar malloc{}
 # contoh resmi examples/malloc.kop ikut diuji (output = dokumentasi hidup)
 printf '36\n150\n16\n4\nKOPI LANG\n9\n9\n7\n3\n1\nserver: 5 request tanpa memReset\n285\n6000000000\n40\n42\nselesai\n' > "$T/kopi/mallex.ref"
 check mallex examples/malloc.kop
 ./kopicc examples/malloc.kop -t x64 -o "$T/kopi/mallex64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/mallex64.s" -o /dev/null \
-    && echo "PASS  mallex [x64]" || { echo "FAIL  mallex [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  mallex [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  mallex [x64]"; FAIL=$((FAIL+1)); }
 
 cat > "$T/kopi/rgesc.kop" <<'EOF'
 class Main {
@@ -1618,7 +1625,7 @@ cp test/mallocsize.ref "$T/kopi/mallocsize.ref"
 check mallocsize test/mallocsize.kop
 ./kopicc test/mallocsize.kop -t x64 -o "$T/kopi/mallocsize64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/mallocsize64.s" -o /dev/null \
-    && echo "PASS  mallocsize [x64]" || { echo "FAIL  mallocsize [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  mallocsize [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  mallocsize [x64]"; FAIL=$((FAIL+1)); }
 
 # diagnostik ukuran: nol, terlalu besar, satuan salah
 for spec in "0mb:lebih besar dari 0" "5000mb:maksimum 4096 MB" "64xb:tidak dikenal"; do
@@ -1664,14 +1671,14 @@ cp test/autosize.ref "$T/kopi/autosize.ref"
 check autosize test/autosize.kop
 ./kopicc test/autosize.kop -t x64 -o "$T/kopi/autosize64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/autosize64.s" -o /dev/null \
-    && echo "PASS  autosize [x64]" || { echo "FAIL  autosize [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  autosize [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  autosize [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── v1.22: pola loop panas (superinstruksi VM) tetap benar ───
 cp test/loopfast.ref "$T/kopi/loopfast.ref"
 check loopfast test/loopfast.kop
 ./kopicc test/loopfast.kop -t x64 -o "$T/kopi/loopfast64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/loopfast64.s" -o /dev/null \
-    && echo "PASS  loopfast [x64]" || { echo "FAIL  loopfast [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  loopfast [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  loopfast [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── v1.22: diagnostik pintar — baris sumber + saran perbaikan ───
 cat > "$T/kopi/diagstr.kop" <<'EOF'
@@ -1710,7 +1717,7 @@ cp test/pbkdf2long.ref "$T/kopi/pbkdf2long.ref"
 check pbkdf2long test/pbkdf2long.kop
 ./kopicc test/pbkdf2long.kop -t x64 -o "$T/kopi/pbkdf2long64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/pbkdf2long64.s" -o /dev/null \
-    && echo "PASS  pbkdf2long [x64]" || { echo "FAIL  pbkdf2long [x64]"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  pbkdf2long [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  pbkdf2long [x64]"; FAIL=$((FAIL+1)); }
 
 # ─── URL (oracle Python urllib.parse) + SHA-1 (hashlib) ───
 python3 tools/gen_urlvec.py > "$T/kopi/urltest.ref"
@@ -1950,14 +1957,14 @@ printf '7\n204\n204\n100\n1000\n99\nkopi-thread\nselesai\n' > "$T/kopi/threadtes
 check threadtest test/threadtest.kop
 ./kopicc test/threadtest.kop -t x64 -o "$T/kopi/threadtest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/threadtest64.s" -o /dev/null \
-    && echo "PASS  threadtest [x64]" || { echo "FAIL  threadtest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  threadtest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  threadtest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
 # ─── fitur bahasa v1.46: channel CSP + mutex + executor ─────────────────
 printf '15\n10\n20\n30\n3\n3\n4000\n110\nselesai\n' > "$T/kopi/chantest.ref"
 check chantest test/chantest.kop
 ./kopicc test/chantest.kop -t x64 -o "$T/kopi/chantest64.s" \
     && cc -target x86_64-linux-gnu -c "$T/kopi/chantest64.s" -o /dev/null \
-    && echo "PASS  chantest [x64]" || { echo "FAIL  chantest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
+    && { echo "PASS  chantest [x64]"; PASS=$((PASS+1)); } || { echo "FAIL  chantest [x64]: sintaks assembly"; FAIL=$((FAIL+1)); }
 
 # ─── v1.46: superinstruksi VM (x = x*C+K, acc += x>>>K) ─────────────────
 printf '%s\n' '-928224423' '33236353' '505' > "$T/kopi/vmfast.ref"

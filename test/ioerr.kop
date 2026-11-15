@@ -1,0 +1,21 @@
+public class Main {
+    public static void main(String[] args) {
+        int[] buf = new int[4];
+
+        // fd tidak valid: semua jalur galat harus -1, bukan 0
+        System.out.println(Net.sendb(-1, buf));
+        System.out.println(Net.recvb(-1, buf));
+
+        int fd = Net.socket(2, 1);
+        Net.close(fd);
+        System.out.println(Net.sendb(fd, buf));
+
+        // fd valid tapi belum terkoneksi: tetap galat
+        int fd2 = Net.socket(2, 1);
+        System.out.println(Net.sendb(fd2, buf));
+        Net.close(fd2);
+
+        // sukses tetap 0 (kontrak sendb: 0 | -1)
+        System.out.println(Net.sendb(1, ""));
+    }
+}

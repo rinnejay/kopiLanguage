@@ -106,8 +106,9 @@ Batas angka:
 
 ## 6. Uji
 
-- Suite: **213/213** (v1.46) — a64 + VM + sintaks x64 + dokumen HTML
-  (213 PASS, 0 fail; x64 diverifikasi sintaks saja, belum dijalankan).
+- Suite: **248/248** (v1.46.1) — a64 + VM + sintaks x64 + dokumen HTML
+  (248 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM;
+  `test-x64.sh` + CI menjalankannya secara nyata di runner x86-64.
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
 - Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal

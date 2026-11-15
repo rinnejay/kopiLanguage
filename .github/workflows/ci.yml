@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build (x86-64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build kopicc + kopivm
+        run: make
+
+      - name: Smoke test (VM)
+        run: |
+          ./kopicc examples/hello.kop -t vm -o /tmp/hello.kbc
+          ./kopivm /tmp/hello.kbc
+
+      - name: Versi compiler
+        run: ./kopicc --version
+
+  x64-native:
+    name: backend x64 dijalankan (output == VM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TMPDIR: /tmp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: make
+
+      - name: Jalankan suite x64
+        run: sh test-x64.sh
+
+      - name: Simpan output saat gagal
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x64-gagal
+          path: |
+            /tmp/kopi-x64/*.out
+            /tmp/kopi-x64/*.vm
+          retention-days: 3
+
+  docs:
+    name: dokumen HTML sinkron
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bangun ulang docs
+        run: make docs
+
+      - name: Gagal bila HTML tertinggal dari Markdown
+        run: git diff --exit-code -- docs/

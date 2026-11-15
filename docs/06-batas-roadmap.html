@@ -277,7 +277,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>213/213</strong> (v1.46) — a64 + VM + sintaks x64 + dokumen HTML (213 PASS, 0 fail; x64 diverifikasi sintaks saja, belum dijalankan).</li>
+<li>Suite: <strong>248/248</strong> (v1.46.1) — a64 + VM + sintaks x64 + dokumen HTML (248 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM; <code>test-x64.sh</code> + CI menjalankannya secara nyata di runner x86-64.</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>

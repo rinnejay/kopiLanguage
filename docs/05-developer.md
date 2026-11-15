@@ -26,6 +26,8 @@ kopi/
 ├── test/                uji sumber (oracle/vektor)
 ├── tools/               generator oracle Python + server uji
 ├── test.sh              suite regresi (a64 + VM + sintaks x64)
+├── test-x64.sh          harness x64 nyata: output native == VM
+├── .github/workflows/   CI: build, x64, docs
 ├── docs/                dokumentasi ini
 └── Makefile
 ```
@@ -133,8 +135,9 @@ Tidak ada tahap optimizer terpisah. Codegen langsung dari AST.
   (maks 8 parameter).
 - Panggilan libc lewat `@PLT`.
 - `is64ty`, `push_val`, label, dan cek batas harus konsisten dengan a64.
-- Backend ini **belum dijalankan runtime** di CI; verifikasi hanya
-  sintaks: `cc -target x86_64-linux-gnu -c out.s`.
+- Backend ini dijalankan **nyata** di CI (runner x86-64) lewat
+  `test-x64.sh`; di mesin ARM hanya diverifikasi sintaks:
+  `cc -target x86_64-linux-gnu -c out.s`.
 
 ### VM (`gen_vm.c` + `vm/kopivm.c`)
 
@@ -283,8 +286,19 @@ check nama path.kop          # jalankan VM & a64, diff ke $T/kopi/nama.ref
 
 - Ref dibuat dari oracle/skrip, bukan dari salah satu backend, kecuali
   output memang didefinisikan oleh implementasi (mis. aturan game).
-- Uji x64 hanya **assembler** (`cc -target x86_64-linux-gnu -c`), bukan
-  runtime. Jangan mengklaim x64 berjalan bila belum dijalankan.
+- Uji x64 di mesin ARM hanya **assembler** (`cc -target x86_64-linux-gnu -c`),
+  bukan runtime. Jangan mengklaim x64 berjalan bila belum dijalankan.
+- `test-x64.sh` menutup celah itu: dijalankan di host x86-64 (CI), semua
+  `test/*.kop` + `examples/*.kop` dikompilasi ke native, dijalankan, lalu
+  outputnya dibandingkan dengan **VM sebagai oracle**. VM dijalankan dua
+  kali lebih dulu; program yang keluarannya tidak deterministik (waktu,
+  acak, jaringan, path Termux) otomatis dilewati, dan daftar lewati
+  eksplisit ada di `test/x64-skip.txt`.
+  Di host ARM harness ini bisa divalidasi dengan
+  `KOPI_X64_TARGET=a64 sh test-x64.sh`.
+- Counter `test.sh` harus sama dengan jumlah baris `PASS`: cek sintaks x64
+  juga menaikkan `PASS` (sebelum v1.46.1 ada 33 cek PASS yang tidak
+  terhitung, sehingga total yang dilaporkan terlalu kecil).
 - Uji acak harus deterministik: contoh nyata bug uji `netbulk` yang
   mengharapkan 32/32 byte acak berbeda (flaky ~12%) — diperbaiki menjadi
   "ada beda".

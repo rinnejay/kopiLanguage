@@ -1,0 +1,7 @@
+# Uji yang dilewati harness x64 (test-x64.sh).
+# Satu nama per baris (nama = nama file tanpa .kop). Komentar dengan #.
+#
+# probe — skrip diagnostik manual: konek ke port 9917 yang tidak selalu
+#         ada, sehingga hasil Net.connect/sendb bergantung lingkungan
+#         (VM -1, a64 0). Bukan uji semantik, jangan dipakai di CI.
+probe

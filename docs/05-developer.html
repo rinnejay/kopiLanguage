@@ -47,6 +47,8 @@
 ├── test/                uji sumber (oracle/vektor)
 ├── tools/               generator oracle Python + server uji
 ├── test.sh              suite regresi (a64 + VM + sintaks x64)
+├── test-x64.sh          harness x64 nyata: output native == VM
+├── .github/workflows/   CI: build, x64, docs
 ├── docs/                dokumentasi ini
 └── Makefile</code></pre>
 <h2 id="2-pipeline">2. Pipeline<a class="anchor" href="#2-pipeline" aria-label="tautan">#</a></h2>
@@ -111,7 +113,7 @@ cc (link libc)  atau  kopivm</code></pre>
 <li>Sama secara konsep; stack slot 8 byte, <code>par</code> melacak paritas agar panggilan libc 16-byte aligned. Arg 1–6 di register, 7–8 di stack (maks 8 parameter).</li>
 <li>Panggilan libc lewat <code>@PLT</code>.</li>
 <li><code>is64ty</code>, <code>push_val</code>, label, dan cek batas harus konsisten dengan a64.</li>
-<li>Backend ini <strong>belum dijalankan runtime</strong> di CI; verifikasi hanya sintaks: <code>cc -target x86_64-linux-gnu -c out.s</code>.</li>
+<li>Backend ini dijalankan <strong>nyata</strong> di CI (runner x86-64) lewat <code>test-x64.sh</code>; di mesin ARM hanya diverifikasi sintaks: <code>cc -target x86_64-linux-gnu -c out.s</code>.</li>
 </ul>
 <h3 id="vm-gen-vm-c-vm-kopivm-c">VM (<code>gen_vm.c</code> + <code>vm/kopivm.c</code>)<a class="anchor" href="#vm-gen-vm-c-vm-kopivm-c" aria-label="tautan">#</a></h3>
 <ul>
@@ -199,7 +201,9 @@ cc (link libc)  atau  kopivm</code></pre>
 <pre><code class="language-sh">check nama path.kop          # jalankan VM &amp; a64, diff ke $T/kopi/nama.ref</code></pre>
 <ul>
 <li>Ref dibuat dari oracle/skrip, bukan dari salah satu backend, kecuali output memang didefinisikan oleh implementasi (mis. aturan game).</li>
-<li>Uji x64 hanya <strong>assembler</strong> (<code>cc -target x86_64-linux-gnu -c</code>), bukan runtime. Jangan mengklaim x64 berjalan bila belum dijalankan.</li>
+<li>Uji x64 di mesin ARM hanya <strong>assembler</strong> (<code>cc -target x86_64-linux-gnu -c</code>), bukan runtime. Jangan mengklaim x64 berjalan bila belum dijalankan.</li>
+<li><code>test-x64.sh</code> menutup celah itu: dijalankan di host x86-64 (CI), semua <code>test/*.kop</code> + <code>examples/*.kop</code> dikompilasi ke native, dijalankan, lalu outputnya dibandingkan dengan <strong>VM sebagai oracle</strong>. VM dijalankan dua kali lebih dulu; program yang keluarannya tidak deterministik (waktu, acak, jaringan, path Termux) otomatis dilewati, dan daftar lewati eksplisit ada di <code>test/x64-skip.txt</code>. Di host ARM harness ini bisa divalidasi dengan <code>KOPI_X64_TARGET=a64 sh test-x64.sh</code>.</li>
+<li>Counter <code>test.sh</code> harus sama dengan jumlah baris <code>PASS</code>: cek sintaks x64 juga menaikkan <code>PASS</code> (sebelum v1.46.1 ada 33 cek PASS yang tidak terhitung, sehingga total yang dilaporkan terlalu kecil).</li>
 <li>Uji acak harus deterministik: contoh nyata bug uji <code>netbulk</code> yang mengharapkan 32/32 byte acak berbeda (flaky ~12%) — diperbaiki menjadi "ada beda".</li>
 <li>Bila menemukan bug: tambahkan uji regresi yang gagal sebelum fix.</li>
 <li>Jalankan <code>sh test.sh</code> sampai <strong>0 fail</strong> sebelum commit.</li>

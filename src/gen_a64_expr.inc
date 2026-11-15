@@ -480,7 +480,7 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tb\t.LPV%dl", ln);
             emit(".LPV%dry:", ln);
             emit("\tadd\tsp, sp, #%d", 2 * 16);
-            emit("\tneg\tw0, wzr");
+            emit("\tmovn\tw0, #0");                /* -1 (bukan neg w0,wzr = 0) */
             emit("\tb\t.LPV%dh", ln);
             emit(".LPV%df:", ln);
             emit("\tadd\tsp, sp, #%d", 2 * 16);
@@ -528,7 +528,7 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tb\t.LPS%dl", ln);
             emit(".LPS%de:", ln);
             emit("\tadd\tsp, sp, #%d", 2 * 16);
-            emit("\tneg\tw0, wzr");
+            emit("\tmovn\tw0, #0");                /* -1 (bukan neg w0,wzr = 0) */
             emit("\tb\t.LPS%dh", ln);
             emit(".LPS%df:", ln);
             emit("\tadd\tsp, sp, #%d", 2 * 16);
@@ -591,7 +591,7 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tb\t.LRV%dl", ln);
             emit(".LRV%dry:", ln);                     /* galat → -1 */
             emit("\tadd\tsp, sp, #%d", 2 * 16);
-            emit("\tneg\tw0, wzr");
+            emit("\tmovn\tw0, #0");                /* -1 (bukan neg w0,wzr = 0) */
             emit("\tb\t.LRV%dh", ln);
             emit(".LRV%de:", ln);                      /* EOF → got */
             emit(".LRV%df:", ln);                      /* penuh → got */
@@ -653,7 +653,7 @@ static int gen_expr(Method *m, Node *e) {
             emit("\tb\t.LRS%dl", ln);
             emit(".LRS%de:", ln);                      /* galat → -1 */
             emit("\tadd\tsp, sp, #%d", 2 * 16);
-            emit("\tneg\tw0, wzr");
+            emit("\tmovn\tw0, #0");                /* -1 (bukan neg w0,wzr = 0) */
             emit("\tb\t.LRS%dh", ln);
             emit(".LRS%df:", ln);                      /* selesai/len 0 → 0 */
             emit("\tadd\tsp, sp, #%d", 2 * 16);
