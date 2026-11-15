@@ -18,7 +18,10 @@ class Main {
 - `main` boleh `static void main()` atau `static void main(String[] args)`.
 - Anggota class bisa **statis** (namespace) atau **instance** (field +
   method `this`, sejak v1.12) — lihat bagian 12.
-- Tidak ada `package`, inheritance, interface, enum, atau generics;
+- Sudah ada `class` (instance/static), `struct` (record field, v1.50),
+  `enum` (konstanta int, v1.46), `trait` + `impl` (metode default, v1.46),
+  `throw`/`try`/`catch` (v1.49), dan lambda/closure.
+- Belum ada `package`, inheritance, interface, overloading, atau generics;
   lihat [06 — Batas](06-batas-roadmap.md).
 
 ## 2. Komentar
@@ -599,6 +602,54 @@ Batas v1.15 (dirancang jujur):
   dulu ke variabel. Rantai **field** (`k.pojok.x`, baca & tulis)
   didukung.
 - Objek bisa dipakai di lambda (ditangkap by-value seperti variabel lain).
+
+## 12b. `struct` — record tanpa metode (v1.50)
+
+`struct` adalah class tanpa metode/constructor/trait: hanya kumpulan
+field publik yang di-zero saat `new`.
+
+```java
+struct Titik { int x; int y; }
+struct Garis { Titik a; Titik b; }
+
+Titik t = new Titik();
+t.x = 3;
+t.y = 4;
+Garis g = new Garis();
+g.a = t;
+g.a.x = 30;          // rantai field sebagai target tulis
+System.out.println(g.a.x);
+```
+
+- Field boleh `int`, `boolean`, `byte`/`short`/`uint*`, `long`, `String`,
+  array, `struct`/`class` lain, serta `double`/`float`.
+- Semantik objek tetap **referensi** (bukan salinan saat di-assign).
+- Constructor, metode, `static`, modifier akses, dan `trait` ditolak
+  dengan pesan jelas — pakai `class` bila butuh perilaku.
+
+## 12c. Exception: `throw` / `try` / `catch` (v1.49)
+
+```java
+static int bagi(int a, int b) {
+    if (b == 0) throw "bagi nol";
+    return a / b;
+}
+
+try {
+    System.out.println(bagi(10, 0));
+} catch (String e) {
+    System.out.println("error: " + e);
+}
+```
+
+- Nilai exception boleh `String` atau integer (tipe apa pun yang bukan
+  `void`); variabel penangkap dideklarasikan di `catch (T e)`.
+- `throw` dari kedalaman berapa pun langsung masuk `catch` terdekat;
+  `catch` boleh melempar lagi (rethrow) ke handler luar.
+- `break`/`continue`/`return` dari dalam `try` menutup handler yang
+  dilompati dengan benar.
+- `throw` tanpa handler: pesan ke stderr + keluar dengan status 1.
+- Belum ada `finally`, tipe exception berjenjang, atau `throws`.
 
 ## 13. JSON literal
 

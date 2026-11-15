@@ -77,9 +77,9 @@
 <td><code>utf8Count</code>; batasi input ke ASCII</td>
 </tr>
 <tr>
-<td>~~<code>switch</code>~~ <strong>✅ v1.19</strong> (desugar if/else; tanpa fall-through; selector int-ish dievaluasi sekali; break/continue milik loop terluar) <code>try/catch</code>, <code>throw</code>, <code>assert</code>, <code>goto</code></td>
-<td>kontrol alur terbatas</td>
-<td><code>if/else</code>, kode error negatif</td>
+<td>~~<code>switch</code>~~ <strong>✅ v1.19</strong>; ~~<code>throw</code>/<code>try</code>/<code>catch</code>~~ <strong>✅ v1.49</strong> (nilai String atau integer, rethrow, try bersarang; tanpa <code>finally</code>)</td>
+<td>sisa: <code>finally</code>, <code>assert</code>, <code>goto</code>, tipe exception berjenjang</td>
+<td><code>if/else</code>, kode error negatif, tangkap lalu ulangi</td>
 </tr>
 <tr>
 <td>~~static field &amp; inisialisasi kelas~~ <strong>✅ v1.41</strong> (<code>static T X = v;</code> sebagai konstanta read-only; <code>Class.X</code> / <code>X</code>)</td>
@@ -87,9 +87,9 @@
 <td>pakai konstanta; untuk state yang berubah pakai objek singleton</td>
 </tr>
 <tr>
-<td>generic, enum, anotasi, overloading</td>
-<td>API harus unik per nama</td>
-<td>sufiks nama (<code>getInt/getStr</code>)</td>
+<td>~~enum~~ <strong>✅ v1.46</strong>; ~~trait/impl~~ <strong>✅ v1.46</strong>; ~~struct~~ <strong>✅ v1.50</strong></td>
+<td>sisa: <strong>generics</strong>, anotasi, overloading</td>
+<td>API harus unik per nama; sufiks nama (<code>getInt/getStr</code>)</td>
 </tr>
 <tr>
 <td><code>finally</code>/RAII</td>
@@ -97,9 +97,9 @@
 <td><code>Net.close</code>, <code>File.close</code></td>
 </tr>
 <tr>
-<td>Field instance bertipe <code>double</code>/<code>float</code></td>
-<td>butuh jalur register float di 3 backend</td>
-<td>simpan sebagai <code>long</code>/<code>String</code> dulu, atau field <code>int</code> + pembagian</td>
+<td>~~Field instance bertipe <code>double</code>/<code>float</code>~~ <strong>✅ v1.50</strong> (class &amp; struct; nilai int dikonversi saat penugasan)</td>
+<td>—</td>
+<td>—</td>
 </tr>
 <tr>
 <td>Constructor overload &amp; <code>this(...)</code></td>
@@ -264,11 +264,11 @@
 </tr>
 <tr>
 <td>Benchmark otomatis</td>
-<td>ada <code>bench.py</code> untuk proyek besar, bukan regresi perf</td>
+<td><code>bench/bench.sh</code> (sum/fib/array/str vs C -O0/-O2, ambil waktu terbaik 3×); belum jadi gerbang CI</td>
 </tr>
 <tr>
-<td>Fuzzing parser</td>
-<td>belum</td>
+<td>Fuzzing</td>
+<td>✅ <code>tools/fuzz_diff.py</code> — fuzzer <strong>diferensial</strong> a64 vs VM (seed tetap, masuk suite); fuzzing parser/AST secara luas belum</td>
 </tr>
 <tr>
 <td>Audit memori (ASAN)</td>
@@ -277,7 +277,7 @@
 </tbody></table></div>
 <h2 id="6-uji">6. Uji<a class="anchor" href="#6-uji" aria-label="tautan">#</a></h2>
 <ul>
-<li>Suite: <strong>248/248</strong> (v1.46.1) — a64 + VM + sintaks x64 + dokumen HTML (248 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM; <code>test-x64.sh</code> + CI menjalankannya secara nyata di runner x86-64.</li>
+<li>Suite: <strong>265/265</strong> (v1.50.0) — a64 + VM + sintaks x64 + fuzzer + dokumen HTML (265 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM; <code>test-x64.sh</code> + CI menjalankannya secara nyata di runner x86-64.</li>
 <li><code>polyvec</code> memakai teks RFC 7539 yang dibundel (<code>test/data</code>), bukan unduhan saat uji.</li>
 <li>Uji UDP/TCP memakai port tetap; pembersihan proses basi ada di awal <code>test.sh</code>, tetapi dua run paralel bisa bentrok.</li>
 <li>Uji acak harus deterministik; jangan mengulang kesalahan <code>netbulk</code> (mengharapkan 32/32 byte acak berbeda).</li>

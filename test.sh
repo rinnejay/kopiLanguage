@@ -1025,7 +1025,9 @@ def quote(c):
     c.shutdown(socket.SHUT_WR)
 
 def discard(c):
-    c.recv(4096)
+    # kuras sampai EOF: menutup socket dengan data yang belum terbaca
+    # mengirim RST (klien melihat -104), bukan EOF yang bersih (0)
+    drain(c)
 
 def chargen(c):
     pat = b"0123456789 "

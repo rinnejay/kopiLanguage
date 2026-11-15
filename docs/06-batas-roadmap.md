@@ -17,11 +17,11 @@ diuji, ditulis "belum".
 | ~~Utilitas byte/teks bercampur~~ **✅ v1.23** (`Str` String, `Bytes` int[]) | sisa: normalisasi Unicode, `double[]` | `Str.utf8*` untuk hitung/validasi/potong code point |
 | `char` & literal char | `'a'` adalah String | pakai kode byte (`97`) atau `charAt` |
 | Unicode/UTF-8 penuh | `length` = byte; `upper/lower` ASCII | `utf8Count`; batasi input ke ASCII |
-| ~~`switch`~~ **✅ v1.19** (desugar if/else; tanpa fall-through; selector int-ish dievaluasi sekali; break/continue milik loop terluar) `try/catch`, `throw`, `assert`, `goto` | kontrol alur terbatas | `if/else`, kode error negatif |
+| ~~`switch`~~ **✅ v1.19**; ~~`throw`/`try`/`catch`~~ **✅ v1.49** (nilai String atau integer, rethrow, try bersarang; tanpa `finally`) | sisa: `finally`, `assert`, `goto`, tipe exception berjenjang | `if/else`, kode error negatif, tangkap lalu ulangi |
 | ~~static field & inisialisasi kelas~~ **✅ v1.41** (`static T X = v;` sebagai konstanta read-only; `Class.X` / `X`) | sisa: static field yang bisa diubah, static array/tipe class, inisialisasi berurutan saat startup | pakai konstanta; untuk state yang berubah pakai objek singleton |
-| generic, enum, anotasi, overloading | API harus unik per nama | sufiks nama (`getInt/getStr`) |
+| ~~enum~~ **✅ v1.46**; ~~trait/impl~~ **✅ v1.46**; ~~struct~~ **✅ v1.50** | sisa: **generics**, anotasi, overloading | API harus unik per nama; sufiks nama (`getInt/getStr`) |
 | `finally`/RAII | resource harus ditutup manual | `Net.close`, `File.close` |
-| Field instance bertipe `double`/`float` | butuh jalur register float di 3 backend | simpan sebagai `long`/`String` dulu, atau field `int` + pembagian |
+| ~~Field instance bertipe `double`/`float`~~ **✅ v1.50** (class & struct; nilai int dikonversi saat penugasan) | — | — |
 | Constructor overload & `this(...)` | satu constructor per class | overload = nama berbeda (`buatKecil`, `buatBesar`) |
 | Method/field pada receiver ekspresi (`buat(1,2).x`) | dispatch statis via variabel | simpan dulu: `Kelas k = buat(1,2);` |
 | `System.out.print/println` sebagai ekspresi | tidak bisa dipakai di badan lambda ekspresi | bungkus dengan method `static void cetak(int x)` lalu `a.forEach(x => cetak(x))` |
@@ -100,14 +100,14 @@ Batas angka:
 | LSP, formatter, linter, syntax highlight resmi | editor belum terintegrasi |
 | CI lintas arsitektur | ✅ GitHub Actions: build x86-64 + cek docs sinkron + suite x64 eksperimental. Runtime x64 belum lulus; a64 tetap diuji di Termux |
 | Spesifikasi formal | docs + kode adalah acuan |
-| Benchmark otomatis | ada `bench.py` untuk proyek besar, bukan regresi perf |
-| Fuzzing parser | belum |
+| Benchmark otomatis | `bench/bench.sh` (sum/fib/array/str vs C -O0/-O2, ambil waktu terbaik 3×); belum jadi gerbang CI |
+| Fuzzing | ✅ `tools/fuzz_diff.py` — fuzzer **diferensial** a64 vs VM (seed tetap, masuk suite); fuzzing parser/AST secara luas belum |
 | Audit memori (ASAN) | belum dijadikan gerbang |
 
 ## 6. Uji
 
-- Suite: **248/248** (v1.46.1) — a64 + VM + sintaks x64 + dokumen HTML
-  (248 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM;
+- Suite: **265/265** (v1.50.0) — a64 + VM + sintaks x64 + fuzzer + dokumen HTML
+  (265 PASS, 0 fail). Backend x64 masih diverifikasi sintaks di mesin ARM;
   `test-x64.sh` + CI menjalankannya secara nyata di runner x86-64.
 - `polyvec` memakai teks RFC 7539 yang dibundel (`test/data`), bukan
   unduhan saat uji.
