@@ -101,6 +101,32 @@ fi
 printf '4\n1.25\n2\n8\n2\n2\n8.5\n4\n4.25\n' > "$T/kopi/fparr.ref"
 check fparr test/fparr.kop
 
+# ─── struct: record field tanpa metode (v1.50) ─────────────────────────
+printf '3\n4\n0\n0\n25\n3\n30\n916\n64\n0\n1234567890123\n1\nkopi\n7\n2.5\n5\n99\n' > "$T/kopi/struct.ref"
+check struct test/struct.kop
+# struct = class tanpa metode: `new S()` harus jadi alokasi array slot
+# (EX_NEWARR) — tidak ada pemanggilan __new/__ctor.
+if [ -f "$T/kopi/struct.s" ] && ! grep -q 'Main____new' "$T/kopi/struct.s"; then
+    echo "PASS  struct [codegen]"; PASS=$((PASS+1))
+else
+    echo "FAIL  struct [codegen]: struct menghasilkan pemanggilan constructor"; FAIL=$((FAIL+1))
+fi
+# struct tidak boleh berisi metode — harus error jelas, bukan crash.
+cat > "$T/kopi/structbad.kop" <<'EOF'
+struct S {
+    int x;
+    int f() { return 1; }
+}
+class Main {
+    public static void main(String[] args) { }
+}
+EOF
+if ./kopicc "$T/kopi/structbad.kop" -t vm -o "$T/kopi/structbad.kbc" 2>/dev/null; then
+    echo "FAIL  struct [metode]: struct dengan metode diterima"; FAIL=$((FAIL+1))
+else
+    echo "PASS  struct [metode]"; PASS=$((PASS+1))
+fi
+
 # ─── hash: SHA-256/384/512 + HMAC-SHA256/512 (vektor FIPS 180-4 / RFC 4231) ─
 python3 tools/gen_hashvec.py "$T/kopi/hashvec.kop" >/dev/null
 printf '1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n1\n' > "$T/kopi/hashvec.ref"

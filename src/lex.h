@@ -18,6 +18,7 @@ enum {
     KW_MALLOC,                               /* v1.20 */
     KW_THREAD, KW_WAIT,                      /* v1.45: thread OS + join */
     KW_ENUM, KW_TRAIT, KW_IMPL,              /* v1.46: enum + trait/impl */
+    KW_STRUCT,                               /* v1.50: struct (record field) */
     KW_THROW, KW_TRY, KW_CATCH,              /* v1.49: exception */
 
     T_PP, T_MM, T_ADDEQ, T_SUBEQ, T_MULEQ, T_DIVEQ, T_MODEQ,

@@ -54,6 +54,7 @@ static Class *find_class(const char *name);
 static TraitDef *find_trait(const char *name);
 static void parse_enum(void);
 static void parse_trait(void);
+static void parse_class(int is_struct);
 static int enum_lookup(const char *en, const char *mem, long *out);
 static void apply_traits(Class *c, TraitDef *td);
 static Method *cur_method;

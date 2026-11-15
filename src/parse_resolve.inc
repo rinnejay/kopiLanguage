@@ -404,7 +404,8 @@ void parse_all(Tok *toks) {
     while (!at(T_EOF)) {
         if (at(KW_ENUM)) parse_enum();          /* v1.46 */
         else if (at(KW_TRAIT)) parse_trait();   /* v1.46 */
-        else parse_class();                     /* class + impl */
+        else if (at(KW_STRUCT)) parse_class(1); /* v1.50: struct */
+        else parse_class(0);                    /* class + impl */
     }
     resolve();
 }

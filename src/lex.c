@@ -37,6 +37,7 @@ static struct { const char *kw; int type; } kws[] = {
     {"malloc", KW_MALLOC},                                              /* v1.20 */
     {"thread", KW_THREAD}, {"wait", KW_WAIT},                           /* v1.45 */
     {"enum", KW_ENUM}, {"trait", KW_TRAIT}, {"impl", KW_IMPL},          /* v1.46 */
+    {"struct", KW_STRUCT},                                                /* v1.50 */
     {"throw", KW_THROW}, {"try", KW_TRY}, {"catch", KW_CATCH},           /* v1.49 */
     {0, 0},
 };

@@ -291,11 +291,18 @@ static int field_ty_ok(Ty t) {
            ty_is_arr(t);                  /* v1.29: field array (pointer 64-bit) */
 }
 
-static void parse_class(void) {
-    skip_mods();
+/* v1.50: struct = class tanpa metode/constructor/trait; hanya kumpulan
+ * field. Semua field publik dan di-zero oleh `new Nama()` (memakai jalur
+ * class: EX_NEWOBJ → EX_NEWARR, akses field → EX_IDX). */
+static void parse_class(int is_struct) {
+    const char *kw = is_struct ? "struct" : "class";
+    if (is_struct) advance();                /* 'struct' */
+    else {
+        skip_mods();
+    }
     int is_impl = 0;
-    if (at(KW_IMPL)) { advance(); is_impl = 1; }
-    else expect(KW_CLASS, "'class'");
+    if (!is_struct && at(KW_IMPL)) { advance(); is_impl = 1; }
+    else if (!is_struct) expect(KW_CLASS, "'class'");
     Tok *id = peek();
     expect(T_ID, is_impl ? "nama class setelah impl" : "nama class");
     Class *c;
@@ -307,9 +314,9 @@ static void parse_class(void) {
                 id->line, id->text);
     } else {
         if (find_class(xs(id->text)))
-            die("baris %d: class '%s' dideklarasikan dua kali", id->line, id->text);
+            die("baris %d: %s '%s' dideklarasikan dua kali", id->line, kw, id->text);
         if (find_enum(xs(id->text)))
-            die("baris %d: class '%s' bentrok dengan nama enum", id->line, id->text);
+            die("baris %d: %s '%s' bentrok dengan nama enum", id->line, kw, id->text);
         c = xmalloc(sizeof(Class));
         c->name = xs(id->text);
         c->next = prog.classes;
@@ -321,6 +328,9 @@ static void parse_class(void) {
     TraitDef *trait_list[16];
     int nt = 0;
     if (at(':')) {
+        if (is_struct)
+            die("baris %d: struct tidak mendukung trait — pakai class",
+                peek()->line);
         advance();
         do {
             Tok *tn = peek();
@@ -334,12 +344,24 @@ static void parse_class(void) {
         } while (at(',') && (advance(), 1));
     }
 
-    expect('{', "'{' setelah nama class");
+    expect('{', is_struct ? "'{' setelah nama struct" : "'{' setelah nama class");
     while (!at('}')) {
-        int was_static = mods_static();
+        int was_static = 0;
+        if (is_struct) {
+            if (at(KW_PUBLIC) || at(KW_PRIVATE) || at(KW_FINAL))
+                die("baris %d: struct tidak memakai modifier akses — semua field publik",
+                    peek()->line);
+            if (at(KW_STATIC))
+                die("baris %d: struct tidak mendukung field/metode static", peek()->line);
+        } else {
+            was_static = mods_static();
+        }
         Tok *rt = peek();
         /* constructor: NamaKelas(...) — desugar ke metode instance __ctor */
         if (at(T_ID) && !strcmp(xs(rt->text), c->name) && tokat(1, '(')) {
+            if (is_struct)
+                die("baris %d: struct tidak punya constructor — pakai "
+                    "`new %s()` lalu set field-nya", rt->line, c->name);
             if (is_impl)
                 die("baris %d: impl tidak boleh berisi constructor — "
                     "definisikan constructor di dalam class", rt->line);
@@ -472,11 +494,12 @@ static void parse_class(void) {
                 prog.nmethods++;
                 continue;
             }
-            if (!field_ty_ok(ret) && !retcls)
+            if (!field_ty_ok(ret) && !retcls &&
+                !(is_struct && ty_is_float(ret)))
                 die("baris %d: field '%s' bertipe ini belum didukung — "
                     "didukung: int/boolean/byte/short/uint8/uint16/long/String, "
-                    "array, dan tipe class (double/float menyusul)",
-                    mn->line, mn->text);
+                    "array, dan tipe class%s",
+                    mn->line, mn->text, is_struct ? ", double/float" : " (double/float menyusul)");
             if (at('=')) {
                 advance();
                 die("baris %d: field '%s' tidak boleh diinisialisasi — "
@@ -496,6 +519,10 @@ static void parse_class(void) {
             c->fields = f;
             continue;
         }
+        if (is_struct)
+            die("baris %d: struct '%s' hanya berisi field — '%s' terlihat "
+                "seperti metode; pakai class bila butuh metode",
+                mn->line, c->name, mn->text);
         int is_static = was_static;
         Method *m = xmalloc(sizeof(Method));
         m->cls = c->name;
@@ -632,7 +659,7 @@ static void parse_class(void) {
     for (int i = 0; i < nt; i++)
         apply_traits(c, trait_list[i]);
 
-    expect('}', "'}' tutup class");
+    expect('}', is_struct ? "'}' tutup struct" : "'}' tutup class");
     prog.curcls = 0;
 }
 

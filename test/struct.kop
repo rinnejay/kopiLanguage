@@ -1,0 +1,81 @@
+/* struct.kop — regresi struct (v1.50).
+ *
+ * struct = kumpulan field tanpa metode/constructor/trait. Semua field
+ * publik, di-zero saat `new Nama()`, dan diakses lewat `.field` seperti
+ * class (representasi runtime sama: array slot). Tipe field: int, boolean,
+ * byte/short/uint*, long, String, array, struct/class lain, double/float.
+ */
+
+struct Titik {
+    int x;
+    int y;
+}
+
+struct Garis {
+    Titik a;
+    Titik b;
+}
+
+struct Campur {
+    long id;
+    boolean aktif;
+    String nama;
+    int[] data;
+    double bobot;
+}
+
+class Main {
+    static int jarak2(Titik p, Titik q) {
+        int dx = p.x - q.x;
+        int dy = p.y - q.y;
+        return dx * dx + dy * dy;
+    }
+
+    static void geser(Titik p, int dx, int dy) {
+        p.x = p.x + dx;
+        p.y = p.y + dy;
+    }
+
+    public static void main(String[] args) {
+        Titik t = new Titik();
+        t.x = 3;
+        t.y = 4;
+        System.out.println(t.x);
+        System.out.println(t.y);
+
+        Titik u = new Titik();
+        System.out.println(u.x);            // zero-init
+        System.out.println(u.y);
+        System.out.println(jarak2(t, u));
+
+        Garis g = new Garis();
+        g.a = t;
+        g.b = u;
+        System.out.println(g.a.x);
+        g.a.x = 30;                          // rantai field sebagai target
+        System.out.println(t.x);             // objek adalah referensi
+        System.out.println(jarak2(g.a, g.b));
+
+        geser(t, 10, 20);                    // field objek bisa diubah lewat parameter
+        System.out.println(t.x + t.y);
+
+        Campur c = new Campur();
+        System.out.println(c.id);
+        c.id = 1234567890123L;
+        c.aktif = true;
+        c.nama = "kopi";
+        c.data = new int[3];
+        c.data[0] = 7;
+        c.bobot = 2.5;
+        System.out.println(c.id);
+        System.out.println(c.aktif);
+        System.out.println(c.nama);
+        System.out.println(c.data[0]);
+        System.out.println(c.bobot);
+        System.out.println(c.bobot * 2.0);
+
+        Titik alias = t;
+        alias.y = 99;
+        System.out.println(t.y);
+    }
+}
